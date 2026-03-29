@@ -193,6 +193,131 @@
   /* ── MAIN ── */
   .main { padding: 24px 28px 80px; }
 
+  /* ── HERO ── */
+  .hero-band {
+    background: var(--dark);
+    border-radius: 20px;
+    padding: 32px 36px;
+    margin-bottom: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-band::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 80% 50%, rgba(240,62,62,0.18) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 28px;
+  }
+
+  .hero-tagline-fr {
+    font-size: 26px;
+    font-weight: 900;
+    color: #ffffff;
+    line-height: 1.2;
+    margin-bottom: 6px;
+  }
+
+  .hero-tagline-fr span { color: var(--rouge2); }
+
+  .hero-tagline-ar {
+    font-family: 'Noto Naskh Arabic', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.4;
+    direction: rtl;
+  }
+
+  .hero-badge {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 12px 20px;
+    text-align: center;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .hero-badge-icon { font-size: 24px; }
+  .hero-badge-text { font-size: 11px; color: rgba(255,255,255,0.45); font-weight: 700; }
+
+  .hero-steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .hero-step {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    transition: background 0.15s;
+  }
+
+  .hero-step:hover { background: rgba(255,255,255,0.08); }
+
+  .hero-step-num {
+    background: var(--rouge);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 900;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .hero-step-title {
+    font-size: 13px;
+    font-weight: 900;
+    color: #fff;
+    margin-bottom: 3px;
+  }
+
+  .hero-step-title-ar {
+    font-family: 'Noto Naskh Arabic', serif;
+    font-size: 12px;
+    color: var(--rouge2);
+    font-weight: 700;
+    direction: rtl;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .hero-step-desc {
+    font-size: 11px;
+    color: rgba(255,255,255,0.45);
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 768px) {
+    .hero-steps { grid-template-columns: 1fr; }
+    .hero-top { flex-direction: column; }
+    .hero-tagline-fr { font-size: 20px; }
+  }
+
   /* ── DEAL CARD ── */
   .feed-grid { display: flex; flex-direction: column; gap: 10px; }
 
@@ -1653,6 +1778,56 @@ function App() {
             <DealDetail deal={selectedDeal} user={user} onBack={() => setDeal(null)} onVote={handleVote} />
           ) : (
             <>
+              {/* ── HERO ── */}
+              <div className="hero-band">
+                <div className="hero-top">
+                  <div>
+                    <div className="hero-tagline-fr">
+                      Les meilleurs bons plans<br/>du Maroc, <span>partagés par vous</span>
+                    </div>
+                    <div className="hero-tagline-ar">
+                      شارك البون بلان ديالك — فيد و ستافيد 🔥
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div className="hero-badge">
+                      <span className="hero-badge-icon">🛒</span>
+                      <span className="hero-badge-text">Marjane · BIM<br/>Jumia · Avito</span>
+                    </div>
+                    <div className="hero-badge">
+                      <span className="hero-badge-icon">📍</span>
+                      <span className="hero-badge-text">Casa · Rabat<br/>Fès · Tanger...</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="hero-steps">
+                  <div className="hero-step">
+                    <div className="hero-step-num">1</div>
+                    <div>
+                      <span className="hero-step-title-ar">شوف البون بلان</span>
+                      <div className="hero-step-title">Tu trouves une promo</div>
+                      <div className="hero-step-desc">En magasin, sur Jumia, Avito ou ailleurs — physique ou en ligne.</div>
+                    </div>
+                  </div>
+                  <div className="hero-step">
+                    <div className="hero-step-num">2</div>
+                    <div>
+                      <span className="hero-step-title-ar">شاركو مع الجماعة</span>
+                      <div className="hero-step-title">Tu le partages</div>
+                      <div className="hero-step-desc">Tu soumets le deal en 30 secondes — notre équipe le vérifie et le publie.</div>
+                    </div>
+                  </div>
+                  <div className="hero-step">
+                    <div className="hero-step-num">3</div>
+                    <div>
+                      <span className="hero-step-title-ar">صوت و قيّم</span>
+                      <div className="hero-step-title">La communauté vote</div>
+                      <div className="hero-step-desc">🔥 Chaud = deal validé par tous. 🧊 Froid = à éviter. Le meilleur remonte en tête.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="filters-bar">
                 <span style={{ fontWeight: 900, fontSize: 13 }}>🔥 Bons plans</span>
                 <div className="filter-wrap">
