@@ -1179,8 +1179,10 @@ function DealDetail({ deal, user, onBack, onVote }) {
     setLoadingComment(true);
     const { error } = await sb.from('commentaires').insert({ deal_id: deal.id, user_id: user.id, contenu: newComment.trim() });
     if (!error) {
-      setComments(p => [...p, { id: Date.now(), contenu: newComment.trim(), users: { pseudo: 'toi' }, created_at: new Date().toISOString() }]);
       setNewComment('');
+      // Recharge depuis Supabase pour avoir le vrai pseudo et persister
+      const { data } = await sb.from('commentaires').select('*, users(pseudo)').eq('deal_id', deal.id).order('created_at');
+      setComments(data || []);
     }
     setLoadingComment(false);
   }
@@ -1357,7 +1359,7 @@ function AdminPage({ user, isAdmin, onGoFeed }) {
       {/* Header admin */}
       <div style={{ background: 'var(--dark)', padding: '0 28px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ background: 'var(--rouge)', borderRadius: 10, padding: '4px 12px' }}>
+          <div style={{ background: 'var(--rouge)', borderRadius: 10, padding: '4px 12px', cursor: 'pointer' }} onClick={onGoFeed}>
             <span style={{ fontFamily: 'Noto Naskh Arabic, serif', fontSize: 16, color: 'white', fontWeight: 700 }}>فيدوستافيد</span>
           </div>
           <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>|</span>
@@ -1630,12 +1632,12 @@ function App() {
             <div className="sub">Bons plans marocains 🇲🇦</div>
           </div>
           <div className="sidebar-section">Trier par</div>
-          <button className={`sidebar-btn ${filterSort === 'score' ? 'active' : ''}`} onClick={() => setFilterSort('score')}>🔥 Les plus chauds</button>
-          <button className={`sidebar-btn ${filterSort === 'recent' ? 'active' : ''}`} onClick={() => setFilterSort('recent')}>⚡ Les plus récents</button>
+          <button className={`sidebar-btn ${filterSort === 'score' ? 'active' : ''}`} onClick={() => { setDeal(null); setFilterSort('score'); }}>🔥 Les plus chauds</button>
+          <button className={`sidebar-btn ${filterSort === 'recent' ? 'active' : ''}`} onClick={() => { setDeal(null); setFilterSort('recent'); }}>⚡ Les plus récents</button>
           <div className="sidebar-section" style={{ marginTop: 12 }}>Catégories</div>
           <div className="sidebar-cats">
             {['Tout', ...CATEGORIES].map(cat => (
-              <button key={cat} className={`cat-btn ${filterCat === cat ? 'active' : ''}`} onClick={() => setFilterCat(cat)}>
+              <button key={cat} className={`cat-btn ${filterCat === cat ? 'active' : ''}`} onClick={() => { setDeal(null); setFilterCat(cat); }}>
                 {cat === 'Tout' ? '🔥 Tous les deals' : `${CAT_ICONS[cat] || '✨'} ${cat}`}
               </button>
             ))}
