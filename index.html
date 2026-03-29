@@ -272,98 +272,190 @@
 
   .hero-step-desc { font-size: 12px; color: var(--muted); font-weight: 600; line-height: 1.65; }
 
-  /* ── DEAL CARD ── */
-  .feed-grid { display: flex; flex-direction: column; gap: 10px; }
+  /* ── FEED ── */
+  .feed-grid { display: flex; flex-direction: column; gap: 8px; }
 
+  /* ── DEAL CARD — Layout Dealabs ── */
   .deal-card {
     background: var(--white);
     border: 1.5px solid var(--border);
-    border-radius: 16px;
+    border-radius: 14px;
     overflow: hidden;
-    display: grid;
-    grid-template-columns: 64px 1fr auto;
+    display: flex;
+    flex-direction: row;
     transition: border-color 0.15s, box-shadow 0.15s;
     cursor: pointer;
   }
   .deal-card:hover { border-color: var(--rouge2); box-shadow: 0 4px 16px rgba(240,62,62,0.08); }
 
-  .deal-score {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    padding: 12px 0;
+  /* Image carrée à gauche */
+  .dc-img {
+    width: 140px;
+    min-width: 140px;
     background: var(--bg);
     border-right: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .dc-img img { width: 100%; height: 140px; object-fit: contain; }
+  .dc-img-placeholder { font-size: 36px; opacity: 0.25; }
+
+  /* Contenu principal */
+  .dc-body {
+    flex: 1;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
   }
 
-  .score-fire-btn, .score-ice-btn {
+  /* Ligne du haut : score + date */
+  .dc-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2px;
+  }
+
+  .dc-score {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    padding: 3px 10px 3px 6px;
+  }
+
+  .dc-score-btn {
     background: none;
     border: none;
-    font-size: 18px;
+    font-size: 14px;
     cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 6px;
+    padding: 1px 3px;
+    border-radius: 4px;
     transition: background 0.1s;
     line-height: 1;
   }
-  .score-fire-btn:hover { background: #fff0f0; }
-  .score-ice-btn:hover  { background: #f0f4ff; }
-  .score-fire-btn.voted { background: #fff0f0; }
-  .score-ice-btn.voted  { background: #f0f4ff; }
+  .dc-score-btn:hover { background: rgba(0,0,0,0.06); }
 
-  .score-num {
-    font-size: 16px;
+  .dc-score-num {
+    font-size: 14px;
     font-weight: 900;
     color: var(--rouge);
-    line-height: 1;
+    min-width: 20px;
+    text-align: center;
   }
-  .score-num.cold { color: var(--blue); }
+  .dc-score-num.cold { color: var(--blue); }
 
-  .deal-body { padding: 12px 16px; }
+  .dc-date { font-size: 11px; color: var(--muted); font-weight: 600; }
 
-  .deal-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
-
-  .deal-tag {
-    font-size: 9px;
+  /* Titre */
+  .dc-title {
+    font-size: 15px;
     font-weight: 800;
-    letter-spacing: 0.5px;
-    padding: 2px 8px;
-    border-radius: 20px;
-    text-transform: uppercase;
+    color: var(--text);
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Prix */
+  .dc-price-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .dc-price-promo { font-size: 22px; font-weight: 900; color: var(--rouge); }
+  .dc-price-normal { font-size: 13px; font-weight: 700; color: var(--muted); text-decoration: line-through; }
+  .dc-price-pct {
+    font-size: 11px; font-weight: 800;
+    background: var(--rouge); color: white;
+    padding: 2px 7px; border-radius: 5px;
+  }
+
+  /* Meta : magasin, ville */
+  .dc-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .dc-meta span { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .dc-meta .dc-shop { font-weight: 800; color: var(--text); }
+
+  /* Description courte */
+  .dc-desc {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Pied de card : actions + bouton */
+  .dc-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+
+  .dc-actions { display: flex; align-items: center; gap: 12px; }
+
+  .dc-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: background 0.1s, color 0.1s;
+  }
+  .dc-action-btn:hover { background: var(--bg); color: var(--text); }
+
+  .dc-voir-btn {
+    background: var(--blue);
+    color: white;
+    border: none;
+    padding: 7px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: 'Noto Naskh Arabic', serif;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    text-decoration: none;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+    direction: rtl;
+  }
+  .dc-voir-btn:hover { opacity: 0.88; }
+
+  /* Compat anciens styles conservés pour fiche détail */
+  .deal-tag {
+    font-size: 9px; font-weight: 800; letter-spacing: 0.5px;
+    padding: 2px 8px; border-radius: 20px; text-transform: uppercase;
   }
   .tag-cat  { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
   .tag-type { background: #fff0f0; color: var(--rouge); }
   .tag-new  { background: var(--yellow); color: #7a5c00; }
   .tag-hot  { background: linear-gradient(135deg, #ff4d4d, #ff8c00); color: white; }
-
   .deal-title { font-size: 15px; font-weight: 900; color: var(--text); margin-bottom: 6px; }
-
   .deal-price-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
   .price-promo    { font-size: 20px; font-weight: 900; color: var(--rouge); }
   .price-normal   { font-size: 13px; font-weight: 700; color: var(--muted); text-decoration: line-through; }
   .price-discount { font-size: 11px; font-weight: 800; background: #e8faf5; color: #0a8c63; padding: 2px 7px; border-radius: 20px; }
-
   .deal-meta { display: flex; gap: 12px; flex-wrap: wrap; }
   .deal-meta span { font-size: 11px; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 3px; }
-
-  .deal-actions {
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    border-left: 1px solid var(--border);
-  }
-
-  .deal-comment-count {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--muted);
-    text-align: center;
-  }
 
   /* ── FILTRES ── */
   .filters-bar {
@@ -779,8 +871,10 @@
     .layout { grid-template-columns: 1fr; }
     .sidebar { display: none; }
     .main { padding: 12px 12px 80px; }
-    .deal-card { grid-template-columns: 56px 1fr; }
-    .deal-actions { display: none; }
+    .dc-img { width: 90px; min-width: 90px; }
+    .dc-img img { height: 90px; }
+    .dc-price-promo { font-size: 18px; }
+    .dc-voir-btn { display: none; }
     .hero-band { padding: 18px 16px; border-radius: 14px; margin-bottom: 16px; }
     .hero-tagline-fr { font-size: 17px; }
     .hero-tagline-ar { font-size: 14px; }
@@ -1288,50 +1382,81 @@ function SubmitDealModal({ user, onClose, onSuccess }) {
 function DealCard({ deal, user, onVote, onClick }) {
   const pct = deal.prix_normal > 0 ? Math.round((1 - deal.prix_promo / deal.prix_normal) * 100) : null;
   const isHot = deal.score >= 20;
+  const dateStr = deal.created_at
+    ? (() => {
+        const diff = Math.floor((Date.now() - new Date(deal.created_at)) / 60000);
+        if (diff < 60) return `il y a ${diff}min`;
+        if (diff < 1440) return `il y a ${Math.floor(diff/60)}h`;
+        return `il y a ${Math.floor(diff/1440)}j`;
+      })()
+    : '';
 
   return (
     <div className="deal-card" onClick={() => onClick(deal)}>
-      {/* Score + votes */}
-      <div className="deal-score">
-        <button className="score-fire-btn" title="🔥 Chaud" onClick={e => { e.stopPropagation(); onVote(deal.id, 'chaud'); }}>🔥</button>
-        <div className={`score-num ${deal.score < 0 ? 'cold' : ''}`}>{deal.score}</div>
-        <button className="score-ice-btn" title="🧊 Froid" onClick={e => { e.stopPropagation(); onVote(deal.id, 'froid'); }}>🧊</button>
+
+      {/* Image à gauche */}
+      <div className="dc-img">
+        {deal.photo_url
+          ? <img src={deal.photo_url} alt={deal.titre} onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+          : null
+        }
+        <span className="dc-img-placeholder" style={{ display: deal.photo_url ? 'none' : 'flex' }}>
+          {CAT_ICONS[deal.categorie] || '🛍️'}
+        </span>
       </div>
 
-      {/* Body */}
-      <div className="deal-body">
-        <div className="deal-tags">
-          <span className="deal-tag tag-cat">{CAT_ICONS[deal.categorie] || '✨'} {deal.categorie}</span>
-          <span className="deal-tag tag-type">{deal.type === 'physique' ? '🏪' : '🌐'} {deal.type}</span>
-          {isHot && <span className="deal-tag tag-hot">🔥 Chaud</span>}
-          {pct >= 30 && <span className="deal-tag tag-new">⚡ -{pct}%</span>}
+      {/* Contenu */}
+      <div className="dc-body">
+
+        {/* Ligne haut : score + date */}
+        <div className="dc-top">
+          <div className="dc-score" onClick={e => e.stopPropagation()}>
+            <button className="dc-score-btn" onClick={e => { e.stopPropagation(); onVote(deal.id, 'chaud'); }}>🔥</button>
+            <span className={`dc-score-num ${deal.score < 0 ? 'cold' : ''}`}>{deal.score}°</span>
+            <button className="dc-score-btn" onClick={e => { e.stopPropagation(); onVote(deal.id, 'froid'); }}>🧊</button>
+          </div>
+          <span className="dc-date">{dateStr}</span>
         </div>
 
-        <div className="deal-title">{deal.titre}</div>
+        {/* Titre */}
+        <div className="dc-title">{deal.titre}</div>
 
-        <div className="deal-price-row">
-          <span className="price-promo">{deal.prix_promo} MAD</span>
-          {deal.prix_normal > 0 && <span className="price-normal">{deal.prix_normal} MAD</span>}
-          {pct > 0 && <span className="price-discount">-{pct}%</span>}
+        {/* Prix */}
+        <div className="dc-price-row">
+          <span className="dc-price-promo">{deal.prix_promo} MAD</span>
+          {deal.prix_normal > 0 && <span className="dc-price-normal">{deal.prix_normal} MAD</span>}
+          {pct > 0 && <span className="dc-price-pct">-{pct}%</span>}
         </div>
 
-        <div className="deal-meta">
-          <span>🏪 {deal.magasin}</span>
+        {/* Meta */}
+        <div className="dc-meta">
+          <span>Dispo. chez <span className="dc-shop">{deal.magasin}</span></span>
           <span>📍 {deal.ville}</span>
           {deal.date_fin && <span>⏰ {new Date(deal.date_fin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>}
+          {isHot && <span style={{ color: 'var(--rouge)', fontWeight: 800 }}>🔥 Tendance</span>}
         </div>
-      </div>
 
-      {/* Image ou actions */}
-      <div className="deal-actions">
-        {deal.photo_url ? (
-          <img src={deal.photo_url} alt={deal.titre}
-            style={{ width: 64, height: 64, objectFit: 'contain', borderRadius: 8, background: 'var(--bg)' }}
-            onError={e => e.target.style.display='none'}
-          />
-        ) : (
-          <span style={{ fontSize: 20 }}>💬</span>
+        {/* Description */}
+        {deal.description && (
+          <div className="dc-desc">{deal.description}</div>
         )}
+
+        {/* Footer : actions + bouton */}
+        <div className="dc-footer">
+          <div className="dc-actions">
+            <button className="dc-action-btn" onClick={e => { e.stopPropagation(); onClick(deal); }}>
+              💬 <span>Commentaires</span>
+            </button>
+          </div>
+          {deal.lien && (
+            <a href={deal.lien} target="_blank" rel="noopener noreferrer"
+              className="dc-voir-btn"
+              onClick={e => e.stopPropagation()}>
+              شوف الدييل ↗
+            </a>
+          )}
+        </div>
+
       </div>
     </div>
   );
