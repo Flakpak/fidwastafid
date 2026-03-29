@@ -797,7 +797,7 @@ function AuthModal({ onClose, onSuccess, defaultTab = 'login' }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" onClick={null}>
       <div className="modal">
         <div className="modal-header">
           <div className="modal-title">
@@ -920,7 +920,7 @@ function SubmitDealModal({ user, onClose, onSuccess }) {
   }
 
   if (done) return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" onClick={null}>
       <div className="modal">
         <div className="modal-header">
           <div className="modal-title">Deal soumis ! 🎉</div>
@@ -942,7 +942,7 @@ function SubmitDealModal({ user, onClose, onSuccess }) {
   );
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" onClick={null}>
       <div className="modal" style={{ maxWidth: 500 }}>
         <div className="modal-header">
           <div className="modal-title">🔥 Soumettre un deal</div>
