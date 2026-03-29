@@ -1168,28 +1168,54 @@ function SubmitDealModal({ user, onClose, onSuccess }) {
                 <input type="url" value={form.lien}
                   onChange={e => handleLienChange(e.target.value)}
                   placeholder="https://jumia.ma/..." />
-                {/* Aperçu image */}
+
+                {/* État : chargement */}
                 {fetchingImg && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>
-                    <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span> Récupération de l'image...
+                  <div style={{ marginTop: 8, fontSize: 12, color: 'var(--muted)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    ⏳ Récupération de l'image en cours...
                   </div>
                 )}
+
+                {/* État : image trouvée auto */}
                 {form.photo_url && !fetchingImg && (
-                  <div style={{ marginTop: 10, position: 'relative', display: 'inline-block' }}>
+                  <div style={{ marginTop: 10, position: 'relative' }}>
                     <img src={form.photo_url} alt="Aperçu"
                       style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--bg)' }}
                       onError={() => { set('photo_url', ''); setImgError(true); }}
                     />
-                    <button onClick={() => { set('photo_url', ''); }}
+                    <button onClick={() => { set('photo_url', ''); setImgError(true); }}
                       style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.55)', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       ✕
                     </button>
                     <div style={{ fontSize: 11, color: '#0a8c63', fontWeight: 700, marginTop: 4 }}>✅ Image récupérée automatiquement</div>
                   </div>
                 )}
-                {imgError && !fetchingImg && form.lien && (
-                  <div style={{ marginTop: 6, fontSize: 11, color: 'var(--muted)', fontWeight: 700 }}>
-                    ⚠️ Pas d'image trouvée sur ce lien — tu peux continuer sans.
+
+                {/* État : pas d'image auto → fallback manuel */}
+                {imgError && !fetchingImg && !form.photo_url && (
+                  <div style={{ marginTop: 10, background: '#fff8e0', border: '1.5px solid #ffe066', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#7a5c00', marginBottom: 8 }}>
+                      ⚠️ Image non récupérée automatiquement
+                    </div>
+                    <div style={{ fontSize: 11, color: '#7a5c00', fontWeight: 600, marginBottom: 10, lineHeight: 1.6 }}>
+                      Sur le site du produit : clic droit sur l'image → <strong>"Copier l'adresse de l'image"</strong> → colle-la ici
+                    </div>
+                    <input
+                      type="url"
+                      value={form.photo_url}
+                      onChange={e => {
+                        set('photo_url', e.target.value);
+                      }}
+                      placeholder="https://...image-du-produit.jpg"
+                      style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #ffe066', borderRadius: 8, fontSize: 13, fontFamily: 'Nunito', fontWeight: 600, background: 'white', color: 'var(--text)' }}
+                    />
+                    {form.photo_url && form.photo_url.startsWith('http') && (
+                      <img src={form.photo_url} alt="Aperçu"
+                        style={{ width: '100%', maxHeight: 150, objectFit: 'contain', borderRadius: 8, marginTop: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}
+                        onError={e => e.target.style.display = 'none'}
+                        onLoad={e => e.target.style.display = 'block'}
+                      />
+                    )}
                   </div>
                 )}
               </div>
