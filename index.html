@@ -958,17 +958,46 @@ function AuthModal({ onClose, onSuccess, defaultTab = 'login' }) {
 //  MODAL SOUMISSION DEAL
 // ══════════════════════════════════════════
 function SubmitDealModal({ user, onClose, onSuccess }) {
-  const [step, setStep] = useState(1); // 1 = infos | 2 = détails | 3 = confirmation
+  const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     titre: '', magasin: '', categorie: 'Alimentaire', ville: 'National',
     type: 'physique', prix_promo: '', prix_normal: '',
-    description: '', lien: '', date_fin: ''
+    description: '', lien: '', date_fin: '', photo_url: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
+  const [fetchingImg, setFetchingImg] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  // ── Auto-fetch og:image quand le lien change ──
+  async function handleLienChange(url) {
+    set('lien', url);
+    set('photo_url', '');
+    setImgError(false);
+    if (!url || !url.startsWith('http')) return;
+    setFetchingImg(true);
+    try {
+      const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxy);
+      const data = await res.json();
+      const html = data.contents || '';
+      // Cherche og:image en priorité, puis twitter:image
+      const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+                   || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
+                   || html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+      if (ogMatch && ogMatch[1]) {
+        set('photo_url', ogMatch[1]);
+      } else {
+        setImgError(true);
+      }
+    } catch {
+      setImgError(true);
+    }
+    setFetchingImg(false);
+  }
 
   const discount = () => {
     const p = parseFloat(form.prix_promo), n = parseFloat(form.prix_normal);
@@ -998,6 +1027,7 @@ function SubmitDealModal({ user, onClose, onSuccess }) {
       prix_normal: parseFloat(form.prix_normal) || 0,
       description: form.description.trim() || null,
       lien:        form.lien.trim() || null,
+      photo_url:   form.photo_url || null,
       date_fin:    form.date_fin || null,
       user_id:     user.id,
       statut:      'en_attente',
@@ -1024,7 +1054,7 @@ function SubmitDealModal({ user, onClose, onSuccess }) {
             <span>Il sera publié dans le feed si notre équipe valide les infos. Tu seras notifié.</span>
           </div>
           <br />
-          <button className="btn-full btn-gradient" onClick={() => { setDone(false); setStep(1); setForm({ titre:'', magasin:'', categorie:'Alimentaire', ville:'National', type:'physique', prix_promo:'', prix_normal:'', description:'', lien:'', date_fin:'' }); onSuccess?.(); onClose(); }}>
+          <button className="btn-full btn-gradient" onClick={() => { setDone(false); setStep(1); setForm({ titre:'', magasin:'', categorie:'Alimentaire', ville:'National', type:'physique', prix_promo:'', prix_normal:'', description:'', lien:'', date_fin:'', photo_url:'' }); onSuccess?.(); onClose(); }}>
             Retour au feed
           </button>
         </div>
@@ -1135,8 +1165,33 @@ function SubmitDealModal({ user, onClose, onSuccess }) {
 
               <div className="field">
                 <label>Lien du deal (si en ligne)</label>
-                <input type="url" value={form.lien} onChange={e => set('lien', e.target.value)}
+                <input type="url" value={form.lien}
+                  onChange={e => handleLienChange(e.target.value)}
                   placeholder="https://jumia.ma/..." />
+                {/* Aperçu image */}
+                {fetchingImg && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>
+                    <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span> Récupération de l'image...
+                  </div>
+                )}
+                {form.photo_url && !fetchingImg && (
+                  <div style={{ marginTop: 10, position: 'relative', display: 'inline-block' }}>
+                    <img src={form.photo_url} alt="Aperçu"
+                      style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--bg)' }}
+                      onError={() => { set('photo_url', ''); setImgError(true); }}
+                    />
+                    <button onClick={() => { set('photo_url', ''); }}
+                      style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.55)', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      ✕
+                    </button>
+                    <div style={{ fontSize: 11, color: '#0a8c63', fontWeight: 700, marginTop: 4 }}>✅ Image récupérée automatiquement</div>
+                  </div>
+                )}
+                {imgError && !fetchingImg && form.lien && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: 'var(--muted)', fontWeight: 700 }}>
+                    ⚠️ Pas d'image trouvée sur ce lien — tu peux continuer sans.
+                  </div>
+                )}
               </div>
 
               <div className="field">
@@ -1158,6 +1213,12 @@ function SubmitDealModal({ user, onClose, onSuccess }) {
           {step === 3 && (
             <>
               <div style={{ background: 'var(--bg)', borderRadius: 14, padding: 16, marginBottom: 16, border: '1.5px solid var(--border)' }}>
+                {form.photo_url && (
+                  <img src={form.photo_url} alt="Aperçu produit"
+                    style={{ width: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 10, marginBottom: 12, background: 'white' }}
+                    onError={e => e.target.style.display='none'}
+                  />
+                )}
                 <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 10 }}>{form.titre}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {[
@@ -1235,10 +1296,16 @@ function DealCard({ deal, user, onVote, onClick }) {
         </div>
       </div>
 
-      {/* Actions */}
+      {/* Image ou actions */}
       <div className="deal-actions">
-        <span style={{ fontSize: 20 }}>💬</span>
-        <span className="deal-comment-count">voir</span>
+        {deal.photo_url ? (
+          <img src={deal.photo_url} alt={deal.titre}
+            style={{ width: 64, height: 64, objectFit: 'contain', borderRadius: 8, background: 'var(--bg)' }}
+            onError={e => e.target.style.display='none'}
+          />
+        ) : (
+          <span style={{ fontSize: 20 }}>💬</span>
+        )}
       </div>
     </div>
   );
@@ -1280,6 +1347,12 @@ function DealDetail({ deal, user, onBack, onVote }) {
           <div className="deal-detail-title">{deal.titre}</div>
         </div>
         <div className="deal-detail-body">
+          {deal.photo_url && (
+            <img src={deal.photo_url} alt={deal.titre}
+              style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 12, marginBottom: 16, background: 'var(--bg)', border: '1px solid var(--border)' }}
+              onError={e => e.target.style.display='none'}
+            />
+          )}
           <div className="deal-tags" style={{ marginBottom: 12 }}>
             <span className="deal-tag tag-cat">{CAT_ICONS[deal.categorie] || '✨'} {deal.categorie}</span>
             <span className="deal-tag tag-type">{deal.type === 'physique' ? '🏪 Physique' : '🌐 En ligne'}</span>
