@@ -195,128 +195,82 @@
 
   /* ── HERO ── */
   .hero-band {
-    background: var(--dark);
+    background: var(--white);
+    border: 1.5px solid var(--border);
     border-radius: 20px;
-    padding: 32px 36px;
-    margin-bottom: 28px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
     position: relative;
     overflow: hidden;
   }
 
-  .hero-band::before {
+  .hero-band::after {
     content: '';
     position: absolute;
-    inset: 0;
-    background: radial-gradient(ellipse at 80% 50%, rgba(240,62,62,0.18) 0%, transparent 70%);
+    top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(240,62,62,0.07) 0%, transparent 70%);
     pointer-events: none;
   }
 
-  .hero-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 24px;
-    margin-bottom: 28px;
-  }
+  .hero-top { margin-bottom: 22px; }
 
   .hero-tagline-fr {
-    font-size: 26px;
+    font-size: 22px;
     font-weight: 900;
-    color: #ffffff;
-    line-height: 1.2;
+    color: var(--text);
+    line-height: 1.25;
     margin-bottom: 6px;
   }
-
-  .hero-tagline-fr span { color: var(--rouge2); }
+  .hero-tagline-fr span { color: var(--rouge); }
 
   .hero-tagline-ar {
     font-family: 'Noto Naskh Arabic', serif;
-    font-size: 22px;
+    font-size: 17px;
     font-weight: 700;
-    color: rgba(255,255,255,0.5);
-    line-height: 1.4;
+    color: var(--muted);
     direction: rtl;
+    display: block;
   }
-
-  .hero-badge {
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 12px;
-    padding: 12px 20px;
-    text-align: center;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-  }
-
-  .hero-badge-icon { font-size: 24px; }
-  .hero-badge-text { font-size: 11px; color: rgba(255,255,255,0.45); font-weight: 700; }
 
   .hero-steps {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
+    gap: 10px;
   }
 
   .hero-step {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: var(--bg);
+    border: 1.5px solid var(--border);
     border-radius: 14px;
     padding: 16px;
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    transition: background 0.15s;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
+  .hero-step:hover { border-color: var(--rouge2); box-shadow: 0 4px 14px rgba(240,62,62,0.07); }
 
-  .hero-step:hover { background: rgba(255,255,255,0.08); }
+  .hero-step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 
   .hero-step-num {
     background: var(--rouge);
     color: white;
-    width: 24px;
-    height: 24px;
+    width: 26px; height: 26px;
     border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: 900;
-    flex-shrink: 0;
-    margin-top: 1px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 900; flex-shrink: 0;
   }
 
-  .hero-step-title {
-    font-size: 13px;
-    font-weight: 900;
-    color: #fff;
-    margin-bottom: 3px;
-  }
+  .hero-step-emoji { font-size: 20px; }
+
+  .hero-step-title { font-size: 13px; font-weight: 900; color: var(--text); }
 
   .hero-step-title-ar {
     font-family: 'Noto Naskh Arabic', serif;
-    font-size: 12px;
-    color: var(--rouge2);
-    font-weight: 700;
-    direction: rtl;
-    display: block;
-    margin-bottom: 4px;
+    font-size: 13px; color: var(--rouge); font-weight: 700;
+    direction: rtl; display: block; margin-bottom: 6px;
   }
 
-  .hero-step-desc {
-    font-size: 11px;
-    color: rgba(255,255,255,0.45);
-    font-weight: 600;
-    line-height: 1.5;
-  }
-
-  @media (max-width: 768px) {
-    .hero-steps { grid-template-columns: 1fr; }
-    .hero-top { flex-direction: column; }
-    .hero-tagline-fr { font-size: 20px; }
-  }
+  .hero-step-desc { font-size: 12px; color: var(--muted); font-weight: 600; line-height: 1.65; }
 
   /* ── DEAL CARD ── */
   .feed-grid { display: flex; flex-direction: column; gap: 10px; }
@@ -824,9 +778,15 @@
   @media (max-width: 768px) {
     .layout { grid-template-columns: 1fr; }
     .sidebar { display: none; }
-    .main { padding: 16px; }
+    .main { padding: 12px 12px 80px; }
     .deal-card { grid-template-columns: 56px 1fr; }
     .deal-actions { display: none; }
+    .hero-band { padding: 18px 16px; border-radius: 14px; margin-bottom: 16px; }
+    .hero-tagline-fr { font-size: 17px; }
+    .hero-tagline-ar { font-size: 14px; }
+    .hero-steps { grid-template-columns: 1fr; gap: 8px; }
+    .hero-step { display: flex; flex-direction: row; align-items: flex-start; gap: 12px; padding: 12px 14px; }
+    .hero-step-head { flex-direction: row; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
   }
 </style>
 </head>
@@ -1781,48 +1741,54 @@ function App() {
               {/* ── HERO ── */}
               <div className="hero-band">
                 <div className="hero-top">
-                  <div>
-                    <div className="hero-tagline-fr">
-                      Les meilleurs bons plans<br/>du Maroc, <span>partagés par vous</span>
-                    </div>
-                    <div className="hero-tagline-ar">
-                      شارك البون بلان ديالك — فيد و ستافيد 🔥
-                    </div>
+                  <div className="hero-tagline-fr">
+                    Les meilleurs bons plans du Maroc,<br/><span>partagés par la communauté</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <div className="hero-badge">
-                      <span className="hero-badge-icon">🛒</span>
-                      <span className="hero-badge-text">Marjane · BIM<br/>Jumia · Avito</span>
-                    </div>
-                    <div className="hero-badge">
-                      <span className="hero-badge-icon">📍</span>
-                      <span className="hero-badge-text">Casa · Rabat<br/>Fès · Tanger...</span>
-                    </div>
+                  <div className="hero-tagline-ar">
+                    فيد و ستافيد — شارك البون بلان ديالك و خلي الجماعة تستافيد 🔥
                   </div>
                 </div>
+
                 <div className="hero-steps">
                   <div className="hero-step">
-                    <div className="hero-step-num">1</div>
-                    <div>
-                      <span className="hero-step-title-ar">شوف البون بلان</span>
-                      <div className="hero-step-title">Tu trouves une promo</div>
-                      <div className="hero-step-desc">En magasin, sur Jumia, Avito ou ailleurs — physique ou en ligne.</div>
+                    <div className="hero-step-head">
+                      <div className="hero-step-num">1</div>
+                      <span className="hero-step-emoji">🔍</span>
+                      <div>
+                        <div className="hero-step-title">Tu déniche une promo</div>
+                        <span className="hero-step-title-ar">لقيتي بون بلان ؟</span>
+                      </div>
+                    </div>
+                    <div className="hero-step-desc">
+                      En faisant tes courses, sur Jumia, Avito ou ailleurs — physique ou en ligne. Si ça t'a fait économiser, ça peut faire économiser tout le monde.
                     </div>
                   </div>
+
                   <div className="hero-step">
-                    <div className="hero-step-num">2</div>
-                    <div>
-                      <span className="hero-step-title-ar">شاركو مع الجماعة</span>
-                      <div className="hero-step-title">Tu le partages</div>
-                      <div className="hero-step-desc">Tu soumets le deal en 30 secondes — notre équipe le vérifie et le publie.</div>
+                    <div className="hero-step-head">
+                      <div className="hero-step-num">2</div>
+                      <span className="hero-step-emoji">📤</span>
+                      <div>
+                        <div className="hero-step-title">Tu le partages en 30 sec</div>
+                        <span className="hero-step-title-ar">شاركو مع الجماعة</span>
+                      </div>
+                    </div>
+                    <div className="hero-step-desc">
+                      Prix promo, magasin, ville — c'est tout ce qu'il faut. Notre équipe vérifie et publie. Ton deal aide des centaines de personnes à faire les mêmes économies.
                     </div>
                   </div>
+
                   <div className="hero-step">
-                    <div className="hero-step-num">3</div>
-                    <div>
-                      <span className="hero-step-title-ar">صوت و قيّم</span>
-                      <div className="hero-step-title">La communauté vote</div>
-                      <div className="hero-step-desc">🔥 Chaud = deal validé par tous. 🧊 Froid = à éviter. Le meilleur remonte en tête.</div>
+                    <div className="hero-step-head">
+                      <div className="hero-step-num">3</div>
+                      <span className="hero-step-emoji">🔥</span>
+                      <div>
+                        <div className="hero-step-title">La communauté vote</div>
+                        <span className="hero-step-title-ar">الجماعة تقيّم</span>
+                      </div>
+                    </div>
+                    <div className="hero-step-desc">
+                      🔥 Chaud = deal validé, fonce. 🧊 Froid = à éviter. Les meilleurs deals remontent en tête — plus tu partages, plus tu construis ta réputation.
                     </div>
                   </div>
                 </div>
