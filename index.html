@@ -715,10 +715,14 @@ const SUPABASE_URL  = 'https://laqwgehhedvxaqucmeeh.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_pTmj1luXr1jVb1rdAm2uzw_me78zTjc';
 // ─────────────────────────────────────────
 
-const ADMIN_EMAIL = 'kamel.lazrek@gmail.com'; // ← ton email admin
-
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 const { useState, useEffect, useRef, useCallback } = React;
+
+// ── CHECK ADMIN (vérifié côté BDD, pas par email) ──
+async function checkIsAdmin(uid) {
+  const { data } = await sb.from('admins').select('id').eq('id', uid).maybeSingle();
+  return !!data;
+}
 
 // ══ CONSTANTES ══
 const CATEGORIES = ['Alimentaire', 'Électroménager', 'High-Tech', 'Mode', 'Maison', 'Beauté', 'Sport', 'Autre'];
@@ -1272,12 +1276,12 @@ function DealDetail({ deal, user, onBack, onVote }) {
 }
 
 // ══════════════════════════════════════════
-//  ADMIN PANEL
+//  PAGE ADMIN (route #admin)
 // ══════════════════════════════════════════
-function AdminPanel({ onClose }) {
-  const [deals, setDeals] = useState([]);
+function AdminPage({ user, isAdmin, onGoFeed }) {
+  const [deals, setDeals]   = useState([]);
   const [loading, setLoading] = useState(true);
-  const [onglet, setOnglet] = useState('en_attente'); // 'en_attente' | 'validé' | 'refusé'
+  const [onglet, setOnglet] = useState('en_attente');
 
   useEffect(() => { loadDeals(); }, [onglet]);
 
@@ -1292,7 +1296,7 @@ function AdminPanel({ onClose }) {
   async function valider(id) {
     await sb.from('deals').update({ statut: 'validé' }).eq('id', id);
     setDeals(p => p.filter(d => d.id !== id));
-    toast('✅ Deal validé et publié dans le feed !', 'ok');
+    toast('✅ Deal validé et publié !', 'ok');
   }
 
   async function refuser(id) {
@@ -1304,39 +1308,87 @@ function AdminPanel({ onClose }) {
   async function supprimer(id) {
     await sb.from('deals').delete().eq('id', id);
     setDeals(p => p.filter(d => d.id !== id));
-    toast('🗑️ Deal supprimé.', 'ok');
+    toast('🗑️ Supprimé.', 'ok');
   }
 
+  // Accès refusé si pas admin
+  if (!user) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ textAlign: 'center', padding: 40 }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+        <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>Accès refusé</div>
+        <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 24 }}>Connecte-toi pour accéder à cette page.</div>
+        <button onClick={onGoFeed} style={{ background: 'var(--rouge)', color: 'white', border: 'none', padding: '10px 24px', borderRadius: 12, fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'Nunito' }}>
+          ← Retour au site
+        </button>
+      </div>
+    </div>
+  );
+
+  if (isAdmin === false) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ textAlign: 'center', padding: 40 }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
+        <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>Accès non autorisé</div>
+        <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 24 }}>Tu n'as pas les droits pour accéder à cette page.</div>
+        <button onClick={onGoFeed} style={{ background: 'var(--rouge)', color: 'white', border: 'none', padding: '10px 24px', borderRadius: 12, fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'Nunito' }}>
+          ← Retour au site
+        </button>
+      </div>
+    </div>
+  );
+
+  if (isAdmin === null) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="loader">Vérification des droits...</div>
+    </div>
+  );
+
   const tabStyle = (t) => ({
-    padding: '8px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
-    fontFamily: 'Nunito', fontSize: 12, fontWeight: 800,
-    background: onglet === t ? 'var(--white)' : 'none',
-    color: onglet === t ? (t === 'en_attente' ? 'var(--orange)' : t === 'validé' ? '#0a8c63' : 'var(--rouge)') : 'var(--muted)',
-    boxShadow: onglet === t ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+    padding: '10px 20px', border: 'none', cursor: 'pointer', fontFamily: 'Nunito',
+    fontSize: 13, fontWeight: 800, transition: 'all 0.15s',
+    borderBottom: onglet === t ? '3px solid var(--rouge)' : '3px solid transparent',
+    background: 'none',
+    color: onglet === t ? 'var(--rouge)' : 'var(--muted)',
   });
 
   return (
-    <div className="modal-overlay">
-      <div className="modal" style={{ maxWidth: 700, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-        <div className="modal-header" style={{ background: 'var(--dark)' }}>
-          <div className="modal-title" style={{ color: 'white' }}>⚙️ Interface Admin</div>
-          <button className="modal-close" style={{ background: 'rgba(255,255,255,0.1)', color: 'white' }} onClick={onClose}>✕</button>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      {/* Header admin */}
+      <div style={{ background: 'var(--dark)', padding: '0 28px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ background: 'var(--rouge)', borderRadius: 10, padding: '4px 12px' }}>
+            <span style={{ fontFamily: 'Noto Naskh Arabic, serif', fontSize: 16, color: 'white', fontWeight: 700 }}>فيدوستافيد</span>
+          </div>
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>|</span>
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 800 }}>⚙️ Interface Admin</span>
+        </div>
+        <button onClick={onGoFeed}
+          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito' }}>
+          ← Voir le site
+        </button>
+      </div>
+
+      <div style={{ maxWidth: 860, margin: '0 auto', padding: '32px 24px 80px' }}>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', marginBottom: 4 }}>Modération des deals</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Connecté en tant que {user.email}</div>
         </div>
 
         {/* Onglets */}
-        <div style={{ display: 'flex', background: 'var(--bg)', padding: '8px 16px', gap: 4, borderBottom: '1px solid var(--border)' }}>
-          <button style={tabStyle('en_attente')} onClick={() => setOnglet('en_attente')}>⏳ En attente ({onglet === 'en_attente' ? deals.length : '…'})</button>
+        <div style={{ background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: '14px 14px 0 0', display: 'flex', borderBottom: '1px solid var(--border)' }}>
+          <button style={tabStyle('en_attente')} onClick={() => setOnglet('en_attente')}>⏳ En attente</button>
           <button style={tabStyle('validé')}     onClick={() => setOnglet('validé')}>✅ Validés</button>
           <button style={tabStyle('refusé')}     onClick={() => setOnglet('refusé')}>❌ Refusés</button>
         </div>
 
-        <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
+        <div style={{ background: 'var(--white)', border: '1.5px solid var(--border)', borderTop: 'none', borderRadius: '0 0 14px 14px', padding: 20, minHeight: 300 }}>
           {loading ? (
             <div className="loader">Chargement...</div>
           ) : deals.length === 0 ? (
             <div className="empty">
               <div className="icon">{onglet === 'en_attente' ? '🎉' : '📭'}</div>
-              <div className="msg">{onglet === 'en_attente' ? 'Aucun deal en attente — tout est traité !' : 'Aucun deal dans cette catégorie.'}</div>
+              <div className="msg">{onglet === 'en_attente' ? 'Aucun deal en attente — tout est traité !' : 'Aucun deal ici.'}</div>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1347,18 +1399,16 @@ function AdminPanel({ onClose }) {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 6 }}>{d.titre}</div>
-                        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 8 }}>
-                          <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--rouge)' }}>
-                            {d.prix_promo} MAD
-                            {pct > 0 && <span style={{ fontSize: 10, background: '#e8faf5', color: '#0a8c63', padding: '1px 6px', borderRadius: 20, marginLeft: 6 }}>-{pct}%</span>}
-                          </span>
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
+                          <span style={{ fontSize: 18, fontWeight: 900, color: 'var(--rouge)' }}>{d.prix_promo} MAD</span>
+                          {pct > 0 && <span style={{ fontSize: 10, background: '#e8faf5', color: '#0a8c63', padding: '2px 8px', borderRadius: 20, fontWeight: 800 }}>-{pct}%</span>}
                           {d.prix_normal > 0 && <span style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'line-through', fontWeight: 700 }}>{d.prix_normal} MAD</span>}
                         </div>
-                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
                           {[['🏪', d.magasin], ['📦', d.categorie], ['📍', d.ville], ['🌐', d.type],
                             d.date_fin && ['⏰', new Date(d.date_fin).toLocaleDateString('fr-FR')]
                           ].filter(Boolean).map(([icon, val]) => (
-                            <span key={val} style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>{icon} {val}</span>
+                            <span key={val} style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>{icon} {val}</span>
                           ))}
                         </div>
                         {d.description && (
@@ -1368,48 +1418,29 @@ function AdminPanel({ onClose }) {
                         )}
                         {d.lien && (
                           <a href={d.lien} target="_blank" rel="noopener noreferrer"
-                            style={{ fontSize: 12, color: 'var(--blue)', fontWeight: 700, display: 'inline-block' }}>
+                            style={{ fontSize: 12, color: 'var(--blue)', fontWeight: 700 }}>
                             🔗 {d.lien}
                           </a>
                         )}
+                        <div style={{ marginTop: 8, fontSize: 10, color: '#bbb', fontWeight: 700 }}>
+                          Soumis le {new Date(d.created_at).toLocaleDateString('fr-FR')} à {new Date(d.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
                       </div>
 
-                      {/* Actions selon onglet */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
                         {onglet === 'en_attente' && <>
-                          <button onClick={() => valider(d.id)}
-                            style={{ background: 'var(--green)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 10, fontWeight: 900, fontSize: 13, cursor: 'pointer', fontFamily: 'Nunito', whiteSpace: 'nowrap' }}>
-                            ✅ Valider
-                          </button>
-                          <button onClick={() => refuser(d.id)}
-                            style={{ background: 'var(--bg)', color: 'var(--rouge)', border: '1.5px solid var(--rouge)', padding: '8px 16px', borderRadius: 10, fontWeight: 900, fontSize: 13, cursor: 'pointer', fontFamily: 'Nunito', whiteSpace: 'nowrap' }}>
-                            ✕ Refuser
-                          </button>
+                          <button onClick={() => valider(d.id)} style={{ background: 'var(--green)', color: 'white', border: 'none', padding: '9px 18px', borderRadius: 10, fontWeight: 900, fontSize: 13, cursor: 'pointer', fontFamily: 'Nunito', whiteSpace: 'nowrap' }}>✅ Valider</button>
+                          <button onClick={() => refuser(d.id)} style={{ background: 'white', color: 'var(--rouge)', border: '1.5px solid var(--rouge)', padding: '9px 18px', borderRadius: 10, fontWeight: 900, fontSize: 13, cursor: 'pointer', fontFamily: 'Nunito', whiteSpace: 'nowrap' }}>✕ Refuser</button>
                         </>}
                         {onglet === 'validé' && <>
-                          <button onClick={() => refuser(d.id)}
-                            style={{ background: 'var(--bg)', color: 'var(--rouge)', border: '1.5px solid var(--rouge)', padding: '8px 16px', borderRadius: 10, fontWeight: 900, fontSize: 13, cursor: 'pointer', fontFamily: 'Nunito', whiteSpace: 'nowrap' }}>
-                            ✕ Retirer
-                          </button>
-                          <button onClick={() => supprimer(d.id)}
-                            style={{ background: 'none', color: 'var(--muted)', border: '1px solid var(--border)', padding: '8px 16px', borderRadius: 10, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'Nunito', whiteSpace: 'nowrap' }}>
-                            🗑 Supprimer
-                          </button>
+                          <button onClick={() => refuser(d.id)} style={{ background: 'white', color: 'var(--rouge)', border: '1.5px solid var(--rouge)', padding: '9px 18px', borderRadius: 10, fontWeight: 900, fontSize: 13, cursor: 'pointer', fontFamily: 'Nunito', whiteSpace: 'nowrap' }}>✕ Retirer</button>
+                          <button onClick={() => supprimer(d.id)} style={{ background: 'none', color: 'var(--muted)', border: '1px solid var(--border)', padding: '9px 18px', borderRadius: 10, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'Nunito' }}>🗑 Supprimer</button>
                         </>}
                         {onglet === 'refusé' && <>
-                          <button onClick={() => valider(d.id)}
-                            style={{ background: 'var(--green)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 10, fontWeight: 900, fontSize: 13, cursor: 'pointer', fontFamily: 'Nunito', whiteSpace: 'nowrap' }}>
-                            ✅ Republier
-                          </button>
-                          <button onClick={() => supprimer(d.id)}
-                            style={{ background: 'none', color: 'var(--muted)', border: '1px solid var(--border)', padding: '8px 16px', borderRadius: 10, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'Nunito', whiteSpace: 'nowrap' }}>
-                            🗑 Supprimer
-                          </button>
+                          <button onClick={() => valider(d.id)} style={{ background: 'var(--green)', color: 'white', border: 'none', padding: '9px 18px', borderRadius: 10, fontWeight: 900, fontSize: 13, cursor: 'pointer', fontFamily: 'Nunito', whiteSpace: 'nowrap' }}>✅ Republier</button>
+                          <button onClick={() => supprimer(d.id)} style={{ background: 'none', color: 'var(--muted)', border: '1px solid var(--border)', padding: '9px 18px', borderRadius: 10, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'Nunito' }}>🗑 Supprimer</button>
                         </>}
                       </div>
-                    </div>
-                    <div style={{ marginTop: 8, fontSize: 10, color: 'var(--muted)', fontWeight: 700 }}>
-                      Soumis le {new Date(d.created_at).toLocaleDateString('fr-FR')} à {new Date(d.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
                 );
@@ -1428,17 +1459,27 @@ function AdminPanel({ onClose }) {
 function App() {
   const [user, setUser]           = useState(null);
   const [userProfile, setProfile] = useState(null);
+  const [isAdmin, setIsAdmin]     = useState(null); // null=chargement, true/false
+  const [route, setRoute]         = useState(location.hash.replace('#','') || 'feed');
   const [deals, setDeals]         = useState([]);
   const [loading, setLoading]     = useState(true);
-  const [modal, setModal]         = useState(null); // null | 'auth' | 'submit'
+  const [modal, setModal]         = useState(null);
   const [authTab, setAuthTab]     = useState('login');
   const [selectedDeal, setDeal]   = useState(null);
   const [filterCat, setFilterCat] = useState('Tout');
   const [filterVille, setFilterVille] = useState('');
   const [filterSort, setFilterSort]   = useState('score');
-  const [showAdmin, setShowAdmin]   = useState(false);
   const [showProfileMenu, setProfileMenu] = useState(false);
   const profileRef = useRef(null);
+
+  // Routing via hash
+  useEffect(() => {
+    const onHash = () => setRoute(location.hash.replace('#','') || 'feed');
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  const goTo = (r) => { location.hash = r; setRoute(r); };
 
   // Ferme le menu profil si clic ailleurs
   useEffect(() => {
@@ -1451,12 +1492,13 @@ function App() {
   useEffect(() => {
     sb.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      if (session?.user) loadProfile(session.user.id);
+      if (session?.user) { loadProfile(session.user.id); checkIsAdmin(session.user.id).then(setIsAdmin); }
+      else setIsAdmin(false);
     });
     const { data: { subscription } } = sb.auth.onAuthStateChange((_e, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) loadProfile(session.user.id);
-      else setProfile(null);
+      if (session?.user) { loadProfile(session.user.id); checkIsAdmin(session.user.id).then(setIsAdmin); }
+      else { setProfile(null); setIsAdmin(false); }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -1466,10 +1508,7 @@ function App() {
     setProfile(data);
   }
 
-  // Charger les deals
-  useEffect(() => {
-    loadDeals();
-  }, [filterCat, filterVille, filterSort]);
+  useEffect(() => { loadDeals(); }, [filterCat, filterVille, filterSort]);
 
   async function loadDeals() {
     setLoading(true);
@@ -1483,53 +1522,58 @@ function App() {
     setLoading(false);
   }
 
-async function handleVote(dealId, type) {
-  if (!user) { setAuthTab('login'); setModal('auth'); return; }
-
-  const { data: existing } = await sb.from('votes').select('*').eq('deal_id', dealId).eq('user_id', user.id).maybeSingle();
-
-  let scoreDelta = 0;
-
-  if (existing) {
-    if (existing.type === type) {
-      await sb.from('votes').delete().eq('id', existing.id);
-      scoreDelta = type === 'chaud' ? -1 : 1;
-      toast('Vote retiré.', 'ok');
+  async function handleVote(dealId, type) {
+    if (!user) { setAuthTab('login'); setModal('auth'); return; }
+    const { data: existing } = await sb.from('votes').select('*').eq('deal_id', dealId).eq('user_id', user.id).maybeSingle();
+    let scoreDelta = 0;
+    if (existing) {
+      if (existing.type === type) {
+        await sb.from('votes').delete().eq('id', existing.id);
+        scoreDelta = type === 'chaud' ? -1 : 1;
+        toast('Vote retiré.', 'ok');
+      } else {
+        await sb.from('votes').update({ type }).eq('id', existing.id);
+        scoreDelta = type === 'chaud' ? 2 : -2;
+        toast(type === 'chaud' ? '🔥 Chaud !' : '🧊 Froid.', 'ok');
+      }
     } else {
-      await sb.from('votes').update({ type }).eq('id', existing.id);
-      scoreDelta = type === 'chaud' ? 2 : -2;
+      await sb.from('votes').insert({ deal_id: dealId, user_id: user.id, type });
+      scoreDelta = type === 'chaud' ? 1 : -1;
       toast(type === 'chaud' ? '🔥 Chaud !' : '🧊 Froid.', 'ok');
     }
-  } else {
-    await sb.from('votes').insert({ deal_id: dealId, user_id: user.id, type });
-    scoreDelta = type === 'chaud' ? 1 : -1;
-    toast(type === 'chaud' ? '🔥 Chaud !' : '🧊 Froid.', 'ok');
+    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, score: d.score + scoreDelta } : d));
+    if (selectedDeal?.id === dealId) setDeal(prev => ({ ...prev, score: prev.score + scoreDelta }));
   }
-
-  // Mise à jour immédiate dans l'interface
-  setDeals(prev => prev.map(d =>
-    d.id === dealId ? { ...d, score: d.score + scoreDelta } : d
-  ));
-
-  // Si on est sur la fiche détail, on met aussi à jour
-  if (selectedDeal?.id === dealId) {
-    setDeal(prev => ({ ...prev, score: prev.score + scoreDelta }));
-  }
-}
 
   async function logout() {
     await sb.auth.signOut();
     setProfileMenu(false);
+    setIsAdmin(false);
     toast('Déconnecté. À bientôt !', 'ok');
   }
 
+  // ── ROUTE ADMIN ──
+  if (route === 'admin') {
+    return (
+      <>
+        <ToastContainer />
+        <AdminPage
+          user={user}
+          isAdmin={isAdmin}
+          onGoFeed={() => goTo('feed')}
+        />
+      </>
+    );
+  }
+
+  // ── ROUTE FEED (principale) ──
   return (
     <>
       <ToastContainer />
 
       {/* TOPBAR */}
       <div className="topbar">
-        <div className="logo-pill" onClick={() => { setDeal(null); }}>
+        <div className="logo-pill" onClick={() => { setDeal(null); goTo('feed'); }}>
           <span style={{ fontSize: 18 }}>🔥</span>
           <span className="logo-ar">فيدوستافيد</span>
           <span className="logo-lat">fidwastafid</span>
@@ -1538,9 +1582,9 @@ async function handleVote(dealId, type) {
         <div className="topbar-right">
           {user ? (
             <>
-              {user.email === ADMIN_EMAIL && (
+              {isAdmin && (
                 <button className="btn-nav" style={{ background: '#fff8e0', color: '#cc8800' }}
-                  onClick={() => setShowAdmin(true)}>
+                  onClick={() => goTo('admin')}>
                   ⚙️ Admin
                 </button>
               )}
@@ -1563,6 +1607,7 @@ async function handleVote(dealId, type) {
                     </div>
                     <button className="profile-menu-item">👤 Mon profil</button>
                     <button className="profile-menu-item">📋 Mes deals soumis</button>
+                    {isAdmin && <button className="profile-menu-item" onClick={() => { setProfileMenu(false); goTo('admin'); }}>⚙️ Interface Admin</button>}
                     <button className="profile-menu-item danger" onClick={logout}>🚪 Déconnexion</button>
                   </div>
                 )}
@@ -1579,17 +1624,14 @@ async function handleVote(dealId, type) {
 
       {/* LAYOUT */}
       <div className="layout">
-        {/* SIDEBAR */}
         <nav className="sidebar">
           <div className="sidebar-brand">
             <span className="ar">فيدوستافيد</span>
             <div className="sub">Bons plans marocains 🇲🇦</div>
           </div>
-
           <div className="sidebar-section">Trier par</div>
           <button className={`sidebar-btn ${filterSort === 'score' ? 'active' : ''}`} onClick={() => setFilterSort('score')}>🔥 Les plus chauds</button>
           <button className={`sidebar-btn ${filterSort === 'recent' ? 'active' : ''}`} onClick={() => setFilterSort('recent')}>⚡ Les plus récents</button>
-
           <div className="sidebar-section" style={{ marginTop: 12 }}>Catégories</div>
           <div className="sidebar-cats">
             {['Tout', ...CATEGORIES].map(cat => (
@@ -1598,25 +1640,17 @@ async function handleVote(dealId, type) {
               </button>
             ))}
           </div>
-
           <div className="sidebar-cta" onClick={() => user ? setModal('submit') : (setAuthTab('signup'), setModal('auth'))}>
             <span className="ar">فيد و ستافيد</span>
             <span className="sub">Partage un bon plan →</span>
           </div>
         </nav>
 
-        {/* MAIN */}
         <main className="main">
           {selectedDeal ? (
-            <DealDetail
-              deal={selectedDeal}
-              user={user}
-              onBack={() => setDeal(null)}
-              onVote={handleVote}
-            />
+            <DealDetail deal={selectedDeal} user={user} onBack={() => setDeal(null)} onVote={handleVote} />
           ) : (
             <>
-              {/* Filtres */}
               <div className="filters-bar">
                 <span style={{ fontWeight: 900, fontSize: 13 }}>🔥 Bons plans</span>
                 <div className="filter-wrap">
@@ -1632,15 +1666,10 @@ async function handleVote(dealId, type) {
                   </button>
                 ))}
               </div>
-
-              {/* Feed */}
               {loading ? (
                 <div className="loader">⏳ Chargement des deals...</div>
               ) : deals.length === 0 ? (
-                <div className="empty">
-                  <div className="icon">🔍</div>
-                  <div className="msg">Aucun deal trouvé pour ces filtres.</div>
-                </div>
+                <div className="empty"><div className="icon">🔍</div><div className="msg">Aucun deal trouvé pour ces filtres.</div></div>
               ) : (
                 <div className="feed-grid">
                   {deals.map(d => (
@@ -1653,24 +1682,12 @@ async function handleVote(dealId, type) {
         </main>
       </div>
 
-      {/* MODALS */}
       {modal === 'auth' && (
-        <AuthModal
-          defaultTab={authTab}
-          onClose={() => setModal(null)}
-          onSuccess={(u) => { setUser(u); setModal(null); }}
-        />
+        <AuthModal defaultTab={authTab} onClose={() => setModal(null)} onSuccess={(u) => { setUser(u); setModal(null); }} />
       )}
-
       {modal === 'submit' && (
-        <SubmitDealModal
-          user={user}
-          onClose={() => setModal(null)}
-          onSuccess={() => { loadDeals(); toast('🔥 Deal soumis ! Merci.', 'ok'); }}
-        />
+        <SubmitDealModal user={user} onClose={() => setModal(null)} onSuccess={() => { loadDeals(); toast('🔥 Deal soumis ! Merci.', 'ok'); }} />
       )}
-
-      {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
     </>
   );
 }
