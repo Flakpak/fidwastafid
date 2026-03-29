@@ -1329,32 +1329,39 @@ function App() {
     setLoading(false);
   }
 
-  async function handleVote(dealId, type) {
-    if (!user) { setAuthTab('login'); setModal('auth'); return; }
+async function handleVote(dealId, type) {
+  if (!user) { setAuthTab('login'); setModal('auth'); return; }
 
-    // Vérifie si déjà voté
-    const { data: existing } = await sb.from('votes').select('*').eq('deal_id', dealId).eq('user_id', user.id).maybeSingle();
+  const { data: existing } = await sb.from('votes').select('*').eq('deal_id', dealId).eq('user_id', user.id).maybeSingle();
 
-    if (existing) {
-      if (existing.type === type) {
-        // Retire le vote
-        await sb.from('votes').delete().eq('id', existing.id);
-        toast('Vote retiré.', 'ok');
-      } else {
-        // Change le vote
-        await sb.from('votes').update({ type }).eq('id', existing.id);
-        toast(type === 'chaud' ? '🔥 Vote changé pour Chaud !' : '🧊 Vote changé pour Froid.', 'ok');
-      }
+  let scoreDelta = 0;
+
+  if (existing) {
+    if (existing.type === type) {
+      await sb.from('votes').delete().eq('id', existing.id);
+      scoreDelta = type === 'chaud' ? -1 : 1;
+      toast('Vote retiré.', 'ok');
     } else {
-      await sb.from('votes').insert({ deal_id: dealId, user_id: user.id, type });
-      toast(type === 'chaud' ? '🔥 Chaud ! Vote enregistré.' : '🧊 Froid. Vote enregistré.', 'ok');
+      await sb.from('votes').update({ type }).eq('id', existing.id);
+      scoreDelta = type === 'chaud' ? 2 : -2;
+      toast(type === 'chaud' ? '🔥 Chaud !' : '🧊 Froid.', 'ok');
     }
-    loadDeals();
-    if (selectedDeal?.id === dealId) {
-      const { data } = await sb.from('deals').select('*').eq('id', dealId).single();
-      setDeal(data);
-    }
+  } else {
+    await sb.from('votes').insert({ deal_id: dealId, user_id: user.id, type });
+    scoreDelta = type === 'chaud' ? 1 : -1;
+    toast(type === 'chaud' ? '🔥 Chaud !' : '🧊 Froid.', 'ok');
   }
+
+  // Mise à jour immédiate dans l'interface
+  setDeals(prev => prev.map(d =>
+    d.id === dealId ? { ...d, score: d.score + scoreDelta } : d
+  ));
+
+  // Si on est sur la fiche détail, on met aussi à jour
+  if (selectedDeal?.id === dealId) {
+    setDeal(prev => ({ ...prev, score: prev.score + scoreDelta }));
+  }
+}
 
   async function logout() {
     await sb.auth.signOut();
