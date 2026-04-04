@@ -1,0 +1,2453 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>فيدوستافيد — Fidwastafid</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Noto+Naskh+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root {
+    --rouge:  #f03e3e;
+    --rouge2: #ff6b6b;
+    --orange: #ff922b;
+    --yellow: #ffd43b;
+    --green:  #20c997;
+    --blue:   #339af0;
+    --bg:     #f8f6f2;
+    --white:  #ffffff;
+    --text:   #1a1a1a;
+    --muted:  #888888;
+    --border: #e8e4de;
+    --dark:   #1e1e1e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Nunito', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    background: var(--white);
+    border-bottom: 2px solid var(--border);
+    padding: 0 20px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  .logo-pill {
+    background: var(--rouge);
+    border-radius: 12px;
+    padding: 5px 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .logo-ar  { font-family: 'Noto Naskh Arabic', serif; font-size: 17px; font-weight: 700; color: white; line-height: 1; }
+  .logo-lat { font-size: 12px; font-weight: 800; color: rgba(255,255,255,0.7); }
+
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+
+  .btn-nav {
+    font-family: 'Nunito', sans-serif;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-login  { background: var(--bg); color: var(--muted); }
+  .btn-login:hover { background: var(--border); color: var(--text); }
+  .btn-signup { background: var(--rouge); color: white; }
+  .btn-signup:hover { background: #d63030; }
+  .btn-submit-nav { background: linear-gradient(135deg, var(--rouge), var(--orange)); color: white; }
+  .btn-submit-nav:hover { opacity: 0.9; }
+
+  .user-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 12px 5px 6px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .user-pill:hover { border-color: var(--rouge2); }
+  .user-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--rouge), var(--orange));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 900;
+    color: white;
+  }
+  .user-pseudo { font-size: 12px; font-weight: 800; color: var(--text); }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: calc(100vh - 56px);
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    background: var(--white);
+    border-right: 1px solid var(--border);
+    padding: 20px 0;
+    position: sticky;
+    top: 56px;
+    height: calc(100vh - 56px);
+    overflow-y: auto;
+  }
+
+  .sidebar-brand {
+    padding: 4px 16px 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .sidebar-brand .ar { font-family: 'Noto Naskh Arabic', serif; font-size: 22px; font-weight: 700; color: var(--rouge); display: block; }
+  .sidebar-brand .sub { font-size: 10px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+
+  .sidebar-section { padding: 8px 16px 4px; font-size: 9px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: #ccc; }
+
+  .sidebar-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    background: none;
+    border: none;
+    border-left: 3px solid transparent;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    transition: all 0.12s;
+  }
+  .sidebar-btn:hover { background: var(--bg); color: var(--text); }
+  .sidebar-btn.active { color: var(--rouge); background: #fff5f5; border-left-color: var(--rouge); }
+
+  .sidebar-cats { padding: 8px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .cat-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    text-align: left;
+    transition: all 0.1s;
+  }
+  .cat-btn:hover, .cat-btn.active { background: #fff0f0; color: var(--rouge); }
+
+  .sidebar-cta {
+    margin: 16px 12px 0;
+    background: linear-gradient(135deg, var(--rouge), var(--orange));
+    border-radius: 14px;
+    padding: 14px;
+    color: white;
+    text-align: center;
+    cursor: pointer;
+  }
+  .sidebar-cta .ar { font-family: 'Noto Naskh Arabic', serif; font-size: 16px; font-weight: 700; display: block; }
+  .sidebar-cta .sub { font-size: 10px; opacity: 0.8; margin-top: 2px; }
+
+  /* ── MAIN ── */
+  .main { padding: 24px 28px 80px; }
+
+  /* ── HERO ── */
+  .hero-band {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-band::after {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(240,62,62,0.07) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-top { margin-bottom: 22px; }
+
+  .hero-tagline-fr {
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--text);
+    line-height: 1.25;
+    margin-bottom: 6px;
+  }
+  .hero-tagline-fr span { color: var(--rouge); }
+
+  /* ── ANIMATIONS HERO ── */
+  @keyframes heroFadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes heroCursorBlink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+
+  .hero-fr-anim {
+    animation: heroFadeUp 0.5s ease both;
+  }
+
+  .hero-ar-anim {
+    animation: heroFadeUp 0.5s ease 0.3s both;
+  }
+
+  .hero-steps-anim {
+    animation: heroFadeUp 0.5s ease 0.15s both;
+  }
+
+  .hero-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background: var(--rouge);
+    margin-left: 2px;
+    vertical-align: middle;
+    animation: heroCursorBlink 0.7s ease infinite;
+    border-radius: 1px;
+  }
+
+  .hero-tagline-ar {
+    font-family: 'Noto Naskh Arabic', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--muted);
+    direction: rtl;
+    display: block;
+  }
+
+  .hero-steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .hero-step {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .hero-step:hover { border-color: var(--rouge2); box-shadow: 0 4px 14px rgba(240,62,62,0.07); }
+
+  .hero-step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+
+  .hero-step-num {
+    background: var(--rouge);
+    color: white;
+    width: 26px; height: 26px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 900; flex-shrink: 0;
+  }
+
+  .hero-step-emoji { font-size: 20px; }
+
+  .hero-step-title { font-size: 13px; font-weight: 900; color: var(--text); }
+
+  .hero-step-title-ar {
+    font-family: 'Noto Naskh Arabic', serif;
+    font-size: 13px; color: var(--rouge); font-weight: 700;
+    direction: rtl; display: block; margin-bottom: 6px;
+  }
+
+  .hero-step-desc { font-size: 12px; color: var(--muted); font-weight: 600; line-height: 1.65; }
+
+  /* ── DEAL CARD ── */
+  .feed-grid { display: flex; flex-direction: column; gap: 10px; }
+
+  /* ── FEED + DEAL CARD — Layout Dealabs ── */
+  .feed-grid { display: flex; flex-direction: column; gap: 8px; }
+
+  .deal-card {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: row;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    cursor: pointer;
+  }
+  .deal-card:hover { border-color: var(--rouge2); box-shadow: 0 4px 16px rgba(240,62,62,0.08); }
+
+  .dc-img {
+    width: 140px; min-width: 140px;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; flex-shrink: 0;
+  }
+  .dc-img img { width: 100%; height: 140px; object-fit: contain; }
+  .dc-img-placeholder { font-size: 36px; opacity: 0.2; }
+
+  .dc-body { flex: 1; padding: 12px 16px; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+
+  .dc-top { display: flex; align-items: center; justify-content: space-between; }
+
+  .dc-score {
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .dc-vote-btn {
+    display: flex; align-items: center; justify-content: center;
+    padding: 5px 10px; border-radius: 8px; border: 1.5px solid var(--border);
+    background: var(--white); cursor: pointer; font-family: 'Noto Naskh Arabic', serif;
+    font-size: 13px; font-weight: 700; transition: all 0.15s; line-height: 1;
+    white-space: nowrap;
+  }
+  .dc-vote-btn.rabah { color: #0a8c63; }
+  .dc-vote-btn.rabah:hover { border-color: #0a8c63; background: #e8faf5; }
+  .dc-vote-btn.khssara { color: var(--rouge); }
+  .dc-vote-btn.khssara:hover { border-color: var(--rouge); background: #fff0f0; }
+  .dc-score-num { font-size: 15px; font-weight: 900; color: var(--rouge); min-width: 28px; text-align: center; }
+  .dc-score-num.cold { color: var(--blue); }
+  .dc-date { font-size: 11px; color: var(--muted); font-weight: 600; }
+
+  .dc-title {
+    font-size: 15px; font-weight: 800; color: var(--text); line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  .dc-price-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .dc-price-promo { font-size: 22px; font-weight: 900; color: var(--rouge); }
+  .dc-price-normal { font-size: 13px; font-weight: 700; color: var(--muted); text-decoration: line-through; }
+  .dc-price-pct { font-size: 11px; font-weight: 800; background: var(--rouge); color: white; padding: 2px 7px; border-radius: 5px; }
+
+  .dc-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .dc-meta span { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .dc-meta .dc-shop { font-weight: 800; color: var(--text); }
+
+  .dc-desc {
+    font-size: 12px; color: var(--muted); font-weight: 600; line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  .dc-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+  .dc-action-btn {
+    display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700;
+    color: var(--muted); background: none; border: none; cursor: pointer;
+    font-family: 'Nunito', sans-serif; padding: 4px 6px; border-radius: 6px; transition: all 0.1s;
+  }
+  .dc-action-btn:hover { background: var(--bg); color: var(--text); }
+
+  .dc-voir-btn {
+    background: var(--blue); color: white; border: none; padding: 7px 16px;
+    border-radius: 8px; font-size: 13px; font-weight: 800; cursor: pointer;
+    font-family: 'Noto Naskh Arabic', serif; direction: rtl;
+    display: flex; align-items: center; gap: 5px;
+    text-decoration: none; transition: opacity 0.15s; white-space: nowrap;
+  }
+  .dc-voir-btn:hover { opacity: 0.88; }
+
+  /* Styles conservés pour fiche détail */
+  .deal-tag { font-size: 9px; font-weight: 800; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 20px; text-transform: uppercase; }
+  .tag-cat  { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+  .tag-type { background: #fff0f0; color: var(--rouge); }
+  .tag-new  { background: var(--yellow); color: #7a5c00; }
+  .tag-hot  { background: linear-gradient(135deg, #ff4d4d, #ff8c00); color: white; }
+  .deal-title { font-size: 15px; font-weight: 900; color: var(--text); margin-bottom: 6px; }
+  .deal-price-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .price-promo    { font-size: 20px; font-weight: 900; color: var(--rouge); }
+  .price-normal   { font-size: 13px; font-weight: 700; color: var(--muted); text-decoration: line-through; }
+  .price-discount { font-size: 11px; font-weight: 800; background: #e8faf5; color: #0a8c63; padding: 2px 7px; border-radius: 20px; }
+  .deal-meta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .deal-meta span { font-size: 11px; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 3px; }
+
+  /* ── FILTRES ── */
+  .filters-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .filter-pill {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    background: var(--white);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    transition: all 0.12s;
+  }
+  .filter-pill:hover, .filter-pill.active { border-color: var(--rouge); color: var(--rouge); background: #fff5f5; }
+
+  .filter-select {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    background: var(--white);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    appearance: none;
+    padding-right: 28px;
+  }
+
+  .filter-wrap { position: relative; }
+  .filter-wrap::after { content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--muted); pointer-events: none; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+    padding: 20px;
+    backdrop-filter: blur(2px);
+  }
+
+  .modal {
+    background: var(--white);
+    border-radius: 20px;
+    width: 100%;
+    max-width: 440px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    animation: modalIn 0.2s ease;
+  }
+
+  @keyframes modalIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .modal-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .modal-title { font-size: 18px; font-weight: 900; color: var(--text); }
+  .modal-title .ar { font-family: 'Noto Naskh Arabic', serif; color: var(--rouge); }
+
+  .modal-close {
+    background: var(--bg);
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    transition: all 0.12s;
+  }
+  .modal-close:hover { background: var(--border); color: var(--text); }
+
+  .modal-body { padding: 24px; }
+
+  .modal-tabs {
+    display: flex;
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 3px;
+    margin-bottom: 20px;
+    gap: 2px;
+  }
+
+  .modal-tab {
+    flex: 1;
+    padding: 8px;
+    border-radius: 10px;
+    border: none;
+    background: none;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    transition: all 0.12s;
+  }
+  .modal-tab.active { background: var(--white); color: var(--rouge); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+  /* ── FORM ── */
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+
+  .field label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .field input, .field select, .field textarea {
+    padding: 11px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--white);
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none;
+    border-color: var(--rouge);
+    background: #fffafa;
+  }
+
+  .field textarea { resize: vertical; min-height: 90px; }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .price-input-wrap { position: relative; }
+  .price-input-wrap input { padding-right: 50px; }
+  .price-unit { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 12px; font-weight: 800; color: var(--muted); }
+
+  .discount-preview {
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #0a8c63;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-full {
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 900;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-rouge { background: var(--rouge); color: white; }
+  .btn-rouge:hover { background: #d63030; }
+  .btn-rouge:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-gradient { background: linear-gradient(135deg, var(--rouge), var(--orange)); color: white; }
+  .btn-gradient:hover { opacity: 0.9; }
+  .btn-gradient:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .auth-switch { text-align: center; margin-top: 16px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .auth-switch button { background: none; border: none; color: var(--rouge); font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; font-size: 13px; }
+
+  .error-banner {
+    background: #fff0f0;
+    border: 1.5px solid #ffc9c9;
+    color: var(--rouge);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .success-banner {
+    background: #e8faf5;
+    border: 1.5px solid #a8e6d4;
+    color: #0a5c42;
+    padding: 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .success-banner .big { font-size: 32px; }
+
+  /* ── FICHE DEAL (page détail) ── */
+  .deal-detail {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    max-width: 680px;
+  }
+
+  .deal-detail-header {
+    background: var(--dark);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .back-btn {
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    transition: background 0.1s;
+  }
+  .back-btn:hover { background: rgba(255,255,255,0.18); }
+
+  .deal-detail-title { font-size: 18px; font-weight: 900; color: white; }
+
+  .deal-detail-body { padding: 24px; }
+
+  .vote-zone {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 0;
+  }
+
+  .vote-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border-radius: 12px;
+    border: 2px solid var(--border);
+    background: var(--white);
+    font-size: 15px;
+    font-weight: 900;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    transition: all 0.15s;
+  }
+  .vote-btn.fire       { color: var(--rouge); }
+  .vote-btn.fire:hover, .vote-btn.fire.voted { border-color: var(--rouge); background: #fff5f5; }
+  .vote-btn.ice        { color: var(--blue); }
+  .vote-btn.ice:hover, .vote-btn.ice.voted { border-color: var(--blue); background: #f0f8ff; }
+
+  .score-big { font-size: 28px; font-weight: 900; color: var(--rouge); }
+
+  /* ── PROFIL DROPDOWN ── */
+  .profile-menu {
+    position: absolute;
+    top: 56px;
+    right: 16px;
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    z-index: 250;
+    min-width: 200px;
+    overflow: hidden;
+    animation: modalIn 0.15s ease;
+  }
+
+  .profile-menu-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .profile-menu-pseudo { font-size: 13px; font-weight: 900; color: var(--text); }
+  .profile-menu-email  { font-size: 11px; color: var(--muted); font-weight: 600; }
+
+  .profile-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    transition: background 0.1s;
+  }
+  .profile-menu-item:hover { background: var(--bg); }
+  .profile-menu-item.danger { color: var(--rouge); }
+
+  /* ── EMPTY / LOADING ── */
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty .msg  { font-size: 14px; font-weight: 700; }
+
+  .loader { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; font-weight: 700; }
+
+  /* ── TOAST ── */
+  .toast-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 400; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+
+  .toast {
+    background: var(--dark);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: toastIn 0.25s ease;
+    max-width: 280px;
+  }
+  .toast.ok  { border-left: 3px solid var(--green); }
+  .toast.err { border-left: 3px solid var(--rouge); }
+
+  @keyframes toastIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* ── SOUMISSION STEPS ── */
+  .steps-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 24px;
+  }
+
+  .step-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 900;
+    color: var(--muted);
+    background: var(--white);
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .step-dot.done   { background: var(--green); border-color: var(--green); color: white; }
+  .step-dot.active { background: var(--rouge); border-color: var(--rouge); color: white; }
+
+  .step-line { flex: 1; height: 2px; background: var(--border); }
+  .step-line.done { background: var(--green); }
+
+  .step-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    margin-bottom: 20px;
+  }
+  .step-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--muted); }
+  .step-label.active { color: var(--rouge); }
+
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .main { padding: 12px 12px 40px; }
+    .hero-band { padding: 18px 16px; border-radius: 14px; margin-bottom: 16px; }
+    .hero-tagline-fr { font-size: 17px; }
+    .hero-tagline-ar { font-size: 14px; }
+    .hero-steps { grid-template-columns: 1fr; gap: 8px; }
+    .hero-step { display: flex; flex-direction: row; align-items: flex-start; gap: 12px; padding: 12px 14px; }
+    .hero-step-head { flex-direction: row; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+    /* Topbar mobile compacte */
+    .topbar { padding: 0 12px; height: 50px; }
+    .logo-pill { padding: 4px 10px; gap: 4px; }
+    .logo-ar { font-size: 15px; }
+    .logo-lat { display: none; }
+    .btn-nav { padding: 6px 10px; font-size: 11px; }
+    .btn-submit-nav .btn-submit-text { display: none; }
+    .user-pseudo { display: none; }
+    .user-pill { padding: 4px 8px 4px 4px; }
+    /* Deal card mobile */
+    .dc-img { width: 90px; min-width: 90px; }
+    .dc-img img { height: 90px; }
+    .dc-price-promo { font-size: 18px; }
+    .dc-voir-btn { display: none; }
+    /* Filters bar desktop → cachée sur mobile */
+    .filters-bar { display: none; }
+    /* Mobile nav visible */
+    .mobile-top-nav { display: flex !important; }
+  }
+
+  /* ── NAV MOBILE — sticky sous la topbar ── */
+  .mobile-top-nav {
+    display: none;
+    position: sticky;
+    top: 50px; /* hauteur topbar mobile */
+    z-index: 190;
+    flex-direction: column;
+    background: var(--white);
+    border-bottom: 1.5px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+
+  .mob-search { padding: 8px 12px 6px; border-bottom: 1px solid var(--border); }
+  .mob-search-wrap { position: relative; }
+  .mob-search-input {
+    width: 100%; padding: 8px 14px 8px 34px;
+    border: 1.5px solid var(--border); border-radius: 20px;
+    font-size: 13px; font-family: 'Nunito', sans-serif; font-weight: 600;
+    color: var(--text); background: var(--bg);
+  }
+  .mob-search-input:focus { outline: none; border-color: var(--rouge); background: #fff; }
+  .mob-search-icon {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    font-size: 13px; pointer-events: none;
+  }
+
+  .mob-tabs {
+    display: flex; overflow-x: auto; gap: 6px;
+    padding: 7px 12px; scrollbar-width: none; -ms-overflow-style: none;
+  }
+  .mob-tabs::-webkit-scrollbar { display: none; }
+
+  .mob-tab {
+    display: flex; align-items: center; gap: 4px;
+    padding: 5px 12px; border-radius: 20px; border: 1.5px solid var(--border);
+    background: var(--white); font-size: 12px; font-weight: 800;
+    color: var(--muted); cursor: pointer; white-space: nowrap;
+    font-family: 'Nunito', sans-serif; flex-shrink: 0; transition: all 0.12s;
+  }
+  .mob-tab.active { border-color: var(--rouge); color: var(--rouge); background: #fff5f5; }
+  .mob-tab.sort-active { border-color: var(--orange); color: var(--orange); background: #fff8f0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+// ─────────────────────────────────────────
+//  ⚠️  REMPLACE CES DEUX VALEURS
+const SUPABASE_URL  = 'https://laqwgehhedvxaqucmeeh.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_pTmj1luXr1jVb1rdAm2uzw_me78zTjc';
+// ─────────────────────────────────────────
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── CHECK ADMIN (vérifié côté BDD, pas par email) ──
+async function checkIsAdmin(uid) {
+  const { data } = await sb.from('admins').select('id').eq('id', uid).maybeSingle();
+  return !!data;
+}
+
+// ══ CONSTANTES ══
+const CATEGORIES = ['Alimentaire', 'Électroménager', 'High-Tech', 'Mode', 'Maison', 'Beauté', 'Sport', 'Autre'];
+const VILLES     = ['National', 'Casablanca', 'Rabat', 'Marrakech', 'Fès', 'Tanger', 'Agadir', 'Meknès', 'Oujda'];
+const CAT_ICONS  = { Alimentaire: '🛒', Électroménager: '🏠', 'High-Tech': '📱', Mode: '👗', Maison: '🛋️', Beauté: '💄', Sport: '⚽', Autre: '✨' };
+
+// ══════════════════════════════════════════
+//  TOAST SYSTEM
+// ══════════════════════════════════════════
+let _addToast = null;
+
+function ToastContainer() {
+  const [toasts, setToasts] = useState([]);
+  _addToast = useCallback((msg, type = 'ok') => {
+    const id = Date.now();
+    setToasts(p => [...p, { id, msg, type }]);
+    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 3000);
+  }, []);
+  return (
+    <div className="toast-wrap">
+      {toasts.map(t => (
+        <div key={t.id} className={`toast ${t.type}`}>{t.msg}</div>
+      ))}
+    </div>
+  );
+}
+
+const toast = (msg, type) => _addToast?.(msg, type);
+
+// ══════════════════════════════════════════
+//  MODAL AUTH (Connexion / Inscription)
+// ══════════════════════════════════════════
+function AuthModal({ onClose, onSuccess, defaultTab = 'login' }) {
+  const [tab, setTab]         = useState(defaultTab); // 'login' | 'signup'
+  const [email, setEmail]     = useState('');
+  const [password, setPass]   = useState('');
+  const [pseudo, setPseudo]   = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
+  const [done, setDone]       = useState(false);
+
+  const reset = () => { setEmail(''); setPass(''); setPseudo(''); setError(''); setDone(false); setLoading(false); };
+
+  const handleTab = (t) => { reset(); setTab(t); };
+
+  // ── CONNEXION ──
+  async function handleLogin() {
+    if (!email || !password) return setError('Remplis tous les champs.');
+    setLoading(true); setError('');
+    const { data, error: err } = await sb.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (err) return setError('Email ou mot de passe incorrect.');
+    toast('👋 Marhba ! Connecté avec succès.', 'ok');
+    onSuccess(data.user);
+  }
+
+  // ── INSCRIPTION ──
+  async function handleSignup() {
+    if (!email || !password || !pseudo) return setError('Remplis tous les champs.');
+    if (password.length < 6) return setError('Le mot de passe doit faire au moins 6 caractères.');
+    if (pseudo.length < 3)   return setError('Le pseudo doit faire au moins 3 caractères.');
+    setLoading(true); setError('');
+
+    // Vérifie si le pseudo est dispo
+    const { data: existing } = await sb.from('users').select('id').eq('pseudo', pseudo).maybeSingle();
+    if (existing) { setLoading(false); return setError('Ce pseudo est déjà pris.'); }
+
+    const { data, error: err } = await sb.auth.signUp({ email, password });
+    if (err) { setLoading(false); return setError(err.message); }
+
+    // Créer le profil dans la table users
+    if (data.user) {
+      await sb.from('users').insert({ id: data.user.id, pseudo });
+    }
+
+    setLoading(false);
+    setDone(true);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={null}>
+      <div className="modal">
+        <div className="modal-header">
+          <div className="modal-title">
+            {tab === 'login' ? 'Connexion' : 'Rejoins'} <span className="ar">فيدوستافيد</span>
+          </div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="modal-tabs">
+            <button className={`modal-tab ${tab === 'login' ? 'active' : ''}`} onClick={() => handleTab('login')}>Se connecter</button>
+            <button className={`modal-tab ${tab === 'signup' ? 'active' : ''}`} onClick={() => handleTab('signup')}>S'inscrire</button>
+          </div>
+
+          {done ? (
+            <div className="success-banner">
+              <span className="big">📬</span>
+              <strong>Vérifie tes emails !</strong>
+              <span>Un lien de confirmation a été envoyé à <strong>{email}</strong>. Clique dessus pour activer ton compte.</span>
+            </div>
+          ) : (
+            <>
+              {error && <div className="error-banner">⚠️ {error}</div>}
+
+              {tab === 'signup' && (
+                <div className="field">
+                  <label>Pseudo *</label>
+                  <input value={pseudo} onChange={e => setPseudo(e.target.value)}
+                    placeholder="ex: casawi_deals" onKeyDown={e => e.key === 'Enter' && handleSignup()} />
+                </div>
+              )}
+
+              <div className="field">
+                <label>Email *</label>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="ton@email.com" onKeyDown={e => e.key === 'Enter' && (tab === 'login' ? handleLogin() : handleSignup())} />
+              </div>
+
+              <div className="field">
+                <label>Mot de passe *</label>
+                <input type="password" value={password} onChange={e => setPass(e.target.value)}
+                  placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && (tab === 'login' ? handleLogin() : handleSignup())} />
+              </div>
+
+              <button
+                className="btn-full btn-rouge"
+                onClick={tab === 'login' ? handleLogin : handleSignup}
+                disabled={loading}
+              >
+                {loading ? '⏳ Chargement...' : tab === 'login' ? '🔑 Se connecter' : '🚀 Créer mon compte'}
+              </button>
+
+              <div className="auth-switch">
+                {tab === 'login'
+                  ? <>Pas encore de compte ? <button onClick={() => handleTab('signup')}>S'inscrire</button></>
+                  : <>Déjà un compte ? <button onClick={() => handleTab('login')}>Se connecter</button></>
+                }
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+//  MODAL SOUMISSION DEAL
+// ══════════════════════════════════════════
+function SubmitDealModal({ user, onClose, onSuccess }) {
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState({
+    titre: '', magasin: '', categorie: 'Alimentaire', ville: 'National',
+    type: 'physique', prix_promo: '', prix_normal: '',
+    description: '', lien: '', date_fin: '', photo_url: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
+  const [fetchingImg, setFetchingImg] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  // ── Auto-fetch og:image quand le lien change ──
+  async function handleLienChange(url) {
+    set('lien', url);
+    set('photo_url', '');
+    setImgError(false);
+    if (!url || !url.startsWith('http')) return;
+    setFetchingImg(true);
+    try {
+      const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxy);
+      const data = await res.json();
+      const html = data.contents || '';
+      // Cherche og:image en priorité, puis twitter:image
+      const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+                   || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
+                   || html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+      if (ogMatch && ogMatch[1]) {
+        set('photo_url', ogMatch[1]);
+      } else {
+        setImgError(true);
+      }
+    } catch {
+      setImgError(true);
+    }
+    setFetchingImg(false);
+  }
+
+  const discount = () => {
+    const p = parseFloat(form.prix_promo), n = parseFloat(form.prix_normal);
+    if (p && n && n > p) return Math.round((1 - p / n) * 100);
+    return null;
+  };
+
+  function nextStep() {
+    setError('');
+    if (step === 1) {
+      if (!form.titre.trim()) return setError('Donne un titre au deal.');
+      if (!form.magasin.trim()) return setError('Indique le magasin ou site.');
+      if (!form.prix_promo) return setError('Indique le prix promo.');
+    }
+    setStep(s => s + 1);
+  }
+
+  async function submit() {
+    setLoading(true); setError('');
+    const payload = {
+      titre:       form.titre.trim(),
+      magasin:     form.magasin.trim(),
+      categorie:   form.categorie,
+      ville:       form.ville,
+      type:        form.type,
+      prix_promo:  parseFloat(form.prix_promo),
+      prix_normal: parseFloat(form.prix_normal) || 0,
+      description: form.description.trim() || null,
+      lien:        form.lien.trim() || null,
+      photo_url:   form.photo_url || null,
+      date_fin:    form.date_fin || null,
+      user_id:     user.id,
+      statut:      'en_attente',
+      score:       0
+    };
+
+    const { error: err } = await sb.from('deals').insert(payload);
+    setLoading(false);
+    if (err) return setError('Erreur : ' + err.message);
+    setDone(true);
+  }
+
+  if (done) return (
+    <div className="modal-overlay" onClick={null}>
+      <div className="modal">
+        <div className="modal-header">
+          <div className="modal-title">Deal soumis ! 🎉</div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="success-banner">
+            <span className="big">🔥</span>
+            <strong>Shukran ! Ton deal est en cours de vérification.</strong>
+            <span>Il sera publié dans le feed si notre équipe valide les infos. Tu seras notifié.</span>
+          </div>
+          <br />
+          <button className="btn-full btn-gradient" onClick={() => { setDone(false); setStep(1); setForm({ titre:'', magasin:'', categorie:'Alimentaire', ville:'National', type:'physique', prix_promo:'', prix_normal:'', description:'', lien:'', date_fin:'', photo_url:'' }); onSuccess?.(); onClose(); }}>
+            Retour au feed
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="modal-overlay" onClick={null}>
+      <div className="modal" style={{ maxWidth: 500 }}>
+        <div className="modal-header">
+          <div className="modal-title">🔥 Soumettre un deal</div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+
+          {/* Indicateur d'étape */}
+          <div className="steps-indicator">
+            {[1,2,3].map((s, i) => (
+              <React.Fragment key={s}>
+                {i > 0 && <div className={`step-line ${step > i ? 'done' : ''}`}/>}
+                <div className={`step-dot ${step > s ? 'done' : step === s ? 'active' : ''}`}>
+                  {step > s ? '✓' : s}
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
+          <div className="step-labels">
+            {['Infos de base', 'Détails', 'Confirmation'].map((l, i) => (
+              <span key={l} className={`step-label ${step === i+1 ? 'active' : ''}`}>{l}</span>
+            ))}
+          </div>
+
+          {error && <div className="error-banner">⚠️ {error}</div>}
+
+          {/* ── ÉTAPE 1 : Infos de base ── */}
+          {step === 1 && (
+            <>
+              <div className="field">
+                <label>Titre du deal *</label>
+                <input value={form.titre} onChange={e => set('titre', e.target.value)}
+                  placeholder="ex: Huile Cristal 5L en promo chez Marjane" />
+              </div>
+
+              <div className="field-row">
+                <div className="field">
+                  <label>Magasin / Site *</label>
+                  <input value={form.magasin} onChange={e => set('magasin', e.target.value)}
+                    placeholder="ex: Marjane, Jumia..." />
+                </div>
+                <div className="field">
+                  <label>Catégorie</label>
+                  <select value={form.categorie} onChange={e => set('categorie', e.target.value)}>
+                    {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="field">
+                <label>Prix promo (MAD) *</label>
+                <div className="price-input-wrap">
+                  <input type="number" min="0" step="0.5" value={form.prix_promo}
+                    onChange={e => set('prix_promo', e.target.value)} placeholder="89" />
+                  <span className="price-unit">MAD</span>
+                </div>
+              </div>
+
+              <div className="field">
+                <label>Prix normal (MAD)</label>
+                <div className="price-input-wrap">
+                  <input type="number" min="0" step="0.5" value={form.prix_normal}
+                    onChange={e => set('prix_normal', e.target.value)} placeholder="115" />
+                  <span className="price-unit">MAD</span>
+                </div>
+                {discount() && (
+                  <div className="discount-preview">✅ Réduction de -{discount()}% calculée automatiquement</div>
+                )}
+              </div>
+
+              <button className="btn-full btn-rouge" onClick={nextStep}>Suivant →</button>
+            </>
+          )}
+
+          {/* ── ÉTAPE 2 : Détails ── */}
+          {step === 2 && (
+            <>
+              <div className="field-row">
+                <div className="field">
+                  <label>Ville</label>
+                  <select value={form.ville} onChange={e => set('ville', e.target.value)}>
+                    {VILLES.map(v => <option key={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Type de deal</label>
+                  <select value={form.type} onChange={e => set('type', e.target.value)}>
+                    <option value="physique">🏪 Physique (magasin)</option>
+                    <option value="online">🌐 En ligne</option>
+                    <option value="les deux">↔️ Les deux</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="field">
+                <label>Valable jusqu'au</label>
+                <input type="date" value={form.date_fin} onChange={e => set('date_fin', e.target.value)} />
+              </div>
+
+              <div className="field">
+                <label>Lien du deal (si en ligne)</label>
+                <input type="url" value={form.lien}
+                  onChange={e => handleLienChange(e.target.value)}
+                  placeholder="https://jumia.ma/..." />
+
+                {/* État : chargement */}
+                {fetchingImg && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: 'var(--muted)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    ⏳ Récupération de l'image en cours...
+                  </div>
+                )}
+
+                {/* État : image trouvée auto */}
+                {form.photo_url && !fetchingImg && (
+                  <div style={{ marginTop: 10, position: 'relative' }}>
+                    <img src={form.photo_url} alt="Aperçu"
+                      style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--bg)' }}
+                      onError={() => { set('photo_url', ''); setImgError(true); }}
+                    />
+                    <button onClick={() => { set('photo_url', ''); setImgError(true); }}
+                      style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.55)', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      ✕
+                    </button>
+                    <div style={{ fontSize: 11, color: '#0a8c63', fontWeight: 700, marginTop: 4 }}>✅ Image récupérée automatiquement</div>
+                  </div>
+                )}
+
+                {/* État : pas d'image auto → fallback manuel */}
+                {imgError && !fetchingImg && !form.photo_url && (
+                  <div style={{ marginTop: 10, background: '#fff8e0', border: '1.5px solid #ffe066', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#7a5c00', marginBottom: 8 }}>
+                      ⚠️ Image non récupérée automatiquement
+                    </div>
+                    <div style={{ fontSize: 11, color: '#7a5c00', fontWeight: 600, marginBottom: 10, lineHeight: 1.6 }}>
+                      Sur le site du produit : clic droit sur l'image → <strong>"Copier l'adresse de l'image"</strong> → colle-la ici
+                    </div>
+                    <input
+                      type="url"
+                      value={form.photo_url}
+                      onChange={e => {
+                        set('photo_url', e.target.value);
+                      }}
+                      placeholder="https://...image-du-produit.jpg"
+                      style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #ffe066', borderRadius: 8, fontSize: 13, fontFamily: 'Nunito', fontWeight: 600, background: 'white', color: 'var(--text)' }}
+                    />
+                    {form.photo_url && form.photo_url.startsWith('http') && (
+                      <img src={form.photo_url} alt="Aperçu"
+                        style={{ width: '100%', maxHeight: 150, objectFit: 'contain', borderRadius: 8, marginTop: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}
+                        onError={e => e.target.style.display = 'none'}
+                        onLoad={e => e.target.style.display = 'block'}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="field">
+                <label>Description / Infos supplémentaires</label>
+                <textarea value={form.description} onChange={e => set('description', e.target.value)}
+                  placeholder="Conditions, où trouver le deal, durée, stock..." />
+              </div>
+
+              <div className="field-row">
+                <button className="btn-full" style={{ background: 'var(--bg)', border: '1.5px solid var(--border)', fontFamily: 'Nunito', fontSize: 14, fontWeight: 800, cursor: 'pointer', padding: 13, borderRadius: 12, color: 'var(--muted)' }} onClick={() => setStep(1)}>
+                  ← Retour
+                </button>
+                <button className="btn-full btn-rouge" onClick={nextStep}>Suivant →</button>
+              </div>
+            </>
+          )}
+
+          {/* ── ÉTAPE 3 : Récap + envoi ── */}
+          {step === 3 && (
+            <>
+              <div style={{ background: 'var(--bg)', borderRadius: 14, padding: 16, marginBottom: 16, border: '1.5px solid var(--border)' }}>
+                {form.photo_url && (
+                  <img src={form.photo_url} alt="Aperçu produit"
+                    style={{ width: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 10, marginBottom: 12, background: 'white' }}
+                    onError={e => e.target.style.display='none'}
+                  />
+                )}
+                <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 10 }}>{form.titre}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {[
+                    ['🏪 Magasin',    form.magasin],
+                    ['📦 Catégorie',  form.categorie + ' ' + (CAT_ICONS[form.categorie] || '')],
+                    ['💰 Prix promo', form.prix_promo + ' MAD' + (discount() ? ` (-${discount()}%)` : '')],
+                    ['📍 Ville',      form.ville],
+                    ['🌐 Type',       form.type],
+                  ].map(([k, v]) => v ? (
+                    <div key={k} style={{ display: 'flex', gap: 8, fontSize: 12 }}>
+                      <span style={{ color: 'var(--muted)', fontWeight: 700, minWidth: 100 }}>{k}</span>
+                      <span style={{ fontWeight: 800, color: 'var(--text)' }}>{v}</span>
+                    </div>
+                  ) : null)}
+                </div>
+              </div>
+
+              <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 16, textAlign: 'center' }}>
+                ⚡ Ton deal sera examiné par notre équipe avant publication.
+              </div>
+
+              <div className="field-row">
+                <button className="btn-full" style={{ background: 'var(--bg)', border: '1.5px solid var(--border)', fontFamily: 'Nunito', fontSize: 14, fontWeight: 800, cursor: 'pointer', padding: 13, borderRadius: 12, color: 'var(--muted)' }} onClick={() => setStep(2)}>
+                  ← Modifier
+                </button>
+                <button className="btn-full btn-gradient" onClick={submit} disabled={loading}>
+                  {loading ? '⏳ Envoi...' : '🔥 Envoyer le deal'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+//  DEAL CARD
+// ══════════════════════════════════════════
+// ══════════════════════════════════════════
+//  HERO BAND — animé
+// ══════════════════════════════════════════
+const TAGLINE_AR = 'فيد و ستافيد — شارك هميزات ديالك و خلي غيرك يستافد 🔥';
+
+function HeroBand() {
+  const [displayed, setDisplayed] = useState('');
+  const [done, setDone]           = useState(false);
+
+  useEffect(() => {
+    let i = 0;
+    // Petit délai avant de démarrer, le temps que le FR soit visible
+    const timeout = setTimeout(() => {
+      const interval = setInterval(() => {
+        i++;
+        setDisplayed(TAGLINE_AR.slice(0, i));
+        if (i >= TAGLINE_AR.length) {
+          clearInterval(interval);
+          setTimeout(() => setDone(true), 600);
+        }
+      }, 35);
+      return () => clearInterval(interval);
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  return (
+    <div className="hero-band">
+      <div className="hero-top">
+        {/* Titre FR — fade-in immédiat */}
+        <div className="hero-tagline-fr hero-fr-anim">
+          Les meilleurs bons plans du Maroc,<br/>
+          <span>partagés par la communauté</span>
+        </div>
+
+        {/* Tagline arabe — typewriter */}
+        <div className="hero-tagline-ar hero-ar-anim">
+          {displayed}
+          {!done && <span className="hero-cursor" />}
+        </div>
+      </div>
+
+      {/* Steps — fade-in décalé */}
+      <div className="hero-steps hero-steps-anim">
+        <div className="hero-step">
+          <div className="hero-step-head">
+            <div className="hero-step-num">1</div>
+            <span className="hero-step-emoji">🔍</span>
+            <div>
+              <div className="hero-step-title">Tu déniche une أميزة</div>
+              <span className="hero-step-title-ar">لقيتي الأميزة ديالك؟</span>
+            </div>
+          </div>
+          <div className="hero-step-desc">
+            En faisant tes courses en magasin ou en ligne — si ça t'a fait économiser, ça peut faire économiser tout le monde.
+          </div>
+        </div>
+
+        <div className="hero-step">
+          <div className="hero-step-head">
+            <div className="hero-step-num">2</div>
+            <span className="hero-step-emoji">📤</span>
+            <div>
+              <div className="hero-step-title">Tu la partages en 30 sec</div>
+              <span className="hero-step-title-ar">شاركها مع الجماعة</span>
+            </div>
+          </div>
+          <div className="hero-step-desc">
+            Prix, magasin, ville — c'est tout ce qu'il faut. Notre équipe vérifie et publie. Ton deal aide des centaines de personnes à faire les mêmes économies.
+          </div>
+        </div>
+
+        <div className="hero-step">
+          <div className="hero-step-head">
+            <div className="hero-step-num">3</div>
+            <span className="hero-step-emoji">🔥</span>
+            <div>
+              <div className="hero-step-title">La communauté vote</div>
+              <span className="hero-step-title-ar">الجماعة تقيّم</span>
+            </div>
+          </div>
+          <div className="hero-step-desc">
+            <strong>ربح</strong> = deal intéressant, fonce. <strong>خسارة</strong> = à éviter. Les meilleures أميزات remontent en tête — plus tu partages, plus tu construis ta réputation.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+//  DEAL CARD
+// ══════════════════════════════════════════
+function DealCard({ deal, user, onVote, onClick }) {
+  const pct = deal.prix_normal > 0 ? Math.round((1 - deal.prix_promo / deal.prix_normal) * 100) : null;
+  const isHot = deal.score >= 20;
+  const dateStr = deal.created_at ? (() => {
+    const diff = Math.floor((Date.now() - new Date(deal.created_at)) / 60000);
+    if (diff < 60) return `il y a ${diff}min`;
+    if (diff < 1440) return `il y a ${Math.floor(diff/60)}h`;
+    return `il y a ${Math.floor(diff/1440)}j`;
+  })() : '';
+
+  return (
+    <div className="deal-card" onClick={() => onClick(deal)}>
+      {/* Image à gauche */}
+      <div className="dc-img">
+        {deal.photo_url
+          ? <img src={deal.photo_url} alt={deal.titre} onError={e => { e.target.style.display='none'; e.target.nextSibling && (e.target.nextSibling.style.display='flex'); }} />
+          : null
+        }
+        <span className="dc-img-placeholder" style={{ display: deal.photo_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+          {CAT_ICONS[deal.categorie] || '🛍️'}
+        </span>
+      </div>
+
+      {/* Contenu */}
+      <div className="dc-body">
+        <div className="dc-top">
+          <div className="dc-score" onClick={e => e.stopPropagation()}>
+            <button className="dc-vote-btn rabah" onClick={e => { e.stopPropagation(); onVote(deal.id, 'chaud'); }}>ربح</button>
+            <span className={`dc-score-num ${deal.score < 0 ? 'cold' : ''}`}>{deal.score}°</span>
+            <button className="dc-vote-btn khssara" onClick={e => { e.stopPropagation(); onVote(deal.id, 'froid'); }}>خسارة</button>
+          </div>
+          <span className="dc-date">{dateStr}</span>
+        </div>
+
+        <div className="dc-title">{deal.titre}</div>
+
+        <div className="dc-price-row">
+          <span className="dc-price-promo">{deal.prix_promo} MAD</span>
+          {deal.prix_normal > 0 && <span className="dc-price-normal">{deal.prix_normal} MAD</span>}
+          {pct > 0 && <span className="dc-price-pct">-{pct}%</span>}
+        </div>
+
+        <div className="dc-meta">
+          <span>Dispo. chez <span className="dc-shop">{deal.magasin}</span></span>
+          <span>📍 {deal.ville}</span>
+          {deal.date_fin && <span>⏰ {new Date(deal.date_fin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>}
+          {isHot && <span style={{ color: 'var(--rouge)', fontWeight: 800 }}>🔥 Tendance</span>}
+        </div>
+
+        {deal.description && <div className="dc-desc">{deal.description}</div>}
+
+        <div className="dc-footer">
+          <button className="dc-action-btn" onClick={e => { e.stopPropagation(); onClick(deal); }}>
+            💬 <span>Commentaires</span>
+          </button>
+          {deal.lien && (
+            <a href={deal.lien} target="_blank" rel="noopener noreferrer"
+              className="dc-voir-btn" onClick={e => e.stopPropagation()}>
+              شوف الدييل ↗
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+//  FICHE DEAL (détail)
+// ══════════════════════════════════════════
+function DealDetail({ deal, user, onBack, onVote }) {
+  const pct = deal.prix_normal > 0 ? Math.round((1 - deal.prix_promo / deal.prix_normal) * 100) : null;
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [loadingComment, setLoadingComment] = useState(false);
+
+  useEffect(() => {
+    sb.from('commentaires').select('*, users(pseudo)').eq('deal_id', deal.id).order('created_at').then(({ data }) => {
+      setComments(data || []);
+    });
+  }, [deal.id]);
+
+  async function addComment() {
+    if (!newComment.trim() || !user) return;
+    setLoadingComment(true);
+    const { error } = await sb.from('commentaires').insert({ deal_id: deal.id, user_id: user.id, contenu: newComment.trim() });
+    if (!error) {
+      setNewComment('');
+      // Recharge depuis Supabase pour avoir le vrai pseudo et persister
+      const { data } = await sb.from('commentaires').select('*, users(pseudo)').eq('deal_id', deal.id).order('created_at');
+      setComments(data || []);
+    }
+    setLoadingComment(false);
+  }
+
+  return (
+    <div>
+      <div className="deal-detail">
+        <div className="deal-detail-header">
+          <button className="back-btn" onClick={onBack}>← Retour</button>
+          <div className="deal-detail-title">{deal.titre}</div>
+        </div>
+        <div className="deal-detail-body">
+          {deal.photo_url && (
+            <img src={deal.photo_url} alt={deal.titre}
+              style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 12, marginBottom: 16, background: 'var(--bg)', border: '1px solid var(--border)' }}
+              onError={e => e.target.style.display='none'}
+            />
+          )}
+          <div className="deal-tags" style={{ marginBottom: 12 }}>
+            <span className="deal-tag tag-cat">{CAT_ICONS[deal.categorie] || '✨'} {deal.categorie}</span>
+            <span className="deal-tag tag-type">{deal.type === 'physique' ? '🏪 Physique' : '🌐 En ligne'}</span>
+          </div>
+
+          <div className="deal-price-row" style={{ marginBottom: 12 }}>
+            <span className="price-promo" style={{ fontSize: 28 }}>{deal.prix_promo} MAD</span>
+            {deal.prix_normal > 0 && <span className="price-normal" style={{ fontSize: 16 }}>{deal.prix_normal} MAD</span>}
+            {pct > 0 && <span className="price-discount" style={{ fontSize: 13 }}>-{pct}%</span>}
+          </div>
+
+          <div className="deal-meta" style={{ marginBottom: 16 }}>
+            <span>🏪 {deal.magasin}</span>
+            <span>📍 {deal.ville}</span>
+            {deal.date_fin && <span>⏰ Valable jusqu'au {new Date(deal.date_fin).toLocaleDateString('fr-FR')}</span>}
+          </div>
+
+          {deal.description && (
+            <p style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 600, marginBottom: 16, lineHeight: 1.7, borderLeft: '3px solid var(--border)', paddingLeft: 12 }}>
+              {deal.description}
+            </p>
+          )}
+
+          {deal.lien && (
+            <a href={deal.lien} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#e8f4ff', color: 'var(--blue)', borderRadius: 10, fontWeight: 800, fontSize: 13, textDecoration: 'none', marginBottom: 16 }}>
+              🔗 Voir le deal en ligne
+            </a>
+          )}
+
+          {/* Votes */}
+          <div className="vote-zone">
+            <button className="vote-btn fire" onClick={() => onVote(deal.id, 'chaud')} style={{ fontFamily: 'Noto Naskh Arabic, serif', fontSize: 16 }}>ربح</button>
+            <div className="score-big">{deal.score}°</div>
+            <button className="vote-btn ice"  onClick={() => onVote(deal.id, 'froid')} style={{ fontFamily: 'Noto Naskh Arabic, serif', fontSize: 16 }}>خسارة</button>
+          </div>
+
+          {/* Commentaires */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 8 }}>
+            <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 12 }}>💬 Commentaires ({comments.length})</div>
+
+            {user ? (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                <input value={newComment} onChange={e => setNewComment(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addComment()}
+                  placeholder="Ajoute un commentaire..."
+                  style={{ flex: 1, padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 10, fontSize: 13, fontFamily: 'Nunito', fontWeight: 600, color: 'var(--text)' }} />
+                <button onClick={addComment} disabled={loadingComment}
+                  style={{ background: 'var(--rouge)', color: 'white', border: 'none', padding: '10px 16px', borderRadius: 10, fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'Nunito' }}>
+                  Envoyer
+                </button>
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600, marginBottom: 16, padding: '10px 14px', background: 'var(--bg)', borderRadius: 10 }}>
+                🔑 Connecte-toi pour commenter.
+              </div>
+            )}
+
+            {comments.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Aucun commentaire — sois le premier ! 🔥</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {comments.map(c => (
+                  <div key={c.id} style={{ display: 'flex', gap: 10 }}>
+                    <div className="user-avatar" style={{ width: 32, height: 32, fontSize: 11, flexShrink: 0 }}>
+                      {(c.users?.pseudo || '?')[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--rouge)', marginBottom: 2 }}>{c.users?.pseudo || 'Anonyme'}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{c.contenu}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+//  PAGE ADMIN (route #admin)
+// ══════════════════════════════════════════
+function AdminPage({ user, isAdmin, onGoFeed }) {
+  const [deals, setDeals]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [onglet, setOnglet]   = useState('en_attente');
+  const [editId, setEditId]   = useState(null);
+  const [editForm, setEditForm] = useState({});
+
+  useEffect(() => { loadDeals(); }, [onglet]);
+
+  async function loadDeals() {
+    setLoading(true);
+    const { data } = await sb.from('deals').select('*')
+      .eq('statut', onglet).order('created_at', { ascending: false });
+    setDeals(data || []);
+    setLoading(false);
+  }
+
+  const updateStatut = async (id, statut) => {
+    await sb.from('deals').update({ statut }).eq('id', id);
+    setDeals(p => p.filter(d => d.id !== id));
+    const msgs = { validé: '✅ Validé !', refusé: '❌ Refusé.', expiré: '⏸ Marqué expiré.', en_attente: '↩️ Remis en attente.' };
+    toast(msgs[statut] || 'Mis à jour.', 'ok');
+  };
+
+  const supprimer = async (id) => {
+    if (!window.confirm('Supprimer ce deal définitivement ?')) return;
+    await sb.from('deals').delete().eq('id', id);
+    setDeals(p => p.filter(d => d.id !== id));
+    toast('🗑️ Supprimé.', 'ok');
+  };
+
+  const startEdit = (d) => {
+    setEditId(d.id);
+    setEditForm({ titre: d.titre, magasin: d.magasin, prix_promo: d.prix_promo, prix_normal: d.prix_normal, ville: d.ville, categorie: d.categorie, type: d.type, description: d.description || '', lien: d.lien || '', date_fin: d.date_fin || '' });
+  };
+
+  const saveEdit = async (id) => {
+    await sb.from('deals').update({ ...editForm, prix_promo: parseFloat(editForm.prix_promo), prix_normal: parseFloat(editForm.prix_normal) || 0 }).eq('id', id);
+    setDeals(p => p.map(d => d.id === id ? { ...d, ...editForm } : d));
+    setEditId(null);
+    toast('💾 Deal mis à jour.', 'ok');
+  };
+
+  const btnAction = (label, onClick, color = 'var(--muted)', bg = 'none', border = '1px solid var(--border)') => (
+    <button onClick={onClick} style={{ background: bg, color, border, padding: '7px 14px', borderRadius: 8, fontWeight: 800, fontSize: 12, cursor: 'pointer', fontFamily: 'Nunito', whiteSpace: 'nowrap', transition: 'opacity 0.1s' }}>
+      {label}
+    </button>
+  );
+
+  if (!user) return <div style={{ padding: 40, textAlign: 'center' }}><div style={{ fontSize: 48 }}>🔒</div><button onClick={onGoFeed} style={{ marginTop: 16, background: 'var(--rouge)', color: 'white', border: 'none', padding: '10px 20px', borderRadius: 10, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito' }}>← Retour</button></div>;
+  if (isAdmin === false) return <div style={{ padding: 40, textAlign: 'center' }}><div style={{ fontSize: 48 }}>🚫</div><p style={{ margin: '12px 0', fontWeight: 700 }}>Accès non autorisé</p><button onClick={onGoFeed} style={{ background: 'var(--rouge)', color: 'white', border: 'none', padding: '10px 20px', borderRadius: 10, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito' }}>← Retour</button></div>;
+  if (isAdmin === null) return <div className="loader" style={{ padding: 60, textAlign: 'center' }}>Vérification...</div>;
+
+  const tabStyle = (t) => ({ padding: '10px 20px', border: 'none', cursor: 'pointer', fontFamily: 'Nunito', fontSize: 13, fontWeight: 800, transition: 'all 0.15s', borderBottom: onglet === t ? '3px solid var(--rouge)' : '3px solid transparent', background: 'none', color: onglet === t ? 'var(--rouge)' : 'var(--muted)' });
+  const inp = (key, placeholder, type = 'text') => (
+    <input type={type} value={editForm[key] || ''} onChange={e => setEditForm(p => ({ ...p, [key]: e.target.value }))}
+      placeholder={placeholder}
+      style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, fontFamily: 'Nunito', fontWeight: 600, color: 'var(--text)', background: 'var(--white)' }} />
+  );
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      <div style={{ background: 'var(--dark)', padding: '0 28px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ background: 'var(--rouge)', borderRadius: 10, padding: '4px 12px', cursor: 'pointer' }} onClick={onGoFeed}>
+            <span style={{ fontFamily: 'Noto Naskh Arabic, serif', fontSize: 16, color: 'white', fontWeight: 700 }}>فيدوستافيد</span>
+          </div>
+          <span style={{ color: 'rgba(255,255,255,0.4)' }}>|</span>
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 800 }}>⚙️ Interface Admin</span>
+        </div>
+        <button onClick={onGoFeed} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito' }}>← Voir le site</button>
+      </div>
+
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 20px 80px' }}>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--text)', marginBottom: 4 }}>Modération des deals</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>{user.email}</div>
+        </div>
+
+        <div style={{ background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: '14px 14px 0 0', display: 'flex', borderBottom: '1px solid var(--border)' }}>
+          {['en_attente','validé','refusé','expiré'].map(t => (
+            <button key={t} style={tabStyle(t)} onClick={() => setOnglet(t)}>
+              {t === 'en_attente' ? '⏳ En attente' : t === 'validé' ? '✅ Validés' : t === 'refusé' ? '❌ Refusés' : '⏸ Expirés'}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ background: 'var(--white)', border: '1.5px solid var(--border)', borderTop: 'none', borderRadius: '0 0 14px 14px', minHeight: 300 }}>
+          {loading ? <div className="loader" style={{ padding: 40, textAlign: 'center' }}>Chargement...</div>
+          : deals.length === 0 ? <div className="empty" style={{ padding: 48, textAlign: 'center' }}><div style={{ fontSize: 36 }}>📭</div><div style={{ marginTop: 10, fontWeight: 700, color: 'var(--muted)' }}>Aucun deal ici.</div></div>
+          : <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {deals.map((d, i) => {
+                const pct = d.prix_normal > 0 ? Math.round((1 - d.prix_promo / d.prix_normal) * 100) : null;
+                const isEditing = editId === d.id;
+                return (
+                  <div key={d.id} style={{ padding: 18, borderBottom: i < deals.length - 1 ? '1px solid var(--border)' : 'none', opacity: d.statut === 'expiré' ? 0.6 : 1 }}>
+                    {isEditing ? (
+                      /* ── MODE ÉDITION ── */
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          {inp('titre', 'Titre')}
+                          {inp('magasin', 'Magasin')}
+                          {inp('prix_promo', 'Prix promo', 'number')}
+                          {inp('prix_normal', 'Prix normal', 'number')}
+                          {inp('ville', 'Ville')}
+                          {inp('date_fin', 'Date fin', 'date')}
+                        </div>
+                        <input value={editForm.description || ''} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} placeholder="Description"
+                          style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, fontFamily: 'Nunito', fontWeight: 600, color: 'var(--text)' }} />
+                        <input value={editForm.lien || ''} onChange={e => setEditForm(p => ({ ...p, lien: e.target.value }))} placeholder="Lien"
+                          style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, fontFamily: 'Nunito', fontWeight: 600, color: 'var(--text)' }} />
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => saveEdit(d.id)} style={{ background: 'var(--green)', color: 'white', border: 'none', padding: '9px 20px', borderRadius: 8, fontWeight: 900, fontSize: 13, cursor: 'pointer', fontFamily: 'Nunito' }}>💾 Sauvegarder</button>
+                          <button onClick={() => setEditId(null)} style={{ background: 'var(--bg)', color: 'var(--muted)', border: '1px solid var(--border)', padding: '9px 16px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'Nunito' }}>Annuler</button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* ── MODE AFFICHAGE ── */
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                        {d.photo_url && <img src={d.photo_url} alt="" style={{ width: 60, height: 60, objectFit: 'contain', borderRadius: 8, background: 'var(--bg)', flexShrink: 0 }} onError={e => e.target.style.display='none'} />}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 4, textDecoration: d.statut === 'expiré' ? 'line-through' : 'none' }}>{d.titre}</div>
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
+                            <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--rouge)' }}>{d.prix_promo} MAD</span>
+                            {pct > 0 && <span style={{ fontSize: 10, background: '#e8faf5', color: '#0a8c63', padding: '2px 7px', borderRadius: 20, fontWeight: 800 }}>-{pct}%</span>}
+                            {d.prix_normal > 0 && <span style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'line-through', fontWeight: 700 }}>{d.prix_normal} MAD</span>}
+                          </div>
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+                            {[['🏪', d.magasin], ['📦', d.categorie], ['📍', d.ville], d.date_fin && ['⏰', new Date(d.date_fin).toLocaleDateString('fr-FR')]].filter(Boolean).map(([icon, val]) => (
+                              <span key={val} style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>{icon} {val}</span>
+                            ))}
+                          </div>
+                          {d.lien && <a href={d.lien} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--blue)', fontWeight: 700 }}>🔗 Voir le lien</a>}
+                          <div style={{ fontSize: 10, color: '#ccc', fontWeight: 700, marginTop: 4 }}>
+                            Soumis le {new Date(d.created_at).toLocaleDateString('fr-FR')} à {new Date(d.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                        {/* Actions */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
+                          {onglet === 'en_attente' && <>
+                            {btnAction('✅ Valider',  () => updateStatut(d.id, 'validé'),  'white', 'var(--green)', 'none')}
+                            {btnAction('✕ Refuser',  () => updateStatut(d.id, 'refusé'),  'var(--rouge)', 'white', '1.5px solid var(--rouge)')}
+                          </>}
+                          {onglet === 'validé' && <>
+                            {btnAction('⏸ Expirer',  () => updateStatut(d.id, 'expiré'),  '#cc8800', '#fff8e0', '1px solid #ffe066')}
+                            {btnAction('✕ Retirer',  () => updateStatut(d.id, 'refusé'),  'var(--rouge)', 'white', '1.5px solid var(--rouge)')}
+                          </>}
+                          {onglet === 'refusé' && <>
+                            {btnAction('✅ Republier', () => updateStatut(d.id, 'validé'), 'white', 'var(--green)', 'none')}
+                            {btnAction('↩️ Attente',   () => updateStatut(d.id, 'en_attente'), 'var(--muted)', 'none', '1px solid var(--border)')}
+                          </>}
+                          {onglet === 'expiré' && <>
+                            {btnAction('✅ Republier', () => updateStatut(d.id, 'validé'), 'white', 'var(--green)', 'none')}
+                          </>}
+                          {btnAction('✏️ Modifier', () => startEdit(d), 'var(--blue)', '#e8f4ff', '1px solid #b8daff')}
+                          {btnAction('🗑 Supprimer', () => supprimer(d.id), 'var(--muted)', 'none', '1px solid var(--border)')}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+//  PAGE MES DEALS
+// ══════════════════════════════════════════
+function MesDealsPage({ user, userProfile, onGoFeed }) {
+  const [deals, setDeals]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editId, setEditId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    sb.from('deals').select('*').eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { setDeals(data || []); setLoading(false); });
+  }, []);
+
+  const startEdit = (d) => {
+    setEditId(d.id);
+    setEditForm({ titre: d.titre, magasin: d.magasin, prix_promo: d.prix_promo, prix_normal: d.prix_normal || '', ville: d.ville, description: d.description || '', lien: d.lien || '', date_fin: d.date_fin || '' });
+  };
+
+  const saveEdit = async (id) => {
+    setSaving(true);
+    // Repasse en_attente pour approbation admin
+    const { error } = await sb.from('deals').update({
+      ...editForm,
+      prix_promo:  parseFloat(editForm.prix_promo),
+      prix_normal: parseFloat(editForm.prix_normal) || 0,
+      statut: 'en_attente'
+    }).eq('id', id);
+    setSaving(false);
+    if (!error) {
+      setDeals(p => p.map(d => d.id === id ? { ...d, ...editForm, statut: 'en_attente' } : d));
+      setEditId(null);
+      toast('✅ Modifications envoyées — en attente de validation.', 'ok');
+    } else {
+      toast('❌ Erreur : ' + error.message, 'err');
+    }
+  };
+
+  const statutLabel = { en_attente: '⏳ En attente', validé: '✅ Validé', refusé: '❌ Refusé', expiré: '⏸ Expiré' };
+  const statutBg    = { en_attente: '#fff8e0', validé: '#e8faf5', refusé: '#fff0f0', expiré: '#f0eee8' };
+  const statutColor = { en_attente: '#cc8800', validé: '#0a8c63', refusé: 'var(--rouge)', expiré: 'var(--muted)' };
+
+  const inp = (key, label, type = 'text') => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <label style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--muted)' }}>{label}</label>
+      <input type={type} value={editForm[key] || ''} onChange={e => setEditForm(p => ({ ...p, [key]: e.target.value }))}
+        style={{ padding: '8px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, fontFamily: 'Nunito', fontWeight: 600, color: 'var(--text)', background: 'var(--white)' }} />
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      <div style={{ background: 'var(--dark)', padding: '0 28px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ background: 'var(--rouge)', borderRadius: 10, padding: '4px 12px', cursor: 'pointer' }} onClick={onGoFeed}>
+            <span style={{ fontFamily: 'Noto Naskh Arabic, serif', fontSize: 16, color: 'white', fontWeight: 700 }}>فيدوستافيد</span>
+          </div>
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>|</span>
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 800 }}>📋 Mes deals soumis</span>
+        </div>
+        <button onClick={onGoFeed} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito' }}>← Retour</button>
+      </div>
+
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '28px 20px 60px' }}>
+        <div style={{ background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center' }}>
+            <span style={{ fontSize: 15, fontWeight: 900 }}>📋 Mes deals soumis</span>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>{deals.length} deal{deals.length > 1 ? 's' : ''}</span>
+          </div>
+
+          {loading ? <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>Chargement...</div>
+          : deals.length === 0 ? (
+            <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)' }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>📭</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>Aucun deal soumis pour l'instant.</div>
+            </div>
+          ) : deals.map((d, i) => {
+            const pct = d.prix_normal > 0 ? Math.round((1 - d.prix_promo / d.prix_normal) * 100) : null;
+            const isEditing = editId === d.id;
+            return (
+              <div key={d.id} style={{ padding: '16px 20px', borderBottom: i < deals.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                {isEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ background: '#fff8e0', border: '1px solid #ffe066', borderRadius: 8, padding: '10px 14px', fontSize: 12, fontWeight: 700, color: '#7a5c00' }}>
+                      ⚠️ Après modification, ton deal repassera en validation avant d'être republié.
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      {inp('titre', 'Titre')}
+                      {inp('magasin', 'Magasin')}
+                      {inp('prix_promo', 'Prix promo (MAD)', 'number')}
+                      {inp('prix_normal', 'Prix normal (MAD)', 'number')}
+                      {inp('ville', 'Ville')}
+                      {inp('date_fin', 'Date fin', 'date')}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <label style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--muted)' }}>Description</label>
+                      <textarea value={editForm.description || ''} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} rows={3}
+                        style={{ padding: '8px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, fontFamily: 'Nunito', fontWeight: 600, color: 'var(--text)', resize: 'vertical' }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => saveEdit(d.id)} disabled={saving}
+                        style={{ background: 'var(--rouge)', color: 'white', border: 'none', padding: '10px 20px', borderRadius: 10, fontWeight: 900, fontSize: 13, cursor: 'pointer', fontFamily: 'Nunito', flex: 1 }}>
+                        {saving ? '⏳ Envoi...' : '📤 Envoyer pour validation'}
+                      </button>
+                      <button onClick={() => setEditId(null)}
+                        style={{ background: 'var(--bg)', color: 'var(--muted)', border: '1px solid var(--border)', padding: '10px 16px', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'Nunito' }}>
+                        Annuler
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {d.photo_url && <img src={d.photo_url} alt="" style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 8, background: 'var(--bg)', flexShrink: 0 }} onError={e => e.target.style.display='none'} />}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.titre}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700 }}>
+                        <span style={{ color: 'var(--rouge)', fontWeight: 900 }}>{d.prix_promo} MAD</span>
+                        {pct > 0 && <span> · -{pct}%</span>}
+                        <span> · {d.magasin} · {new Date(d.created_at).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 10px', borderRadius: 20, background: statutBg[d.statut], color: statutColor[d.statut] }}>
+                        {statutLabel[d.statut] || d.statut}
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--rouge)' }}>🔥 {d.score}</span>
+                      {(d.statut === 'validé' || d.statut === 'refusé' || d.statut === 'en_attente') && (
+                        <button onClick={() => startEdit(d)}
+                          style={{ background: '#e8f4ff', color: 'var(--blue)', border: '1px solid #b8daff', padding: '5px 12px', borderRadius: 8, fontWeight: 800, fontSize: 12, cursor: 'pointer', fontFamily: 'Nunito', whiteSpace: 'nowrap' }}>
+                          ✏️ Modifier
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+//  PAGE PROFIL
+// ══════════════════════════════════════════
+function ProfilPage({ user, userProfile, onGoFeed, onProfileUpdate }) {
+  const [form, setForm] = useState({ genre: '', tranche_age: '', ville: '', situation_fam: '', nb_enfants: '' });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved]   = useState(false);
+
+  useEffect(() => {
+    if (userProfile) {
+      setForm({
+        genre:         userProfile.genre         || '',
+        tranche_age:   userProfile.tranche_age   || '',
+        ville:         userProfile.ville         || '',
+        situation_fam: userProfile.situation_fam || '',
+        nb_enfants:    userProfile.nb_enfants    || '',
+      });
+    }
+  }, [userProfile]);
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const filled = [form.genre, form.tranche_age, form.ville, form.situation_fam].filter(Boolean).length;
+  const total  = 4;
+  const pctFill = Math.round((filled / total) * 100);
+
+  async function saveProfile() {
+    setSaving(true);
+    const profil_complet = filled === total;
+    const { error } = await sb.from('users').update({ ...form, profil_complet }).eq('id', user.id);
+    setSaving(false);
+    if (!error) { setSaved(true); onProfileUpdate?.(); setTimeout(() => setSaved(false), 2500); toast('✅ Profil mis à jour !', 'ok'); }
+    else toast('❌ ' + error.message, 'err');
+  }
+
+  // Style bouton sélectionnable — vert si rempli, rouge si sélection active
+  const btnStyle = (fieldVal, val) => ({
+    padding: '8px 14px', borderRadius: 10, fontFamily: 'Nunito', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+    transition: 'all 0.15s',
+    border: `1.5px solid ${fieldVal === val ? 'var(--green)' : 'var(--border)'}`,
+    background: fieldVal === val ? '#e8faf5' : 'var(--white)',
+    color: fieldVal === val ? '#0a8c63' : 'var(--muted)',
+  });
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      {/* Header */}
+      <div style={{ background: 'var(--dark)', padding: '0 28px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ background: 'var(--rouge)', borderRadius: 10, padding: '4px 12px', cursor: 'pointer' }} onClick={onGoFeed}>
+            <span style={{ fontFamily: 'Noto Naskh Arabic, serif', fontSize: 16, color: 'white', fontWeight: 700 }}>فيدوستافيد</span>
+          </div>
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>|</span>
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 800 }}>👤 Mon profil</span>
+        </div>
+        <button onClick={onGoFeed} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito' }}>← Retour</button>
+      </div>
+
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '28px 20px 60px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+        {/* Carte identité */}
+        <div style={{ background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 16, padding: 24, display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg, var(--rouge), var(--orange))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 900, color: 'white', flexShrink: 0 }}>
+            {(userProfile?.pseudo || user.email)[0].toUpperCase()}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--text)', marginBottom: 4 }}>{userProfile?.pseudo || 'Mon compte'}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>{user.email}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 16, flexShrink: 0 }}>
+            {[['🔥', userProfile?.score_reputation || 0, 'Score'],['📦', userProfile?.deals_soumis || 0, 'Soumis'],['✅', userProfile?.deals_valides || 0, 'Validés']].map(([icon, val, label]) => (
+              <div key={label} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--rouge)' }}>{icon} {val}</div>
+                <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Profil démographique */}
+        <div style={{ background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
+          {/* Header avec barre de progression */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 15, fontWeight: 900, color: 'var(--text)' }}>📊 Profil consommateur</span>
+              <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 800, color: pctFill === 100 ? '#0a8c63' : '#cc8800' }}>
+                {pctFill === 100 ? '✅ Complet' : `${filled}/${total} renseigné${filled > 1 ? 's' : ''}`}
+              </span>
+            </div>
+            {/* Barre de progression */}
+            <div style={{ height: 6, background: 'var(--border)', borderRadius: 20, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pctFill}%`, background: pctFill === 100 ? 'var(--green)' : 'var(--orange)', borderRadius: 20, transition: 'width 0.4s ease' }} />
+            </div>
+            {pctFill < 100 && (
+              <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, marginTop: 8, lineHeight: 1.6, background: '#fff8e0', border: '1px solid #ffe066', borderRadius: 8, padding: '8px 12px' }}>
+                💡 Ces infos nous permettent de te proposer des deals adaptés à ton profil.
+              </div>
+            )}
+          </div>
+
+          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            {/* Genre */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Genre</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {[['homme','👨 Homme'],['femme','👩 Femme'],['non_precise','— Ne pas préciser']].map(([val, label]) => (
+                  <button key={val} onClick={() => set('genre', val)} style={btnStyle(form.genre, val)}>{label}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tranche d'âge */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Tranche d'âge</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {['18-24','25-34','35-44','45-54','55+'].map(val => (
+                  <button key={val} onClick={() => set('tranche_age', val)} style={btnStyle(form.tranche_age, val)}>{val} ans</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Ville */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Ta ville</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {VILLES.slice(1).map(val => (
+                  <button key={val} onClick={() => set('ville', val)} style={btnStyle(form.ville, val)}>{val}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Situation familiale */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Situation familiale</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {[['celibataire','🙋 Célibataire'],['en_couple','💑 En couple'],['marie','💍 Marié(e)'],['marie_enfants','👨‍👩‍👧 Marié(e) avec enfants']].map(([val, label]) => (
+                  <button key={val} onClick={() => set('situation_fam', val)} style={btnStyle(form.situation_fam, val)}>{label}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Enfants — si marié */}
+            {(form.situation_fam === 'marie' || form.situation_fam === 'marie_enfants') && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Nombre d'enfants</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[['0','Aucun'],['1-2','1 ou 2'],['3+','3 ou plus']].map(([val, label]) => (
+                    <button key={val} onClick={() => set('nb_enfants', val)} style={btnStyle(form.nb_enfants, val)}>{label}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button onClick={saveProfile} disabled={saving}
+              style={{ background: saved ? 'var(--green)' : 'var(--rouge)', color: 'white', border: 'none', padding: 13, borderRadius: 12, fontSize: 15, fontWeight: 900, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'Nunito', opacity: saving ? 0.7 : 1, transition: 'all 0.2s' }}>
+              {saving ? '⏳ Enregistrement...' : saved ? '✅ Profil sauvegardé !' : pctFill === 100 ? '💾 Mettre à jour' : '💾 Sauvegarder'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+//  APP PRINCIPALE
+// ══════════════════════════════════════════
+function App() {
+  const [user, setUser]           = useState(null);
+  const [userProfile, setProfile] = useState(null);
+  const [isAdmin, setIsAdmin]     = useState(null); // null=chargement, true/false
+  const [route, setRoute]         = useState(location.hash.replace('#','') || 'feed');
+  const [deals, setDeals]         = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [modal, setModal]         = useState(null);
+  const [authTab, setAuthTab]     = useState('login');
+  const [selectedDeal, setDeal]   = useState(null);
+  const [filterCat, setFilterCat] = useState('Tout');
+  const [filterVille, setFilterVille] = useState('');
+  const [filterSort, setFilterSort]   = useState('score');
+  const [filterSearch, setFilterSearch] = useState('');
+  const [showProfileMenu, setProfileMenu] = useState(false);
+  const profileRef = useRef(null);
+
+  // Routing via hash
+  useEffect(() => {
+    const onHash = () => setRoute(location.hash.replace('#','') || 'feed');
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  const goTo = (r) => { location.hash = r; setRoute(r); };
+
+  // Ferme le menu profil si clic ailleurs
+  useEffect(() => {
+    const handler = (e) => { if (profileRef.current && !profileRef.current.contains(e.target)) setProfileMenu(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Auth init
+  useEffect(() => {
+    sb.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) { loadProfile(session.user.id); checkIsAdmin(session.user.id).then(setIsAdmin); }
+      else setIsAdmin(false);
+    });
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) { loadProfile(session.user.id); checkIsAdmin(session.user.id).then(setIsAdmin); }
+      else { setProfile(null); setIsAdmin(false); }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function loadProfile(uid) {
+    const { data } = await sb.from('users').select('*').eq('id', uid).maybeSingle();
+    setProfile(data);
+  }
+
+  useEffect(() => { loadDeals(); }, [filterCat, filterVille, filterSort, filterSearch]);
+
+  async function loadDeals() {
+    setLoading(true);
+    let q = sb.from('deals').select('*').eq('statut', 'validé');
+    if (filterCat !== 'Tout') q = q.eq('categorie', filterCat);
+    if (filterVille) q = q.eq('ville', filterVille);
+    if (filterSearch.trim()) q = q.ilike('titre', `%${filterSearch.trim()}%`);
+    if (filterSort === 'score')  q = q.order('score', { ascending: false });
+    if (filterSort === 'recent') q = q.order('created_at', { ascending: false });
+    const { data } = await q;
+    setDeals(data || []);
+    setLoading(false);
+  }
+
+  async function handleVote(dealId, type) {
+    if (!user) { setAuthTab('login'); setModal('auth'); return; }
+    const { data: existing } = await sb.from('votes').select('*').eq('deal_id', dealId).eq('user_id', user.id).maybeSingle();
+    let scoreDelta = 0;
+    if (existing) {
+      if (existing.type === type) {
+        await sb.from('votes').delete().eq('id', existing.id);
+        scoreDelta = type === 'chaud' ? -1 : 1;
+        toast(type === 'chaud' ? '✅ ربح — vote enregistré !' : '❌ خسارة — vote enregistré.', 'ok');
+      } else {
+        await sb.from('votes').update({ type }).eq('id', existing.id);
+        scoreDelta = type === 'chaud' ? 2 : -2;
+        toast(type === 'chaud' ? '✅ ربح !' : '❌ خسارة.', 'ok');
+      }
+    } else {
+      await sb.from('votes').insert({ deal_id: dealId, user_id: user.id, type });
+      scoreDelta = type === 'chaud' ? 1 : -1;
+      toast(type === 'chaud' ? '✅ ربح !' : '❌ خسارة.', 'ok');
+    }
+    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, score: d.score + scoreDelta } : d));
+    if (selectedDeal?.id === dealId) setDeal(prev => ({ ...prev, score: prev.score + scoreDelta }));
+  }
+
+  async function logout() {
+    await sb.auth.signOut();
+    setProfileMenu(false);
+    setIsAdmin(false);
+    toast('Déconnecté. À bientôt !', 'ok');
+  }
+
+  // ── ROUTE ADMIN ──
+  if (route === 'admin') {
+    return (
+      <>
+        <ToastContainer />
+        <AdminPage user={user} isAdmin={isAdmin} onGoFeed={() => goTo('feed')} />
+      </>
+    );
+  }
+
+  // ── ROUTE PROFIL ──
+  if (route === 'profil') {
+    return (
+      <>
+        <ToastContainer />
+        <ProfilPage
+          user={user}
+          userProfile={userProfile}
+          onGoFeed={() => goTo('feed')}
+          onProfileUpdate={() => loadProfile(user.id)}
+        />
+      </>
+    );
+  }
+
+  // ── ROUTE DEALS ──
+  if (route === 'deals') {
+    return (
+      <>
+        <ToastContainer />
+        <MesDealsPage
+          user={user}
+          userProfile={userProfile}
+          onGoFeed={() => goTo('feed')}
+        />
+      </>
+    );
+  }
+
+  // ── ROUTE FEED (principale) ──
+  return (
+    <>
+      <ToastContainer />
+
+      {/* TOPBAR */}
+      <div className="topbar">
+        <div className="logo-pill" onClick={() => { setDeal(null); goTo('feed'); }}>
+          <span style={{ fontSize: 18 }}>🔥</span>
+          <span className="logo-ar">فيدوستافيد</span>
+          <span className="logo-lat">fidwastafid</span>
+        </div>
+
+        <div className="topbar-right">
+          {user ? (
+            <>
+              {isAdmin && (
+                <button className="btn-nav" style={{ background: '#fff8e0', color: '#cc8800' }}
+                  onClick={() => goTo('admin')}>
+                  ⚙️ Admin
+                </button>
+              )}
+              <button className="btn-nav btn-submit-nav" onClick={() => setModal('submit')}>
+                <span>+</span><span className="btn-submit-text"> Soumettre un deal</span>
+              </button>
+              <div style={{ position: 'relative' }} ref={profileRef}>
+                <div className="user-pill" onClick={() => setProfileMenu(p => !p)}>
+                  <div className="user-avatar">
+                    {(userProfile?.pseudo || user.email)[0].toUpperCase()}
+                  </div>
+                  <span className="user-pseudo">{userProfile?.pseudo || 'Mon compte'}</span>
+                  <span style={{ fontSize: 10, color: 'var(--muted)' }}>▾</span>
+                </div>
+                {showProfileMenu && (
+                  <div className="profile-menu">
+                    <div className="profile-menu-header">
+                      <div className="profile-menu-pseudo">{userProfile?.pseudo || 'Mon profil'}</div>
+                      <div className="profile-menu-email">{user.email}</div>
+                    </div>
+                    <button className="profile-menu-item" onClick={() => { setProfileMenu(false); goTo('profil'); }}>👤 Mon profil</button>
+                    <button className="profile-menu-item" onClick={() => { setProfileMenu(false); goTo('deals'); }}>📋 Mes deals soumis</button>
+                    {isAdmin && <button className="profile-menu-item" onClick={() => { setProfileMenu(false); goTo('admin'); }}>⚙️ Interface Admin</button>}
+                    <button className="profile-menu-item danger" onClick={logout}>🚪 Déconnexion</button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <button className="btn-nav btn-login" onClick={() => { setAuthTab('login'); setModal('auth'); }}>Connexion</button>
+              <button className="btn-nav btn-signup" onClick={() => { setAuthTab('signup'); setModal('auth'); }}>S'inscrire</button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── NAV MOBILE EN HAUT ── */}
+      <div className="mobile-top-nav">
+        <div className="mob-search">
+          <div className="mob-search-wrap">
+            <span className="mob-search-icon">🔍</span>
+            <input className="mob-search-input" placeholder="Chercher un deal..."
+              value={filterSearch || ''}
+              onChange={e => { setDeal(null); setFilterSearch(e.target.value); }}
+            />
+          </div>
+        </div>
+        <div className="mob-tabs">
+          <button className={`mob-tab ${filterSort === 'score' ? 'sort-active' : ''}`}
+            onClick={() => { setDeal(null); setFilterSort('score'); }}>🔥 Chauds</button>
+          <button className={`mob-tab ${filterSort === 'recent' ? 'sort-active' : ''}`}
+            onClick={() => { setDeal(null); setFilterSort('recent'); }}>⚡ Récents</button>
+          <div style={{ width: 1, background: 'var(--border)', margin: '4px 2px', flexShrink: 0 }} />
+          {['Tout', ...CATEGORIES].map(cat => (
+            <button key={cat} className={`mob-tab ${filterCat === cat ? 'active' : ''}`}
+              onClick={() => { setDeal(null); setFilterCat(cat); }}>
+              {cat === 'Tout' ? '🛍️ Tout' : `${CAT_ICONS[cat] || ''} ${cat}`}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* LAYOUT */}
+      <div className="layout">
+        <nav className="sidebar">
+          <div className="sidebar-brand">
+            <span className="ar">فيدوستافيد</span>
+            <div className="sub">Bons plans marocains 🇲🇦</div>
+          </div>
+          <div className="sidebar-section">Trier par</div>
+          <button className={`sidebar-btn ${filterSort === 'score' ? 'active' : ''}`} onClick={() => { setDeal(null); setFilterSort('score'); }}>🔥 Les plus chauds</button>
+          <button className={`sidebar-btn ${filterSort === 'recent' ? 'active' : ''}`} onClick={() => { setDeal(null); setFilterSort('recent'); }}>⚡ Les plus récents</button>
+          <div className="sidebar-section" style={{ marginTop: 12 }}>Catégories</div>
+          <div className="sidebar-cats">
+            {['Tout', ...CATEGORIES].map(cat => (
+              <button key={cat} className={`cat-btn ${filterCat === cat ? 'active' : ''}`} onClick={() => { setDeal(null); setFilterCat(cat); }}>
+                {cat === 'Tout' ? '🔥 Tous les deals' : `${CAT_ICONS[cat] || '✨'} ${cat}`}
+              </button>
+            ))}
+          </div>
+          <div className="sidebar-cta" onClick={() => user ? setModal('submit') : (setAuthTab('signup'), setModal('auth'))}>
+            <span className="ar">فيد و ستافيد</span>
+            <span className="sub">Partage un bon plan →</span>
+          </div>
+        </nav>
+
+        <main className="main">
+          {selectedDeal ? (
+            <DealDetail deal={selectedDeal} user={user} onBack={() => setDeal(null)} onVote={handleVote} />
+          ) : (
+            <>
+              {/* ── HERO ANIMÉ ── */}
+              <HeroBand />
+
+              <div className="filters-bar">
+                <span style={{ fontWeight: 900, fontSize: 13 }}>🔥 Bons plans</span>
+                <div className="filter-wrap">
+                  <select className="filter-select" value={filterVille} onChange={e => setFilterVille(e.target.value)}>
+                    <option value="">📍 Toutes les villes</option>
+                    {VILLES.slice(1).map(v => <option key={v} value={v}>📍 {v}</option>)}
+                  </select>
+                </div>
+                <button className={`filter-pill ${filterCat === 'Tout' ? 'active' : ''}`} onClick={() => setFilterCat('Tout')}>Tous</button>
+                {CATEGORIES.slice(0, 4).map(c => (
+                  <button key={c} className={`filter-pill ${filterCat === c ? 'active' : ''}`} onClick={() => setFilterCat(c)}>
+                    {CAT_ICONS[c]} {c}
+                  </button>
+                ))}
+              </div>
+              {loading ? (
+                <div className="loader">⏳ Chargement des deals...</div>
+              ) : deals.length === 0 ? (
+                <div className="empty"><div className="icon">🔍</div><div className="msg">Aucun deal trouvé pour ces filtres.</div></div>
+              ) : (
+                <div className="feed-grid">
+                  {deals.map(d => (
+                    <DealCard key={d.id} deal={d} user={user} onVote={handleVote} onClick={setDeal} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </main>
+      </div>
+
+      {modal === 'auth' && (
+        <AuthModal defaultTab={authTab} onClose={() => setModal(null)} onSuccess={(u) => { setUser(u); setModal(null); }} />
+      )}
+      {modal === 'submit' && (
+        <SubmitDealModal user={user} onClose={() => setModal(null)} onSuccess={() => { loadDeals(); toast('🔥 Deal soumis ! Merci.', 'ok'); }} />
+      )}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
