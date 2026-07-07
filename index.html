@@ -2196,14 +2196,22 @@ function AdminPage({ user, isAdmin, onGoFeed }) {
   const [editId, setEditId]   = useState(null);
   const [editForm, setEditForm] = useState({});
   const [uploadingAdmin, setUploadingAdmin] = useState(false);
+  const [selection, setSelection] = useState(new Set());
 
   useEffect(() => { loadDeals(); }, [onglet]);
 
   async function loadDeals() {
     setLoading(true);
+    setSelection(new Set());
     const { data } = await sb.from('deals').select('*')
       .eq('statut', onglet).order('created_at', { ascending: false });
-    setDeals(data || []);
+    let list = data || [];
+    // Onglet pipeline : tri par % de remise décroissant (les meilleurs deals d'abord)
+    if (onglet === 'auto_draft') {
+      const pctOf = d => d.prix_normal > 0 ? 1 - d.prix_promo / d.prix_normal : 0;
+      list = [...list].sort((a, b) => pctOf(b) - pctOf(a));
+    }
+    setDeals(list);
     setLoading(false);
   }
 
@@ -2213,6 +2221,20 @@ function AdminPage({ user, isAdmin, onGoFeed }) {
     const msgs = { validé: '✅ Validé !', refusé: '❌ Refusé.', expiré: '⏸ Marqué expiré.', en_attente: '↩️ Remis en attente.' };
     toast(msgs[statut] || 'Mis à jour.', 'ok');
   };
+
+  const updateStatutGroupe = async (statut) => {
+    const ids = [...selection];
+    if (ids.length === 0) return;
+    const verbe = statut === 'validé' ? 'Valider' : 'Refuser';
+    if (!window.confirm(`${verbe} ${ids.length} deal(s) d'un coup ?`)) return;
+    await sb.from('deals').update({ statut }).in('id', ids);
+    setDeals(p => p.filter(d => !selection.has(d.id)));
+    setSelection(new Set());
+    toast(`${statut === 'validé' ? '✅' : '❌'} ${ids.length} deal(s) ${statut === 'validé' ? 'validés' : 'refusés'}.`, 'ok');
+  };
+
+  const toggleSel = (id) => setSelection(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAll = () => setSelection(p => p.size === deals.length ? new Set() : new Set(deals.map(d => d.id)));
 
   const supprimer = async (id) => {
     if (!window.confirm('Supprimer ce deal définitivement ?')) return;
@@ -2270,14 +2292,26 @@ function AdminPage({ user, isAdmin, onGoFeed }) {
         </div>
 
         <div style={{ background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: '14px 14px 0 0', display: 'flex', borderBottom: '1px solid var(--border)' }}>
-          {['en_attente','validé','refusé','expiré'].map(t => (
+          {['auto_draft','en_attente','validé','refusé','expiré'].map(t => (
             <button key={t} style={tabStyle(t)} onClick={() => setOnglet(t)}>
-              {t === 'en_attente' ? '⏳ En attente' : t === 'validé' ? '✅ Validés' : t === 'refusé' ? '❌ Refusés' : '⏸ Expirés'}
+              {t === 'auto_draft' ? '🤖 Pipeline' : t === 'en_attente' ? '⏳ En attente' : t === 'validé' ? '✅ Validés' : t === 'refusé' ? '❌ Refusés' : '⏸ Expirés'}
             </button>
           ))}
         </div>
 
         <div style={{ background: 'var(--white)', border: '1.5px solid var(--border)', borderTop: 'none', borderRadius: '0 0 14px 14px', minHeight: 300 }}>
+          {(onglet === 'auto_draft' || onglet === 'en_attente') && deals.length > 0 && !loading && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: '1px solid var(--border)', background: '#fafaf6', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 800, color: 'var(--muted)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={deals.length > 0 && selection.size === deals.length} onChange={toggleAll} style={{ width: 17, height: 17, accentColor: 'var(--rouge)', cursor: 'pointer' }} />
+                Tout sélectionner ({selection.size}/{deals.length})
+              </label>
+              {selection.size > 0 && <>
+                {btnAction(`✅ Valider la sélection (${selection.size})`, () => updateStatutGroupe('validé'), 'white', 'var(--green)', 'none')}
+                {btnAction(`✕ Refuser la sélection (${selection.size})`, () => updateStatutGroupe('refusé'), 'var(--rouge)', 'white', '1.5px solid var(--rouge)')}
+              </>}
+            </div>
+          )}
           {loading ? <div className="loader" style={{ padding: 40, textAlign: 'center' }}>Chargement...</div>
           : deals.length === 0 ? <div className="empty" style={{ padding: 48, textAlign: 'center' }}><div style={{ fontSize: 36 }}>📭</div><div style={{ marginTop: 10, fontWeight: 700, color: 'var(--muted)' }}>Aucun deal ici.</div></div>
           : <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -2357,6 +2391,10 @@ function AdminPage({ user, isAdmin, onGoFeed }) {
                     ) : (
                       /* ── MODE AFFICHAGE ── */
                       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                        {(onglet === 'auto_draft' || onglet === 'en_attente') && (
+                          <input type="checkbox" checked={selection.has(d.id)} onChange={() => toggleSel(d.id)}
+                            style={{ width: 17, height: 17, marginTop: 4, accentColor: 'var(--rouge)', cursor: 'pointer', flexShrink: 0 }} />
+                        )}
                         {d.photo_url && <img src={d.photo_url} alt="" style={{ width: 60, height: 60, objectFit: 'contain', borderRadius: 8, background: 'var(--bg)', flexShrink: 0 }} onError={e => e.target.style.display='none'} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 4, textDecoration: d.statut === 'expiré' ? 'line-through' : 'none' }}>{d.titre}</div>
@@ -2377,6 +2415,10 @@ function AdminPage({ user, isAdmin, onGoFeed }) {
                         </div>
                         {/* Actions */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
+                          {onglet === 'auto_draft' && <>
+                            {btnAction('✅ Valider',  () => updateStatut(d.id, 'validé'),  'white', 'var(--green)', 'none')}
+                            {btnAction('✕ Refuser',  () => updateStatut(d.id, 'refusé'),  'var(--rouge)', 'white', '1.5px solid var(--rouge)')}
+                          </>}
                           {onglet === 'en_attente' && <>
                             {btnAction('✅ Valider',  () => updateStatut(d.id, 'validé'),  'white', 'var(--green)', 'none')}
                             {btnAction('✕ Refuser',  () => updateStatut(d.id, 'refusé'),  'var(--rouge)', 'white', '1.5px solid var(--rouge)')}
@@ -2448,9 +2490,9 @@ function MesDealsPage({ user, userProfile, onGoFeed }) {
     }
   };
 
-  const statutLabel = { en_attente: '⏳ En attente', validé: '✅ Validé', refusé: '❌ Refusé', expiré: '⏸ Expiré' };
-  const statutBg    = { en_attente: '#fff8e0', validé: '#e8faf5', refusé: '#fff0f0', expiré: '#f0eee8' };
-  const statutColor = { en_attente: '#cc8800', validé: '#0a8c63', refusé: 'var(--rouge)', expiré: 'var(--muted)' };
+  const statutLabel = { auto_draft: '🤖 Pipeline', en_attente: '⏳ En attente', validé: '✅ Validé', refusé: '❌ Refusé', expiré: '⏸ Expiré' };
+  const statutBg    = { auto_draft: '#eef4ff', en_attente: '#fff8e0', validé: '#e8faf5', refusé: '#fff0f0', expiré: '#f0eee8' };
+  const statutColor = { auto_draft: 'var(--blue)', en_attente: '#cc8800', validé: '#0a8c63', refusé: 'var(--rouge)', expiré: 'var(--muted)' };
 
   const inp = (key, label, type = 'text') => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
