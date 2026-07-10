@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { Analytics } from "@vercel/analytics/react";
 
 // ─── CONFIG SUPABASE ───────────────────────────────────────────────
 // Remplace ces deux valeurs par celles de ton projet Supabase
@@ -873,6 +874,7 @@ export default function App() {
           userVotes={userVotes}
         />
       )}
+      <Analytics />
     </div>
   );
 }
