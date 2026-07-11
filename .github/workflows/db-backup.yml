@@ -74,6 +74,7 @@ jobs:
       - name: Dump de la base de production
         env:
           PGCONNECT_TIMEOUT: '30'
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
           # --no-owner / --no-privileges : dump portable, restaurable dans n'importe quel
@@ -95,8 +96,6 @@ jobs:
             echo "::error::Dump tronqué : marqueur de fin absent."
             exit 1
           fi
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
       - name: Test de restauration (le vrai garde-fou)
         env:
