@@ -1,0 +1,160 @@
+# .github/workflows/db-backup.yml
+#
+# Phase 0 — Protéger l'existant : backup quotidien de la base de production.
+#
+# Ce workflow :
+#   1. Dumpe la base prod (pg_dump plain, portable — aucune dépendance Supabase-only).
+#   2. Vérifie que le dump est complet (marqueur de fin) et non vide.
+#   3. RESTAURE le dump dans un Postgres jetable et ÉCHOUE si les données ne reviennent pas.
+#      → « Un backup non testé n'existe pas. »
+#   4. Compresse et stocke le backup HORS Supabase :
+#         - toujours : artefact GitHub (protection immédiate, rétention 30 j) ;
+#         - si secrets R2 configurés : Cloudflare R2 (durable, S3-compatible → portable).
+#
+# SECRETS À CONFIGURER (Settings → Secrets and variables → Actions) :
+#   SUPABASE_DB_URL   (obligatoire) chaîne du SESSION POOLER (IPv4), format :
+#     postgresql://postgres.<ref>:<motdepasse>@aws-0-<region>.pooler.supabase.com:5432/postgres
+#   R2_ACCOUNT_ID     (optionnel) id de compte Cloudflare
+#   R2_BUCKET         (optionnel) nom du bucket R2
+#   R2_ACCESS_KEY_ID  (optionnel) clé d'accès R2
+#   R2_SECRET_ACCESS_KEY (optionnel)
+#
+# Tant que les secrets R2 ne sont pas mis, le backup part quand même en artefact GitHub :
+# tu es protégé dès le premier run, R2 peut venir juste après.
+
+name: Backup base de données (pg_dump quotidien)
+
+on:
+  schedule:
+    - cron: '0 3 * * *'      # 03:00 UTC chaque jour (~04:00 heure du Maroc)
+  workflow_dispatch:          # bouton "Run workflow" pour tester à la main
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false   # ne jamais couper un backup en cours
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Postgres jetable qui sert UNIQUEMENT au test de restauration.
+    services:
+      restore_target:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: restore_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=15
+
+    env:
+      DUMP_FILE: fidwastafid_${{ github.run_id }}.sql
+      # Remontés au niveau job pour pouvoir les tester dans les `if:` d'étape.
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+
+    steps:
+      - name: Installer pg_dump 17 (dépôt officiel PGDG)
+        run: |
+          set -euo pipefail
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          pg_dump --version
+
+      - name: Dump de la base de production
+        env:
+          PGCONNECT_TIMEOUT: '30'
+        run: |
+          set -euo pipefail
+          # --no-owner / --no-privileges : dump portable, restaurable dans n'importe quel
+          # Postgres (VPS futur inclus) sans dépendre des rôles Supabase. Cohérent avec
+          # la porte de sortie "la base sort par pg_dump".
+          pg_dump "$SUPABASE_DB_URL" \
+            --no-owner --no-privileges \
+            --format=plain \
+            --file="$DUMP_FILE"
+
+          echo "Taille du dump : $(du -h "$DUMP_FILE" | cut -f1)"
+
+          # Intégrité 1/2 : fichier non vide.
+          test -s "$DUMP_FILE"
+
+          # Intégrité 2/2 : pg_dump écrit ce marqueur en toute fin. S'il est absent,
+          # le dump a été coupé (réseau, timeout) → on refuse ce backup.
+          if ! grep -q "PostgreSQL database dump complete" "$DUMP_FILE"; then
+            echo "::error::Dump tronqué : marqueur de fin absent."
+            exit 1
+          fi
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+
+      - name: Test de restauration (le vrai garde-fou)
+        env:
+          PGPASSWORD: testpass
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGDATABASE: restore_test
+        run: |
+          set -euo pipefail
+
+          # On restaure SANS ON_ERROR_STOP : un dump Supabase contient des références à
+          # des rôles/extensions internes (auth, storage, graphql…) absents d'un Postgres
+          # nu. Ces erreurs sont attendues et sans conséquence sur les données métier.
+          # Le vrai test = l'assertion ci-dessous sur les tables réellement restaurées.
+          psql -f "$DUMP_FILE" > restore.log 2>&1 || true
+
+          # Assertion dure : au moins une table métier restaurée dans le schéma public.
+          TABLES=$(psql -tAc \
+            "select count(*) from information_schema.tables
+             where table_schema='public' and table_type='BASE TABLE';")
+          echo "Tables restaurées dans public : $TABLES"
+          if [ "${TABLES:-0}" -lt 1 ]; then
+            echo "::error::Aucune table métier restaurée — backup inexploitable."
+            echo '----- extrait du log de restauration -----'
+            tail -n 40 restore.log || true
+            exit 1
+          fi
+
+          # Log lisible (visible dans l'onglet du run) : lignes par table.
+          echo '----- Contenu restauré -----'
+          psql -c "select relname as table, n_live_tup as lignes
+                   from pg_stat_user_tables order by n_live_tup desc;"
+
+      - name: Compresser le backup validé
+        run: |
+          set -euo pipefail
+          gzip -9 "$DUMP_FILE"
+          echo "STAMP=$(date -u +%Y%m%d_%H%M%S)" >> "$GITHUB_ENV"
+
+      # Protection immédiate : marche sans aucune config supplémentaire.
+      - name: Archiver en artefact GitHub (hors Supabase)
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ env.STAMP }}
+          path: ${{ env.DUMP_FILE }}.gz
+          retention-days: 30
+
+      # Stockage durable : ne s'exécute que si les secrets R2 sont présents.
+      - name: Envoyer vers Cloudflare R2 (durable)
+        if: ${{ env.R2_ACCOUNT_ID != '' && env.R2_BUCKET != '' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          set -euo pipefail
+          KEY="fidwastafid/${STAMP}.sql.gz"
+          aws s3 cp "${DUMP_FILE}.gz" "s3://${R2_BUCKET}/${KEY}" \
+            --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          echo "Backup durable : s3://${R2_BUCKET}/${KEY}"
