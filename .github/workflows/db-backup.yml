@@ -69,7 +69,11 @@ jobs:
             | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17
-          pg_dump --version
+          # Le runner a un pg_dump 16 préinstallé qui gagne dans le PATH. On place les
+          # binaires 17 en tête du PATH pour TOUTES les étapes suivantes (serveur = PG 17).
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          # Vérif immédiate via le chemin complet (GITHUB_PATH ne s'applique qu'aux étapes suivantes).
+          /usr/lib/postgresql/17/bin/pg_dump --version
 
       - name: Dump de la base de production
         env:
