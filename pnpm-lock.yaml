@@ -46,6 +46,28 @@ importers:
         specifier: ^8.0.1
         version: 8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(tsx@4.23.0)
 
+  packages/auth:
+    dependencies:
+      '@fidwastafid/db':
+        specifier: workspace:*
+        version: link:../db
+      '@fidwastafid/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      '@supabase/supabase-js':
+        specifier: ^2.99.2
+        version: 2.110.2
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      tsx:
+        specifier: ^4.19.1
+        version: 4.23.0
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
   packages/db:
     dependencies:
       pg:
@@ -1572,10 +1594,11 @@ snapshots:
   '@types/node@26.1.1':
     dependencies:
       undici-types: 8.3.0
+    optional: true
 
   '@types/pg@8.20.0':
     dependencies:
-      '@types/node': 26.1.1
+      '@types/node': 22.20.1
       pg-protocol: 1.15.0
       pg-types: 2.2.0
 
@@ -2096,7 +2119,8 @@ snapshots:
 
   undici-types@6.21.0: {}
 
-  undici-types@8.3.0: {}
+  undici-types@8.3.0:
+    optional: true
 
   update-browserslist-db@1.2.3(browserslist@4.28.5):
     dependencies:
