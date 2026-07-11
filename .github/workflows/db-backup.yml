@@ -142,7 +142,7 @@ jobs:
 
       # Protection immédiate : marche sans aucune config supplémentaire.
       - name: Archiver en artefact GitHub (hors Supabase)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: db-backup-${{ env.STAMP }}
           path: ${{ env.DUMP_FILE }}.gz
