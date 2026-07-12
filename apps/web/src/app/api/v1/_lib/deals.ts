@@ -1,5 +1,5 @@
 import type { PoolClient } from "@fidwastafid/db";
-import { dealSchema, type Deal } from "@fidwastafid/schemas";
+import { dealSchema, dealAdminSchema, type Deal, type DealAdmin } from "@fidwastafid/schemas";
 
 /** Colonnes lues pour toute représentation publique d'un deal (liste ou détail). */
 export const DEAL_SELECT = `
@@ -62,6 +62,23 @@ export function toDeal(row: DealRow): Deal {
 
 /** Statuts visibles sans auth — CONTRAT-V1 §1 : un deal expiré reste 200, jamais 404. */
 export const PUBLIC_STATUTS = new Set(["publie", "expire"]);
+
+/**
+ * Colonnes admin — ajoute whatsapp_contact, qui ne doit JAMAIS apparaître
+ * hors de GET/PATCH /api/v1/admin/deals (CONTRAT-V1 §4).
+ */
+export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.whatsapp_contact`;
+
+export interface DealAdminRow extends DealRow {
+  whatsapp_contact: string | null;
+}
+
+export function toDealAdmin(row: DealAdminRow): DealAdmin {
+  return dealAdminSchema.parse({
+    ...toDeal(row),
+    whatsappContact: row.whatsapp_contact,
+  });
+}
 
 /**
  * `deals.id` (bigint) revient en string via pg (évite la perte de précision
