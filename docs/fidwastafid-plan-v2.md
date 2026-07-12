@@ -167,7 +167,7 @@ PROCHAINE TÂCHE : Phase 2 — Fondation (monorepo pnpm, schémas zod, migration
 | 0 — Protéger l'existant | ☐ à faire | |
 | 1 — Conception | ☐ à faire | |
 | 2 — Fondation | ✅ fait | monorepo pnpm (schemas/db/auth/web), Next.js 15+Tailwind (charte), Docker+compose testé, en-têtes sécurité, CI verte, Dependabot. Déploiement Vercel (branche v2, URL de préversion) **non fait** — à faire séparément, en clics. |
-| 3 — API | ☐ à faire | |
+| 3 — API | ✅ fait | `/api/v1` complet (public+auth+admin), migrations SQL schéma v2 (Postgres local uniquement, prod v1 non touchée), rate limiting Postgres-backé, Turnstile soumission, audit log admin, spec OpenAPI, tests d'intégration + job CI dédié (Postgres jetable + secrets Supabase dev). CI verte (3 jobs). |
 | 4 — Web | ☐ à faire | |
 | 5 — SEO | ☐ à faire | |
 | 6 — Bascule prod | ☐ à faire | |
@@ -175,7 +175,7 @@ PROCHAINE TÂCHE : Phase 2 — Fondation (monorepo pnpm, schémas zod, migration
 | 8 — Mobile & ops | ☐ à faire | |
 | 9 — VPS | ☐ conditionnel | |
 
-**PROCHAINE TÂCHE** : déployer le squelette sur Vercel (branche v2, URL de préversion — en clics, hors session) puis Phase 3 — l'API d'abord (`/api/v1` selon le contrat).
+**PROCHAINE TÂCHE** : déployer le squelette sur Vercel (branche v2, URL de préversion — en clics, hors session, toujours en attente depuis la Phase 2) puis Phase 4 — le web comme premier client (feed SSR, page deal, pages enseignes, auth/votes/commentaires/soumission via l'API, admin pipeline, redesign charte).
 
 ---
 
