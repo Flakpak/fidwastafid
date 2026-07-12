@@ -4,7 +4,8 @@ import { requireUser } from "@fidwastafid/auth";
 import { dealInputSchema, generatePublicId } from "@fidwastafid/schemas";
 import { apiError, withAuthErrors } from "../_lib/errors.js";
 import { parseJsonBody } from "../_lib/validation.js";
-import { isRateLimited } from "../_lib/rateLimit.js";
+import { isRateLimited, getClientIp } from "../_lib/rateLimit.js";
+import { verifyTurnstile } from "../_lib/turnstile.js";
 import { decodeCursor, encodeCursor, type TriDeals } from "../_lib/pagination.js";
 import { DEAL_SELECT, DEAL_FROM, PUBLIC_STATUTS, toDeal, type DealRow } from "../_lib/deals.js";
 
@@ -105,6 +106,14 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
 
   if (await isRateLimited("soumission", request, user.id)) {
     return apiError("RATE_LIMITED", "Trop de soumissions, réessaie plus tard.");
+  }
+
+  // Turnstile sur la soumission (plan v2, Phase 3) — token dans un header
+  // dédié, pas dans le body : dealInputSchema est le modèle de domaine figé
+  // (CONTRAT-V1 §3), pas l'endroit pour un artefact anti-abus.
+  const turnstileOk = await verifyTurnstile(request.headers.get("x-turnstile-token"), getClientIp(request));
+  if (!turnstileOk) {
+    return apiError("VALIDATION_ERROR", "Vérification anti-robot invalide.");
   }
 
   const parsed = await parseJsonBody(request, dealInputSchema);
