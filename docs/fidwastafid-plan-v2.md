@@ -166,7 +166,7 @@ PROCHAINE TÂCHE : Phase 2 — Fondation (monorepo pnpm, schémas zod, migration
 |---|---|---|
 | 0 — Protéger l'existant | ☐ à faire | |
 | 1 — Conception | ☐ à faire | |
-| 2 — Fondation | ☐ à faire | |
+| 2 — Fondation | ✅ fait | monorepo pnpm (schemas/db/auth/web), Next.js 15+Tailwind (charte), Docker+compose testé, en-têtes sécurité, CI verte, Dependabot. Déploiement Vercel (branche v2, URL de préversion) **non fait** — à faire séparément, en clics. |
 | 3 — API | ☐ à faire | |
 | 4 — Web | ☐ à faire | |
 | 5 — SEO | ☐ à faire | |
@@ -175,7 +175,7 @@ PROCHAINE TÂCHE : Phase 2 — Fondation (monorepo pnpm, schémas zod, migration
 | 8 — Mobile & ops | ☐ à faire | |
 | 9 — VPS | ☐ conditionnel | |
 
-**PROCHAINE TÂCHE** : Phase 0 — backup automatique `pg_dump` via GitHub Actions.
+**PROCHAINE TÂCHE** : déployer le squelette sur Vercel (branche v2, URL de préversion — en clics, hors session) puis Phase 3 — l'API d'abord (`/api/v1` selon le contrat).
 
 ---
 
