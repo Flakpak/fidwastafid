@@ -1,0 +1,1172 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Fidwastafid API v1",
+    "version": "1.0.0",
+    "description": "Généré depuis packages/schemas — voir docs/CONTRAT-V1.md §4 pour le contrat de référence."
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Supabase Auth JWT — ou cookie de session pour le web (CONTRAT-V1 §5)."
+      }
+    },
+    "schemas": {
+      "Deal": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string",
+            "pattern": "^[23456789abcdefghijkmnpqrstuvwxyz]{10}$"
+          },
+          "titre": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200
+          },
+          "enseigneSlug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "ville": {
+            "type": "string",
+            "enum": [
+              "National",
+              "Casablanca",
+              "Rabat",
+              "Marrakech",
+              "Fès",
+              "Tanger",
+              "Agadir",
+              "Meknès",
+              "Oujda"
+            ]
+          },
+          "categorie": {
+            "type": "string",
+            "enum": [
+              "Alimentaire",
+              "Électroménager",
+              "High-Tech",
+              "Mode",
+              "Maison",
+              "Beauté",
+              "Sport",
+              "Autre"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "physique",
+              "en_ligne",
+              "les_deux"
+            ]
+          },
+          "prixPromo": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "prixNormal": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "dateFin": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "lien": {
+            "type": "string",
+            "format": "uri"
+          },
+          "imageKey": {
+            "type": "string"
+          },
+          "statut": {
+            "type": "string",
+            "enum": [
+              "auto_draft",
+              "en_attente",
+              "publie",
+              "rejete",
+              "expire"
+            ]
+          },
+          "score": {
+            "type": "integer"
+          },
+          "submitterPublicId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[23456789abcdefghijkmnpqrstuvwxyz]{10}$"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "publicId",
+          "titre",
+          "enseigneSlug",
+          "categorie",
+          "type",
+          "prixPromo",
+          "statut",
+          "score",
+          "submitterPublicId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "DealAdmin": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string",
+            "pattern": "^[23456789abcdefghijkmnpqrstuvwxyz]{10}$"
+          },
+          "titre": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200
+          },
+          "enseigneSlug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "ville": {
+            "type": "string",
+            "enum": [
+              "National",
+              "Casablanca",
+              "Rabat",
+              "Marrakech",
+              "Fès",
+              "Tanger",
+              "Agadir",
+              "Meknès",
+              "Oujda"
+            ]
+          },
+          "categorie": {
+            "type": "string",
+            "enum": [
+              "Alimentaire",
+              "Électroménager",
+              "High-Tech",
+              "Mode",
+              "Maison",
+              "Beauté",
+              "Sport",
+              "Autre"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "physique",
+              "en_ligne",
+              "les_deux"
+            ]
+          },
+          "prixPromo": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "prixNormal": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "dateFin": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "lien": {
+            "type": "string",
+            "format": "uri"
+          },
+          "imageKey": {
+            "type": "string"
+          },
+          "statut": {
+            "type": "string",
+            "enum": [
+              "auto_draft",
+              "en_attente",
+              "publie",
+              "rejete",
+              "expire"
+            ]
+          },
+          "score": {
+            "type": "integer"
+          },
+          "submitterPublicId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[23456789abcdefghijkmnpqrstuvwxyz]{10}$"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "whatsappContact": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "publicId",
+          "titre",
+          "enseigneSlug",
+          "categorie",
+          "type",
+          "prixPromo",
+          "statut",
+          "score",
+          "submitterPublicId",
+          "createdAt",
+          "updatedAt",
+          "whatsappContact"
+        ]
+      },
+      "DealInput": {
+        "type": "object",
+        "properties": {
+          "titre": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200
+          },
+          "enseigneSlug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "ville": {
+            "type": "string",
+            "enum": [
+              "National",
+              "Casablanca",
+              "Rabat",
+              "Marrakech",
+              "Fès",
+              "Tanger",
+              "Agadir",
+              "Meknès",
+              "Oujda"
+            ]
+          },
+          "categorie": {
+            "type": "string",
+            "enum": [
+              "Alimentaire",
+              "Électroménager",
+              "High-Tech",
+              "Mode",
+              "Maison",
+              "Beauté",
+              "Sport",
+              "Autre"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "physique",
+              "en_ligne",
+              "les_deux"
+            ]
+          },
+          "prixPromo": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "prixNormal": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "dateFin": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "lien": {
+            "type": "string",
+            "format": "uri"
+          },
+          "imageKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "titre",
+          "enseigneSlug",
+          "categorie",
+          "type",
+          "prixPromo"
+        ]
+      },
+      "DealStatutUpdate": {
+        "type": "object",
+        "properties": {
+          "statut": {
+            "type": "string",
+            "enum": [
+              "auto_draft",
+              "en_attente",
+              "publie",
+              "rejete",
+              "expire"
+            ]
+          }
+        },
+        "required": [
+          "statut"
+        ]
+      },
+      "Enseigne": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "nom": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "slug",
+          "nom"
+        ]
+      },
+      "VoteInput": {
+        "type": "object",
+        "properties": {
+          "sens": {
+            "type": "string",
+            "enum": [
+              "chaud",
+              "froid"
+            ]
+          }
+        },
+        "required": [
+          "sens"
+        ]
+      },
+      "CommentaireInput": {
+        "type": "object",
+        "properties": {
+          "contenu": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "contenu"
+        ]
+      },
+      "Commentaire": {
+        "type": "object",
+        "properties": {
+          "contenu": {
+            "type": "string"
+          },
+          "auteurPublicId": {
+            "type": "string",
+            "pattern": "^[23456789abcdefghijkmnpqrstuvwxyz]{10}$"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "contenu",
+          "auteurPublicId",
+          "createdAt"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "UNAUTHENTICATED",
+                  "FORBIDDEN",
+                  "NOT_FOUND",
+                  "VALIDATION_ERROR",
+                  "RATE_LIMITED"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "DealPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Deal"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/deals": {
+      "get": {
+        "summary": "Liste des deals (filtres, pagination par curseur)",
+        "tags": [
+          "deals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "publie|expire — publie par défaut"
+            },
+            "required": false,
+            "name": "statut",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "enseigne",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "ville",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "categorie",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "score|recent — score par défaut"
+            },
+            "required": false,
+            "name": "tri",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Curseur invalide",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Soumission communautaire — toujours créé en_attente",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "deals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Cloudflare Turnstile"
+            },
+            "required": false,
+            "name": "X-Turnstile-Token",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Créé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corps invalide ou vérification anti-robot échouée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentification requise",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de soumissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/{publicId}": {
+      "get": {
+        "summary": "Détail d'un deal (jamais 404 sur un deal expiré — CONTRAT-V1 §1)",
+        "tags": [
+          "deals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal introuvable ou non public",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/enseignes": {
+      "get": {
+        "summary": "Liste des enseignes",
+        "tags": [
+          "enseignes"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Enseigne"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/{publicId}/votes": {
+      "post": {
+        "summary": "Voter (upsert — un seul vote courant par utilisateur/deal)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "deals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK — score recalculé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corps invalide",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentification requise",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de votes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Retirer son vote",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "deals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK — score recalculé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentification requise",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/{publicId}/commentaires": {
+      "post": {
+        "summary": "Commenter un deal public (publie/expire)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "deals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentaireInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Créé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Commentaire"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corps invalide",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentification requise",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de commentaires",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/deals": {
+      "get": {
+        "summary": "Pipeline complet — auto_draft toujours en tête. Inclut whatsappContact.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "statut",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DealAdmin"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/deals/{publicId}": {
+      "patch": {
+        "summary": "Changer le statut d'un deal (tracé dans journal_audit)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealStatutUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealAdmin"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Statut invalide",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/deals/bulk": {
+      "post": {
+        "summary": "Action groupée — statut appliqué à un lot de public_id (max 100)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "publicIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "maxItems": 100
+                  },
+                  "statut": {
+                    "type": "string",
+                    "enum": [
+                      "auto_draft",
+                      "en_attente",
+                      "publie",
+                      "rejete",
+                      "expire"
+                    ]
+                  }
+                },
+                "required": [
+                  "publicIds",
+                  "statut"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK — public_id inconnus ignorés silencieusement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "updated": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "updated"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corps invalide",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

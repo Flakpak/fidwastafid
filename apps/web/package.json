@@ -7,9 +7,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "openapi:generate": "tsx scripts/generate-openapi.ts"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.0",
     "@fidwastafid/auth": "workspace:*",
     "@fidwastafid/db": "workspace:*",
     "@fidwastafid/schemas": "workspace:*",
@@ -24,6 +26,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.1",
     "typescript": "^5.6.3"
   }
 }
