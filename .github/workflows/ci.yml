@@ -2,10 +2,16 @@
 #
 # Phase 2 — Fondation : rien ne merge si lint/typecheck/test/build cassent.
 #
-# Deux jobs indépendants (en parallèle) :
-#   - quality : pnpm lint + typecheck + test sur tout le workspace.
-#   - docker  : build de l'image apps/web (ne pousse nulle part, sert juste
-#     à vérifier que le Dockerfile reste buildable à chaque push/PR).
+# Trois jobs indépendants (en parallèle, aucun `needs:` entre eux) :
+#   - quality     : pnpm lint + typecheck + test sur tout le workspace.
+#                   Ne dépend JAMAIS des secrets Supabase (décision
+#                   explicite, Phase 3 morceau 9) — un souci sur le projet
+#                   Supabase de dev ne doit jamais bloquer cette validation.
+#   - docker      : build de l'image apps/web (ne pousse nulle part, sert
+#                   juste à vérifier que le Dockerfile reste buildable).
+#   - integration : tests d'intégration (soumission/validation/vote) contre
+#                   un Postgres jetable + un vrai JWT du projet Supabase de
+#                   dev. Seul job qui touche aux secrets Supabase.
 
 name: CI
 
@@ -52,3 +58,45 @@ jobs:
           tags: fidwastafid-web:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  integration:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fidwastafid
+          POSTGRES_PASSWORD: fidwastafid
+          POSTGRES_DB: fidwastafid
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U fidwastafid"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DATABASE_URL: postgres://fidwastafid:fidwastafid@localhost:5432/fidwastafid
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+      TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+      # Clé de test PUBLIQUE Cloudflare ("always passes"), pas un secret.
+      TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @fidwastafid/db migrate
+      - run: pnpm --filter @fidwastafid/web test:integration
