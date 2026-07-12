@@ -1,5 +1,6 @@
 import {
   publicIdSchema,
+  generatePublicId,
   dealInputSchema,
   voteInputSchema,
   authUserSchema,
@@ -23,6 +24,8 @@ check("10 caractères alphabet restreint accepté", publicIdSchema.safeParse("x7
 check("caractère ambigu 'o' rejeté", !publicIdSchema.safeParse("x7k2p9qao1").success);
 check("longueur 9 rejetée", !publicIdSchema.safeParse("x7k2p9qa2").success);
 check("uuid interne (mauvaise forme) rejeté", !publicIdSchema.safeParse("550e8400-e29b-41d4-a716-446655440000").success);
+check("generatePublicId() produit un public_id valide", publicIdSchema.safeParse(generatePublicId()).success);
+check("generatePublicId() produit des valeurs différentes", generatePublicId() !== generatePublicId());
 
 console.log("\ndeal — physique sans lien (doit passer)");
 check(

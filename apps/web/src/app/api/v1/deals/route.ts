@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { query } from "@fidwastafid/db";
-import { apiError } from "../_lib/errors.js";
+import { requireUser } from "@fidwastafid/auth";
+import { dealInputSchema, generatePublicId } from "@fidwastafid/schemas";
+import { apiError, withAuthErrors } from "../_lib/errors.js";
+import { parseJsonBody } from "../_lib/validation.js";
 import { decodeCursor, encodeCursor, type TriDeals } from "../_lib/pagination.js";
 import { DEAL_SELECT, DEAL_FROM, PUBLIC_STATUTS, toDeal, type DealRow } from "../_lib/deals.js";
 
@@ -89,3 +92,56 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   return NextResponse.json({ data: pageRows.map(toDeal), nextCursor });
 }
+
+/**
+ * POST /api/v1/deals — soumission communautaire, authentifiée (requireUser).
+ * Toujours créé en `en_attente` (CONTRAT-V1 §4 : "la machine collecte,
+ * l'humain publie" — la validation admin est un acte séparé, PATCH
+ * /api/v1/admin/deals/:publicId).
+ */
+export const POST = withAuthErrors(async (request: Request): Promise<NextResponse> => {
+  const user = await requireUser(request);
+
+  const parsed = await parseJsonBody(request, dealInputSchema);
+  if (!parsed.success) return parsed.response;
+  const input = parsed.data;
+
+  const enseigneRows = await query<{ id: number }>("select id from enseignes where slug = $1", [
+    input.enseigneSlug,
+  ]);
+  if (!enseigneRows[0]) {
+    return apiError("VALIDATION_ERROR", `enseigneSlug: enseigne "${input.enseigneSlug}" inconnue.`);
+  }
+
+  const publicId = generatePublicId();
+
+  await query(
+    `insert into deals
+       (public_id, titre, enseigne_id, ville, categorie, type, prix_promo,
+        prix_normal, date_fin, description, lien, image_key, statut, submitter_id, score)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'en_attente',$13,0)`,
+    [
+      publicId,
+      input.titre,
+      enseigneRows[0].id,
+      input.ville ?? null,
+      input.categorie,
+      input.type,
+      input.prixPromo,
+      input.prixNormal ?? null,
+      input.dateFin ?? null,
+      input.description ?? null,
+      input.lien ?? null,
+      input.imageKey ?? null,
+      user.id,
+    ]
+  );
+
+  // Relecture jointe (enseigne/submitter) plutôt qu'un RETURNING simple,
+  // pour repasser par le même toDeal() que le reste de l'API.
+  const rows = await query<DealRow>(`select ${DEAL_SELECT} ${DEAL_FROM} where d.public_id = $1`, [publicId]);
+  const created = rows[0];
+  if (!created) throw new Error("Deal introuvable juste après insertion — ne devrait pas arriver.");
+
+  return NextResponse.json(toDeal(created), { status: 201 });
+});

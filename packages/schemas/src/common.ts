@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { customAlphabet } from "nanoid";
 
 /**
  * Alphabet nanoid volontairement restreint : chiffres 2-9 + lettres a-z
@@ -11,6 +12,9 @@ export const PUBLIC_ID_ALPHABET = "23456789abcdefghijkmnpqrstuvwxyz";
 export const PUBLIC_ID_LENGTH = 10;
 
 const PUBLIC_ID_REGEX = new RegExp(`^[${PUBLIC_ID_ALPHABET}]{${PUBLIC_ID_LENGTH}}$`);
+
+/** Génère un public_id conforme à publicIdSchema — même alphabet, même longueur. */
+export const generatePublicId = customAlphabet(PUBLIC_ID_ALPHABET, PUBLIC_ID_LENGTH);
 
 /** Identité canonique — deal, user, etc. Jamais l'id séquentiel interne. */
 export const publicIdSchema = z

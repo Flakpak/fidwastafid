@@ -1,5 +1,8 @@
 import { Pool, types, type PoolClient, type QueryResultRow } from "pg";
 
+/** Réexporté pour que les consommateurs (apps/web) n'aient pas besoin de dépendre de `pg` directement. */
+export type { PoolClient };
+
 /**
  * `pg` parse par défaut le type `date` (OID 1082) en objet `Date` JS, ce qui
  * peut décaler le jour selon le fuseau du process (piège classique). On garde

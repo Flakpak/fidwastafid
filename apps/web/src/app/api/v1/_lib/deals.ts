@@ -1,3 +1,4 @@
+import type { PoolClient } from "@fidwastafid/db";
 import { dealSchema, type Deal } from "@fidwastafid/schemas";
 
 /** Colonnes lues pour toute représentation publique d'un deal (liste ou détail). */
@@ -61,3 +62,37 @@ export function toDeal(row: DealRow): Deal {
 
 /** Statuts visibles sans auth — CONTRAT-V1 §1 : un deal expiré reste 200, jamais 404. */
 export const PUBLIC_STATUTS = new Set(["publie", "expire"]);
+
+/**
+ * `deals.id` (bigint) revient en string via pg (évite la perte de précision
+ * JS) — jamais renvoyé au client, uniquement pour les requêtes internes de
+ * la même transaction (vote, recalcul de score).
+ */
+export async function lockDealIdByPublicId(client: PoolClient, publicId: string): Promise<string | null> {
+  const result = await client.query<{ id: string }>("select id from deals where public_id = $1 for update", [
+    publicId,
+  ]);
+  return result.rows[0]?.id ?? null;
+}
+
+/**
+ * Recalcule deals.score depuis les votes existants — appelé dans la même
+ * transaction que l'insert/update/delete sur votes (décision explicite :
+ * synchrone, pas de trigger, pas d'async).
+ */
+export async function recalculateScore(client: PoolClient, dealId: string): Promise<void> {
+  await client.query(
+    `update deals set score = (
+       select coalesce(count(*) filter (where sens = 'chaud'), 0)
+            - coalesce(count(*) filter (where sens = 'froid'), 0)
+       from votes where deal_id = $1
+     ), updated_at = now()
+     where id = $1`,
+    [dealId]
+  );
+}
+
+export async function fetchDealById(client: PoolClient, dealId: string): Promise<DealRow | null> {
+  const result = await client.query<DealRow>(`select ${DEAL_SELECT} ${DEAL_FROM} where d.id = $1`, [dealId]);
+  return result.rows[0] ?? null;
+}
