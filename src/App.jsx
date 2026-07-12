@@ -612,6 +612,7 @@ export default function App() {
   useEffect(() => {
     if (SUPABASE_URL.includes("XXXXXXXXXXXXXXXX")) return; // Pas encore configuré
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- v1 gelé jusqu'à Phase 6, pas retouché ici
     setLoading(true);
     supabase
       .from("deals")

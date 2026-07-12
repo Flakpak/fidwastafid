@@ -1,0 +1,54 @@
+# .github/workflows/ci.yml
+#
+# Phase 2 — Fondation : rien ne merge si lint/typecheck/test/build cassent.
+#
+# Deux jobs indépendants (en parallèle) :
+#   - quality : pnpm lint + typecheck + test sur tout le workspace.
+#   - docker  : build de l'image apps/web (ne pousse nulle part, sert juste
+#     à vérifier que le Dockerfile reste buildable à chaque push/PR).
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build apps/web (validation uniquement, pas de push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: false
+          tags: fidwastafid-web:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
