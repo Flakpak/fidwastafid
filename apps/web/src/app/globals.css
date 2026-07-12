@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+/**
+ * Tokens extraits tels quels de index.html (racine du repo, :root, lignes 14-27) —
+ * seule source de vérité de la charte tant que l'app v1 tourne. Ne pas inventer
+ * de nouvelles teintes ici ; si une couleur manque, retourner à index.html.
+ */
+@theme {
+  --color-rouge: #f03e3e; /* --rouge */
+  --color-rouge-clair: #ff6b6b; /* --rouge2 */
+  --color-or: #ffd43b; /* --yellow */
+  --color-orange: #ff922b; /* --orange */
+  --color-vert: #20c997; /* --green */
+  --color-bleu: #339af0; /* --blue */
+  --color-creme: #f8f6f2; /* --bg */
+  --color-texte: #1a1a1a; /* --text */
+  --color-muted: #888888; /* --muted */
+  --color-bordure: #e8e4de; /* --border */
+  --color-sombre: #1e1e1e; /* --dark */
+}
+
+/** Variable posée par next/font/google sur <html> — voir layout.tsx. */
+@theme inline {
+  --font-arabic: var(--font-scheherazade), serif;
+}
+
+body {
+  background-color: var(--color-creme);
+  color: var(--color-texte);
+}
