@@ -1,4 +1,12 @@
-import { Pool, type PoolClient, type QueryResultRow } from "pg";
+import { Pool, types, type PoolClient, type QueryResultRow } from "pg";
+
+/**
+ * `pg` parse par défaut le type `date` (OID 1082) en objet `Date` JS, ce qui
+ * peut décaler le jour selon le fuseau du process (piège classique). On garde
+ * la chaîne brute `YYYY-MM-DD` telle quelle — c'est le format qu'attend
+ * `z.string().date()` dans packages/schemas.
+ */
+types.setTypeParser(1082, (value) => value);
 
 /**
  * Connexion Postgres nue via `pg` — jamais le client Supabase côté serveur.
