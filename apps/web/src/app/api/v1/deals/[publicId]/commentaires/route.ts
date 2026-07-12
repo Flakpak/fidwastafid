@@ -5,6 +5,7 @@ import { commentaireInputSchema, commentaireSchema } from "@fidwastafid/schemas"
 import { apiError, withAuthErrors } from "../../../_lib/errors.js";
 import { parseJsonBody } from "../../../_lib/validation.js";
 import { PUBLIC_STATUTS } from "../../../_lib/deals.js";
+import { isRateLimited } from "../../../_lib/rateLimit.js";
 
 type Context = { params: Promise<{ publicId: string }> };
 
@@ -17,6 +18,10 @@ type Context = { params: Promise<{ publicId: string }> };
 export const POST = withAuthErrors<Context>(async (request, { params }) => {
   const user = await requireUser(request);
   const { publicId } = await params;
+
+  if (await isRateLimited("commentaire", request, user.id)) {
+    return apiError("RATE_LIMITED", "Trop de commentaires, réessaie plus tard.");
+  }
 
   const parsed = await parseJsonBody(request, commentaireInputSchema);
   if (!parsed.success) return parsed.response;

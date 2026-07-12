@@ -4,6 +4,7 @@ import { requireUser } from "@fidwastafid/auth";
 import { dealInputSchema, generatePublicId } from "@fidwastafid/schemas";
 import { apiError, withAuthErrors } from "../_lib/errors.js";
 import { parseJsonBody } from "../_lib/validation.js";
+import { isRateLimited } from "../_lib/rateLimit.js";
 import { decodeCursor, encodeCursor, type TriDeals } from "../_lib/pagination.js";
 import { DEAL_SELECT, DEAL_FROM, PUBLIC_STATUTS, toDeal, type DealRow } from "../_lib/deals.js";
 
@@ -101,6 +102,10 @@ export async function GET(request: Request): Promise<NextResponse> {
  */
 export const POST = withAuthErrors(async (request: Request): Promise<NextResponse> => {
   const user = await requireUser(request);
+
+  if (await isRateLimited("soumission", request, user.id)) {
+    return apiError("RATE_LIMITED", "Trop de soumissions, réessaie plus tard.");
+  }
 
   const parsed = await parseJsonBody(request, dealInputSchema);
   if (!parsed.success) return parsed.response;

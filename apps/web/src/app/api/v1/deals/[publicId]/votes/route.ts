@@ -5,6 +5,7 @@ import { voteInputSchema } from "@fidwastafid/schemas";
 import { apiError, withAuthErrors } from "../../../_lib/errors.js";
 import { parseJsonBody } from "../../../_lib/validation.js";
 import { toDeal, lockDealIdByPublicId, recalculateScore, fetchDealById } from "../../../_lib/deals.js";
+import { isRateLimited } from "../../../_lib/rateLimit.js";
 
 type Context = { params: Promise<{ publicId: string }> };
 
@@ -17,6 +18,10 @@ type Context = { params: Promise<{ publicId: string }> };
 export const POST = withAuthErrors<Context>(async (request, { params }) => {
   const user = await requireUser(request);
   const { publicId } = await params;
+
+  if (await isRateLimited("vote", request, user.id)) {
+    return apiError("RATE_LIMITED", "Trop de votes, réessaie plus tard.");
+  }
 
   const parsed = await parseJsonBody(request, voteInputSchema);
   if (!parsed.success) return parsed.response;
