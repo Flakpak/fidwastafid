@@ -1,0 +1,16 @@
+# Phase 2 — Dependabot actif (principes non négociables §7).
+# "npm" avec directory "/" couvre tout le workspace pnpm (racine + apps/* +
+# packages/*), Dependabot lit pnpm-lock.yaml et pnpm-workspace.yaml nativement.
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
