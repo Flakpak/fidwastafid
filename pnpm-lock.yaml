@@ -51,6 +51,15 @@ importers:
 
   apps/web:
     dependencies:
+      '@fidwastafid/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@fidwastafid/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@fidwastafid/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
       next:
         specifier: ^15.1.0
         version: 15.5.20(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -60,6 +69,9 @@ importers:
       react-dom:
         specifier: ^19.2.4
         version: 19.2.7(react@19.2.7)
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.0.0

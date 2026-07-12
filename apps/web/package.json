@@ -10,9 +10,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fidwastafid/auth": "workspace:*",
+    "@fidwastafid/db": "workspace:*",
+    "@fidwastafid/schemas": "workspace:*",
     "next": "^15.1.0",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
