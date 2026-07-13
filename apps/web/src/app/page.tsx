@@ -7,6 +7,15 @@ export const metadata: Metadata = {
   title: "Fidwastafid — Bons plans au Maroc",
 };
 
+/**
+ * SSR par requête, pas de pré-rendu statique au build (plan v2 : "Feed en
+ * SSR — rendu serveur, HTML complet pour Google", donc bien par requête).
+ * Sans ça, `next build` tente de générer cette page statiquement et échoue
+ * faute de DATABASE_URL à l'étape de build Docker (elle n'existe qu'au
+ * runtime, via docker-compose).
+ */
+export const dynamic = "force-dynamic";
+
 interface DealsPage {
   data: Deal[];
   nextCursor: string | null;
