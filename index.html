@@ -2636,7 +2636,12 @@ function ProfilPage({ user, userProfile, onGoFeed, onProfileUpdate }) {
   async function saveProfile() {
     setSaving(true);
     const profil_complet = filled === total;
-    const { error } = await sb.from('users').update({ ...form, profil_complet }).eq('id', user.id);
+    // Court-circuit loi 09-08 / CNDP : genre/tranche_age/situation_fam/
+    // nb_enfants ne sont plus envoyés à `users`, même si cette fonction est
+    // appelée par un autre chemin que le bouton (masqué ci-dessous). Rien
+    // n'est supprimé en base — juste plus rien n'est écrit désormais.
+    const { genre, tranche_age, situation_fam, nb_enfants, ...formSansDemographie } = form;
+    const { error } = await sb.from('users').update({ ...formSansDemographie, profil_complet }).eq('id', user.id);
     setSaving(false);
     if (!error) { setSaved(true); onProfileUpdate?.(); setTimeout(() => setSaved(false), 2500); toast('✅ Profil mis à jour !', 'ok'); }
     else toast('❌ ' + error.message, 'err');
@@ -2686,7 +2691,14 @@ function ProfilPage({ user, userProfile, onGoFeed, onProfileUpdate }) {
           </div>
         </div>
 
-        {/* Profil démographique */}
+        {/* Profil démographique — DÉSACTIVÉ : collecte de données
+            personnelles (genre/tranche d'âge/situation familiale/nb
+            enfants) sans dispositif de consentement, loi 09-08 / CNDP.
+            Code conservé tel quel pour réactivation si un consentement
+            explicite est câblé (voir CONTRAT-V1 §3, checklist Phase 6
+            dans docs/fidwastafid-plan-v2.md). Rien n'est supprimé en
+            base. */}
+        {false && (
         <div style={{ background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
           {/* Header avec barre de progression */}
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
@@ -2767,6 +2779,7 @@ function ProfilPage({ user, userProfile, onGoFeed, onProfileUpdate }) {
             </button>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
