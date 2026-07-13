@@ -37,7 +37,31 @@ import type { NextRequest } from "next/server";
  * un build Docker (`docker compose up --build`, CSP complet) avant d'être
  * considéré terminé — pas seulement testé en `next dev`.
  */
+/**
+ * Canonicalisation d'URL (CONTRAT-V1 §2, règles transverses) : minuscules
+ * partout et pas de trailing slash, chacune avec 301 (redirection
+ * permanente 308) depuis la variante non canonique. Fait ici plutôt que
+ * dans chaque page — s'applique uniformément à toute route, y compris
+ * celles qui n'ont pas encore été écrites.
+ */
+function canonicalRedirect(request: NextRequest): NextResponse | null {
+  const { pathname, search } = request.nextUrl;
+  const lower = pathname.toLowerCase();
+  const hasTrailingSlash = lower.length > 1 && lower.endsWith("/");
+  const canonicalPath = hasTrailingSlash ? lower.slice(0, -1) : lower;
+
+  if (canonicalPath === pathname) return null;
+
+  const url = request.nextUrl.clone();
+  url.pathname = canonicalPath;
+  url.search = search;
+  return NextResponse.redirect(url, 308);
+}
+
 export function middleware(request: NextRequest) {
+  const redirect = canonicalRedirect(request);
+  if (redirect) return redirect;
+
   if (process.env.NODE_ENV !== "production") {
     return NextResponse.next();
   }
