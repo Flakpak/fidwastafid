@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { SiteHeader } from "../../components/SiteHeader.js";
 import { AdminPipeline } from "./AdminPipeline.js";
-import { resolveAdminGuardUser } from "../../lib/adminGuard.js";
+import { resolveCurrentUser } from "../../lib/currentUser.js";
 
 /**
  * `metadata` en export statique ne suffit pas ici : un objet statique est
@@ -14,7 +14,7 @@ import { resolveAdminGuardUser } from "../../lib/adminGuard.js";
  * garde en tête, exactement comme la page. Voir CONTRAT-V1 §5.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const user = await resolveAdminGuardUser();
+  const user = await resolveCurrentUser();
   if (!user) redirect("/connexion?next=/admin");
   if (!user.isAdmin) notFound();
 
@@ -28,10 +28,10 @@ export async function generateMetadata(): Promise<Metadata> {
  * Garde répétée ici, pas seulement dans layout.tsx ni generateMetadata() :
  * App Router rend layout, page et métadonnées indépendamment, une garde
  * seule n'empêche pas l'émission du payload RSC des autres. `React.cache()`
- * dans resolveAdminGuardUser() dédupe la résolution par requête.
+ * dans resolveCurrentUser() dédupe la résolution par requête.
  */
 export default async function AdminPage() {
-  const user = await resolveAdminGuardUser();
+  const user = await resolveCurrentUser();
   if (!user) redirect("/connexion?next=/admin");
   if (!user.isAdmin) notFound();
 

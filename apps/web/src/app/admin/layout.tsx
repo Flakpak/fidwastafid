@@ -1,10 +1,10 @@
 import { notFound, redirect } from "next/navigation";
-import { resolveAdminGuardUser } from "../../lib/adminGuard.js";
+import { resolveCurrentUser } from "../../lib/currentUser.js";
 
 /**
  * Garde serveur pour tout /admin/* — doctrine d'accès admin (CONTRAT-V1 §5) :
  * aucun fragment HTML admin n'est envoyé à un non-admin, l'UI n'est jamais
- * la seule barrière. `headers()` (dans adminGuard.ts) fait basculer ce
+ * la seule barrière. `headers()` (dans currentUser.ts) fait basculer ce
  * sous-arbre en rendu dynamique — EFFET DÉSIRÉ, pas une lenteur à corriger :
  * une surface admin ne doit jamais être pré-rendue statiquement.
  *
@@ -19,7 +19,7 @@ import { resolveAdminGuardUser } from "../../lib/adminGuard.js";
  * `getCurrentUser()`, déjà publique et inchangée.
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const user = await resolveAdminGuardUser();
+  const user = await resolveCurrentUser();
 
   if (!user) redirect("/connexion?next=/admin");
   if (!user.isAdmin) notFound();
