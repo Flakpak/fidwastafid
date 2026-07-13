@@ -5,6 +5,8 @@ import { assertUser, assertAdmin } from "./guards.js";
 
 export type { AuthUser } from "@fidwastafid/schemas";
 export { AuthError } from "@fidwastafid/schemas";
+/** Nom du cookie de session — pour que le web (connexion/déconnexion) et ce module s'accordent sans dupliquer la chaîne. */
+export { SESSION_COOKIE_NAME } from "./token.js";
 
 /**
  * Interface figée — CONTRAT-V1 §5. Rien d'autre ne sort du module (pas de

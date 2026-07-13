@@ -63,6 +63,9 @@ importers:
       '@fidwastafid/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
+      '@supabase/supabase-js':
+        specifier: ^2.99.2
+        version: 2.110.2
       next:
         specifier: ^15.1.0
         version: 15.5.20(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
