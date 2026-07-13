@@ -158,6 +158,14 @@ requireAdmin(request: Request): Promise<AuthUser>  // throw AuthError('FORBIDDEN
 - Chaque route `/api/v1/admin/*` revérifie `requireAdmin()` indépendamment —
   l'UI n'est jamais la barrière.
 - `/admin/*` : noindex + Disallow robots.txt (déjà acté §2).
+- La garde vit dans le layout **ET** dans chaque page `/admin/*` qui rend du
+  contenu : layouts et pages rendent en parallèle (App Router), une garde de
+  layout seule n'empêche pas l'émission du payload RSC de la page.
+- Les métadonnées statiques (`export const metadata`) sont résolues par
+  Next.js hors du rendu de la page, donc hors de portée de toute garde posée
+  dans le corps du composant — toute page `/admin/*` utilise
+  `generateMetadata()` (fonction) avec la garde en tête, jamais un objet
+  `metadata` statique.
 
 ## 6 — Schéma d'URL des images
 
