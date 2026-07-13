@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Deal } from "@fidwastafid/schemas";
 
 interface ApiErrorBody {
@@ -11,6 +11,10 @@ export function DealActions({ deal }: { deal: Deal }) {
   const [score, setScore] = useState(deal.score);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Détecté après montage (jamais côté serveur) pour éviter un mismatch
+  // d'hydratation entre le SSR (pas de `navigator`) et le client.
+  const [canShare, setCanShare] = useState(false);
+  useEffect(() => setCanShare(typeof navigator.share === "function"), []);
 
   async function vote(sens: "chaud" | "froid") {
     setPending(true);
@@ -48,6 +52,18 @@ export function DealActions({ deal }: { deal: Deal }) {
     }
   }
 
+  function share() {
+    const pct =
+      deal.prixNormal && deal.prixNormal > deal.prixPromo
+        ? Math.round((1 - deal.prixPromo / deal.prixNormal) * 100)
+        : null;
+    void navigator.share?.({
+      title: deal.titre,
+      text: `Fidwastafid : ${deal.titre} à ${deal.prixPromo} DH${pct !== null ? ` (-${pct}%)` : ""}`,
+      url: window.location.href,
+    });
+  }
+
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-3">
@@ -71,6 +87,15 @@ export function DealActions({ deal }: { deal: Deal }) {
         <button type="button" onClick={removeVote} disabled={pending} className="text-xs text-muted underline">
           Retirer mon vote
         </button>
+        {canShare && (
+          <button
+            type="button"
+            onClick={share}
+            className="ml-auto bg-creme border border-bordure rounded-lg px-3 py-1.5 font-bold text-sm"
+          >
+            Partager
+          </button>
+        )}
       </div>
       {error && <p className="text-sm text-rouge">{error}</p>}
     </div>

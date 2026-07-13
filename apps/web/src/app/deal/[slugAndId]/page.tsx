@@ -3,6 +3,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { dealUrlSlug, type Deal } from "@fidwastafid/schemas";
 import { GET as getDealHandler } from "../../api/v1/deals/[publicId]/route.js";
 import { GET as getCommentairesHandler } from "../../api/v1/deals/[publicId]/commentaires/route.js";
+import { SiteHeader } from "../../../components/SiteHeader.js";
 import { DealActions } from "./DealActions.js";
 import { CommentForm } from "./CommentForm.js";
 
@@ -67,6 +68,7 @@ export default async function DealPage({ params }: PageParams) {
 
   return (
     <div className="min-h-screen bg-creme text-texte">
+      <SiteHeader />
       <main className="max-w-2xl mx-auto p-4 flex flex-col gap-4">
         {expire && (
           <div className="bg-white border border-bordure rounded-lg p-3 text-sm font-bold text-muted text-center">
@@ -85,6 +87,12 @@ export default async function DealPage({ params }: PageParams) {
             {deal.prixNormal && <span className="text-muted line-through">{deal.prixNormal} DH</span>}
           </div>
           {deal.description && <p className="text-sm text-muted leading-relaxed">{deal.description}</p>}
+          {!expire && deal.dateFin && (
+            <div className="bg-creme border border-bordure rounded-lg px-3 py-2 text-sm font-bold text-muted">
+              ⏰ Valable jusqu&apos;au{" "}
+              {new Date(deal.dateFin).toLocaleDateString("fr-MA", { day: "numeric", month: "long" })}
+            </div>
+          )}
           {deal.lien && (
             <a
               href={deal.lien}

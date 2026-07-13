@@ -148,13 +148,26 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       </label>
 
       <div className="flex gap-3">
-        <label className="flex-1 flex flex-col gap-1 text-sm font-bold">
+        <label className="flex-1 min-w-0 flex flex-col gap-1 text-sm font-bold">
           Prix promo (DH)
-          <input name="prixPromo" type="number" step="0.01" min="0.01" required className="border border-bordure rounded px-3 py-2 font-normal" />
+          <input
+            name="prixPromo"
+            type="number"
+            step="0.01"
+            min="0.01"
+            required
+            className="w-full min-w-0 border border-bordure rounded px-3 py-2 font-normal"
+          />
         </label>
-        <label className="flex-1 flex flex-col gap-1 text-sm font-bold">
+        <label className="flex-1 min-w-0 flex flex-col gap-1 text-sm font-bold">
           Prix normal (DH)
-          <input name="prixNormal" type="number" step="0.01" min="0.01" className="border border-bordure rounded px-3 py-2 font-normal" />
+          <input
+            name="prixNormal"
+            type="number"
+            step="0.01"
+            min="0.01"
+            className="w-full min-w-0 border border-bordure rounded px-3 py-2 font-normal"
+          />
         </label>
       </div>
 

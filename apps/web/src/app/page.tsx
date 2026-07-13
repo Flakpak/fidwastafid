@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { Deal } from "@fidwastafid/schemas";
 import { GET as getDealsHandler } from "./api/v1/deals/route.js";
 import { SiteHeader } from "../components/SiteHeader.js";
-import { DealCard } from "../components/DealCard.js";
+import { Feed } from "./Feed.js";
 
 export const metadata: Metadata = {
   title: "Fidwastafid — Bons plans au Maroc",
@@ -40,13 +40,7 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-creme text-texte">
       <SiteHeader />
-
-      <main className="max-w-2xl mx-auto p-4 flex flex-col gap-3">
-        {deals.length === 0 && <p className="text-center text-muted py-16">Aucun bon plan pour l&apos;instant.</p>}
-        {deals.map((deal) => (
-          <DealCard key={deal.publicId} deal={deal} />
-        ))}
-      </main>
+      <Feed initialDeals={deals} />
     </div>
   );
 }
