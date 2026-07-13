@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# .env racine : lu par docker-compose pour SUPABASE_URL/SUPABASE_ANON_KEY
+# côté conteneur web (mêmes valeurs que apps/web/.env.local, jamais commité).
+.env
+
 # Next.js (apps/web)
 .next/
 out/

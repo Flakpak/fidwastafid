@@ -16,7 +16,32 @@ import type { NextRequest } from "next/server";
  * autorisé par nonce — nécessaire pour les chunks JS que Next charge
  * dynamiquement au runtime.
  */
+/**
+ * CSP désactivé en `next dev` UNIQUEMENT — constat empirique (diagnostic
+ * fait avec accord explicite, local uniquement) : le nonce CSP change à
+ * chaque requête et casse l'hydratation React sous le HMR/Fast Refresh de
+ * `next dev` (SSR correct, mais React ne s'attache jamais côté client).
+ * Confirmé SANS lien avec la sécurité elle-même : un build de production
+ * réel (`next start`, testé via `docker compose up --build`) hydrate
+ * correctement avec le CSP strict complet, inchangé. Donc : la prod garde
+ * exactement la même protection (nonce + 'strict-dynamic', jamais
+ * 'unsafe-inline') ; seul le confort de dev change.
+ *
+ * ATTENTION — conséquence directe : `next dev` ne peut plus détecter une
+ * violation CSP (ex. script/ressource externe bloqué). Tout morceau qui
+ * ajoute du JS client ou une ressource externe doit être revérifié contre
+ * un build Docker (`docker compose up --build`, CSP complet) avant d'être
+ * considéré terminé — pas seulement testé en `next dev`. Cas concret à
+ * venir : Turnstile (Phase 4 Morceau 5) charge un script depuis
+ * `challenges.cloudflare.com`, qui devra être explicitement autorisé dans
+ * `script-src`/`frame-src` — une régression que le dev sans CSP ne
+ * révélerait plus.
+ */
 export function middleware(request: NextRequest) {
+  if (process.env.NODE_ENV !== "production") {
+    return NextResponse.next();
+  }
+
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
 
   const csp = `
