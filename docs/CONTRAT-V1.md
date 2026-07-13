@@ -98,6 +98,10 @@ GET /api/v1/deals?cursor=xxx&limit=20  →  { "data": [...], "nextCursor": "yyy"
 GET  /api/v1/deals                          liste (filtres: statut=publie par défaut, enseigne, ville, categorie, type)
 GET  /api/v1/deals/:publicId                détail
 GET  /api/v1/enseignes                      liste des enseignes
+GET  /api/v1/deals/:publicId/commentaires   liste, pagination par curseur — ajouté en Phase 4 :
+                                             lecture symétrique du POST ci-dessous, omission du
+                                             contrat initial (aucun autre endpoint n'était prévu
+                                             pour afficher les commentaires soumis)
 
 # Authentifié (requireUser)
 POST   /api/v1/deals                        soumission → statut=en_attente
