@@ -6,6 +6,7 @@ import { GET as getCommentairesHandler } from "../../api/v1/deals/[publicId]/com
 import { SiteHeader } from "../../../components/SiteHeader.js";
 import { DealActions } from "./DealActions.js";
 import { CommentForm } from "./CommentForm.js";
+import { dealDescription } from "./seo.js";
 
 /** SSR par requête — mêmes raisons que la page d'accueil (voir app/page.tsx). */
 export const dynamic = "force-dynamic";
@@ -45,7 +46,17 @@ async function fetchCommentaires(publicId: string): Promise<Commentaire[]> {
 export async function generateMetadata({ params }: PageParams): Promise<Metadata> {
   const { slugAndId } = await params;
   const deal = await fetchDeal(extractPublicId(slugAndId));
-  return { title: deal ? `${deal.titre} — Fidwastafid` : "Deal introuvable — Fidwastafid" };
+  if (!deal) return { title: "Deal introuvable" };
+
+  const canonical = `/deal/${dealUrlSlug(deal.titre, deal.publicId)}`;
+  const description = dealDescription(deal);
+
+  return {
+    title: deal.titre,
+    description,
+    alternates: { canonical },
+    openGraph: { title: deal.titre, description, url: canonical, type: "website" },
+  };
 }
 
 export default async function DealPage({ params }: PageParams) {

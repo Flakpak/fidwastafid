@@ -3,7 +3,7 @@ import { inscriptionAction } from "../../lib/authActions.js";
 
 /** noindex — CONTRAT-V1 §2. */
 export const metadata: Metadata = {
-  title: "Inscription — Fidwastafid",
+  title: "Inscription",
   robots: { index: false, follow: false },
 };
 

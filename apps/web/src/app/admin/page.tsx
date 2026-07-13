@@ -3,7 +3,7 @@ import { SiteHeader } from "../../components/SiteHeader.js";
 import { AdminPipeline } from "./AdminPipeline.js";
 
 export const metadata: Metadata = {
-  title: "Admin — Fidwastafid",
+  title: "Admin",
   robots: { index: false, follow: false },
 };
 

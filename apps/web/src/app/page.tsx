@@ -4,8 +4,15 @@ import { GET as getDealsHandler } from "./api/v1/deals/route.js";
 import { SiteHeader } from "../components/SiteHeader.js";
 import { Feed } from "./Feed.js";
 
+const DESCRIPTION = "Les meilleurs bons plans et promotions au Maroc, votés par la communauté : alimentaire, high-tech, mode et plus.";
+
 export const metadata: Metadata = {
-  title: "Fidwastafid — Bons plans au Maroc",
+  // absolute : contourne le template "%s — Fidwastafid" du layout, ce
+  // titre porte déjà le nom du site.
+  title: { absolute: "Fidwastafid — Bons plans au Maroc" },
+  description: DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: { title: "Fidwastafid — Bons plans au Maroc", description: DESCRIPTION, url: "/" },
 };
 
 /**

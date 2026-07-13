@@ -7,7 +7,7 @@ import { SiteHeader } from "../../components/SiteHeader.js";
 import { SoumettreForm } from "./SoumettreForm.js";
 
 export const metadata: Metadata = {
-  title: "Proposer un bon plan — Fidwastafid",
+  title: "Proposer un bon plan",
   robots: { index: false, follow: false },
 };
 

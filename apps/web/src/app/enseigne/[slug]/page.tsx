@@ -28,7 +28,17 @@ async function fetchDeals(slug: string): Promise<Deal[]> {
 export async function generateMetadata({ params }: PageParams): Promise<Metadata> {
   const { slug } = await params;
   const enseigne = await fetchEnseigne(slug);
-  return { title: enseigne ? `${enseigne.nom} — Fidwastafid` : "Enseigne introuvable — Fidwastafid" };
+  if (!enseigne) return { title: "Enseigne introuvable" };
+
+  const description = `Tous les bons plans et promotions ${enseigne.nom} au Maroc, votés par la communauté.`;
+  const canonical = `/enseigne/${enseigne.slug}`;
+
+  return {
+    title: enseigne.nom,
+    description,
+    alternates: { canonical },
+    openGraph: { title: enseigne.nom, description, url: canonical, type: "website" },
+  };
 }
 
 export default async function EnseignePage({ params }: PageParams) {

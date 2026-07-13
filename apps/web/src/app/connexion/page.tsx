@@ -3,7 +3,7 @@ import { connexionAction } from "../../lib/authActions.js";
 
 /** noindex — CONTRAT-V1 §2. */
 export const metadata: Metadata = {
-  title: "Connexion — Fidwastafid",
+  title: "Connexion",
   robots: { index: false, follow: false },
 };
 
