@@ -4,6 +4,8 @@ import {
   dealInputSchema,
   voteInputSchema,
   authUserSchema,
+  slugify,
+  dealUrlSlug,
 } from "./index.js";
 
 let pass = 0;
@@ -107,6 +109,25 @@ check(
     pseudo: "Kamel",
     isAdmin: true,
   }).success
+);
+
+console.log("\nslugify / dealUrlSlug");
+check("minuscules + tirets", slugify("Huile Lesieur 5L") === "huile-lesieur-5l");
+check("accents retirés", slugify("Écouteurs à réduction de bruit") === "ecouteurs-a-reduction-de-bruit");
+check("ponctuation -> tirets uniques", slugify("Promo !! -50%  chez Marjane") === "promo-50-chez-marjane");
+check("pas de tiret en tête/fin", !slugify("  -Test-  ").startsWith("-") && !slugify("  -Test-  ").endsWith("-"));
+check("tronqué à 60 caractères", slugify("x".repeat(100)).length <= 60);
+check(
+  "titre sans caractère ASCII -> chaîne vide",
+  slugify("فيدوستافيد") === ""
+);
+check(
+  "dealUrlSlug compose slug-publicId",
+  dealUrlSlug("Huile Lesieur 5L", "x7k2p9qa23") === "huile-lesieur-5l-x7k2p9qa23"
+);
+check(
+  "dealUrlSlug replie sur le public_id si slug vide",
+  dealUrlSlug("فيدوستافيد", "x7k2p9qa23") === "x7k2p9qa23"
 );
 
 console.log(`\n${pass} passés, ${fail} échoués`);
