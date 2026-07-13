@@ -145,6 +145,20 @@ requireAdmin(request: Request): Promise<AuthUser>  // throw AuthError('FORBIDDEN
   donnée métier normale via l'API).
 - Appelé uniquement depuis `/api/v1`, jamais directement par un composant web ou le pipeline.
 
+### Doctrine d'accès admin
+
+- Pas de sous-domaine, pas d'URL secrète : `/admin` est public en tant qu'URL,
+  la sécurité vient de l'authentification, jamais de l'obscurité.
+- Le layout `apps/web` `/admin/*` appelle `requireAdmin()` côté serveur avant
+  tout rendu. Non connecté → redirect `/connexion?next=/admin`. Connecté
+  non-admin → **404** (pas 403 : ne pas confirmer l'existence de la surface).
+- Aucun composant, lien ou fragment HTML admin n'est envoyé à un non-admin.
+  Le lien admin dans la nav est rendu conditionnellement **côté serveur**
+  (jamais un `if` dans du JS client, contrairement au bouton admin v1).
+- Chaque route `/api/v1/admin/*` revérifie `requireAdmin()` indépendamment —
+  l'UI n'est jamais la barrière.
+- `/admin/*` : noindex + Disallow robots.txt (déjà acté §2).
+
 ## 6 — Schéma d'URL des images
 
 `fidwastafid.com/img/deals/[public_id]` — proxifié et caché par Cloudflare, backend interchangeable.
