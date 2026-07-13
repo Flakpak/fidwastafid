@@ -170,7 +170,7 @@ PROCHAINE TÂCHE : Phase 2 — Fondation (monorepo pnpm, schémas zod, migration
 | 3 — API | ✅ fait | `/api/v1` complet (public+auth+admin), migrations SQL schéma v2 (Postgres local uniquement, prod v1 non touchée), rate limiting Postgres-backé, Turnstile soumission, audit log admin, spec OpenAPI, tests d'intégration + job CI dédié (Postgres jetable + secrets Supabase dev). CI verte (3 jobs). |
 | 4 — Web | ☐ à faire | |
 | 5 — SEO | ☐ à faire | |
-| 6 — Bascule prod | ☐ à faire | |
+| 6 — Bascule prod | ☐ à faire | **Checklist avant bascule** : SMTP custom pour Supabase Auth (le SMTP partagé par défaut est rate-limité — `429 over_email_send_rate_limit` dès la 2e inscription en test, `fidwastafid.dev` a même été rejeté comme domaine invalide faute de MX) + réactiver "Confirm email" (désactivé temporairement en Phase 4 pour tester l'inscription en dev) + vérifier le domaine `fidwastafid.dev`. |
 | 7 — Pipeline | ☐ à faire | |
 | 8 — Mobile & ops | ☐ à faire | |
 | 9 — VPS | ☐ conditionnel | |
