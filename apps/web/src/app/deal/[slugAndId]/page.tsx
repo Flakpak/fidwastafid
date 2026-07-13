@@ -6,7 +6,7 @@ import { GET as getCommentairesHandler } from "../../api/v1/deals/[publicId]/com
 import { SiteHeader } from "../../../components/SiteHeader.js";
 import { DealActions } from "./DealActions.js";
 import { CommentForm } from "./CommentForm.js";
-import { dealDescription } from "./seo.js";
+import { dealDescription, dealJsonLd } from "./seo.js";
 
 /** SSR par requête — mêmes raisons que la page d'accueil (voir app/page.tsx). */
 export const dynamic = "force-dynamic";
@@ -77,9 +77,16 @@ export default async function DealPage({ params }: PageParams) {
   const commentaires = await fetchCommentaires(deal.publicId);
   const expire = deal.statut === "expire";
 
+  // Échappe `<` pour empêcher un titre/description soumis par un utilisateur
+  // de casser hors du <script> (ex. "</script><script>...") — JSON.stringify
+  // seul n'échappe pas les chevrons, nécessaires ici car le JSON est injecté
+  // tel quel dans du HTML, pas juste parsé en JS.
+  const jsonLd = JSON.stringify(dealJsonLd(deal, `/deal/${canonical}`)).replace(/</g, "\\u003c");
+
   return (
     <div className="min-h-screen bg-creme text-texte">
       <SiteHeader />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <main className="max-w-2xl mx-auto p-4 flex flex-col gap-4">
         {expire && (
           <div className="bg-white border border-bordure rounded-lg p-3 text-sm font-bold text-muted text-center">
