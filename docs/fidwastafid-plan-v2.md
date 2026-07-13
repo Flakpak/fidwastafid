@@ -30,6 +30,7 @@ Toute décision en cours de route se vérifie contre cette liste. Si elle en vio
 5. **Jamais de prix deviné** : le rejet prime sur l'invention (principe existant du pipeline, étendu à toute la plateforme).
 6. **Périmètre fermé par phase** : aucune feature ajoutée en cours de phase. Les idées vont dans un fichier `IDEES.md`, elles seront triées après la mise en prod de la v2.
 7. **Sécurité by design** : validation d'entrée systématique, moindre privilège, en-têtes de sécurité dès le squelette, audit log des actions admin, secrets uniquement en variables d'environnement, Dependabot actif.
+8. **Le SUIVI se met à jour à chaque session.** Un plan périmé fait prendre des décisions sur un état du monde qui n'existe plus.
 
 ---
 
@@ -39,8 +40,8 @@ Ce sont les choix coûteux à changer après coup. C'est ici que « ne pas reven
 
 | Décision | Pourquoi c'est irréversible | À figer |
 |---|---|---|
-| **Format des slugs de deals** | Les URLs indexées par Google et partagées sur WhatsApp ne doivent JAMAIS changer | `/deal/[slug]` avec slug stable (ex : `huile-lesieur-5l-marjane-89dh` + suffixe id court pour l'unicité) |
-| **Arborescence d'URLs** | Idem — le SEO se construit dessus pendant des années | `/` (feed) · `/deal/[slug]` · `/enseigne/[nom]` · `/ville/[nom]` (réservé) · `/api/v1/*` |
+| **Format des slugs de deals** | Les URLs indexées par Google et partagées sur WhatsApp ne doivent JAMAIS changer | `/deal/[slug]-[public_id]` — slug dérivé du titre seul, jamais du prix (CONTRAT-V1 §1 : un deal est éphémère, son URL est éternelle), `public_id` = nanoid 10 caractères immuable (ex : `huile-lesieur-5l-a1b2c3d4e5`) |
+| **Arborescence d'URLs** | Idem — le SEO se construit dessus pendant des années | `/` (feed) · `/deal/[slug]-[public_id]` · `/enseigne/[nom]` · `/ville/[nom]` (réservé) · `/api/v1/*` |
 | **Modèle de domaine (schémas zod)** | Partagé par l'API, le web, le mobile futur et le pipeline — le changer casse tout en cascade | Entités : Deal, Vote, Commentaire, Soumission, User, Enseigne + statuts (`auto_draft`, `en_attente`, `publie`, `rejete`, `expire`) |
 | **Contrat API v1** | La future app mobile et d'éventuels partenaires B2B consommeront ce contrat | Liste fermée des endpoints + conventions (pagination, erreurs, versionnage) |
 | **Interface du module auth** | Tout le code s'écrit contre elle | `getCurrentUser()`, `requireUser()`, `requireAdmin()` — rien d'autre ne sort du module |
@@ -95,7 +96,7 @@ PROCHAINE TÂCHE : Phase 2 — Fondation (monorepo pnpm, schémas zod, migration
 
 ### PHASE 4 — Le web comme premier client *(4-5 sessions)*
 - [ ] Feed en SSR (rendu serveur, HTML complet pour Google).
-- [ ] Page deal `/deal/[slug]` — la pièce maîtresse SEO.
+- [ ] Page deal `/deal/[slug]-[public_id]` — la pièce maîtresse SEO.
 - [ ] Pages enseignes `/enseigne/marjane`, `/enseigne/bim`, `/enseigne/carrefour`.
 - [ ] Auth (connexion, inscription), votes, commentaires, soumission — via l'API.
 - [ ] Admin avec onglet Pipeline (`auto_draft` en premier, bulk select/validate/reject, tri par remise décroissante — parité avec l'existant).
@@ -108,19 +109,68 @@ PROCHAINE TÂCHE : Phase 2 — Fondation (monorepo pnpm, schémas zod, migration
 - [ ] Metadata par page (title, description) + Open Graph (partages WhatsApp avec image et prix).
 - [ ] Données structurées schema.org `Offer`/`Product` sur chaque deal.
 - [ ] `sitemap.xml` dynamique généré depuis la base.
-- [ ] Redirections 301 depuis les anciennes URLs (mapping de la Phase 1).
+- *Aucune redirection depuis la v1 (CONTRAT §2) — l'indexation repart de zéro, c'est attendu.*
 - [ ] Search Console : soumission du sitemap, vérification de l'indexation.
 
 **Terminé quand** : le test de résultats enrichis Google valide les données structurées + le sitemap est soumis et exploré.
 
-### PHASE 6 — Bascule en production *(1 session + surveillance)*
-- [ ] Gel du contenu v1, dernière synchro.
-- [ ] Bascule DNS du domaine vers la v2.
-- [ ] Passage Vercel Pro (conformité usage commercial).
-- [ ] Surveillance 72h : erreurs, indexation, remontées utilisateurs.
-- [ ] Suppression du code v1 du repo (le tag `v1-legacy` reste l'archive).
+### PHASE 6 — Bascule en production *(1 session + 7 jours de surveillance)*
 
-**Terminé quand** : la v2 sert 100 % du trafic depuis 1 semaine sans régression.
+**Chantiers à lever AVANT la session (lancés en parallèle des Phases 3-5) :**
+- [ ] Base de prod v2 : Postgres du projet Supabase aswbu (celui de l'auth),
+      connexion via Session pooler (IPv4). DATABASE_URL de prod câblée dans
+      Vercel. Migration 0001_init appliquée dessus. DÉCISION GRAVÉE — un
+      troisième store serait de la complexité gratuite.
+- [ ] Script ETL v1→v2 (apps/pipeline ou script dédié) : laqwg → aswbu.
+      Transformations : magasin texte → enseigne_id (table enseignes curée à
+      la main), votes.type → votes.sens, génération public_id (nanoid10),
+      photo_url → image_key. Les colonnes démographiques d'users (genre,
+      tranche_age, situation_fam, nb_enfants) NE SONT PAS migrées (loi 09-08 —
+      conservation sans consentement). Répété au moins une fois sur base
+      jetable, durée mesurée, procédure écrite. Idempotent (rejouable).
+- [ ] Comptes utilisateurs : PAS de migration auth (décision — cohérente avec
+      l'abandon des redirections v1, CONTRAT §2 : usage réel quasi nul).
+      Les lignes users migrent comme données d'auteur (pseudo + public_id),
+      délinkées de l'auth ; le provisioning paresseux recrée le lien au
+      premier login v2, réconciliation par email si disponible.
+- [ ] CNDP / loi 09-08 : la collecte démographique v1 (index.html ~l.2614)
+      coupée par le commit fd913b1
+      (https://github.com/Flakpak/fidwastafid/commit/fd913b1f45f517b0a3f7dcf86723c96bfc84ded6).
+      Champs absents de l'inscription v2. B2B data reporté dans IDEES.md
+      derrière consentement explicite + déclaration CNDP.
+- [ ] Vercel Pro effectif avant la bascule.
+- [ ] DNSSEC désactivé chez OVH (reliquat Phase 0).
+- [ ] Parité v1 ↔ v2 validée sur mobile réel.
+- [ ] Ignored Build Step configuré sur le projet Vercel v1 au moment du gel
+      J-0 — un push sur le repo rebuild actuellement LES DEUX projets, il faut
+      que le gel v1 soit réel.
+
+**J-0 — session de bascule**
+- [ ] Gel des écritures v1 (admin en lecture seule), puis exécution de l'ETL
+      v1→v2 (procédure répétée) vers la base aswbu.
+- [ ] Bascule du domaine : réassignation dans Vercel/Cloudflare (pas de TTL
+      DNS à gérer, domaine proxifié Cloudflare — bascule et rollback quasi
+      instantanés).
+- [ ] Vérifications : 200 sur /, /deal/[slug]-[public_id], /enseigne/marjane ;
+      en-têtes CSP ; images via /img/deals/[public_id] ; une écriture de test
+      (vote) de bout en bout.
+
+**J+1 → J+7** : 5xx, latence, échecs d'écriture, Search Console (indexation
+repart de zéro — attendu), remontées WhatsApp.
+
+**J+7 — clôture**
+- [ ] Suppression de index.html racine (⚠️ PAS src/App.jsx, prototype
+      orphelin). Rollback dès lors dégradé mais pas perdu : redéploiement
+      possible depuis le tag v1-legacy (~15 min au lieu d'instantané).
+- [ ] Analytics : vérifier que la v2 remonte dans Vercel Web Analytics
+      (@vercel/analytics côté Next, pas la balise script v1).
+
+**Rollback J-0 → J+7** : repointer le domaine vers le projet v1. La base v1
+n'ayant jamais été modifiée, le rollback DNS suffit ; l'ETL se rejoue après
+correction (idempotent).
+
+**Terminé quand** : v2 sert 100 % du trafic depuis 7 jours, zéro 5xx récurrent,
+zéro régression signalée, rollback non déclenché.
 
 ### PHASE 7 — Pipeline & automatisation *(2 sessions)*
 - [ ] Pipeline `.mjs` rejoint le monorepo (`apps/pipeline`) — code inchangé, il utilise désormais les schémas zod partagés pour valider avant insertion.
@@ -164,18 +214,18 @@ PROCHAINE TÂCHE : Phase 2 — Fondation (monorepo pnpm, schémas zod, migration
 
 | Phase | Statut | Notes |
 |---|---|---|
-| 0 — Protéger l'existant | ☐ à faire | |
-| 1 — Conception | ☐ à faire | |
-| 2 — Fondation | ✅ fait | monorepo pnpm (schemas/db/auth/web), Next.js 15+Tailwind (charte), Docker+compose testé, en-têtes sécurité, CI verte, Dependabot. Déploiement Vercel fait (par Kamel, en clics) — build "success" confirmé via l'API Vercel (commit 9d7e6e2). URL protégée par Vercel Authentication, non vérifiée visuellement par l'agent. |
-| 3 — API | ✅ fait | `/api/v1` complet (public+auth+admin), migrations SQL schéma v2 (Postgres local uniquement, prod v1 non touchée), rate limiting Postgres-backé, Turnstile soumission, audit log admin, spec OpenAPI, tests d'intégration + job CI dédié (Postgres jetable + secrets Supabase dev). CI verte (3 jobs). |
-| 4 — Web | ✅ fait | Morceaux 1-7 faits et pushés : provisioning+auth, feed SSR+slugify, page deal (votes/commentaires/redirection slug/état expiré), pages enseignes, soumission+Turnstile, pipeline admin, polish parité+mobile. Parité v1 : recherche + filtres ville/catégorie/type + tri (feed), bouton partage + bandeau "valable jusqu'au" (page deal), SiteHeader ajouté sur la page deal (oubli du Morceau 3). Mobile : 0 débordement horizontal constaté sur feed/deal/enseigne/soumettre/admin/connexion à 375px, un débordement corrigé (ligne prix promo/normal sur /soumettre, `min-w-0` manquant sur des inputs number en flex). CSP par nonce désactivé en `next dev` uniquement (casse l'hydratation sous HMR — confirmé sans lien avec la sécurité, la prod garde le CSP strict inchangé, voir commentaire dans `middleware.ts`) — chaque morceau ajoutant une ressource externe est vérifié contre un build Docker complet (fait pour Turnstile : script-src/frame-src/connect-src étendus à challenges.cloudflare.com). |
-| 5 — SEO | ✅ fait | Morceaux 1-3 faits et pushés (CI verte) : metadata+Open Graph par page (image OG générique via `next/og`, vraies photos par deal reportées — même écart que Phase 4), données structurées Product+Offer (priceValidUntil depuis dateFin, availability honnête sur un deal expiré — jamais InStock après expiration), canonicalisation URL (301 majuscule/trailing-slash, CONTRAT-V1 §2) + sitemap.xml dynamique + robots.txt. Item "redirections 301 depuis la v1" retiré du plan : CONTRAT-V1 §2 dit explicitement qu'aucun mapping n'est nécessaire (v1 en hash routing, jamais indexé). Morceau 4 (soumission Search Console) : manuel, à faire séparément par Kamel une fois en prod — le sitemap est prêt pour ça. |
-| 6 — Bascule prod | ☐ à faire | **Checklist avant bascule** : SMTP custom pour Supabase Auth (le SMTP partagé par défaut est rate-limité — `429 over_email_send_rate_limit` dès la 2e inscription en test, `fidwastafid.dev` a même été rejeté comme domaine invalide faute de MX) + réactiver "Confirm email" (désactivé temporairement en Phase 4 pour tester l'inscription en dev) + vérifier le domaine `fidwastafid.dev`. |
-| 7 — Pipeline | ☐ à faire | |
+| 0 — Protéger l'existant | ☑ fait | pg_dump quotidien GA, runbook 5 scénarios, tag v1-legacy, DNS → Cloudflare (Full Strict, reliquat : DNSSEC à désactiver chez OVH) |
+| 1 — Conception | ☑ fait | docs/CONTRAT-V1.md gravé |
+| 2 — Fondation | ☑ fait | monorepo pnpm, packages schemas/db/auth, Next 15, Docker, CSP nonce, CI verte, Dependabot |
+| 3 — API | ☑ fait | endpoints publics + écritures + rate limiting, CI verte |
+| 4 — Web | ◐ code complet | commits 06ca057→9d4718c ; RESTE : validation parité v1↔v2 sur mobile réel (critère "Terminé quand" — action Kamel) |
+| 5 — SEO | ◐ code complet | commits 94147b2→d3583ed ; RESTE : soumission sitemap Search Console + test résultats enrichis Google (actions externes) |
+| 6 — Bascule prod | ☐ à faire | risque n°1 = provisioning base prod v2 + ETL v1→v2 (la v2 n'a pas encore de base de production ; la base v1 ne sera jamais modifiée) |
+| 7 — Pipeline | ☐ à faire | 3 scripts .mjs opérationnels hors monorepo |
 | 8 — Mobile & ops | ☐ à faire | |
 | 9 — VPS | ☐ conditionnel | |
 
-**PROCHAINE TÂCHE** : Phase 6 — Bascule en production (voir checklist ci-dessus : SMTP custom, réactivation "Confirm email", vérification domaine).
+**PROCHAINE TÂCHE** : clore 4 et 5 — (a) validation parité sur mobile réel, (b) soumission sitemap + test résultats enrichis. Ensuite : chantiers préalables de la Phase 6.
 
 ---
 
