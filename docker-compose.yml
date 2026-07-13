@@ -20,6 +20,11 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        # NEXT_PUBLIC_* est figé dans le bundle par `next build` — doit donc
+        # être fourni comme build arg, pas comme variable d'environnement du
+        # conteneur (qui n'agit qu'au runtime, trop tard).
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://fidwastafid:fidwastafid@db:5432/fidwastafid
@@ -29,6 +34,10 @@ services:
       # les JWT Supabase, y compris dans ce conteneur de test.
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      # Contrepartie du NEXT_PUBLIC_TURNSTILE_SITE_KEY (build arg ci-dessus,
+      # côté client) : la clé secrète, elle, est lue au runtime par l'API
+      # (verifyTurnstile), donc ici en variable d'environnement du conteneur.
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY}
     ports:
       - "3000:3000"
     depends_on:

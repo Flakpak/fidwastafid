@@ -20,6 +20,8 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app ./
 COPY . .
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY
+ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=$NEXT_PUBLIC_TURNSTILE_SITE_KEY
 RUN pnpm --filter @fidwastafid/web build
 
 # ---- runner : image finale minimale, non-root ----

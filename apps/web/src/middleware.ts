@@ -14,9 +14,13 @@ import type { NextRequest } from "next/server";
  * l'applique à ses propres scripts injectés (pattern documenté officiel).
  * 'strict-dynamic' fait confiance à tout script chargé par un script déjà
  * autorisé par nonce — nécessaire pour les chunks JS que Next charge
- * dynamiquement au runtime.
- */
-/**
+ * dynamiquement au runtime, ainsi que pour le script Turnstile
+ * (challenges.cloudflare.com, page /soumettre) tant que le <script> qui le
+ * charge porte lui-même le nonce (voir soumettre/page.tsx). frame-src et
+ * connect-src listent explicitement challenges.cloudflare.com : strict-
+ * dynamic ne couvre que script-src, pas les iframes ni les appels réseau du
+ * widget.
+ *
  * CSP désactivé en `next dev` UNIQUEMENT — constat empirique (diagnostic
  * fait avec accord explicite, local uniquement) : le nonce CSP change à
  * chaque requête et casse l'hydratation React sous le HMR/Fast Refresh de
@@ -31,11 +35,7 @@ import type { NextRequest } from "next/server";
  * violation CSP (ex. script/ressource externe bloqué). Tout morceau qui
  * ajoute du JS client ou une ressource externe doit être revérifié contre
  * un build Docker (`docker compose up --build`, CSP complet) avant d'être
- * considéré terminé — pas seulement testé en `next dev`. Cas concret à
- * venir : Turnstile (Phase 4 Morceau 5) charge un script depuis
- * `challenges.cloudflare.com`, qui devra être explicitement autorisé dans
- * `script-src`/`frame-src` — une régression que le dev sans CSP ne
- * révélerait plus.
+ * considéré terminé — pas seulement testé en `next dev`.
  */
 export function middleware(request: NextRequest) {
   if (process.env.NODE_ENV !== "production") {
@@ -50,7 +50,8 @@ export function middleware(request: NextRequest) {
     style-src 'self' 'nonce-${nonce}';
     img-src 'self' data: blob:;
     font-src 'self';
-    connect-src 'self';
+    connect-src 'self' https://challenges.cloudflare.com;
+    frame-src 'self' https://challenges.cloudflare.com;
     object-src 'none';
     base-uri 'self';
     form-action 'self';
