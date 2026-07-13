@@ -53,6 +53,7 @@ export function AdminPipeline() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- chargement initial au montage, pattern standard (https://react.dev/reference/react/useEffect#fetching-data-with-effects), pas de state dérivable du render
     void fetchDeals();
   }, [fetchDeals]);
 

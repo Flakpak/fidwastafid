@@ -14,7 +14,10 @@ export function DealActions({ deal }: { deal: Deal }) {
   // Détecté après montage (jamais côté serveur) pour éviter un mismatch
   // d'hydratation entre le SSR (pas de `navigator`) et le client.
   const [canShare, setCanShare] = useState(false);
-  useEffect(() => setCanShare(typeof navigator.share === "function"), []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- détection de feature volontairement post-montage, seule façon d'éviter un mismatch SSR/client sur `navigator`
+    setCanShare(typeof navigator.share === "function");
+  }, []);
 
   async function vote(sens: "chaud" | "froid") {
     setPending(true);
