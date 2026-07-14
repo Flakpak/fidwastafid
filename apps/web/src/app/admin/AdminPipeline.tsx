@@ -13,24 +13,59 @@ function remise(deal: DealAdmin): number {
   return Math.round((1 - deal.prixPromo / deal.prixNormal) * 100);
 }
 
-/** auto_draft toujours en tête (CONTRAT-V1 §4), puis remise décroissante. */
-function comparePipeline(a: DealAdmin, b: DealAdmin): number {
-  const aAuto = a.statut === "auto_draft" ? 0 : 1;
-  const bAuto = b.statut === "auto_draft" ? 0 : 1;
-  if (aAuto !== bAuto) return aAuto - bAuto;
+function compareRemise(a: DealAdmin, b: DealAdmin): number {
   return remise(b) - remise(a);
 }
 
-const STATUT_LABELS: Record<DealStatut, string> = {
-  auto_draft: "Auto (brouillon)",
+const ONGLETS: DealStatut[] = ["auto_draft", "en_attente", "publie", "rejete", "expire"];
+
+const ONGLET_LABELS: Record<DealStatut, string> = {
+  auto_draft: "Pipeline",
   en_attente: "En attente",
-  publie: "Publié",
-  rejete: "Rejeté",
-  expire: "Expiré",
+  publie: "Publiés",
+  rejete: "Rejetés",
+  expire: "Expirés",
+};
+
+interface Action {
+  label: string;
+  statut: DealStatut;
+  variant: "primaire" | "danger" | "neutre";
+}
+
+/** Actions contextuelles par onglet — parité v1 (index.html AdminPage, machine à états statut). */
+const ONGLET_ACTIONS: Record<DealStatut, Action[]> = {
+  auto_draft: [
+    { label: "Valider", statut: "publie", variant: "primaire" },
+    { label: "Rejeter", statut: "rejete", variant: "danger" },
+  ],
+  en_attente: [
+    { label: "Valider", statut: "publie", variant: "primaire" },
+    { label: "Rejeter", statut: "rejete", variant: "danger" },
+  ],
+  publie: [
+    { label: "Expirer", statut: "expire", variant: "neutre" },
+    { label: "Retirer", statut: "rejete", variant: "danger" },
+  ],
+  rejete: [
+    { label: "Republier", statut: "publie", variant: "primaire" },
+    { label: "Remettre en attente", statut: "en_attente", variant: "neutre" },
+  ],
+  expire: [{ label: "Republier", statut: "publie", variant: "primaire" }],
+};
+
+/** Sélection groupée réservée aux deux onglets de modération initiale (v1 : idem). */
+const BULK_ONGLETS = new Set<DealStatut>(["auto_draft", "en_attente"]);
+
+const ACTION_CLASSES: Record<Action["variant"], string> = {
+  primaire: "bg-vert text-white",
+  danger: "border border-rouge text-rouge",
+  neutre: "border border-bordure text-muted",
 };
 
 export function AdminPipeline() {
   const [deals, setDeals] = useState<DealAdmin[] | null>(null);
+  const [onglet, setOnglet] = useState<DealStatut>("en_attente");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -50,7 +85,6 @@ export function AdminPipeline() {
     }
     const body = (await res.json()) as { data: DealAdmin[] };
     setDeals(body.data);
-    setSelected(new Set());
   }, []);
 
   useEffect(() => {
@@ -58,7 +92,21 @@ export function AdminPipeline() {
     void fetchDeals();
   }, [fetchDeals]);
 
-  const sorted = useMemo(() => (deals ? [...deals].sort(comparePipeline) : []), [deals]);
+  function changerOnglet(t: DealStatut) {
+    setOnglet(t);
+    setSelected(new Set());
+  }
+
+  const comptes = useMemo(() => {
+    const c: Record<DealStatut, number> = { auto_draft: 0, en_attente: 0, publie: 0, rejete: 0, expire: 0 };
+    for (const d of deals ?? []) c[d.statut] += 1;
+    return c;
+  }, [deals]);
+
+  const parOnglet = useMemo(() => {
+    if (!deals) return [];
+    return deals.filter((d) => d.statut === onglet).sort(compareRemise);
+  }, [deals, onglet]);
 
   function toggle(publicId: string) {
     setSelected((prev) => {
@@ -67,6 +115,26 @@ export function AdminPipeline() {
       else next.add(publicId);
       return next;
     });
+  }
+
+  async function updateStatut(publicId: string, statut: DealStatut) {
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/admin/deals/${publicId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statut }),
+      });
+      if (!res.ok) {
+        const body = (await res.json()) as ApiErrorBody;
+        setError(body.error?.message ?? "Action impossible.");
+        return;
+      }
+      await fetchDeals();
+    } finally {
+      setPending(false);
+    }
   }
 
   async function bulk(statut: "publie" | "rejete") {
@@ -84,6 +152,7 @@ export function AdminPipeline() {
         setError(body.error?.message ?? "Action groupée impossible.");
         return;
       }
+      setSelected(new Set());
       await fetchDeals();
     } finally {
       setPending(false);
@@ -100,46 +169,57 @@ export function AdminPipeline() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => void bulk("publie")}
-          disabled={pending || selected.size === 0}
-          className="bg-rouge text-white rounded-lg px-4 py-2 font-bold text-sm disabled:opacity-50"
-        >
-          Valider la sélection ({selected.size})
-        </button>
-        <button
-          type="button"
-          onClick={() => void bulk("rejete")}
-          disabled={pending || selected.size === 0}
-          className="bg-white border border-bordure rounded-lg px-4 py-2 font-bold text-sm disabled:opacity-50"
-        >
-          Rejeter la sélection
-        </button>
+      <div className="flex border-b border-bordure overflow-x-auto">
+        {ONGLETS.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => changerOnglet(t)}
+            className={`px-4 py-2 text-sm font-bold whitespace-nowrap border-b-2 -mb-px ${
+              onglet === t ? "border-rouge text-rouge" : "border-transparent text-muted"
+            }`}
+          >
+            {ONGLET_LABELS[t]} ({comptes[t]})
+          </button>
+        ))}
       </div>
 
-      {sorted.length === 0 && <p className="text-center text-muted py-16">Rien dans le pipeline.</p>}
+      {BULK_ONGLETS.has(onglet) && parOnglet.length > 0 && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void bulk("publie")}
+            disabled={pending || selected.size === 0}
+            className="bg-rouge text-white rounded-lg px-4 py-2 font-bold text-sm disabled:opacity-50"
+          >
+            Valider la sélection ({selected.size})
+          </button>
+          <button
+            type="button"
+            onClick={() => void bulk("rejete")}
+            disabled={pending || selected.size === 0}
+            className="bg-white border border-bordure rounded-lg px-4 py-2 font-bold text-sm disabled:opacity-50"
+          >
+            Rejeter la sélection
+          </button>
+        </div>
+      )}
+
+      {parOnglet.length === 0 && <p className="text-center text-muted py-16">Rien dans cet onglet.</p>}
 
       <ul className="flex flex-col gap-2">
-        {sorted.map((deal) => (
-          <li
-            key={deal.publicId}
-            className="bg-white border border-bordure rounded-xl p-4 flex items-start gap-3"
-          >
-            <input
-              type="checkbox"
-              checked={selected.has(deal.publicId)}
-              onChange={() => toggle(deal.publicId)}
-              className="mt-1"
-            />
+        {parOnglet.map((deal) => (
+          <li key={deal.publicId} className="bg-white border border-bordure rounded-xl p-4 flex items-start gap-3">
+            {BULK_ONGLETS.has(onglet) && (
+              <input
+                type="checkbox"
+                checked={selected.has(deal.publicId)}
+                onChange={() => toggle(deal.publicId)}
+                className="mt-1"
+              />
+            )}
             <div className="flex-1 flex flex-col gap-1">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="font-bold">{deal.titre}</span>
-                <span className="text-xs font-bold bg-creme border border-bordure rounded px-2 py-0.5">
-                  {STATUT_LABELS[deal.statut]}
-                </span>
-              </div>
+              <span className="font-bold">{deal.titre}</span>
               <div className="text-xs text-muted">{joinMeta(deal.enseigneSlug, deal.ville, deal.categorie)}</div>
               <div className="flex items-baseline gap-2">
                 <span className="font-black text-rouge">{deal.prixPromo} DH</span>
@@ -148,12 +228,21 @@ export function AdminPipeline() {
                   <span className="text-xs font-bold bg-rouge text-white rounded px-2 py-0.5">-{remise(deal)}%</span>
                 )}
               </div>
-              {deal.whatsappContact && (
-                <div className="text-xs text-muted">WhatsApp : {deal.whatsappContact}</div>
-              )}
-              <div className="text-xs text-muted">
-                Soumis par {deal.submitterPublicId ?? "collecte automatique"}
-              </div>
+              {deal.whatsappContact && <div className="text-xs text-muted">WhatsApp : {deal.whatsappContact}</div>}
+              <div className="text-xs text-muted">Soumis par {deal.submitterPublicId ?? "collecte automatique"}</div>
+            </div>
+            <div className="flex flex-col gap-1 flex-shrink-0">
+              {ONGLET_ACTIONS[onglet].map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={() => void updateStatut(deal.publicId, action.statut)}
+                  disabled={pending}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${ACTION_CLASSES[action.variant]}`}
+                >
+                  {action.label}
+                </button>
+              ))}
             </div>
           </li>
         ))}
