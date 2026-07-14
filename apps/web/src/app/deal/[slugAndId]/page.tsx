@@ -7,6 +7,7 @@ import { SiteHeader } from "../../../components/SiteHeader.js";
 import { DealActions } from "./DealActions.js";
 import { CommentForm } from "./CommentForm.js";
 import { dealDescription, dealJsonLd } from "./seo.js";
+import { joinMeta } from "../../../lib/format.js";
 
 /** SSR par requête — mêmes raisons que la page d'accueil (voir app/page.tsx). */
 export const dynamic = "force-dynamic";
@@ -95,10 +96,7 @@ export default async function DealPage({ params }: PageParams) {
         )}
 
         <div className="bg-white border border-bordure rounded-xl p-5 flex flex-col gap-3">
-          <div className="text-xs font-bold text-muted">
-            {deal.enseigneSlug}
-            {deal.ville ? ` · ${deal.ville}` : ""}
-          </div>
+          <div className="text-xs font-bold text-muted">{joinMeta(deal.enseigneSlug, deal.ville)}</div>
           <h1 className="text-2xl font-black leading-snug">{deal.titre}</h1>
           <div className="flex items-baseline gap-3 flex-wrap">
             <span className="text-3xl font-black text-rouge">{deal.prixPromo} DH</span>

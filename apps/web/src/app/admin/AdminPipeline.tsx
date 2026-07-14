@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DealAdmin, DealStatut } from "@fidwastafid/schemas";
+import { joinMeta } from "../../lib/format.js";
 
 interface ApiErrorBody {
   error?: { code?: string; message?: string };
@@ -139,10 +140,7 @@ export function AdminPipeline() {
                   {STATUT_LABELS[deal.statut]}
                 </span>
               </div>
-              <div className="text-xs text-muted">
-                {deal.enseigneSlug}
-                {deal.ville ? ` · ${deal.ville}` : ""} · {deal.categorie}
-              </div>
+              <div className="text-xs text-muted">{joinMeta(deal.enseigneSlug, deal.ville, deal.categorie)}</div>
               <div className="flex items-baseline gap-2">
                 <span className="font-black text-rouge">{deal.prixPromo} DH</span>
                 {deal.prixNormal && <span className="text-sm text-muted line-through">{deal.prixNormal} DH</span>}

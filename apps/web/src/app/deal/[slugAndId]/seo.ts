@@ -10,7 +10,8 @@ export function discountPct(deal: Deal): number | null {
 export function dealDescription(deal: Deal): string {
   const pct = discountPct(deal);
   const remise = pct !== null ? ` (-${pct}%)` : "";
-  const base = `${deal.titre} à ${deal.prixPromo} DH${remise} chez ${deal.enseigneSlug}.`;
+  const chez = deal.enseigneSlug ? ` chez ${deal.enseigneSlug}` : "";
+  const base = `${deal.titre} à ${deal.prixPromo} DH${remise}${chez}.`;
   return deal.description ? `${base} ${deal.description}` : base;
 }
 

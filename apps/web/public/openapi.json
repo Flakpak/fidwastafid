@@ -127,7 +127,6 @@
         "required": [
           "publicId",
           "titre",
-          "enseigneSlug",
           "categorie",
           "type",
           "prixPromo",
@@ -251,7 +250,6 @@
         "required": [
           "publicId",
           "titre",
-          "enseigneSlug",
           "categorie",
           "type",
           "prixPromo",
@@ -337,7 +335,6 @@
         },
         "required": [
           "titre",
-          "enseigneSlug",
           "categorie",
           "type",
           "prixPromo"

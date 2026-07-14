@@ -8,16 +8,21 @@ export const DEAL_SELECT = `
   d.statut, d.score, u.public_id as submitter_public_id, d.created_at, d.updated_at
 `;
 
+/**
+ * `left join` sur enseignes — CONTRAT-V1 §3, amendement : un deal peut
+ * ne pas avoir d'enseigne (enseigne_id nullable). Un `join` (inner)
+ * exclurait silencieusement ces deals de toute l'API.
+ */
 export const DEAL_FROM = `
   from deals d
-  join enseignes e on e.id = d.enseigne_id
+  left join enseignes e on e.id = d.enseigne_id
   left join users u on u.id = d.submitter_id
 `;
 
 export interface DealRow {
   public_id: string;
   titre: string;
-  enseigne_slug: string;
+  enseigne_slug: string | null;
   ville: string | null;
   categorie: string;
   type: string;
@@ -42,7 +47,7 @@ export function toDeal(row: DealRow): Deal {
   return dealSchema.parse({
     publicId: row.public_id,
     titre: row.titre,
-    enseigneSlug: row.enseigne_slug,
+    enseigneSlug: row.enseigne_slug ?? undefined,
     ville: row.ville ?? undefined,
     categorie: row.categorie,
     type: row.type,

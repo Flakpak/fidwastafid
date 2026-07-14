@@ -17,7 +17,9 @@ export type DealType = z.infer<typeof dealTypeSchema>;
 /** Champs communs à l'input utilisateur et à la représentation stockée. */
 const dealCoreShape = {
   titre: z.string().trim().min(3).max(200),
-  enseigneSlug: z.string().min(1).max(60),
+  /** Optionnel — commerces indépendants/hanouts sans enseigne référencée
+   *  (CONTRAT-V1 §3, amendement). Jamais de valeur placeholder type "Autre". */
+  enseigneSlug: z.string().min(1).max(60).optional(),
   ville: villeSchema.optional(),
   categorie: categorieSchema,
   type: dealTypeSchema,

@@ -40,7 +40,7 @@ export function Feed({ initialDeals }: { initialDeals: Deal[] }) {
   const visibles = useMemo(() => {
     if (!recherche.trim()) return deals;
     const q = recherche.trim().toLowerCase();
-    return deals.filter((d) => d.titre.toLowerCase().includes(q) || d.enseigneSlug.toLowerCase().includes(q));
+    return deals.filter((d) => d.titre.toLowerCase().includes(q) || (d.enseigneSlug ?? "").toLowerCase().includes(q));
   }, [deals, recherche]);
 
   return (

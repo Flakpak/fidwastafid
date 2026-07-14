@@ -26,6 +26,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
     const data = new FormData(form);
     const turnstileToken = data.get("cf-turnstile-response");
 
+    const enseigneSlug = data.get("enseigneSlug");
     const ville = data.get("ville");
     const prixNormal = data.get("prixNormal");
     const dateFin = data.get("dateFin");
@@ -34,7 +35,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
 
     const body = {
       titre: String(data.get("titre") ?? ""),
-      enseigneSlug: String(data.get("enseigneSlug") ?? ""),
+      enseigneSlug: enseigneSlug ? String(enseigneSlug) : undefined,
       ville: ville ? String(ville) : undefined,
       categorie: String(data.get("categorie") ?? ""),
       type,
@@ -90,9 +91,9 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-bold">
-        Enseigne
-        <select name="enseigneSlug" required className="border border-bordure rounded px-3 py-2 font-normal">
-          <option value="">— choisir —</option>
+        Enseigne (facultatif)
+        <select name="enseigneSlug" className="border border-bordure rounded px-3 py-2 font-normal">
+          <option value="">— Aucune enseigne —</option>
           {enseignes.map((e) => (
             <option key={e.slug} value={e.slug}>
               {e.nom}

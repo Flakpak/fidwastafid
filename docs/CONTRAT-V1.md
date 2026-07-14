@@ -76,6 +76,11 @@ tel quel comme exception historique documentée — pas un précédent pour de f
 Au Maroc, la collecte de données personnelles à fin de revente est encadrée par la CNDP (loi 09-08) —
 généralement consentement explicite + déclaration requis. À vérifier avant la bascule prod.
 
+**`enseigne_id` nullable** — un deal peut ne pas avoir d'enseigne (commerces indépendants, hanouts).
+Décision produit du 2026-07-14, remplace l'obligation implicite initiale. Pas de valeur placeholder
+type "Autre" (rejeté explicitement — page `/enseigne/autre` absurde, données polluées) : un deal sans
+enseigne a `enseigne_id`/`enseigneSlug` réellement absents, partout (API, affichage, recherche).
+
 ## 4 — Contrat API v1
 
 **Erreurs** — format unique partout :

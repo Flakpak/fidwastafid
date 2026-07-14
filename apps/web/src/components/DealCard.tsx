@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { dealUrlSlug, type Deal } from "@fidwastafid/schemas";
+import { joinMeta } from "../lib/format.js";
 
 function reduction(deal: Deal): number | null {
   if (!deal.prixNormal || deal.prixNormal <= deal.prixPromo) return null;
@@ -14,10 +15,7 @@ export function DealCard({ deal }: { deal: Deal }) {
       className="bg-white border border-bordure rounded-xl p-4 flex flex-col gap-2 hover:border-rouge-clair transition-colors"
     >
       <div className="flex items-center justify-between text-xs font-bold text-muted">
-        <span>
-          {deal.enseigneSlug}
-          {deal.ville ? ` · ${deal.ville}` : ""}
-        </span>
+        <span>{joinMeta(deal.enseigneSlug, deal.ville)}</span>
         <span className="text-rouge">🔥 {deal.score}</span>
       </div>
       <h2 className="font-bold text-lg leading-snug line-clamp-2">{deal.titre}</h2>

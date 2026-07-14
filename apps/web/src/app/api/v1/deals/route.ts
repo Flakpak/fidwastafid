@@ -120,11 +120,15 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
   if (!parsed.success) return parsed.response;
   const input = parsed.data;
 
-  const enseigneRows = await query<{ id: number }>("select id from enseignes where slug = $1", [
-    input.enseigneSlug,
-  ]);
-  if (!enseigneRows[0]) {
-    return apiError("VALIDATION_ERROR", `enseigneSlug: enseigne "${input.enseigneSlug}" inconnue.`);
+  let enseigneId: number | null = null;
+  if (input.enseigneSlug) {
+    const enseigneRows = await query<{ id: number }>("select id from enseignes where slug = $1", [
+      input.enseigneSlug,
+    ]);
+    if (!enseigneRows[0]) {
+      return apiError("VALIDATION_ERROR", `enseigneSlug: enseigne "${input.enseigneSlug}" inconnue.`);
+    }
+    enseigneId = enseigneRows[0].id;
   }
 
   const publicId = generatePublicId();
@@ -137,7 +141,7 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
     [
       publicId,
       input.titre,
-      enseigneRows[0].id,
+      enseigneId,
       input.ville ?? null,
       input.categorie,
       input.type,
