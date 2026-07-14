@@ -105,6 +105,9 @@ PROCHAINE TÂCHE : Phase 2 — Fondation (monorepo pnpm, schémas zod, migration
 
 **Terminé quand** : parité fonctionnelle complète avec le site actuel, validée en préversion sur mobile. **Pas une feature de plus.**
 
+**Amendement (2026-07-14)** : parité validée hors page profil/Mes deals —
+exception documentée, cf. `docs/IDEES.md`.
+
 ### PHASE 5 — SEO industrialisé *(2 sessions)*
 - [ ] Metadata par page (title, description) + Open Graph (partages WhatsApp avec image et prix).
 - [ ] Données structurées schema.org `Offer`/`Product` sur chaque deal.
@@ -153,6 +156,10 @@ PROCHAINE TÂCHE : Phase 2 — Fondation (monorepo pnpm, schémas zod, migration
       emails/heure, non viable en prod). Domaine fidwastafid.com vérifié
       (DKIM/SPF dans Cloudflare, DNS only), expéditeur
       noreply@fidwastafid.com, smtp.resend.com:465. Fait le 2026-07-14.
+- [x] Régions alignées Vercel/Supabase (Ireland) — chaque requête payait
+      un aller-retour transatlantique (fonctions Vercel en Amérique du
+      Nord, Supabase en Ireland), diagnostiqué lors du test de parité
+      Phase 4. Fait le 2026-07-14, chantier perf diagnostic clos.
 
 **J-0 — session de bascule**
 - [ ] Gel des écritures v1 (admin en lecture seule), puis exécution de l'ETL
