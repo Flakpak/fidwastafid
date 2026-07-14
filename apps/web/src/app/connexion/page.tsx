@@ -22,7 +22,12 @@ export default async function ConnexionPage({
       >
         <h1 className="font-arabic text-2xl text-rouge">تسجيل الدخول</h1>
         <p className="text-sm text-muted">Connexion</p>
-        {erreur && <p className="text-sm text-rouge">Identifiants invalides.</p>}
+        {erreur === "confirmation" && (
+          <p className="text-sm text-rouge">
+            Lien de confirmation invalide ou expiré. Réessaie de t&apos;inscrire.
+          </p>
+        )}
+        {erreur && erreur !== "confirmation" && <p className="text-sm text-rouge">Identifiants invalides.</p>}
         <label className="flex flex-col gap-1 text-sm">
           Email
           <input type="email" name="email" required className="border border-bordure rounded px-3 py-2" />

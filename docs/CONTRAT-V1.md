@@ -33,6 +33,7 @@ une décision consciente, pas une dérive.*
 /membre/[pseudo]-[public_id]   profil public   (réservé, PAS construit en v1)
 /soumettre                     soumission communautaire (noindex)
 /connexion  /inscription       auth (noindex)
+/auth/confirm                  callback confirmation email Supabase (noindex) — ajouté en Phase 6
 /admin/*                       back-office (noindex, protégé requireAdmin)
 /api/v1/*                      API — porte d'entrée unique
 /ar/...                        réservé si besoin futur — le français ne bouge jamais

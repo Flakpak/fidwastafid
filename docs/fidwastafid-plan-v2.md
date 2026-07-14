@@ -144,6 +144,9 @@ PROCHAINE TÂCHE : Phase 2 — Fondation (monorepo pnpm, schémas zod, migration
 - [ ] Ignored Build Step configuré sur le projet Vercel v1 au moment du gel
       J-0 — un push sur le repo rebuild actuellement LES DEUX projets, il faut
       que le gel v1 soit réel.
+- [ ] Bascule des URLs d'auth : `NEXT_PUBLIC_SITE_URL` (Vercel) et Supabase
+      Site URL + Redirect URLs passent de la préversion à fidwastafid.com —
+      sinon les emails de confirmation pointeront sur la préversion morte.
 
 **J-0 — session de bascule**
 - [ ] Gel des écritures v1 (admin en lecture seule), puis exécution de l'ETL

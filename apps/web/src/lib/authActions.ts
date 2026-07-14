@@ -4,17 +4,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SESSION_COOKIE_NAME } from "@fidwastafid/auth";
 import { getAuthClient } from "./supabaseAuthClient.js";
-
-async function setSessionCookie(accessToken: string, expiresIn: number): Promise<void> {
-  const store = await cookies();
-  store.set(SESSION_COOKIE_NAME, accessToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: expiresIn,
-  });
-}
+import { setSessionCookie } from "./sessionCookie.js";
+import { SITE_URL } from "./siteUrl.js";
 
 export async function connexionAction(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "").trim();
@@ -44,7 +35,15 @@ export async function inscriptionAction(formData: FormData): Promise<void> {
   const { data, error } = await getAuthClient().auth.signUp({
     email,
     password,
-    options: pseudo ? { data: { pseudo } } : undefined,
+    options: {
+      data: pseudo ? { pseudo } : undefined,
+      // Dérivé de SITE_URL (par déploiement) plutôt que de compter
+      // uniquement sur la "Site URL" unique du dashboard Supabase — le lien
+      // de confirmation retombe correctement sur la préversion ET,
+      // plus tard, sur fidwastafid.com, à condition que les deux soient
+      // dans la liste blanche "Additional Redirect URLs" côté Supabase.
+      emailRedirectTo: new URL("/auth/confirm", SITE_URL).toString(),
+    },
   });
 
   if (error) {
