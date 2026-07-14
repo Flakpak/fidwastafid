@@ -184,6 +184,10 @@ Cohérent avec la règle : jamais d'`id` séquentiel exposé, y compris dans une
 - Nommage tables/colonnes en français (continuité de l'existant).
 - Migrations SQL versionnées dans le repo — plus jamais de SQL manuel en prod.
 - Nouvelles valeurs d'enum en français ; `auto_draft` excepté (historique, voir section 3).
+- La CI vérifie en lecture seule la cohérence bidirectionnelle entre
+  `packages/db/migrations/` et `schema_migrations` de la prod. Un écart =
+  CI rouge. L'application des migrations en prod reste un geste humain
+  via le runner (`pnpm migrate`) — la CI ne modifie jamais la prod.
 
 ## 8 — Design tokens (déjà tranchés, non-négociables)
 

@@ -2,16 +2,25 @@
 #
 # Phase 2 — Fondation : rien ne merge si lint/typecheck/test/build cassent.
 #
-# Trois jobs indépendants (en parallèle, aucun `needs:` entre eux) :
-#   - quality     : pnpm lint + typecheck + test sur tout le workspace.
-#                   Ne dépend JAMAIS des secrets Supabase (décision
-#                   explicite, Phase 3 morceau 9) — un souci sur le projet
-#                   Supabase de dev ne doit jamais bloquer cette validation.
-#   - docker      : build de l'image apps/web (ne pousse nulle part, sert
-#                   juste à vérifier que le Dockerfile reste buildable).
-#   - integration : tests d'intégration (soumission/validation/vote) contre
-#                   un Postgres jetable + un vrai JWT du projet Supabase de
-#                   dev. Seul job qui touche aux secrets Supabase.
+# Quatre jobs indépendants (en parallèle, aucun `needs:` entre eux) :
+#   - quality          : pnpm lint + typecheck + test sur tout le workspace.
+#                         Ne dépend JAMAIS des secrets Supabase (décision
+#                         explicite, Phase 3 morceau 9) — un souci sur le
+#                         projet Supabase de dev ne doit jamais bloquer
+#                         cette validation.
+#   - docker           : build de l'image apps/web (ne pousse nulle part,
+#                         sert juste à vérifier que le Dockerfile reste
+#                         buildable).
+#   - integration      : tests d'intégration (soumission/validation/vote)
+#                         contre un Postgres jetable + un vrai JWT du projet
+#                         Supabase de dev. Touche aux secrets Supabase de
+#                         dev (pas la prod).
+#   - migrations-check : lecture seule (CONTRAT-V1 §7) — compare
+#                         packages/db/migrations/ à schema_migrations de la
+#                         prod (aswbu), dans les deux sens. N'applique
+#                         jamais rien ; un écart fait échouer le job.
+#                         Rôle Postgres dédié `ci_migrations_check`,
+#                         SELECT sur schema_migrations uniquement.
 
 name: CI
 
@@ -100,3 +109,23 @@ jobs:
 
       - run: pnpm --filter @fidwastafid/db migrate
       - run: pnpm --filter @fidwastafid/web test:integration
+
+  migrations-check:
+    runs-on: ubuntu-latest
+
+    env:
+      CI_MIGRATIONS_CHECK_URL: ${{ secrets.CI_MIGRATIONS_CHECK_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @fidwastafid/db check-migrations-sync

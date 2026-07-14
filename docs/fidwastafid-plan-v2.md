@@ -160,6 +160,17 @@ exception documentée, cf. `docs/IDEES.md`.
       un aller-retour transatlantique (fonctions Vercel en Amérique du
       Nord, Supabase en Ireland), diagnostiqué lors du test de parité
       Phase 4. Fait le 2026-07-14, chantier perf diagnostic clos.
+- [x] CI `migrations-check` (lecture seule, cf. CONTRAT-V1 §7) — déclenché
+      par la découverte que la migration 0004 était committée et testée en
+      Docker mais jamais appliquée sur aswbu (base provisionnée avant ce
+      chantier, aucun garde-fou). Rôle `ci_migrations_check` (SELECT sur
+      `schema_migrations` uniquement) créé par la migration 0005. Fait le
+      2026-07-14.
+
+Discipline complémentaire (pas un mécanisme, juste une habitude à garder) :
+en fin de chantier touchant une migration, vérifier explicitement si elle
+a été appliquée sur aswbu avant de passer au suivant — le filet CI
+`migrations-check` ci-dessus reste la protection réelle contre l'oubli.
 
 **J-0 — session de bascule**
 - [ ] Gel des écritures v1 (admin en lecture seule), puis exécution de l'ETL

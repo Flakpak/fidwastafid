@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx src/verify.ts",
     "migrate": "tsx src/migrate.ts",
-    "seed": "tsx src/seed.ts"
+    "seed": "tsx src/seed.ts",
+    "check-migrations-sync": "tsx src/checkMigrationsSync.ts"
   },
   "dependencies": {
     "pg": "^8.13.1"
