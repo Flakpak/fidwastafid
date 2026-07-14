@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { VILLES, CATEGORIES, type Deal } from "@fidwastafid/schemas";
 import { DealCard } from "../components/DealCard.js";
 
@@ -20,7 +20,15 @@ export function Feed({ initialDeals }: { initialDeals: Deal[] }) {
   const [tri, setTri] = useState<Tri>("score");
   const [recherche, setRecherche] = useState("");
 
+  /** Le premier rendu a déjà les données SSR (mêmes filtres par défaut) — refetch uniquement quand un filtre change réellement. */
+  const premierRendu = useRef(true);
+
   useEffect(() => {
+    if (premierRendu.current) {
+      premierRendu.current = false;
+      return;
+    }
+
     const params = new URLSearchParams({ limit: "24", tri });
     if (ville) params.set("ville", ville);
     if (categorie) params.set("categorie", categorie);
