@@ -8,6 +8,12 @@ interface ApiErrorBody {
   error?: { code?: string; message?: string };
 }
 
+declare global {
+  interface Window {
+    turnstile?: { reset: (widgetId?: string) => void };
+  }
+}
+
 export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -57,19 +63,34 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       });
 
       if (!res.ok) {
-        const errBody = (await res.json()) as ApiErrorBody;
-        if (errBody.error?.code === "UNAUTHENTICATED") {
-          setError("Connecte-toi pour proposer un bon plan.");
-        } else if (errBody.error?.code === "RATE_LIMITED") {
-          setError("Trop de soumissions, réessaie plus tard.");
-        } else {
-          setError(errBody.error?.message ?? "Soumission impossible.");
+        // Le token Turnstile est à usage unique et déjà consommé par cet essai
+        // (succès ou échec côté serveur) — sans reset, le prochain essai part
+        // avec un token périmé et échoue à la vérification anti-robot, quelle
+        // que soit la cause du premier échec.
+        window.turnstile?.reset();
+        let message = "Soumission impossible.";
+        try {
+          const errBody = (await res.json()) as ApiErrorBody;
+          if (errBody.error?.code === "UNAUTHENTICATED") {
+            message = "Connecte-toi pour proposer un bon plan.";
+          } else if (errBody.error?.code === "RATE_LIMITED") {
+            message = "Trop de soumissions, réessaie plus tard.";
+          } else if (errBody.error?.message) {
+            message = errBody.error.message;
+          }
+        } catch {
+          // Réponse d'erreur non structurée (ex. 500 hors format API) — le
+          // message générique reste affiché plutôt que de rester silencieux.
         }
+        setError(message);
         return;
       }
 
       setDone(true);
       router.refresh();
+    } catch {
+      window.turnstile?.reset();
+      setError("Soumission impossible, réessaie.");
     } finally {
       setPending(false);
     }
