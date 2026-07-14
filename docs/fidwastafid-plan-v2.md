@@ -124,18 +124,6 @@ exception documentée, cf. `docs/IDEES.md`.
       connexion via Session pooler (IPv4). DATABASE_URL de prod câblée dans
       Vercel. Migration 0001_init appliquée dessus. DÉCISION GRAVÉE — un
       troisième store serait de la complexité gratuite.
-- [ ] Script ETL v1→v2 (apps/pipeline ou script dédié) : laqwg → aswbu.
-      Transformations : magasin texte → enseigne_id (table enseignes curée à
-      la main), votes.type → votes.sens, génération public_id (nanoid10),
-      photo_url → image_key. Les colonnes démographiques d'users (genre,
-      tranche_age, situation_fam, nb_enfants) NE SONT PAS migrées (loi 09-08 —
-      conservation sans consentement). Répété au moins une fois sur base
-      jetable, durée mesurée, procédure écrite. Idempotent (rejouable).
-- [ ] Comptes utilisateurs : PAS de migration auth (décision — cohérente avec
-      l'abandon des redirections v1, CONTRAT §2 : usage réel quasi nul).
-      Les lignes users migrent comme données d'auteur (pseudo + public_id),
-      délinkées de l'auth ; le provisioning paresseux recrée le lien au
-      premier login v2, réconciliation par email si disponible.
 - [ ] CNDP / loi 09-08 : la collecte démographique v1 (index.html ~l.2614)
       coupée par le commit fd913b1
       (https://github.com/Flakpak/fidwastafid/commit/fd913b1f45f517b0a3f7dcf86723c96bfc84ded6).
@@ -144,9 +132,9 @@ exception documentée, cf. `docs/IDEES.md`.
 - [ ] Vercel Pro effectif avant la bascule.
 - [ ] DNSSEC désactivé chez OVH (reliquat Phase 0).
 - [ ] Parité v1 ↔ v2 validée sur mobile réel.
-- [ ] Ignored Build Step configuré sur le projet Vercel v1 au moment du gel
-      J-0 — un push sur le repo rebuild actuellement LES DEUX projets, il faut
-      que le gel v1 soit réel.
+- [ ] Ignored Build Step configuré sur le projet Vercel v1 au moment de la
+      bascule J-0 — un push sur le repo rebuild actuellement LES DEUX
+      projets, il faut que le gel du déploiement v1 soit réel.
 - [ ] Bascule des URLs d'auth : `NEXT_PUBLIC_SITE_URL` (Vercel) et Supabase
       Site URL + Redirect URLs passent de la préversion à fidwastafid.com —
       sinon les emails de confirmation pointeront sur la préversion morte.
@@ -173,8 +161,6 @@ a été appliquée sur aswbu avant de passer au suivant — le filet CI
 `migrations-check` ci-dessus reste la protection réelle contre l'oubli.
 
 **J-0 — session de bascule**
-- [ ] Gel des écritures v1 (admin en lecture seule), puis exécution de l'ETL
-      v1→v2 (procédure répétée) vers la base aswbu.
 - [ ] Bascule du domaine : réassignation dans Vercel/Cloudflare (pas de TTL
       DNS à gérer, domaine proxifié Cloudflare — bascule et rollback quasi
       instantanés).
@@ -191,10 +177,13 @@ repart de zéro — attendu), remontées WhatsApp.
       possible depuis le tag v1-legacy (~15 min au lieu d'instantané).
 - [ ] Analytics : vérifier que la v2 remonte dans Vercel Web Analytics
       (@vercel/analytics côté Next, pas la balise script v1).
+- [ ] Nettoyer laqwg après bascule : `DROP VIEW public.v1_auth_users_audit;`
+      puis supprimer le rôle `etl_reader` (cf. exception du 2026-07-14,
+      SUIVI).
 
 **Rollback J-0 → J+7** : repointer le domaine vers le projet v1. La base v1
-n'ayant jamais été modifiée, le rollback DNS suffit ; l'ETL se rejoue après
-correction (idempotent).
+n'ayant jamais été modifiée ni migrée (pas d'ETL, cf. SUIVI), le rollback DNS
+suffit.
 
 **Terminé quand** : v2 sert 100 % du trafic depuis 7 jours, zéro 5xx récurrent,
 zéro régression signalée, rollback non déclenché.
@@ -247,10 +236,29 @@ zéro régression signalée, rollback non déclenché.
 | 3 — API | ☑ fait | endpoints publics + écritures + rate limiting, CI verte |
 | 4 — Web | ◐ code complet | commits 06ca057→9d4718c ; RESTE : validation parité v1↔v2 sur mobile réel (critère "Terminé quand" — action Kamel) |
 | 5 — SEO | ◐ code complet | commits 94147b2→d3583ed ; RESTE : soumission sitemap Search Console + test résultats enrichis Google (actions externes) |
-| 6 — Bascule prod | ☐ à faire | risque n°1 = provisioning base prod v2 + ETL v1→v2 (la v2 n'a pas encore de base de production ; la base v1 ne sera jamais modifiée) |
+| 6 — Bascule prod | ☐ à faire | pas d'ETL v1→v2 (décision 14/07/2026) ; base prod v2 aswbu provisionnée, seed de test purgé |
 | 7 — Pipeline | ☐ à faire | 3 scripts .mjs opérationnels hors monorepo |
 | 8 — Mobile & ops | ☐ à faire | |
 | 9 — VPS | ☐ conditionnel | |
+
+**Décision — 14/07/2026** : pas d'ETL v1 → v2. La v2 démarre sur base vide.
+L'audit (`docs/AUDIT-V1.md`) a établi le contenu réel de la v1 : 580 deals de
+catalogue périssables (dont 559 scrapés, régénérables par le pipeline), 3
+auteurs référencés, 15 votes, 24 commentaires, 0 profil utilisateur. Le coût
+et le risque d'une migration (curation des enseignes, mapping de 4 enums,
+rapatriement de 559 images hébergées chez un tiers) sont sans commune mesure
+avec la valeur récupérée. Cohérent avec les décisions déjà prises : pas de
+migration des comptes auth, pas de redirections 301 depuis la v1. Le risque
+n°1 de la Phase 6 est supprimé, pas résolu.
+
+**Exception documentée — 14/07/2026** : création de la vue
+`public.v1_auth_users_audit` sur laqwg (`SELECT id, email, created_at FROM
+auth.users`), le rôle `postgres` de Supabase ne pouvant pas accorder
+`USAGE` sur le schéma `auth` (propriété de `supabase_auth_admin`). Objet en
+lecture seule, aucune donnée v1 modifiée, aucune incidence sur le site v1
+en production. Seule entorse au principe « la base v1 n'est jamais
+modifiée » — assumée, tracée, temporaire. Nettoyage prévu en Phase 6, J+7
+(cf. checklist).
 
 **PROCHAINE TÂCHE** : clore 4 et 5 — (a) validation parité sur mobile réel, (b) soumission sitemap + test résultats enrichis. Ensuite : chantiers préalables de la Phase 6.
 
