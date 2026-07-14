@@ -147,6 +147,12 @@ PROCHAINE TÂCHE : Phase 2 — Fondation (monorepo pnpm, schémas zod, migration
 - [ ] Bascule des URLs d'auth : `NEXT_PUBLIC_SITE_URL` (Vercel) et Supabase
       Site URL + Redirect URLs passent de la préversion à fidwastafid.com —
       sinon les emails de confirmation pointeront sur la préversion morte.
+- [x] SMTP custom opérationnel (Resend) — prérequis découvert lors du fix
+      confirmation email (Supabase verrouille l'édition des templates email
+      sans SMTP custom, et son expéditeur par défaut est limité à quelques
+      emails/heure, non viable en prod). Domaine fidwastafid.com vérifié
+      (DKIM/SPF dans Cloudflare, DNS only), expéditeur
+      noreply@fidwastafid.com, smtp.resend.com:465. Fait le 2026-07-14.
 
 **J-0 — session de bascule**
 - [ ] Gel des écritures v1 (admin en lecture seule), puis exécution de l'ETL
