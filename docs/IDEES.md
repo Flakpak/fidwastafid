@@ -29,6 +29,16 @@ deals" avec édition — nécessite un amendement du contrat API (`PATCH`
 deal par son auteur → repasse `en_attente`, hors de la liste fermée
 actuelle §4).
 
+## Chrome / parité v1
+
+Vote depuis la carte : en v1, `DealCard` portait ses propres boutons ربح/خسارة
+(vote direct sur la carte, sans ouvrir la fiche). En v2, la carte n'affiche
+qu'un score statique (`{score}°`) — le vote n'existe que sur la page deal
+(`DealActions`). Régression de confort constatée lors de la mise en
+conformité charte (2026-07-14), non corrigée dans cette passe (ajouter des
+boutons de vote sur la carte est une fonctionnalité, pas un ajustement de
+chrome). À trier post-Phase 6.
+
 ## Monétisation
 
 Deals sponsorisés = colonne `sponsorise` boolean + badge sur la carte + critère de tri, post-Phase 6, quand il y aura un premier annonceur réel. Affiliation = paramètre de tracking sur le champ `lien` existant. Display ads (AdSense & co) : ÉCARTÉ — incompatible CSP par nonce, contraire au positionnement premium, rentable uniquement à fort volume.

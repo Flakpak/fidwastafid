@@ -124,6 +124,12 @@ exception documentée, cf. `docs/IDEES.md`.
       connexion via Session pooler (IPv4). DATABASE_URL de prod câblée dans
       Vercel. Migration 0001_init appliquée dessus. DÉCISION GRAVÉE — un
       troisième store serait de la complexité gratuite.
+- [ ] Infra image (CONTRAT-V1 §6) : route `/img/deals/[public_id]` jamais
+      construite, `deals.image_key` jamais peuplé (pas de formulaire
+      d'upload). Constaté lors de la mise en conformité charte (2026-07-14) :
+      `DealCard` ne peut pas afficher d'image tant que cette infra n'existe
+      pas. À lever avant bascule si le pipeline de scraping doit fournir des
+      photos de deals.
 - [ ] CNDP / loi 09-08 : la collecte démographique v1 (index.html ~l.2614)
       coupée par le commit fd913b1
       (https://github.com/Flakpak/fidwastafid/commit/fd913b1f45f517b0a3f7dcf86723c96bfc84ded6).
