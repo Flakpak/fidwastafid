@@ -4,6 +4,7 @@ import { dealUrlSlug, type Deal } from "@fidwastafid/schemas";
 import { GET as getDealHandler } from "../../api/v1/deals/[publicId]/route.js";
 import { GET as getCommentairesHandler } from "../../api/v1/deals/[publicId]/commentaires/route.js";
 import { SiteHeader } from "../../../components/SiteHeader.js";
+import { SiteFooter } from "../../../components/SiteFooter.js";
 import { DealActions } from "./DealActions.js";
 import { CommentForm } from "./CommentForm.js";
 import { dealDescription, dealJsonLd } from "./seo.js";
@@ -135,6 +136,7 @@ export default async function DealPage({ params }: PageParams) {
           </ul>
         </section>
       </main>
+      <SiteFooter />
     </div>
   );
 }

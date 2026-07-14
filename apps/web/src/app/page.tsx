@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { Deal } from "@fidwastafid/schemas";
 import { GET as getDealsHandler } from "./api/v1/deals/route.js";
 import { SiteHeader } from "../components/SiteHeader.js";
+import { SiteFooter } from "../components/SiteFooter.js";
 import { Feed } from "./Feed.js";
 
 const DESCRIPTION = "Les meilleurs bons plans et promotions au Maroc, votés par la communauté : alimentaire, high-tech, mode et plus.";
@@ -48,6 +49,7 @@ export default async function Home() {
     <div className="min-h-screen bg-creme text-texte">
       <SiteHeader />
       <Feed initialDeals={deals} />
+      <SiteFooter />
     </div>
   );
 }

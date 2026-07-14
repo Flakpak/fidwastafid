@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import type { Enseigne } from "@fidwastafid/schemas";
 import { GET as getEnseignesHandler } from "../api/v1/enseignes/route.js";
 import { SiteHeader } from "../../components/SiteHeader.js";
+import { SiteFooter } from "../../components/SiteFooter.js";
 import { SoumettreForm } from "./SoumettreForm.js";
 
 export const metadata: Metadata = {
@@ -35,6 +36,7 @@ export default async function SoumettrePage() {
         <h1 className="text-xl font-black">Proposer un bon plan</h1>
         <SoumettreForm enseignes={enseignes} />
       </main>
+      <SiteFooter />
     </div>
   );
 }

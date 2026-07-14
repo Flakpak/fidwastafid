@@ -4,6 +4,7 @@ import type { Deal, Enseigne } from "@fidwastafid/schemas";
 import { GET as getDealsHandler } from "../../api/v1/deals/route.js";
 import { GET as getEnseignesHandler } from "../../api/v1/enseignes/route.js";
 import { SiteHeader } from "../../../components/SiteHeader.js";
+import { SiteFooter } from "../../../components/SiteFooter.js";
 import { DealCard } from "../../../components/DealCard.js";
 
 /** SSR par requête — mêmes raisons que le feed (voir app/page.tsx). */
@@ -61,6 +62,7 @@ export default async function EnseignePage({ params }: PageParams) {
           <DealCard key={deal.publicId} deal={deal} />
         ))}
       </main>
+      <SiteFooter />
     </div>
   );
 }

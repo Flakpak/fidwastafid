@@ -74,18 +74,18 @@ export function DealActions({ deal }: { deal: Deal }) {
           type="button"
           onClick={() => vote("chaud")}
           disabled={pending}
-          className="bg-creme border border-bordure rounded-lg px-3 py-1.5 font-bold text-sm disabled:opacity-50"
+          className="font-arabic bg-creme border border-bordure rounded-lg px-3 py-1.5 font-bold text-base disabled:opacity-50"
         >
-          🔥 Chaud
+          ربح ▲
         </button>
         <span className="text-2xl font-black text-rouge min-w-[2ch] text-center">{score}</span>
         <button
           type="button"
           onClick={() => vote("froid")}
           disabled={pending}
-          className="bg-creme border border-bordure rounded-lg px-3 py-1.5 font-bold text-sm disabled:opacity-50"
+          className="font-arabic bg-creme border border-bordure rounded-lg px-3 py-1.5 font-bold text-base disabled:opacity-50"
         >
-          ❄️ Froid
+          ▼ خسارة
         </button>
         <button type="button" onClick={removeVote} disabled={pending} className="text-xs text-muted underline">
           Retirer mon vote
