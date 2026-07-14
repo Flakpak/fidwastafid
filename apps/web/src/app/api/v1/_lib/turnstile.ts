@@ -10,6 +10,8 @@ function readSecretKey(): string {
 
 interface TurnstileResponse {
   success: boolean;
+  "error-codes"?: string[];
+  hostname?: string;
 }
 
 /**
@@ -27,5 +29,9 @@ export async function verifyTurnstile(token: string | null, remoteIp?: string): 
   if (!response.ok) return false;
 
   const data = (await response.json()) as TurnstileResponse;
+  // TEMPORAIRE — diagnostic échec soumission préversion, à retirer après lecture des logs Vercel.
+  if (!data.success) {
+    console.error("[turnstile-diag] rejet siteverify", { errorCodes: data["error-codes"], hostname: data.hostname });
+  }
   return data.success === true;
 }
