@@ -14,6 +14,16 @@ export function DealCard({ deal }: { deal: Deal }) {
       href={`/deal/${dealUrlSlug(deal.titre, deal.publicId)}`}
       className="bg-white border border-bordure rounded-xl p-4 flex flex-col gap-2 hover:border-rouge-clair transition-colors"
     >
+      {deal.imageKey && (
+        // Jamais d'URL Supabase construite ici — uniquement la route proxy
+        // /img/deals/[publicId] (CONTRAT-V1 §6).
+        <img
+          src={`/img/deals/${deal.publicId}`}
+          alt={deal.titre}
+          loading="lazy"
+          className="w-full h-32 object-cover rounded-lg"
+        />
+      )}
       <div className="flex items-center justify-between text-xs font-bold text-muted">
         <span>{joinMeta(deal.enseigneSlug, deal.ville)}</span>
         <span className="text-rouge">{deal.score}°</span>

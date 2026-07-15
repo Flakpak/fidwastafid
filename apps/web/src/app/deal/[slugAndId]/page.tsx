@@ -97,6 +97,16 @@ export default async function DealPage({ params }: PageParams) {
         )}
 
         <div className="bg-white border border-bordure rounded-xl p-5 flex flex-col gap-3">
+          {deal.imageKey && (
+            // Jamais d'URL Supabase construite ici — uniquement la route proxy
+            // /img/deals/[publicId] (CONTRAT-V1 §6).
+            <img
+              src={`/img/deals/${deal.publicId}`}
+              alt={deal.titre}
+              loading="lazy"
+              className="w-full h-56 object-cover rounded-lg"
+            />
+          )}
           <div className="text-xs font-bold text-muted">{joinMeta(deal.enseigneSlug, deal.ville)}</div>
           <h1 className="text-2xl font-black leading-snug">{deal.titre}</h1>
           <div className="flex items-baseline gap-3 flex-wrap">
