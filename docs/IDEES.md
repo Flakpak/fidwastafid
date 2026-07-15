@@ -39,6 +39,25 @@ conformité charte (2026-07-14), non corrigée dans cette passe (ajouter des
 boutons de vote sur la carte est une fonctionnalité, pas un ajustement de
 chrome). À trier post-Phase 6.
 
+## Images (15/07/2026)
+
+- Images des deals catalogue : `extract-catalogue.mjs` (pipeline, hors
+  monorepo) n'extrait que l'image de la page entière du catalogue envoyée à
+  Claude — aucune coordonnée par produit n'est disponible, donc aucune
+  image individuelle associable à un deal catalogue (cf. audit du
+  15/07/2026). Pour y remédier : demander une bounding box par produit dans
+  le prompt d'extraction + recadrage `sharp` côté pipeline — chantier réel,
+  coût/fiabilité à évaluer (fiabilité des bounding box retournées par
+  l'API, temps de traitement). En attendant, les deals catalogue partent
+  sans image ; seuls les deals Bringo (scraper) en ont une (module image,
+  `images.mjs`).
+- Qualité de `mapCategorie()` (scraper Bringo) : sur les 569 deals réels
+  archivés, 375 (66 %) tombent dans "Autre" — le mapping par mots-clés sur
+  `item_list_name` est trop pauvre pour catégoriser correctement le
+  catalogue Carrefour/Bringo. Pistes : enrichir la liste de mots-clés, ou
+  déléguer la catégorisation à l'API Claude à l'ingestion (comme
+  `extract-catalogue.mjs` le fait déjà pour les catalogues).
+
 ## Monétisation
 
 Deals sponsorisés = colonne `sponsorise` boolean + badge sur la carte + critère de tri, post-Phase 6, quand il y aura un premier annonceur réel. Affiliation = paramètre de tracking sur le champ `lien` existant. Display ads (AdSense & co) : ÉCARTÉ — incompatible CSP par nonce, contraire au positionnement premium, rentable uniquement à fort volume.
