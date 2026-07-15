@@ -16,12 +16,17 @@ export function DealCard({ deal }: { deal: Deal }) {
     >
       {deal.imageKey && (
         // Jamais d'URL Supabase construite ici — uniquement la route proxy
-        // /img/deals/[publicId] (CONTRAT-V1 §6).
+        // /img/deals/[publicId] (CONTRAT-V1 §6). Pas de w-full/object-cover :
+        // la quasi-totalité des sources font ~1000px, mais le pipeline a un
+        // repli thumbnail 240px (images.mjs) — w-full l'agrandirait et le
+        // flouterait. max-w-full + h-auto laisse l'image à sa taille
+        // naturelle, jamais agrandie (self-start : la carte est flex-col,
+        // sans ça align-items:stretch réétirerait la largeur).
         <img
           src={`/img/deals/${deal.publicId}`}
           alt={deal.titre}
           loading="lazy"
-          className="w-full h-32 object-cover rounded-lg"
+          className="self-start max-w-full max-h-32 w-auto h-auto rounded-lg"
         />
       )}
       <div className="flex items-center justify-between text-xs font-bold text-muted">
