@@ -188,7 +188,9 @@ registry.registerPath({
   responses: {
     200: {
       description: "OK",
-      content: { "application/json": { schema: z.object({ data: z.array(DealAdmin) }) } },
+      content: {
+        "application/json": { schema: z.object({ data: z.array(DealAdmin), total: z.number() }) },
+      },
     },
     403: errorResponse("Accès refusé (non-admin)"),
   },

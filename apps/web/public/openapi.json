@@ -978,10 +978,14 @@
                       "items": {
                         "$ref": "#/components/schemas/DealAdmin"
                       }
+                    },
+                    "total": {
+                      "type": "number"
                     }
                   },
                   "required": [
-                    "data"
+                    "data",
+                    "total"
                   ]
                 }
               }

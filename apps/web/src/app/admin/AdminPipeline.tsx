@@ -65,6 +65,11 @@ const ACTION_CLASSES: Record<Action["variant"], string> = {
 
 export function AdminPipeline() {
   const [deals, setDeals] = useState<DealAdmin[] | null>(null);
+  // Total réel renvoyé par l'API (count(*) over(), toutes statuts confondus
+  // — l'appel n'est pas filtré par statut). Sert uniquement à détecter une
+  // troncature par LIMIT ; ce n'est pas un total par onglet (l'API ne le
+  // renvoie pas dans ce mode non filtré).
+  const [total, setTotal] = useState(0);
   const [onglet, setOnglet] = useState<DealStatut>("en_attente");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -83,8 +88,9 @@ export function AdminPipeline() {
       setDeals(null);
       return;
     }
-    const body = (await res.json()) as { data: DealAdmin[] };
+    const body = (await res.json()) as { data: DealAdmin[]; total: number };
     setDeals(body.data);
+    setTotal(body.total);
   }, []);
 
   useEffect(() => {
@@ -183,6 +189,13 @@ export function AdminPipeline() {
           </button>
         ))}
       </div>
+
+      {deals.length < total && (
+        <p className="text-xs text-muted">
+          {deals.length} deals chargés sur {total} au total (tous statuts) — la limite serveur a tronqué le
+          résultat, augmente LIMIT côté API si ça se reproduit.
+        </p>
+      )}
 
       {BULK_ONGLETS.has(onglet) && parOnglet.length > 0 && (
         <div className="flex items-center gap-2">
