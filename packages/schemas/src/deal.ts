@@ -28,31 +28,45 @@ const dealCoreShape = {
   dateFin: z.string().date().optional(),
   description: z.string().max(2000).optional(),
   lien: z.string().url().optional(),
-  /** Chemin/clé interne — l'URL publique se dérive en /img/deals/[publicId] (CONTRAT-V1 §6). */
-  imageKey: z.string().optional(),
+  /** Clé interne stricte — jamais une URL, format imposé `deals/{public_id}.webp`
+   *  (CONTRAT-V1 §6 : "jamais une URL Supabase Storage directe"). L'URL publique
+   *  se dérive en /img/deals/[publicId]. Seule écriture autorisée : le pipeline,
+   *  qui écrit directement en base — absente de `dealInputSchema` (cf. plus bas),
+   *  jamais alimentable via POST /api/v1/deals. */
+  imageKey: z
+    .string()
+    .regex(/^deals\/[a-z0-9]{10}\.webp$/)
+    .optional(),
 };
 
 /**
  * POST /api/v1/deals — CONTRAT-V1 §3 :
  * - lien requis si type ∈ {en_ligne, les_deux} (un deal en ligne sans lien est inutilisable)
  * - prixNormal, si fourni, doit être ≥ prixPromo
+ *
+ * `imageKey` exclu volontairement (CONTRAT-V1 §6) : la soumission publique
+ * ne peut jamais fixer sa propre clé d'image, seul le pipeline écrit cette
+ * colonne, directement en base.
  */
-export const dealInputSchema = z.object(dealCoreShape).superRefine((val, ctx) => {
-  if ((val.type === "en_ligne" || val.type === "les_deux") && !val.lien) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["lien"],
-      message: "Un lien est requis pour un deal en ligne.",
-    });
-  }
-  if (val.prixNormal !== undefined && val.prixNormal < val.prixPromo) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["prixNormal"],
-      message: "Le prix normal doit être supérieur ou égal au prix promo.",
-    });
-  }
-});
+export const dealInputSchema = z
+  .object(dealCoreShape)
+  .omit({ imageKey: true })
+  .superRefine((val, ctx) => {
+    if ((val.type === "en_ligne" || val.type === "les_deux") && !val.lien) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["lien"],
+        message: "Un lien est requis pour un deal en ligne.",
+      });
+    }
+    if (val.prixNormal !== undefined && val.prixNormal < val.prixPromo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["prixNormal"],
+        message: "Le prix normal doit être supérieur ou égal au prix promo.",
+      });
+    }
+  });
 export type DealInput = z.infer<typeof dealInputSchema>;
 
 /** Représentation publique — jamais whatsappContact, jamais l'id interne. */

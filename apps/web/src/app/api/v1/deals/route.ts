@@ -133,11 +133,15 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
 
   const publicId = generatePublicId();
 
+  // image_key toujours null ici : dealInputSchema n'accepte plus imageKey
+  // (CONTRAT-V1 §6) — la soumission publique ne peut pas fixer sa propre
+  // clé d'image. Seul le pipeline écrit cette colonne, directement en
+  // base, hors de cet endpoint.
   await query(
     `insert into deals
        (public_id, titre, enseigne_id, ville, categorie, type, prix_promo,
         prix_normal, date_fin, description, lien, image_key, statut, submitter_id, score)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'en_attente',$13,0)`,
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,null,'en_attente',$12,0)`,
     [
       publicId,
       input.titre,
@@ -150,7 +154,6 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
       input.dateFin ?? null,
       input.description ?? null,
       input.lien ?? null,
-      input.imageKey ?? null,
       user.id,
     ]
   );
