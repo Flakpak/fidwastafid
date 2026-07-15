@@ -18,11 +18,15 @@ function readAdminUserId(): string {
 const ADMIN_PUBLIC_ID = process.env.SEED_ADMIN_PUBLIC_ID ?? "kdm2p9qa23";
 const ADMIN_PSEUDO = process.env.SEED_ADMIN_PSEUDO ?? "Kamel";
 
+// Référentiel de référence = la prod (aswbu) : bim/bringo/carrefour/marjane.
+// Le seed contenait "jumia" au lieu de "bringo" — divergence constatée et
+// corrigée le 15/07/2026 (bringo est l'enseigne réellement scrapée par
+// apps/pipeline/scraper-bringo.mjs, cf. audit du pipeline).
 const ENSEIGNES = [
   { slug: "marjane", nom: "Marjane" },
   { slug: "carrefour", nom: "Carrefour" },
   { slug: "bim", nom: "Bim" },
-  { slug: "jumia", nom: "Jumia" },
+  { slug: "bringo", nom: "Bringo" },
 ] as const;
 
 interface DealSeed {
@@ -54,13 +58,14 @@ const DEALS: DealSeed[] = [
   {
     publicId: "d3m2p9qa24",
     titre: "Écouteurs sans fil",
-    enseigneSlug: "jumia",
+    // enseigneSlug suit le renommage jumia → bringo ci-dessus (15/07/2026).
+    enseigneSlug: "bringo",
     ville: null,
     categorie: "High-Tech",
     type: "en_ligne",
     prixPromo: 199,
     prixNormal: 299,
-    lien: "https://jumia.ma/produit-x",
+    lien: "https://bringo.ma/produit-x",
     statut: "publie",
   },
   {
