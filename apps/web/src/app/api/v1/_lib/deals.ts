@@ -3,7 +3,7 @@ import { dealSchema, dealAdminSchema, type Deal, type DealAdmin } from "@fidwast
 
 /** Colonnes lues pour toute représentation publique d'un deal (liste ou détail). */
 export const DEAL_SELECT = `
-  d.public_id, d.titre, e.slug as enseigne_slug, d.ville, d.categorie, d.type,
+  d.public_id, d.titre, e.slug as enseigne_slug, e.nom as enseigne_nom, d.ville, d.categorie, d.type,
   d.prix_promo, d.prix_normal, d.date_fin, d.description, d.lien, d.image_key,
   d.statut, d.score, u.public_id as submitter_public_id, d.created_at, d.updated_at
 `;
@@ -23,6 +23,7 @@ export interface DealRow {
   public_id: string;
   titre: string;
   enseigne_slug: string | null;
+  enseigne_nom: string | null;
   ville: string | null;
   categorie: string;
   type: string;
@@ -48,6 +49,7 @@ export function toDeal(row: DealRow): Deal {
     publicId: row.public_id,
     titre: row.titre,
     enseigneSlug: row.enseigne_slug ?? undefined,
+    enseigneNom: row.enseigne_nom ?? undefined,
     ville: row.ville ?? undefined,
     categorie: row.categorie,
     type: row.type,

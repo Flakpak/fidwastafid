@@ -96,6 +96,9 @@
             "type": "string",
             "pattern": "^deals\\/[a-z0-9]{10}\\.webp$"
           },
+          "enseigneNom": {
+            "type": "string"
+          },
           "statut": {
             "type": "string",
             "enum": [
@@ -213,6 +216,9 @@
           "imageKey": {
             "type": "string",
             "pattern": "^deals\\/[a-z0-9]{10}\\.webp$"
+          },
+          "enseigneNom": {
+            "type": "string"
           },
           "statut": {
             "type": "string",

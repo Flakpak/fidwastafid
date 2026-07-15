@@ -73,6 +73,11 @@ export type DealInput = z.infer<typeof dealInputSchema>;
 export const dealSchema = z.object({
   publicId: publicIdSchema,
   ...dealCoreShape,
+  /** Nom propre de l'enseigne (ex. "Marjane") — dérivé de la table
+   *  enseignes via enseigneSlug, lecture seule. Volontairement hors de
+   *  dealCoreShape : n'apparaît jamais dans dealInputSchema, un
+   *  utilisateur ne peut pas soumettre son propre nom d'enseigne. */
+  enseigneNom: z.string().optional(),
   statut: dealStatutSchema,
   score: z.number().int(),
   /** null si soumis par le pipeline automatique (pas d'utilisateur humain). */
