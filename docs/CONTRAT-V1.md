@@ -179,6 +179,12 @@ requireAdmin(request: Request): Promise<AuthUser>  // throw AuthError('FORBIDDEN
 En base, `deals.image_key` stocke un chemin/clé interne, jamais une URL Supabase Storage directe.
 Cohérent avec la règle : jamais d'`id` séquentiel exposé, y compris dans une URL d'image.
 
+Nuance factuelle (15/07/2026) : en phase Vercel (Cloudflare en DNS-only, pas en proxy orange
+cloud), le cache edge de la route `/img/deals/[public_id]` est assuré par le CDN Vercel via
+`s-maxage`, pas par Cloudflare. Le cache Cloudflare devient effectif à la bascule VPS (Phase 9),
+quand le domaine repasse en proxifié. L'esprit du contrat (cache edge, backend interchangeable)
+est inchangé — seul l'opérateur de cache diffère selon la phase d'hébergement.
+
 ## 7 — Conventions base de données
 
 - Nommage tables/colonnes en français (continuité de l'existant).
