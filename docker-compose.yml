@@ -34,6 +34,10 @@ services:
       # les JWT Supabase, y compris dans ce conteneur de test.
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      # Route proxy /img/deals/[publicId] (apps/web/src/app/img/deals) —
+      # seule consommatrice. Pass-through pur depuis l'environnement hôte,
+      # jamais de valeur ici.
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       # Contrepartie du NEXT_PUBLIC_TURNSTILE_SITE_KEY (build arg ci-dessus,
       # côté client) : la clé secrète, elle, est lue au runtime par l'API
       # (verifyTurnstile), donc ici en variable d'environnement du conteneur.
