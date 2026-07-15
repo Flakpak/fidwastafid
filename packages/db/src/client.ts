@@ -29,9 +29,24 @@ function readDatabaseUrl(): string {
 
 let pool: Pool | null = null;
 
+/**
+ * Pool dimensionné pour du serverless (incident du 15/07/2026,
+ * EMAXCONNSESSION sur le Session pooler Supabase — 15 clients max
+ * dépassés). En serverless, la concurrence vient du NOMBRE d'instances qui
+ * tournent en parallèle, pas de la taille du pool DANS chaque instance :
+ * un pool par défaut (10) multiplié par plusieurs instances chaudes
+ * simultanées épuise le pooler en amont bien avant d'atteindre une charge
+ * réelle élevée. max: 2 laisse de la marge à un grand nombre d'instances
+ * concurrentes sans jamais dépasser la limite du pooler à lui seul.
+ */
 export function getPool(): Pool {
   if (!pool) {
-    pool = new Pool({ connectionString: readDatabaseUrl() });
+    pool = new Pool({
+      connectionString: readDatabaseUrl(),
+      max: 2,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    });
   }
   return pool;
 }
