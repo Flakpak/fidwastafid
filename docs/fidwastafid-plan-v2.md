@@ -243,7 +243,7 @@ zéro régression signalée, rollback non déclenché.
 | 4 — Web | ◐ code complet | commits 06ca057→9d4718c ; RESTE : validation parité v1↔v2 sur mobile réel (critère "Terminé quand" — action Kamel) |
 | 5 — SEO | ◐ code complet | commits 94147b2→d3583ed ; RESTE : soumission sitemap Search Console + test résultats enrichis Google (actions externes) |
 | 6 — Bascule prod | ☐ à faire | pas d'ETL v1→v2 (décision 14/07/2026) ; base prod v2 aswbu provisionnée, seed de test purgé |
-| 7 — Pipeline | ☐ à faire | 3 scripts .mjs opérationnels hors monorepo |
+| 7 — Pipeline | ☐ à faire | 3 scripts .mjs opérationnels hors monorepo ; insert-deals.mjs déjà adapté au schéma v2 et images.mjs (module image haute résolution + fallback) déjà écrit — hors monorepo, 15/07/2026 ; l'intégration monorepo (apps/pipeline) reste à faire |
 | 8 — Mobile & ops | ☐ à faire | |
 | 9 — VPS | ☐ conditionnel | |
 
@@ -265,6 +265,19 @@ lecture seule, aucune donnée v1 modifiée, aucune incidence sur le site v1
 en production. Seule entorse au principe « la base v1 n'est jamais
 modifiée » — assumée, tracée, temporaire. Nettoyage prévu en Phase 6, J+7
 (cf. checklist).
+
+**Dette infra images soldée — 15/07/2026** : route proxy
+`/img/deals/[publicId]` construite et validée de bout en bout (chemin 200
+et 404 testés contre le storage prod), `image_key` verrouillé côté API
+(format strict, écriture publique fermée — commit `e07b077`). Pipeline
+(`insert-deals.mjs`, hors monorepo) adapté au schéma v2 et doté d'un
+module image (`images.mjs`) : source haute résolution avec repli
+thumbnail, garde-fous (timeout, taille, MIME), jamais bloquant. Périmètre
+v1 : images des deals Bringo uniquement — les deals catalogue partent
+sans image (cf. IDEES.md, bounding box à évaluer). Upload utilisateur
+(formulaire `/soumettre`) explicitement exclu de ce périmètre :
+`dealInputSchema` n'accepte pas `imageKey`, amendement du contrat requis
+le jour où cette fonctionnalité serait ajoutée.
 
 **PROCHAINE TÂCHE** : clore 4 et 5 — (a) validation parité sur mobile réel, (b) soumission sitemap + test résultats enrichis. Ensuite : chantiers préalables de la Phase 6.
 
