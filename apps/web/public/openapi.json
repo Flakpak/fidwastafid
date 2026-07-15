@@ -421,6 +421,9 @@
             "type": "string",
             "pattern": "^[23456789abcdefghijkmnpqrstuvwxyz]{10}$"
           },
+          "pseudo": {
+            "type": "string"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -429,6 +432,7 @@
         "required": [
           "contenu",
           "auteurPublicId",
+          "pseudo",
           "createdAt"
         ]
       },

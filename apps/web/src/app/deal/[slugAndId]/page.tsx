@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 interface Commentaire {
   contenu: string;
   auteurPublicId: string;
+  pseudo: string;
   createdAt: string;
 }
 

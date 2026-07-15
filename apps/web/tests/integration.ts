@@ -1,6 +1,10 @@
 import { withTransaction, closePool, query } from "@fidwastafid/db";
 import { POST as postDeal } from "../src/app/api/v1/deals/route.js";
 import { POST as postVote, DELETE as deleteVote } from "../src/app/api/v1/deals/[publicId]/votes/route.js";
+import {
+  POST as postComment,
+  GET as getComments,
+} from "../src/app/api/v1/deals/[publicId]/commentaires/route.js";
 
 /**
  * Tests d'intégration (plan v2, Phase 3 : "soumission, validation, vote") —
@@ -126,9 +130,10 @@ async function main() {
     }),
     noParams
   );
-  const submitBody = (await submitRes.json()) as { statut?: string };
+  const submitBody = (await submitRes.json()) as { statut?: string; enseigneNom?: string };
   check("soumission valide -> 201", submitRes.status === 201);
   check("soumission valide -> statut en_attente", submitBody.statut === "en_attente");
+  check("soumission valide -> enseigneNom résolu depuis la table enseignes", submitBody.enseigneNom === "Test Integration");
 
   console.log("\nvalidation — corps invalide et absence d'authentification");
   const invalidRes = await postDeal(
@@ -189,6 +194,29 @@ async function main() {
   const voteDelete = await deleteVote(authedRequest(`http://localhost/api/v1/deals/${DEAL_PUBLIC_ID}/votes`, token), context);
   const voteDeleteBody = (await voteDelete.json()) as { score?: number };
   check("delete vote -> score = 0", voteDeleteBody.score === 0);
+
+  console.log("\ncommentaires — pseudo exposé en plus de auteurPublicId");
+  const postCommentRes = await postComment(
+    authedRequest(`http://localhost/api/v1/deals/${DEAL_PUBLIC_ID}/commentaires`, token, {
+      method: "POST",
+      body: JSON.stringify({ contenu: "Commentaire du test d'intégration" }),
+    }),
+    context
+  );
+  const postCommentBody = (await postCommentRes.json()) as { pseudo?: string; auteurPublicId?: string };
+  check("POST commentaire -> 201", postCommentRes.status === 201);
+  check("POST commentaire -> pseudo = IntegrationTest", postCommentBody.pseudo === "IntegrationTest");
+  check("POST commentaire -> auteurPublicId toujours présent", typeof postCommentBody.auteurPublicId === "string");
+
+  const listCommentsRes = await getComments(
+    new Request(`http://localhost/api/v1/deals/${DEAL_PUBLIC_ID}/commentaires`),
+    context
+  );
+  const listCommentsBody = (await listCommentsRes.json()) as { data?: { pseudo?: string }[] };
+  check(
+    "GET commentaires -> pseudo présent sur au moins une ligne",
+    (listCommentsBody.data ?? []).some((c) => c.pseudo === "IntegrationTest")
+  );
 
   console.log(`\n${pass} passés, ${fail} échoués`);
   await closePool();

@@ -29,6 +29,7 @@ function decodeCommentCursor(raw: string): string | null {
 interface CommentaireRow {
   contenu: string;
   auteur_public_id: string;
+  pseudo: string;
   created_at: string;
 }
 
@@ -71,7 +72,7 @@ export async function GET(request: Request, { params }: Context): Promise<NextRe
   const limitIdx = values.length;
 
   const rows = await query<CommentaireRow>(
-    `select c.contenu, u.public_id as auteur_public_id, c.created_at
+    `select c.contenu, u.public_id as auteur_public_id, u.pseudo, c.created_at
      from commentaires c
      join users u on u.id = c.auteur_id
      where ${conditions.join(" and ")}
@@ -87,6 +88,7 @@ export async function GET(request: Request, { params }: Context): Promise<NextRe
     commentaireSchema.parse({
       contenu: row.contenu,
       auteurPublicId: row.auteur_public_id,
+      pseudo: row.pseudo,
       createdAt: new Date(row.created_at).toISOString(),
     })
   );
@@ -132,6 +134,7 @@ export const POST = withAuthErrors<Context>(async (request, { params }) => {
   const commentaire = commentaireSchema.parse({
     contenu: row.contenu,
     auteurPublicId: user.publicId,
+    pseudo: user.pseudo,
     createdAt: new Date(row.created_at).toISOString(),
   });
 
