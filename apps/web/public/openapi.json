@@ -93,7 +93,8 @@
             "format": "uri"
           },
           "imageKey": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^deals\\/[a-z0-9]{10}\\.webp$"
           },
           "statut": {
             "type": "string",
@@ -210,7 +211,8 @@
             "format": "uri"
           },
           "imageKey": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^deals\\/[a-z0-9]{10}\\.webp$"
           },
           "statut": {
             "type": "string",
@@ -328,9 +330,6 @@
           "lien": {
             "type": "string",
             "format": "uri"
-          },
-          "imageKey": {
-            "type": "string"
           }
         },
         "required": [
