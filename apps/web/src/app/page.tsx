@@ -44,12 +44,21 @@ async function fetchFeed(): Promise<Deal[]> {
   return body.data;
 }
 
-export default async function Home() {
-  const deals = await fetchFeed();
+type PageParams = { searchParams: Promise<{ compte?: string }> };
+
+export default async function Home({ searchParams }: PageParams) {
+  const [deals, { compte }] = await Promise.all([fetchFeed(), searchParams]);
 
   return (
     <div className="min-h-screen bg-creme text-texte">
       <SiteHeader />
+      {compte === "supprime" && (
+        <div className="max-w-2xl mx-auto mt-4 px-4">
+          <div className="bg-white border border-vert/30 rounded-xl p-4 text-sm font-bold text-vert text-center">
+            Ton compte a bien été supprimé. Merci d&apos;avoir fait partie de la communauté.
+          </div>
+        </div>
+      )}
       <Ticker />
       <Feed initialDeals={deals} hero={<HeroBand />} />
       <SiteFooter />
