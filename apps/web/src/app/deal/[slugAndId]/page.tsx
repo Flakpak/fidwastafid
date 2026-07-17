@@ -123,7 +123,13 @@ export default async function DealPage({ params }: PageParams) {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-[40%_1fr]">
-            <div className="bg-bordure flex items-center justify-center p-8 md:p-10 min-h-[220px] md:min-h-[380px]">
+            {/* Fond blanc (même blanc que la carte) : les photos produit ont
+                elles-mêmes un fond blanc, un panneau teinté créerait un
+                rectangle visible autour de l'image. Le filet (border-b
+                empilé mobile, border-r en 2 colonnes desktop) sépare la
+                zone image du contenu ; l'ombre de la carte la sépare du
+                fond crème de la page. */}
+            <div className="bg-white border-b md:border-b-0 md:border-r border-bordure flex items-center justify-center p-8 md:p-10 min-h-[220px] md:min-h-[380px]">
               {deal.imageKey ? (
                 // Jamais d'URL Supabase construite ici — uniquement la route
                 // proxy /img/deals/[publicId] (CONTRAT-V1 §6). max-h + w-auto
@@ -136,7 +142,7 @@ export default async function DealPage({ params }: PageParams) {
                   className="max-w-full max-h-[380px] w-auto h-auto object-contain"
                 />
               ) : (
-                <span aria-hidden="true" className="text-8xl opacity-10">
+                <span aria-hidden="true" className="text-8xl opacity-15">
                   {categorieIcon(deal.categorie)}
                 </span>
               )}

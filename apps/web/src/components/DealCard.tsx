@@ -30,10 +30,15 @@ export function DealCard({ deal }: { deal: Deal }) {
 
   return (
     <div className="bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow overflow-hidden flex flex-row">
-      {/* Colonne image — largeur fixe, la carte reste 2 colonnes même en mobile. */}
+      {/* Colonne image — largeur fixe, la carte reste 2 colonnes même en
+          mobile. Fond blanc (même blanc que la carte) : les photos produit
+          ont elles-mêmes un fond blanc, un panneau teinté créerait un
+          rectangle visible autour de l'image. Le filet vertical (border-r)
+          sépare la zone image du contenu ; l'ombre de la carte la sépare
+          du fond crème de la page. */}
       <Link
         href={dealHref}
-        className="w-[110px] md:w-[180px] shrink-0 self-stretch flex items-center justify-center p-3 bg-bordure"
+        className="w-[110px] md:w-[180px] shrink-0 self-stretch flex items-center justify-center p-3 bg-white border-r border-bordure"
       >
         {deal.imageKey ? (
           // Jamais d'URL Supabase construite ici — uniquement la route proxy
@@ -49,7 +54,7 @@ export function DealCard({ deal }: { deal: Deal }) {
             className="max-w-full max-h-28 w-auto h-auto object-contain"
           />
         ) : (
-          <span aria-hidden="true" className="text-4xl opacity-30">
+          <span aria-hidden="true" className="text-4xl opacity-40">
             {categorieIcon(deal.categorie)}
           </span>
         )}
