@@ -78,12 +78,19 @@ export function DealCard({ deal }: { deal: Deal }) {
       </div>
 
       <div className="flex items-center justify-between text-xs font-bold">
-        {/* Pas de compteur — parité v1 exacte (dc-footer, index.html racine :
-            le bouton "💬 Commentaires" n'affiche pas de nombre sur la carte,
-            seule la page deal le fait). */}
-        <Link href={`${dealHref}#commentaires`} className="text-muted hover:text-rouge">
-          💬 Commentaires
-        </Link>
+        <div className="flex items-center gap-1.5">
+          {/* Pas de compteur — parité v1 exacte (dc-footer, index.html racine :
+              le bouton "💬 Commentaires" n'affiche pas de nombre sur la carte,
+              seule la page deal le fait). */}
+          <Link href={`${dealHref}#commentaires`} className="text-muted hover:text-rouge">
+            💬 Commentaires
+          </Link>
+          {deal.submitterPseudo && (
+            <span className="text-[10px] text-muted font-semibold">
+              par <strong className="text-texte">{deal.submitterPseudo}</strong>
+            </span>
+          )}
+        </div>
         {deal.lien && (
           <a
             href={deal.lien}
