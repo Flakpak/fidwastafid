@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { dealUrlSlug, type Deal } from "@fidwastafid/schemas";
+import { dealUrlSlug, type Deal, type Commentaire } from "@fidwastafid/schemas";
 import { GET as getDealHandler } from "../../api/v1/deals/[publicId]/route.js";
 import { GET as getCommentairesHandler } from "../../api/v1/deals/[publicId]/commentaires/route.js";
 import { SiteHeader } from "../../../components/SiteHeader.js";
@@ -16,13 +16,6 @@ import { urgence } from "../../../lib/urgence.js";
 
 /** SSR par requête — mêmes raisons que la page d'accueil (voir app/page.tsx). */
 export const dynamic = "force-dynamic";
-
-interface Commentaire {
-  contenu: string;
-  auteurPublicId: string;
-  pseudo: string;
-  createdAt: string;
-}
 
 type PageParams = { params: Promise<{ slugAndId: string }> };
 

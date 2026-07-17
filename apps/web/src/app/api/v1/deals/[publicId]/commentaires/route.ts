@@ -28,8 +28,9 @@ function decodeCommentCursor(raw: string): string | null {
 
 interface CommentaireRow {
   contenu: string;
-  auteur_public_id: string;
+  auteur_public_id: string | null;
   pseudo: string;
+  couleur_avatar: string;
   created_at: string;
 }
 
@@ -71,10 +72,17 @@ export async function GET(request: Request, { params }: Context): Promise<NextRe
   values.push(limit + 1);
   const limitIdx = values.length;
 
+  // left join (pas join) : un auteur peut avoir supprimé son compte (espace
+  // membre, CONTRAT-V1 §4 amendement 16/07/2026) — le commentaire est
+  // conservé, anonymisé (auteur_id -> null). Un inner join exclurait
+  // silencieusement ces commentaires de toute lecture.
   const rows = await query<CommentaireRow>(
-    `select c.contenu, u.public_id as auteur_public_id, u.pseudo, c.created_at
+    `select c.contenu, u.public_id as auteur_public_id,
+       coalesce(u.pseudo, 'Membre supprimé') as pseudo,
+       coalesce(u.couleur_avatar, 'ardoise') as couleur_avatar,
+       c.created_at
      from commentaires c
-     join users u on u.id = c.auteur_id
+     left join users u on u.id = c.auteur_id
      where ${conditions.join(" and ")}
      order by c.created_at desc
      limit $${limitIdx}`,
@@ -89,6 +97,7 @@ export async function GET(request: Request, { params }: Context): Promise<NextRe
       contenu: row.contenu,
       auteurPublicId: row.auteur_public_id,
       pseudo: row.pseudo,
+      couleurAvatar: row.couleur_avatar,
       createdAt: new Date(row.created_at).toISOString(),
     })
   );
@@ -123,9 +132,16 @@ export const POST = withAuthErrors<Context>(async (request, { params }) => {
   const deal = dealRows[0];
   if (!deal) return apiError("NOT_FOUND", "Deal introuvable.");
 
-  const rows = await query<{ contenu: string; created_at: string }>(
-    `insert into commentaires (deal_id, auteur_id, contenu) values ($1, $2, $3)
-     returning contenu, created_at`,
+  // CTE plutôt qu'un aller-retour séparé : `user` (AuthUser, CONTRAT-V1 §5)
+  // ne porte jamais couleur_avatar — interface figée, pas de profil étendu.
+  const rows = await query<{ contenu: string; created_at: string; couleur_avatar: string }>(
+    `with inserted as (
+       insert into commentaires (deal_id, auteur_id, contenu) values ($1, $2, $3)
+       returning contenu, created_at
+     )
+     select i.contenu, i.created_at, u.couleur_avatar
+     from inserted i, users u
+     where u.id = $2`,
     [deal.id, user.id, parsed.data.contenu]
   );
   const row = rows[0];
@@ -135,6 +151,7 @@ export const POST = withAuthErrors<Context>(async (request, { params }) => {
     contenu: row.contenu,
     auteurPublicId: user.publicId,
     pseudo: user.pseudo,
+    couleurAvatar: row.couleur_avatar,
     createdAt: new Date(row.created_at).toISOString(),
   });
 
