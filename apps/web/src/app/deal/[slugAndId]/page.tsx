@@ -6,10 +6,13 @@ import { GET as getDealHandler } from "../../api/v1/deals/[publicId]/route.js";
 import { GET as getCommentairesHandler } from "../../api/v1/deals/[publicId]/commentaires/route.js";
 import { SiteHeader } from "../../../components/SiteHeader.js";
 import { SiteFooter } from "../../../components/SiteFooter.js";
-import { DealActions } from "./DealActions.js";
+import { CardVote } from "../../../components/CardVote.js";
+import { ShareButton } from "../../../components/ShareButton.js";
+import { UrgenceCountdown } from "../../../components/UrgenceCountdown.js";
 import { CommentForm } from "./CommentForm.js";
 import { dealDescription, dealJsonLd } from "./seo.js";
-import { categorieIcon, dealTypeLabel, relativeDate } from "../../../lib/format.js";
+import { categorieIcon, dealTypeLabel, relativeDate, shortDate } from "../../../lib/format.js";
+import { urgence } from "../../../lib/urgence.js";
 
 /** SSR par requête — mêmes raisons que la page d'accueil (voir app/page.tsx). */
 export const dynamic = "force-dynamic";
@@ -30,7 +33,7 @@ function extractPublicId(param: string): string {
 }
 
 /** Parité avec DealCard.reduction() — même calcul, dupliqué volontairement
- *  (fonction pure de deux lignes, même pattern déjà répété dans DealActions.share()). */
+ *  (fonction pure de deux lignes, même pattern déjà répété dans ShareButton). */
 function reduction(deal: Deal): number | null {
   if (!deal.prixNormal || deal.prixNormal <= deal.prixPromo) return null;
   return Math.round((1 - deal.prixPromo / deal.prixNormal) * 100);
@@ -85,42 +88,42 @@ export default async function DealPage({ params }: PageParams) {
     permanentRedirect(`/deal/${canonical}`);
   }
 
+  const dealHref = `/deal/${canonical}`;
   const commentaires = await fetchCommentaires(deal.publicId);
   const expire = deal.statut === "expire";
   const pct = reduction(deal);
-  const aMeta = Boolean(deal.enseigneNom || deal.ville || (!expire && deal.dateFin));
+  const urg = urgence(deal);
+  const aMeta = Boolean(deal.enseigneNom || deal.ville || urg);
+  const aPropos = Boolean(deal.description || deal.submitterPseudo);
 
   // Échappe `<` pour empêcher un titre/description soumis par un utilisateur
   // de casser hors du <script> (ex. "</script><script>...") — JSON.stringify
   // seul n'échappe pas les chevrons, nécessaires ici car le JSON est injecté
   // tel quel dans du HTML, pas juste parsé en JS.
-  const jsonLd = JSON.stringify(dealJsonLd(deal, `/deal/${canonical}`)).replace(/</g, "\\u003c");
+  const jsonLd = JSON.stringify(dealJsonLd(deal, dealHref)).replace(/</g, "\\u003c");
 
   return (
     <div className="min-h-screen bg-creme text-texte">
       <SiteHeader />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <main className="max-w-3xl mx-auto p-4 flex flex-col gap-4">
-        {expire && (
-          <div className="bg-white border border-bordure rounded-lg p-3 text-sm font-bold text-muted text-center">
-            Ce bon plan est expiré.
-          </div>
-        )}
+      <main className="max-w-6xl mx-auto p-4 flex flex-col gap-4">
+        <Link href="/" className="self-start text-sm font-bold text-muted hover:text-rouge">
+          ← Retour au feed
+        </Link>
 
-        <div className="bg-white border border-bordure rounded-xl overflow-hidden flex flex-col">
-          {/* Bandeau haut : retour au feed + date de publication relative
-              (référence v1 deal-detail-topbar, index.html racine). */}
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-bordure bg-creme text-sm">
-            <Link href="/" className="font-bold text-muted hover:text-rouge">
-              ← Retour au feed
-            </Link>
-            <span className="font-semibold text-muted">Publié {relativeDate(deal.createdAt)}</span>
-          </div>
+        {/* CARTE 1 — hero du deal, référence structure Dealabs (2 colonnes,
+            jamais ses couleurs — charte fidwastafid). */}
+        <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+          {expire && (
+            // Bandeau d'état neutre, pas funèbre — l'URL vit à vie (CONTRAT-V1 §1),
+            // l'état doit juste être évident.
+            <div className="bg-creme text-muted text-center py-2 text-sm font-bold border-b border-bordure">
+              Ce bon plan est expiré
+            </div>
+          )}
 
-          {/* Layout 2 colonnes desktop (image ~45% | contenu), empilé mobile
-              — référence v1 deal-detail-layout. */}
-          <div className="grid grid-cols-1 md:grid-cols-[45%_1fr]">
-            <div className="bg-creme flex items-center justify-center p-8 border-b md:border-b-0 md:border-r border-bordure min-h-[200px] md:min-h-[340px]">
+          <div className="grid grid-cols-1 md:grid-cols-[40%_1fr]">
+            <div className="bg-[#f8f7f4] flex items-center justify-center p-8 md:p-10 min-h-[220px] md:min-h-[380px]">
               {deal.imageKey ? (
                 // Jamais d'URL Supabase construite ici — uniquement la route
                 // proxy /img/deals/[publicId] (CONTRAT-V1 §6). max-h + w-auto
@@ -130,19 +133,38 @@ export default async function DealPage({ params }: PageParams) {
                   src={`/img/deals/${deal.publicId}`}
                   alt={deal.titre}
                   loading="lazy"
-                  className="max-w-full max-h-[340px] w-auto h-auto object-contain"
+                  className="max-w-full max-h-[380px] w-auto h-auto object-contain"
                 />
               ) : (
-                // Placeholder catégorie grand format, faible opacité —
-                // référence v1 deal-detail-img-placeholder.
                 <span aria-hidden="true" className="text-8xl opacity-10">
                   {categorieIcon(deal.categorie)}
                 </span>
               )}
             </div>
 
-            <div className="p-5 md:p-9 flex flex-col gap-3">
-              <div className="flex items-center gap-1.5 flex-wrap text-xs font-bold">
+            <div className="p-5 md:p-8 flex flex-col gap-3">
+              {/* a. Pilule de vote + actions. */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <CardVote publicId={deal.publicId} initialScore={deal.score} />
+                <div className="flex items-center gap-3 text-sm font-bold">
+                  <Link href={`${dealHref}#commentaires`} className="text-muted hover:text-rouge">
+                    💬 {deal.commentairesCount}
+                  </Link>
+                  <ShareButton
+                    titre={deal.titre}
+                    prixPromo={deal.prixPromo}
+                    prixNormal={deal.prixNormal}
+                    dealHref={dealHref}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted font-semibold">
+                Vos votes mettent en avant les meilleures لهميزات — c&apos;est un bon deal ?
+              </p>
+
+              {/* b. Publié + badges catégorie/type. */}
+              <div className="flex items-center gap-1.5 flex-wrap text-xs font-bold text-muted">
+                <span>Publié {relativeDate(deal.createdAt)}</span>
                 <span className="bg-creme border border-bordure rounded-full px-3 py-1">
                   {categorieIcon(deal.categorie)} {deal.categorie}
                 </span>
@@ -151,70 +173,96 @@ export default async function DealPage({ params }: PageParams) {
                 </span>
               </div>
 
-              <h1 className="text-xl md:text-2xl font-black leading-snug">{deal.titre}</h1>
+              {/* c. Titre — pièce centrale. */}
+              <h1 className="text-3xl md:text-4xl font-black leading-tight">{deal.titre}</h1>
 
-              {deal.submitterPseudo && (
-                <p className="text-xs text-muted font-semibold">
-                  Partagé par <strong className="text-texte">{deal.submitterPseudo}</strong>
-                </p>
-              )}
-
+              {/* d. Prix. */}
               <div className="flex items-baseline gap-3 flex-wrap">
-                <span className="text-3xl md:text-4xl font-black text-rouge">{deal.prixPromo} DH</span>
-                {deal.prixNormal && <span className="text-muted line-through font-bold">{deal.prixNormal} DH</span>}
-                {pct !== null && <span className="text-sm font-bold bg-rouge text-white rounded px-3 py-1">-{pct}%</span>}
+                <span className="text-4xl md:text-5xl font-black text-rouge">{deal.prixPromo} DH</span>
+                {deal.prixNormal && (
+                  <span className="text-lg text-muted line-through font-bold">{deal.prixNormal} DH</span>
+                )}
+                {pct !== null && (
+                  <span className="text-sm font-bold bg-vert/10 text-vert rounded-full px-3 py-1">-{pct}%</span>
+                )}
               </div>
 
+              {/* e. Méta : enseigne/ville/urgence. */}
               {aMeta && (
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-bold text-muted">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-bold text-muted">
                   {deal.enseigneNom && (
                     <span>
                       Dispo. chez <strong className="text-texte">{deal.enseigneNom}</strong>
                     </span>
                   )}
                   {deal.ville && <span>📍 {deal.ville}</span>}
-                  {!expire && deal.dateFin && (
-                    <span>
-                      ⏰ Valable jusqu&apos;au{" "}
-                      {new Date(deal.dateFin).toLocaleDateString("fr-MA", { day: "numeric", month: "long" })}
-                    </span>
+                  {urg?.mode === "expiree" && (
+                    <span className="text-xs font-bold bg-creme text-muted rounded-full px-2.5 py-1">Expiré</span>
+                  )}
+                  {urg?.mode === "compte-a-rebours" && <UrgenceCountdown dateFin={deal.dateFin!} />}
+                  {urg?.mode === "lointaine" && (
+                    <span className="text-xs text-muted">⏰ jusqu&apos;au {shortDate(deal.dateFin!)}</span>
                   )}
                 </div>
               )}
 
-              {deal.description && (
-                <div className="bg-creme border border-bordure border-l-4 border-l-orange rounded-r-lg px-4 py-3">
-                  <p className="text-[11px] font-black uppercase tracking-wide text-orange mb-1.5">
-                    ℹ️ Infos du deal
-                  </p>
-                  <p className="text-sm text-texte font-semibold leading-relaxed">{deal.description}</p>
-                </div>
-              )}
-
+              {/* f. CTA proéminent — uniquement si lien externe (on est déjà sur la page du deal). */}
               {deal.lien && (
                 <a
                   href={deal.lien}
                   target="_blank"
                   rel="noopener noreferrer nofollow"
-                  className="font-arabic self-start bg-bleu text-white rounded-xl px-8 py-3.5 text-lg font-bold"
+                  className="font-arabic w-full text-center bg-rouge text-white rounded-2xl px-8 py-4 text-xl font-bold mt-2"
                 >
                   شوف الدييل ↗
                 </a>
               )}
             </div>
           </div>
-
-          {/* Barre de vote — référence v1 deal-detail-votes-label. */}
-          <div className="flex items-center gap-3.5 flex-wrap px-5 py-4 border-t border-bordure bg-creme">
-            <p className="flex-1 min-w-[200px] text-sm font-bold">
-              Vos votes mettent en avant les meilleures لهميزات — c&apos;est un bon deal ?
-            </p>
-            <DealActions deal={deal} />
-          </div>
         </div>
 
-        <section id="commentaires" className="bg-white border border-bordure rounded-xl p-5 flex flex-col gap-4">
-          <h2 className="font-bold">Commentaires ({commentaires.length})</h2>
+        {/* CARTE 2 — à propos (auteur + description), omise si ni l'un ni l'autre. */}
+        {aPropos && (
+          <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 flex flex-col gap-4">
+            <h2 className="text-lg font-black">À propos de ce deal</h2>
+
+            {deal.submitterPseudo && (
+              <div className="flex items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-br from-rouge to-orange text-white flex items-center justify-center text-sm font-black"
+                >
+                  {deal.submitterPseudo[0]?.toUpperCase()}
+                </span>
+                <p className="text-sm font-semibold text-muted">
+                  Partagé par <strong className="text-texte">{deal.submitterPseudo}</strong>
+                </p>
+              </div>
+            )}
+
+            {deal.description && (
+              // whitespace-pre-line : les descriptions du pipeline contiennent
+              // des \n structurés (champs "Marque:", "Numéro..." etc.), ils
+              // doivent rester visibles tels quels.
+              <p className="text-[15px] text-texte leading-relaxed whitespace-pre-line">{deal.description}</p>
+            )}
+
+            {deal.lien && (
+              <a
+                href={deal.lien}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className="self-start text-bleu font-bold hover:underline"
+              >
+                Plus de détails{deal.enseigneNom ? ` sur ${deal.enseigneNom}` : ""} ↗
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* CARTE 3 — commentaires. */}
+        <section id="commentaires" className="bg-white rounded-2xl shadow-md p-6 md:p-8 flex flex-col gap-4">
+          <h2 className="text-lg font-black">Commentaires ({commentaires.length})</h2>
           <CommentForm publicId={deal.publicId} />
           <ul className="flex flex-col gap-3">
             {commentaires.map((c) => (

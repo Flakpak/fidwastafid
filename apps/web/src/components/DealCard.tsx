@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { dealUrlSlug, type Deal } from "@fidwastafid/schemas";
 import { categorieIcon, relativeDate, shortDate } from "../lib/format.js";
+import { urgence } from "../lib/urgence.js";
 import { CardVote } from "./CardVote.js";
 import { UrgenceCountdown } from "./UrgenceCountdown.js";
 import { ShareButton } from "./ShareButton.js";
@@ -8,19 +9,6 @@ import { ShareButton } from "./ShareButton.js";
 function reduction(deal: Deal): number | null {
   if (!deal.prixNormal || deal.prixNormal <= deal.prixPromo) return null;
   return Math.round((1 - deal.prixPromo / deal.prixNormal) * 100);
-}
-
-type Urgence = { mode: "expiree" } | { mode: "compte-a-rebours" } | { mode: "lointaine" } | null;
-
-/** Classification stable (pas de tick) — seul le mode "compte-a-rebours"
- *  a besoin d'un composant client pour la valeur qui bouge (UrgenceCountdown). */
-function urgence(deal: Deal): Urgence {
-  if (!deal.dateFin) return null;
-  if (deal.statut === "expire") return { mode: "expiree" };
-  const finMs = new Date(`${deal.dateFin}T23:59:59`).getTime() - Date.now();
-  if (finMs <= 0) return { mode: "expiree" };
-  if (finMs <= 48 * 3600 * 1000) return { mode: "compte-a-rebours" };
-  return { mode: "lointaine" };
 }
 
 /**

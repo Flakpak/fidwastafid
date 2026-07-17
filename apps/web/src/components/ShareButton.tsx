@@ -10,10 +10,9 @@ interface ShareButtonProps {
 }
 
 /**
- * Bouton partage du pied de carte — même pattern Web Share API que
- * DealActions (page deal), avec repli copie du lien si l'API est absente
- * (DealActions se contente de masquer son bouton ; ici la carte veut
- * toujours proposer une action). Composant client minimal et isolé.
+ * Bouton partage — Web Share API avec repli copie du lien si l'API est
+ * absente (toujours une action proposée, jamais masqué). Composant client
+ * minimal et isolé, réutilisé sur la carte du feed ET la page deal.
  */
 export function ShareButton({ titre, prixPromo, prixNormal, dealHref }: ShareButtonProps) {
   const [canShare, setCanShare] = useState(false);

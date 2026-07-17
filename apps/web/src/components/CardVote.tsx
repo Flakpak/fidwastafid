@@ -10,9 +10,10 @@ interface ApiErrorBody {
 /**
  * Pilule de vote — capsule bordée unique [خسارة | score | ربح], porté
  * depuis le design Dealabs (structure uniquement, charte fidwastafid).
- * Composant client minimal (boutons + score), isolé du reste de DealCard
- * qui reste rendu serveur (feed SSR, Phase 4). Même endpoint et même
- * pattern d'état que DealActions (page deal).
+ * Composant client minimal (boutons + score), isolé du reste de son
+ * conteneur (feed SSR, page deal). Réutilisé tel quel sur la carte du feed
+ * ET la page deal — pas de retrait de vote ici, seulement chaud/froid (le
+ * pattern Dealabs n'a pas ce bouton, cohérent avec la simplification).
  */
 export function CardVote({ publicId, initialScore }: { publicId: string; initialScore: number }) {
   const router = useRouter();
