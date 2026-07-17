@@ -85,6 +85,8 @@ export const dealSchema = z.object({
   /** Pseudo du soumetteur — même null-si-pipeline, lecture seule, jamais
    *  dans dealInputSchema (même pattern que enseigneNom). */
   submitterPseudo: z.string().nullable(),
+  /** Nombre de commentaires — agrégat lecture seule, jamais dans dealInputSchema. */
+  commentairesCount: z.number().int().nonnegative(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
