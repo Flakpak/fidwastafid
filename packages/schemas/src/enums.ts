@@ -60,3 +60,19 @@ export const CATEGORIE_SLUGS: Record<Categorie, string> = {
   Sport: "sport",
   Autre: "autre",
 };
+
+/** Couleurs d'avatar — espace membre (CONTRAT-V1 §4, amendement 16/07/2026).
+ *  Mêmes valeurs que la contrainte CHECK de users.couleur_avatar (packages/db). */
+export const COULEURS_AVATAR = [
+  "rouge",
+  "terracotta",
+  "or",
+  "olive",
+  "bleu",
+  "indigo",
+  "prune",
+  "ardoise",
+] as const;
+
+export const couleurAvatarSchema = z.enum(COULEURS_AVATAR);
+export type CouleurAvatar = z.infer<typeof couleurAvatarSchema>;

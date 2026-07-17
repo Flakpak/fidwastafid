@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { publicIdSchema } from "./common.js";
-import { villeSchema, categorieSchema } from "./enums.js";
+import { villeSchema, categorieSchema, couleurAvatarSchema } from "./enums.js";
 
 export const dealStatutSchema = z.enum([
   "auto_draft", // exception historique (anglais, déjà câblé pipeline+admin) — CONTRAT-V1 §7
@@ -85,6 +85,9 @@ export const dealSchema = z.object({
   /** Pseudo du soumetteur — même null-si-pipeline, lecture seule, jamais
    *  dans dealInputSchema (même pattern que enseigneNom). */
   submitterPseudo: z.string().nullable(),
+  /** Couleur d'avatar du soumetteur — espace membre (CONTRAT-V1 §4,
+   *  amendement 16/07/2026), même null-si-pipeline que submitterPseudo. */
+  submitterCouleurAvatar: couleurAvatarSchema.nullable(),
   /** Nombre de commentaires — agrégat lecture seule, jamais dans dealInputSchema. */
   commentairesCount: z.number().int().nonnegative(),
   createdAt: z.string().datetime(),
