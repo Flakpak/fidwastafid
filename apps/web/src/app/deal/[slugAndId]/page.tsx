@@ -123,7 +123,7 @@ export default async function DealPage({ params }: PageParams) {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-[40%_1fr]">
-            <div className="bg-[#f8f7f4] flex items-center justify-center p-8 md:p-10 min-h-[220px] md:min-h-[380px]">
+            <div className="bg-bordure flex items-center justify-center p-8 md:p-10 min-h-[220px] md:min-h-[380px]">
               {deal.imageKey ? (
                 // Jamais d'URL Supabase construite ici — uniquement la route
                 // proxy /img/deals/[publicId] (CONTRAT-V1 §6). max-h + w-auto

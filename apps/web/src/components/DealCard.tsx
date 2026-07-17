@@ -33,7 +33,7 @@ export function DealCard({ deal }: { deal: Deal }) {
       {/* Colonne image — largeur fixe, la carte reste 2 colonnes même en mobile. */}
       <Link
         href={dealHref}
-        className="w-[110px] md:w-[180px] shrink-0 self-stretch flex items-center justify-center p-3 bg-[#f8f7f4]"
+        className="w-[110px] md:w-[180px] shrink-0 self-stretch flex items-center justify-center p-3 bg-bordure"
       >
         {deal.imageKey ? (
           // Jamais d'URL Supabase construite ici — uniquement la route proxy
