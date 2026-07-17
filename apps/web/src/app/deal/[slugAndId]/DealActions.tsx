@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import type { Deal } from "@fidwastafid/schemas";
 
 interface ApiErrorBody {
@@ -8,6 +9,8 @@ interface ApiErrorBody {
 }
 
 export function DealActions({ deal }: { deal: Deal }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [score, setScore] = useState(deal.score);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +33,11 @@ export function DealActions({ deal }: { deal: Deal }) {
       });
       const body = (await res.json()) as ApiErrorBody & { score?: number };
       if (!res.ok) {
-        setError(body.error?.code === "UNAUTHENTICATED" ? "Connecte-toi pour voter." : "Vote impossible.");
+        if (body.error?.code === "UNAUTHENTICATED") {
+          router.push(`/connexion?next=${encodeURIComponent(pathname)}`);
+          return;
+        }
+        setError("Vote impossible.");
         return;
       }
       if (typeof body.score === "number") setScore(body.score);
@@ -46,7 +53,11 @@ export function DealActions({ deal }: { deal: Deal }) {
       const res = await fetch(`/api/v1/deals/${deal.publicId}/votes`, { method: "DELETE" });
       const body = (await res.json()) as ApiErrorBody & { score?: number };
       if (!res.ok) {
-        setError(body.error?.code === "UNAUTHENTICATED" ? "Connecte-toi pour voter." : "Action impossible.");
+        if (body.error?.code === "UNAUTHENTICATED") {
+          router.push(`/connexion?next=${encodeURIComponent(pathname)}`);
+          return;
+        }
+        setError("Action impossible.");
         return;
       }
       if (typeof body.score === "number") setScore(body.score);

@@ -139,7 +139,7 @@ export default async function DealPage({ params }: PageParams) {
           <DealActions deal={deal} />
         </div>
 
-        <section className="bg-white border border-bordure rounded-xl p-5 flex flex-col gap-4">
+        <section id="commentaires" className="bg-white border border-bordure rounded-xl p-5 flex flex-col gap-4">
           <h2 className="font-bold">Commentaires ({commentaires.length})</h2>
           <CommentForm publicId={deal.publicId} />
           <ul className="flex flex-col gap-3">
