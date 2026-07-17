@@ -3,6 +3,8 @@ import type { Deal } from "@fidwastafid/schemas";
 import { GET as getDealsHandler } from "./api/v1/deals/route.js";
 import { SiteHeader } from "../components/SiteHeader.js";
 import { SiteFooter } from "../components/SiteFooter.js";
+import { Ticker } from "../components/Ticker.js";
+import { HeroBand } from "../components/HeroBand.js";
 import { Feed } from "./Feed.js";
 
 const DESCRIPTION = "Les meilleurs bons plans et promotions au Maroc, votés par la communauté : alimentaire, high-tech, mode et plus.";
@@ -48,7 +50,8 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-creme text-texte">
       <SiteHeader />
-      <Feed initialDeals={deals} />
+      <Ticker />
+      <Feed initialDeals={deals} hero={<HeroBand />} />
       <SiteFooter />
     </div>
   );

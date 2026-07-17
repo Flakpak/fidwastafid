@@ -28,3 +28,44 @@ body {
   background-color: var(--color-creme);
   color: var(--color-texte);
 }
+
+/* Hero + ticker — animations CSS pures, portées telles quelles depuis
+   index.html (racine, v1 : keyframes heroFadeUp/heroCursorBlink/tickerScroll). */
+@keyframes hero-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes hero-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.hero-fr-anim { animation: hero-fade-up 0.5s ease both; }
+.hero-steps-anim { animation: hero-fade-up 0.5s ease 0.15s both; }
+.hero-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--color-rouge);
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: hero-cursor-blink 0.7s ease infinite;
+  border-radius: 1px;
+}
+
+.ticker-track {
+  animation: ticker-scroll 22s linear infinite;
+}
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+/* CSP/perf : pas d'animation infinie pour les utilisateurs qui la refusent. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-fr-anim, .hero-steps-anim, .hero-cursor { animation: none; }
+  .ticker-track { animation: none; }
+}
