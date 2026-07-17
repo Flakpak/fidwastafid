@@ -9,6 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "openapi:generate": "tsx scripts/generate-openapi.ts",
+    "favicon:generate": "tsx scripts/generate-favicon.ts",
     "test:integration": "tsx tests/integration.ts"
   },
   "dependencies": {
