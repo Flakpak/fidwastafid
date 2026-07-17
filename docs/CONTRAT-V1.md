@@ -114,6 +114,11 @@ POST   /api/v1/deals                        soumission → statut=en_attente
 POST   /api/v1/deals/:publicId/votes        body: { sens: "chaud"|"froid" } — upsert
 DELETE /api/v1/deals/:publicId/votes        retirer son vote
 POST   /api/v1/deals/:publicId/commentaires
+GET    /api/v1/me                           profil courant (pseudo, email, couleurAvatar, publicId, compteurs)
+PATCH  /api/v1/me                           body: { pseudo?, couleurAvatar? }
+DELETE /api/v1/me                           suppression de compte (anonymisation des commentaires,
+                                             deals conservés avec submitter_id null, suppression du
+                                             compte auth)
 
 # Admin (requireAdmin)
 GET    /api/v1/admin/deals                  pipeline complet (auto_draft en premier)
@@ -122,6 +127,8 @@ POST   /api/v1/admin/deals/bulk             actions groupées
 ```
 
 **Notes** :
+- Amendement du 16/07/2026 — espace membre : exercice des droits d'accès/rectification/effacement
+  (loi 09-08). Premier amendement conscient de la liste fermée.
 - `whatsapp_contact` n'apparaît **jamais** hors de `GET /api/v1/admin/deals`.
 - Le pipeline (`apps/pipeline`, `.mjs`) écrit **directement en base**, hors `/api/v1` — exception
   documentée (script d'infra dans un environnement de confiance), pas une entorse au principe
