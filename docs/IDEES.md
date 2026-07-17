@@ -29,16 +29,6 @@ deals" avec édition — nécessite un amendement du contrat API (`PATCH`
 deal par son auteur → repasse `en_attente`, hors de la liste fermée
 actuelle §4).
 
-## Chrome / parité v1
-
-Vote depuis la carte : en v1, `DealCard` portait ses propres boutons ربح/خسارة
-(vote direct sur la carte, sans ouvrir la fiche). En v2, la carte n'affiche
-qu'un score statique (`{score}°`) — le vote n'existe que sur la page deal
-(`DealActions`). Régression de confort constatée lors de la mise en
-conformité charte (2026-07-14), non corrigée dans cette passe (ajouter des
-boutons de vote sur la carte est une fonctionnalité, pas un ajustement de
-chrome). À trier post-Phase 6.
-
 ## Images (15/07/2026)
 
 - Images des deals catalogue : `extract-catalogue.mjs` (pipeline, hors
@@ -57,6 +47,11 @@ chrome). À trier post-Phase 6.
   catalogue Carrefour/Bringo. Pistes : enrichir la liste de mots-clés, ou
   déléguer la catégorisation à l'API Claude à l'ingestion (comme
   `extract-catalogue.mjs` le fait déjà pour les catalogues).
+
+## Favoris (2026-07-17)
+
+Favoris/bookmark sur les cartes (type Dealabs) — nécessite table + endpoints
++ page mes-favoris, feature complète post-lancement.
 
 ## Monétisation
 
