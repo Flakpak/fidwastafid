@@ -53,6 +53,11 @@ actuelle §4).
 Favoris/bookmark sur les cartes (type Dealabs) — nécessite table + endpoints
 + page mes-favoris, feature complète post-lancement.
 
+## Page deal — profil auteur (2026-07-17)
+
+Enrichissements profil auteur (membre depuis, nombre de deals partagés) :
+dépend du futur `/membre/[pseudo]-[public_id]` réservé au contrat §2.
+
 ## Monétisation
 
 Deals sponsorisés = colonne `sponsorise` boolean + badge sur la carte + critère de tri, post-Phase 6, quand il y aura un premier annonceur réel. Affiliation = paramètre de tracking sur le champ `lien` existant. Display ads (AdSense & co) : ÉCARTÉ — incompatible CSP par nonce, contraire au positionnement premium, rentable uniquement à fort volume.
