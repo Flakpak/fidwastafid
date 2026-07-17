@@ -174,6 +174,10 @@ a été appliquée sur aswbu avant de passer au suivant — le filet CI
 - [ ] Vérifications : 200 sur /, /deal/[slug]-[public_id], /enseigne/marjane ;
       en-têtes CSP ; images via /img/deals/[public_id] ; une écriture de test
       (vote) de bout en bout.
+      Partiel fait le 18/07/2026 (périmètre SITE_URL uniquement, cf. SUIVI) :
+      sitemap.xml et robots.txt en https://fidwastafid.com, og:url/canonical/
+      JSON-LD d'une page deal corrects. RESTE pour clore cette case :
+      /enseigne/marjane, en-têtes CSP, images, écriture de test.
 
 **J+1 → J+7** : 5xx, latence, échecs d'écriture, Search Console (indexation
 repart de zéro — attendu), remontées WhatsApp.
@@ -290,6 +294,15 @@ renseigné, ne doit pas passer à travers) et `NEXT_PUBLIC_SITE_URL` ajouté
 comme build arg (Dockerfile + docker-compose.yml), au même titre que
 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — jusqu'ici absent, donc invisible du
 build Docker local qui retombait silencieusement sur le fallback.
+
+**Vérification post-déploiement — 18/07/2026** : redéploiement déclenché par
+le commit ci-dessus, confirmé stable au curl sur https://fidwastafid.com —
+sitemap.xml (57 occurrences du domaine, 0 vercel.app/www), robots.txt
+(Sitemap: https://fidwastafid.com/sitemap.xml), page deal (og:url,
+canonical et JSON-LD Offer.url tous en https://fidwastafid.com). Périmètre
+volontairement limité à SITE_URL — le reste de la checklist J-0
+(/enseigne/marjane, en-têtes CSP, images, écriture de test) reste à faire
+en session de bascule dédiée (cf. case ci-dessus).
 
 **PROCHAINE TÂCHE** : clore 4 et 5 — (a) validation parité sur mobile réel, (b) soumission sitemap + test résultats enrichis. Ensuite : vérifications J-0 complètes de la Phase 6 (curl post-déploiement), puis surveillance J+1→J+7.
 
