@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { inscriptionAction } from "../../lib/authActions.js";
+import { safeNextPath } from "../../lib/nextPath.js";
 
 /** noindex — CONTRAT-V1 §2. */
 export const metadata: Metadata = {
@@ -10,9 +11,10 @@ export const metadata: Metadata = {
 export default async function InscriptionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ erreur?: string; etape?: string }>;
+  searchParams: Promise<{ erreur?: string; etape?: string; next?: string }>;
 }) {
-  const { erreur, etape } = await searchParams;
+  const { erreur, etape, next: rawNext } = await searchParams;
+  const next = safeNextPath(rawNext);
 
   if (etape === "verification") {
     return (
@@ -34,6 +36,7 @@ export default async function InscriptionPage({
         <h1 className="font-arabic text-2xl text-rouge">إنشاء حساب</h1>
         <p className="text-sm text-muted">Inscription</p>
         {erreur && <p className="text-sm text-rouge">Impossible de créer le compte.</p>}
+        <input type="hidden" name="next" value={next} />
         <label className="flex flex-col gap-1 text-sm">
           Pseudo
           <input type="text" name="pseudo" required maxLength={40} className="border border-bordure rounded px-3 py-2" />
@@ -49,7 +52,10 @@ export default async function InscriptionPage({
         <button type="submit" className="bg-rouge text-white rounded px-4 py-2 font-bold">
           Créer mon compte
         </button>
-        <a href="/connexion" className="text-sm text-center text-muted underline">
+        <a
+          href={next === "/" ? "/connexion" : `/connexion?next=${encodeURIComponent(next)}`}
+          className="text-sm text-center text-muted underline"
+        >
           Déjà un compte ? Connecte-toi
         </a>
       </form>

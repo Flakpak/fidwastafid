@@ -6,19 +6,21 @@ import { SESSION_COOKIE_NAME } from "@fidwastafid/auth";
 import { getAuthClient } from "./supabaseAuthClient.js";
 import { setSessionCookie } from "./sessionCookie.js";
 import { SITE_URL } from "./siteUrl.js";
+import { safeNextPath } from "./nextPath.js";
 
 export async function connexionAction(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const next = safeNextPath(formData.get("next"));
 
   const { data, error } = await getAuthClient().auth.signInWithPassword({ email, password });
 
   if (error || !data.session) {
-    redirect("/connexion?erreur=1");
+    redirect(`/connexion?erreur=1&next=${encodeURIComponent(next)}`);
   }
 
   await setSessionCookie(data.session.access_token, data.session.expires_in);
-  redirect("/");
+  redirect(next);
 }
 
 /**
@@ -31,6 +33,7 @@ export async function inscriptionAction(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const pseudo = String(formData.get("pseudo") ?? "").trim();
+  const next = safeNextPath(formData.get("next"));
 
   const { data, error } = await getAuthClient().auth.signUp({
     email,
@@ -47,16 +50,18 @@ export async function inscriptionAction(formData: FormData): Promise<void> {
   });
 
   if (error) {
-    redirect("/inscription?erreur=1");
+    redirect(`/inscription?erreur=1&next=${encodeURIComponent(next)}`);
   }
 
   if (data.session) {
     await setSessionCookie(data.session.access_token, data.session.expires_in);
-    redirect("/");
+    redirect(next);
   }
 
   // Pas de session immédiate : le projet Supabase exige une confirmation
-  // par email avant la première connexion.
+  // par email avant la première connexion. `next` n'est pas propagé au-delà
+  // de ce point (emailRedirectTo pointe sur /auth/confirm, sans le relayer)
+  // — limite connue, hors périmètre de cette action.
   redirect("/inscription?etape=verification");
 }
 
