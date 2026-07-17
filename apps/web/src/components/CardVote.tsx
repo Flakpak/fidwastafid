@@ -8,10 +8,11 @@ interface ApiErrorBody {
 }
 
 /**
- * Vote depuis la carte — composant client minimal (boutons + score),
- * isolé du reste de DealCard qui reste rendu serveur (feed SSR, Phase 4).
- * Même endpoint et même pattern d'état que DealActions (page deal) : pas
- * de nouvel endpoint, juste le même flux réutilisé à plus petite échelle.
+ * Pilule de vote — capsule bordée unique [خسارة | score | ربح], porté
+ * depuis le design Dealabs (structure uniquement, charte fidwastafid).
+ * Composant client minimal (boutons + score), isolé du reste de DealCard
+ * qui reste rendu serveur (feed SSR, Phase 4). Même endpoint et même
+ * pattern d'état que DealActions (page deal).
  */
 export function CardVote({ publicId, initialScore }: { publicId: string; initialScore: number }) {
   const router = useRouter();
@@ -42,21 +43,7 @@ export function CardVote({ publicId, initialScore }: { publicId: string; initial
   }
 
   return (
-    <div className="flex items-center gap-1.5">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          void vote("chaud");
-        }}
-        disabled={pending}
-        className="font-arabic border border-bordure rounded-lg px-2 py-1 text-sm font-bold text-vert hover:border-vert disabled:opacity-50"
-      >
-        ربح ▲
-      </button>
-      <span className={`text-base font-black min-w-[2ch] text-center ${score < 0 ? "text-bleu" : "text-rouge"}`}>
-        {score}°
-      </span>
+    <div className="inline-flex items-center rounded-full border border-bordure bg-white overflow-hidden text-sm">
       <button
         type="button"
         onClick={(e) => {
@@ -64,9 +51,25 @@ export function CardVote({ publicId, initialScore }: { publicId: string; initial
           void vote("froid");
         }}
         disabled={pending}
-        className="font-arabic border border-bordure rounded-lg px-2 py-1 text-sm font-bold text-rouge hover:border-rouge disabled:opacity-50"
+        className="font-arabic px-2.5 py-1 font-bold text-rouge hover:bg-creme disabled:opacity-50"
       >
         ▼ خسارة
+      </button>
+      <span
+        className={`px-1.5 font-black border-x border-bordure ${score < 0 ? "text-bleu" : "text-rouge"}`}
+      >
+        {score}°
+      </span>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          void vote("chaud");
+        }}
+        disabled={pending}
+        className="font-arabic px-2.5 py-1 font-bold text-vert hover:bg-creme disabled:opacity-50"
+      >
+        ربح ▲
       </button>
     </div>
   );
