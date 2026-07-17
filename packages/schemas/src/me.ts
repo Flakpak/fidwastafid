@@ -1,6 +1,17 @@
 import { z } from "zod";
 import { publicIdSchema } from "./common.js";
 import { couleurAvatarSchema } from "./enums.js";
+import { dealStatutSchema } from "./deal.js";
+
+/** Un des propres deals de l'utilisateur, tel que listé sur /compte —
+ *  pas le schéma Deal complet (pas besoin du prix/enseigne/etc. ici). */
+export const meDealSchema = z.object({
+  publicId: publicIdSchema,
+  titre: z.string(),
+  statut: dealStatutSchema,
+  createdAt: z.string().datetime(),
+});
+export type MeDeal = z.infer<typeof meDealSchema>;
 
 /** GET /api/v1/me — profil courant, jamais celui d'un autre utilisateur
  *  (pas de :publicId dans l'URL, CONTRAT-V1 §4). L'email n'apparaît que
@@ -13,6 +24,10 @@ export const meSchema = z.object({
   dealsCount: z.number().int().nonnegative(),
   votesCount: z.number().int().nonnegative(),
   commentairesCount: z.number().int().nonnegative(),
+  /** Enrichissement de lecture du même GET (pas un nouvel endpoint) — la
+   *  liste complète, pas de pagination (volume par utilisateur toujours
+   *  modeste à cette échelle). */
+  mesDeals: z.array(meDealSchema),
 });
 export type Me = z.infer<typeof meSchema>;
 

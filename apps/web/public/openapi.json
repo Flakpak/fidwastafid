@@ -549,6 +549,41 @@
           "commentairesCount": {
             "type": "integer",
             "minimum": 0
+          },
+          "mesDeals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "publicId": {
+                  "type": "string",
+                  "pattern": "^[23456789abcdefghijkmnpqrstuvwxyz]{10}$"
+                },
+                "titre": {
+                  "type": "string"
+                },
+                "statut": {
+                  "type": "string",
+                  "enum": [
+                    "auto_draft",
+                    "en_attente",
+                    "publie",
+                    "rejete",
+                    "expire"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "publicId",
+                "titre",
+                "statut",
+                "createdAt"
+              ]
+            }
           }
         },
         "required": [
@@ -558,7 +593,8 @@
           "couleurAvatar",
           "dealsCount",
           "votesCount",
-          "commentairesCount"
+          "commentairesCount",
+          "mesDeals"
         ]
       },
       "MeUpdate": {

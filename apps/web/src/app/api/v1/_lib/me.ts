@@ -11,6 +11,13 @@ interface MeRow {
   commentaires_count: number;
 }
 
+interface MeDealRow {
+  public_id: string;
+  titre: string;
+  statut: string;
+  created_at: string;
+}
+
 /**
  * Construit la réponse GET /api/v1/me — partagée avec PATCH (relit l'état
  * à jour après écriture plutôt que de reconstruire la réponse à la main).
@@ -33,6 +40,11 @@ export async function buildMe(user: AuthUser): Promise<Me> {
   const email = await fetchAuthUserEmail(user.id);
   if (!email) throw new Error("Email introuvable via l'API admin Supabase.");
 
+  const dealRows = await query<MeDealRow>(
+    `select public_id, titre, statut, created_at from deals where submitter_id = $1 order by created_at desc`,
+    [user.id]
+  );
+
   return meSchema.parse({
     publicId: user.publicId,
     pseudo: row.pseudo,
@@ -41,5 +53,11 @@ export async function buildMe(user: AuthUser): Promise<Me> {
     dealsCount: row.deals_count,
     votesCount: row.votes_count,
     commentairesCount: row.commentaires_count,
+    mesDeals: dealRows.map((d) => ({
+      publicId: d.public_id,
+      titre: d.titre,
+      statut: d.statut,
+      createdAt: new Date(d.created_at).toISOString(),
+    })),
   });
 }
