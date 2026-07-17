@@ -13,3 +13,24 @@ export function relativeDate(iso: string): string {
   if (diffMin < 1440) return `il y a ${Math.floor(diffMin / 60)}h`;
   return `il y a ${Math.floor(diffMin / 1440)}j`;
 }
+
+/** Date fin courte ("12 juil.") — porté tel quel depuis le DealCard v1. */
+export function shortDate(isoDate: string): string {
+  return new Date(isoDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+}
+
+/** Mapping catégorie → emoji, porté tel quel depuis CAT_ICONS (index.html
+ *  racine, v1). Fallback 🛍️ identique à v1 (dc-img-placeholder). */
+export const CAT_ICONS: Record<string, string> = {
+  Alimentaire: "🛒",
+  Électroménager: "🏠",
+  "High-Tech": "📱",
+  Mode: "👗",
+  Maison: "🛋️",
+  Beauté: "💄",
+  Sport: "⚽",
+  Autre: "✨",
+};
+export function categorieIcon(categorie: string): string {
+  return CAT_ICONS[categorie] ?? "🛍️";
+}
