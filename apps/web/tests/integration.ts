@@ -5,6 +5,7 @@ import {
   POST as postComment,
   GET as getComments,
 } from "../src/app/api/v1/deals/[publicId]/commentaires/route.js";
+import { GET as getMe, PATCH as patchMe } from "../src/app/api/v1/me/route.js";
 
 /**
  * Tests d'intégration (plan v2, Phase 3 : "soumission, validation, vote") —
@@ -80,6 +81,10 @@ function authedRequest(url: string, token: string | null, init: RequestInit = {}
 
 const ENSEIGNE_SLUG = "test-integration";
 const DEAL_PUBLIC_ID = "itgd2a9qa2";
+// Fixture pure DB, jamais authentifié — sert uniquement à occuper un pseudo
+// pour tester le rejet d'un doublon (contrainte unique users.pseudo, migration 0006).
+const AUTRE_USER_ID = "00000000-0000-4000-8000-000000000042";
+const AUTRE_PSEUDO = "PseudoDejaPris";
 
 async function seedFixtures(userId: string): Promise<void> {
   await withTransaction(async (client) => {
@@ -87,6 +92,11 @@ async function seedFixtures(userId: string): Promise<void> {
       `insert into users (id, public_id, pseudo) values ($1, 'itg2p9qa23', 'IntegrationTest')
        on conflict (id) do nothing`,
       [userId]
+    );
+    await client.query(
+      `insert into users (id, public_id, pseudo) values ($1, 'aut2p9qa23', $2)
+       on conflict (id) do nothing`,
+      [AUTRE_USER_ID, AUTRE_PSEUDO]
     );
     await client.query(`insert into enseignes (slug, nom) values ($1, 'Test Integration') on conflict (slug) do nothing`, [
       ENSEIGNE_SLUG,
@@ -221,6 +231,64 @@ async function main() {
   check(
     "GET commentaires -> pseudo présent sur au moins une ligne",
     (listCommentsBody.data ?? []).some((c) => c.pseudo === "IntegrationTest")
+  );
+
+  console.log("\nespace membre — GET/PATCH /api/v1/me");
+  const meRes = await getMe(authedRequest("http://localhost/api/v1/me", token), noParams);
+  const meBody = (await meRes.json()) as {
+    publicId?: string;
+    pseudo?: string;
+    email?: string;
+    couleurAvatar?: string;
+    dealsCount?: number;
+    votesCount?: number;
+    commentairesCount?: number;
+  };
+  check("GET /me -> 200", meRes.status === 200);
+  check("GET /me -> pseudo = IntegrationTest", meBody.pseudo === "IntegrationTest");
+  check("GET /me -> email présent", typeof meBody.email === "string" && meBody.email.length > 0);
+  check("GET /me -> couleurAvatar présente", typeof meBody.couleurAvatar === "string");
+  check(
+    "GET /me -> compteurs numériques",
+    typeof meBody.dealsCount === "number" &&
+      typeof meBody.votesCount === "number" &&
+      typeof meBody.commentairesCount === "number"
+  );
+
+  const meNoAuthRes = await getMe(new Request("http://localhost/api/v1/me"), noParams);
+  check("GET /me sans token -> 401 UNAUTHENTICATED", meNoAuthRes.status === 401);
+
+  const patchOkRes = await patchMe(
+    authedRequest("http://localhost/api/v1/me", token, {
+      method: "PATCH",
+      body: JSON.stringify({ pseudo: "IntegrationTest", couleurAvatar: "bleu" }),
+    }),
+    noParams
+  );
+  const patchOkBody = (await patchOkRes.json()) as { couleurAvatar?: string };
+  check("PATCH /me valide -> 200", patchOkRes.status === 200);
+  check("PATCH /me valide -> couleurAvatar mise à jour", patchOkBody.couleurAvatar === "bleu");
+
+  const patchDupRes = await patchMe(
+    authedRequest("http://localhost/api/v1/me", token, {
+      method: "PATCH",
+      body: JSON.stringify({ pseudo: AUTRE_PSEUDO }),
+    }),
+    noParams
+  );
+  check("PATCH /me pseudo déjà pris -> 400 VALIDATION_ERROR", patchDupRes.status === 400);
+
+  const patchBadColorRes = await patchMe(
+    authedRequest("http://localhost/api/v1/me", token, {
+      method: "PATCH",
+      body: JSON.stringify({ couleurAvatar: "fuchsia" }),
+    }),
+    noParams
+  );
+  check("PATCH /me couleur hors enum -> 400 VALIDATION_ERROR", patchBadColorRes.status === 400);
+
+  console.log(
+    "\n(DELETE /api/v1/me non testé automatiquement — suppression réelle du compte de test, à valider manuellement.)"
   );
 
   console.log(`\n${pass} passés, ${fail} échoués`);
