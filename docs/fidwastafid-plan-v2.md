@@ -141,9 +141,10 @@ exception documentée, cf. `docs/IDEES.md`.
 - [ ] Ignored Build Step configuré sur le projet Vercel v1 au moment de la
       bascule J-0 — un push sur le repo rebuild actuellement LES DEUX
       projets, il faut que le gel du déploiement v1 soit réel.
-- [ ] Bascule des URLs d'auth : `NEXT_PUBLIC_SITE_URL` (Vercel) et Supabase
+- [x] Bascule des URLs d'auth : `NEXT_PUBLIC_SITE_URL` (Vercel) et Supabase
       Site URL + Redirect URLs passent de la préversion à fidwastafid.com —
       sinon les emails de confirmation pointeront sur la préversion morte.
+      Fait le 16/07/2026 (cf. SUIVI).
 - [x] SMTP custom opérationnel (Resend) — prérequis découvert lors du fix
       confirmation email (Supabase verrouille l'édition des templates email
       sans SMTP custom, et son expéditeur par défaut est limité à quelques
@@ -167,9 +168,9 @@ a été appliquée sur aswbu avant de passer au suivant — le filet CI
 `migrations-check` ci-dessus reste la protection réelle contre l'oubli.
 
 **J-0 — session de bascule**
-- [ ] Bascule du domaine : réassignation dans Vercel/Cloudflare (pas de TTL
+- [x] Bascule du domaine : réassignation dans Vercel/Cloudflare (pas de TTL
       DNS à gérer, domaine proxifié Cloudflare — bascule et rollback quasi
-      instantanés).
+      instantanés). Fait le 16/07/2026 (cf. SUIVI).
 - [ ] Vérifications : 200 sur /, /deal/[slug]-[public_id], /enseigne/marjane ;
       en-têtes CSP ; images via /img/deals/[public_id] ; une écriture de test
       (vote) de bout en bout.
@@ -242,7 +243,7 @@ zéro régression signalée, rollback non déclenché.
 | 3 — API | ☑ fait | endpoints publics + écritures + rate limiting, CI verte |
 | 4 — Web | ◐ code complet | commits 06ca057→9d4718c ; RESTE : validation parité v1↔v2 sur mobile réel (critère "Terminé quand" — action Kamel) |
 | 5 — SEO | ◐ code complet | commits 94147b2→d3583ed ; RESTE : soumission sitemap Search Console + test résultats enrichis Google (actions externes) |
-| 6 — Bascule prod | ☐ à faire | pas d'ETL v1→v2 (décision 14/07/2026) ; base prod v2 aswbu provisionnée, seed de test purgé |
+| 6 — Bascule prod | ◐ en cours | pas d'ETL v1→v2 (décision 14/07/2026) ; base prod v2 aswbu provisionnée, seed de test purgé ; bascule DNS faite le 16/07/2026 (cf. SUIVI) ; RESTE : vérifications J-0 complètes, surveillance J+1→J+7, clôture J+7 |
 | 7 — Pipeline | ☐ à faire | 3 scripts .mjs opérationnels hors monorepo ; insert-deals.mjs déjà adapté au schéma v2 et images.mjs (module image haute résolution + fallback) déjà écrit — hors monorepo, 15/07/2026 ; l'intégration monorepo (apps/pipeline) reste à faire |
 | 8 — Mobile & ops | ☐ à faire | |
 | 9 — VPS | ☐ conditionnel | |
@@ -279,7 +280,18 @@ sans image (cf. IDEES.md, bounding box à évaluer). Upload utilisateur
 `dealInputSchema` n'accepte pas `imageKey`, amendement du contrat requis
 le jour où cette fonctionnalité serait ajoutée.
 
-**PROCHAINE TÂCHE** : clore 4 et 5 — (a) validation parité sur mobile réel, (b) soumission sitemap + test résultats enrichis. Ensuite : chantiers préalables de la Phase 6.
+**Bascule DNS effectuée — 16/07/2026** : fidwastafid.com sert désormais la
+v2 (`NEXT_PUBLIC_SITE_URL` mis à jour dans Vercel Production). Audit de
+suivi (18/07/2026) : aucune URL `vercel.app`/`fidwastafid-web` codée en dur
+dans `apps/web` — tout dérive déjà de `SITE_URL`
+(`apps/web/src/lib/siteUrl.ts`). Deux corrections faites à cette occasion :
+fallback `??` → `||` (une chaîne vide, ex. build Docker sans le build arg
+renseigné, ne doit pas passer à travers) et `NEXT_PUBLIC_SITE_URL` ajouté
+comme build arg (Dockerfile + docker-compose.yml), au même titre que
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` — jusqu'ici absent, donc invisible du
+build Docker local qui retombait silencieusement sur le fallback.
+
+**PROCHAINE TÂCHE** : clore 4 et 5 — (a) validation parité sur mobile réel, (b) soumission sitemap + test résultats enrichis. Ensuite : vérifications J-0 complètes de la Phase 6 (curl post-déploiement), puis surveillance J+1→J+7.
 
 ---
 
