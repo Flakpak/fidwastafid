@@ -9,6 +9,7 @@ export const RATE_LIMITS = {
   soumission: { limit: 5, windowSeconds: 3600 },
   vote: { limit: 30, windowSeconds: 60 },
   commentaire: { limit: 10, windowSeconds: 60 },
+  profil: { limit: 10, windowSeconds: 3600 },
 } as const;
 
 export type RateLimitAction = keyof typeof RATE_LIMITS;

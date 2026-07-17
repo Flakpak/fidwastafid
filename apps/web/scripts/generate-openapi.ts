@@ -12,6 +12,8 @@ import {
   voteInputSchema,
   commentaireInputSchema,
   commentaireSchema,
+  meSchema,
+  meUpdateSchema,
   apiErrorSchema,
 } from "@fidwastafid/schemas";
 
@@ -32,6 +34,8 @@ const Enseigne = registry.register("Enseigne", enseigneSchema);
 const VoteInput = registry.register("VoteInput", voteInputSchema);
 const CommentaireInput = registry.register("CommentaireInput", commentaireInputSchema);
 const Commentaire = registry.register("Commentaire", commentaireSchema);
+const Me = registry.register("Me", meSchema);
+const MeUpdate = registry.register("MeUpdate", meUpdateSchema);
 const ApiError = registry.register("ApiError", apiErrorSchema);
 
 const bearerAuth = registry.registerComponent("securitySchemes", "bearerAuth", {
@@ -175,6 +179,49 @@ registry.registerPath({
     429: errorResponse("Trop de commentaires"),
   },
   tags: ["deals"],
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/me",
+  summary: "Profil de l'utilisateur courant (espace membre, CONTRAT-V1 §4 amendement 16/07/2026)",
+  security: [{ [bearerAuth.name]: [] }],
+  responses: {
+    200: { description: "OK", content: { "application/json": { schema: Me } } },
+    401: errorResponse("Authentification requise"),
+  },
+  tags: ["me"],
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/me",
+  summary: "Rectification du profil courant (pseudo et/ou couleur d'avatar)",
+  security: [{ [bearerAuth.name]: [] }],
+  request: { body: { content: { "application/json": { schema: MeUpdate } } } },
+  responses: {
+    200: { description: "OK", content: { "application/json": { schema: Me } } },
+    400: errorResponse("Corps invalide ou pseudo déjà pris"),
+    401: errorResponse("Authentification requise"),
+    429: errorResponse("Trop de modifications"),
+  },
+  tags: ["me"],
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/me",
+  summary:
+    "Suppression du compte — commentaires anonymisés, votes supprimés (scores recalculés), deals soumis conservés (submitter_id null), compte Supabase Auth supprimé",
+  security: [{ [bearerAuth.name]: [] }],
+  responses: {
+    200: {
+      description: "OK",
+      content: { "application/json": { schema: z.object({ ok: z.literal(true) }) } },
+    },
+    401: errorResponse("Authentification requise"),
+  },
+  tags: ["me"],
 });
 
 // ---- Admin (requireAdmin) ----

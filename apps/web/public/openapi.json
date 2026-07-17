@@ -125,6 +125,22 @@
               "null"
             ]
           },
+          "submitterCouleurAvatar": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "rouge",
+              "terracotta",
+              "or",
+              "olive",
+              "bleu",
+              "indigo",
+              "prune",
+              "ardoise"
+            ]
+          },
           "commentairesCount": {
             "type": "integer",
             "minimum": 0
@@ -148,6 +164,7 @@
           "score",
           "submitterPublicId",
           "submitterPseudo",
+          "submitterCouleurAvatar",
           "commentairesCount",
           "createdAt",
           "updatedAt"
@@ -258,6 +275,22 @@
               "null"
             ]
           },
+          "submitterCouleurAvatar": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "rouge",
+              "terracotta",
+              "or",
+              "olive",
+              "bleu",
+              "indigo",
+              "prune",
+              "ardoise"
+            ]
+          },
           "commentairesCount": {
             "type": "integer",
             "minimum": 0
@@ -287,6 +320,7 @@
           "score",
           "submitterPublicId",
           "submitterPseudo",
+          "submitterCouleurAvatar",
           "commentairesCount",
           "createdAt",
           "updatedAt",
@@ -442,11 +476,27 @@
             "type": "string"
           },
           "auteurPublicId": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "pattern": "^[23456789abcdefghijkmnpqrstuvwxyz]{10}$"
           },
           "pseudo": {
             "type": "string"
+          },
+          "couleurAvatar": {
+            "type": "string",
+            "enum": [
+              "rouge",
+              "terracotta",
+              "or",
+              "olive",
+              "bleu",
+              "indigo",
+              "prune",
+              "ardoise"
+            ]
           },
           "createdAt": {
             "type": "string",
@@ -457,8 +507,82 @@
           "contenu",
           "auteurPublicId",
           "pseudo",
+          "couleurAvatar",
           "createdAt"
         ]
+      },
+      "Me": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string",
+            "pattern": "^[23456789abcdefghijkmnpqrstuvwxyz]{10}$"
+          },
+          "pseudo": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "couleurAvatar": {
+            "type": "string",
+            "enum": [
+              "rouge",
+              "terracotta",
+              "or",
+              "olive",
+              "bleu",
+              "indigo",
+              "prune",
+              "ardoise"
+            ]
+          },
+          "dealsCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "votesCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "commentairesCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "publicId",
+          "pseudo",
+          "email",
+          "couleurAvatar",
+          "dealsCount",
+          "votesCount",
+          "commentairesCount"
+        ]
+      },
+      "MeUpdate": {
+        "type": "object",
+        "properties": {
+          "pseudo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "couleurAvatar": {
+            "type": "string",
+            "enum": [
+              "rouge",
+              "terracotta",
+              "or",
+              "olive",
+              "bleu",
+              "indigo",
+              "prune",
+              "ardoise"
+            ]
+          }
+        }
       },
       "ApiError": {
         "type": "object",
@@ -967,6 +1091,147 @@
           },
           "429": {
             "description": "Trop de commentaires",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "summary": "Profil de l'utilisateur courant (espace membre, CONTRAT-V1 §4 amendement 16/07/2026)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "me"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentification requise",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Rectification du profil courant (pseudo et/ou couleur d'avatar)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "me"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corps invalide ou pseudo déjà pris",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentification requise",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de modifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Suppression du compte — commentaires anonymisés, votes supprimés (scores recalculés), deals soumis conservés (submitter_id null), compte Supabase Auth supprimé",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "me"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentification requise",
             "content": {
               "application/json": {
                 "schema": {
