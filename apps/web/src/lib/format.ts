@@ -34,3 +34,11 @@ export const CAT_ICONS: Record<string, string> = {
 export function categorieIcon(categorie: string): string {
   return CAT_ICONS[categorie] ?? "🛍️";
 }
+
+/** Badge type deal — v1 ne gérait que physique/en_ligne (index.html deal-detail-content) ;
+ *  "les_deux" est une extension v2 du schéma, absente de v1. */
+export function dealTypeLabel(type: "physique" | "en_ligne" | "les_deux"): string {
+  if (type === "physique") return "🏪 Physique";
+  if (type === "en_ligne") return "🌐 En ligne";
+  return "🏪 🌐 Physique et en ligne";
+}
