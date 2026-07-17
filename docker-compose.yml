@@ -25,6 +25,9 @@ services:
         # être fourni comme build arg, pas comme variable d'environnement du
         # conteneur (qui n'agit qu'au runtime, trop tard).
         NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+        # Absent du host → docker-compose interpole une chaîne vide (pas
+        # "non défini") ; siteUrl.ts s'en protège désormais via `||`.
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://fidwastafid:fidwastafid@db:5432/fidwastafid
