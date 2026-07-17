@@ -130,10 +130,15 @@ async function main() {
     }),
     noParams
   );
-  const submitBody = (await submitRes.json()) as { statut?: string; enseigneNom?: string };
+  const submitBody = (await submitRes.json()) as {
+    statut?: string;
+    enseigneNom?: string;
+    submitterPseudo?: string | null;
+  };
   check("soumission valide -> 201", submitRes.status === 201);
   check("soumission valide -> statut en_attente", submitBody.statut === "en_attente");
   check("soumission valide -> enseigneNom résolu depuis la table enseignes", submitBody.enseigneNom === "Test Integration");
+  check("soumission valide -> submitterPseudo résolu depuis la table users", submitBody.submitterPseudo === "IntegrationTest");
 
   console.log("\nvalidation — corps invalide et absence d'authentification");
   const invalidRes = await postDeal(

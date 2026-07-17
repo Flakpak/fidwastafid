@@ -82,6 +82,9 @@ export const dealSchema = z.object({
   score: z.number().int(),
   /** null si soumis par le pipeline automatique (pas d'utilisateur humain). */
   submitterPublicId: publicIdSchema.nullable(),
+  /** Pseudo du soumetteur — même null-si-pipeline, lecture seule, jamais
+   *  dans dealInputSchema (même pattern que enseigneNom). */
+  submitterPseudo: z.string().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

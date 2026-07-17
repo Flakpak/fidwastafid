@@ -5,7 +5,8 @@ import { dealSchema, dealAdminSchema, type Deal, type DealAdmin } from "@fidwast
 export const DEAL_SELECT = `
   d.public_id, d.titre, e.slug as enseigne_slug, e.nom as enseigne_nom, d.ville, d.categorie, d.type,
   d.prix_promo, d.prix_normal, d.date_fin, d.description, d.lien, d.image_key,
-  d.statut, d.score, u.public_id as submitter_public_id, d.created_at, d.updated_at
+  d.statut, d.score, u.public_id as submitter_public_id, u.pseudo as submitter_pseudo,
+  d.created_at, d.updated_at
 `;
 
 /**
@@ -36,6 +37,7 @@ export interface DealRow {
   statut: string;
   score: number;
   submitter_public_id: string | null;
+  submitter_pseudo: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -62,6 +64,7 @@ export function toDeal(row: DealRow): Deal {
     statut: row.statut,
     score: row.score,
     submitterPublicId: row.submitter_public_id,
+    submitterPseudo: row.submitter_pseudo,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   });

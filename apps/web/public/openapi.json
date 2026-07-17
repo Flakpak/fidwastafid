@@ -119,6 +119,12 @@
             ],
             "pattern": "^[23456789abcdefghijkmnpqrstuvwxyz]{10}$"
           },
+          "submitterPseudo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -137,6 +143,7 @@
           "statut",
           "score",
           "submitterPublicId",
+          "submitterPseudo",
           "createdAt",
           "updatedAt"
         ]
@@ -240,6 +247,12 @@
             ],
             "pattern": "^[23456789abcdefghijkmnpqrstuvwxyz]{10}$"
           },
+          "submitterPseudo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -264,6 +277,7 @@
           "statut",
           "score",
           "submitterPublicId",
+          "submitterPseudo",
           "createdAt",
           "updatedAt",
           "whatsappContact"
