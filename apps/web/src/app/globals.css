@@ -17,6 +17,22 @@
   --color-muted: #888888; /* --muted */
   --color-bordure: #e8e4de; /* --border */
   --color-sombre: #1e1e1e; /* --dark */
+
+  /* Couleurs d'avatar — espace membre (CONTRAT-V1 §4, amendement
+     16/07/2026). Distinctes des accents ci-dessus : un avatar porte un
+     fond plein + initiale blanche, donc chaque teinte est calibrée assez
+     sombre/saturée pour un contraste correct avec du texte blanc (ex. "or"
+     ici est un doré profond, pas le jaune vif de --color-or, illisible en
+     fond plein sous du blanc). Mêmes 8 valeurs que la contrainte CHECK de
+     users.couleur_avatar (packages/db, migration 0006). */
+  --color-avatar-rouge: #f03e3e;
+  --color-avatar-terracotta: #c2542e;
+  --color-avatar-or: #b8860b;
+  --color-avatar-olive: #74812f;
+  --color-avatar-bleu: #2c5f8a;
+  --color-avatar-indigo: #4b3f8f;
+  --color-avatar-prune: #7a3b56;
+  --color-avatar-ardoise: #5b6470;
 }
 
 /** Variable posée par next/font/google sur <html> — voir layout.tsx. */
