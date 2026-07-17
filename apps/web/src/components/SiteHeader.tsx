@@ -32,6 +32,9 @@ export async function SiteHeader() {
                   Admin
                 </Link>
               )}
+              <Link href="/compte" className="block px-4 py-2 text-sm hover:bg-creme">
+                Mon compte
+              </Link>
               <form action={deconnexionAction}>
                 <button type="submit" className="block w-full text-left px-4 py-2 text-sm text-rouge hover:bg-creme">
                   Déconnexion

@@ -5,6 +5,7 @@ import { urgence } from "../lib/urgence.js";
 import { CardVote } from "./CardVote.js";
 import { UrgenceCountdown } from "./UrgenceCountdown.js";
 import { ShareButton } from "./ShareButton.js";
+import { Avatar } from "./Avatar.js";
 
 function reduction(deal: Deal): number | null {
   if (!deal.prixNormal || deal.prixNormal <= deal.prixPromo) return null;
@@ -99,12 +100,7 @@ export function DealCard({ deal }: { deal: Deal }) {
             {deal.ville && <span className="text-muted">📍 {deal.ville}</span>}
             {deal.submitterPseudo && (
               <span className="flex items-center gap-1 text-muted">
-                <span
-                  aria-hidden="true"
-                  className="w-4 h-4 rounded-full bg-gradient-to-br from-rouge to-orange text-white flex items-center justify-center text-[9px] font-black"
-                >
-                  {deal.submitterPseudo[0]?.toUpperCase()}
-                </span>
+                <Avatar pseudo={deal.submitterPseudo} couleurAvatar={deal.submitterCouleurAvatar} size="sm" />
                 Partagé par <strong className="text-texte">{deal.submitterPseudo}</strong>
               </span>
             )}

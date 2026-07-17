@@ -9,6 +9,7 @@ import { SiteFooter } from "../../../components/SiteFooter.js";
 import { CardVote } from "../../../components/CardVote.js";
 import { ShareButton } from "../../../components/ShareButton.js";
 import { UrgenceCountdown } from "../../../components/UrgenceCountdown.js";
+import { Avatar } from "../../../components/Avatar.js";
 import { CommentForm } from "./CommentForm.js";
 import { dealDescription, dealJsonLd } from "./seo.js";
 import { categorieIcon, dealTypeLabel, relativeDate, shortDate } from "../../../lib/format.js";
@@ -227,12 +228,7 @@ export default async function DealPage({ params }: PageParams) {
 
             {deal.submitterPseudo && (
               <div className="flex items-center gap-3">
-                <span
-                  aria-hidden="true"
-                  className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-br from-rouge to-orange text-white flex items-center justify-center text-sm font-black"
-                >
-                  {deal.submitterPseudo[0]?.toUpperCase()}
-                </span>
+                <Avatar pseudo={deal.submitterPseudo} couleurAvatar={deal.submitterCouleurAvatar} size="lg" />
                 <p className="text-sm font-semibold text-muted">
                   Partagé par <strong className="text-texte">{deal.submitterPseudo}</strong>
                 </p>
@@ -266,13 +262,7 @@ export default async function DealPage({ params }: PageParams) {
           <ul className="flex flex-col gap-3">
             {commentaires.map((c) => (
               <li key={c.createdAt} className="flex gap-2.5 border-t border-bordure pt-3 text-sm">
-                {/* Avatar cercle coloré à initiale — référence v1 user-avatar. */}
-                <span
-                  aria-hidden="true"
-                  className="w-8 h-8 shrink-0 rounded-full bg-gradient-to-br from-rouge to-orange text-white flex items-center justify-center text-xs font-black"
-                >
-                  {c.pseudo[0]?.toUpperCase()}
-                </span>
+                <Avatar pseudo={c.pseudo} couleurAvatar={c.couleurAvatar} size="md" />
                 <div>
                   <p className="font-black text-rouge text-xs mb-0.5">{c.pseudo}</p>
                   <p className="text-muted">{c.contenu}</p>
