@@ -19,9 +19,16 @@ export async function SiteHeader() {
       <Link href="/" aria-label="فيدوستافيد">
         <Seal className="w-11 h-11" />
       </Link>
-      <nav className="flex items-center gap-4 text-sm font-bold">
-        <Link href="/soumettre" className="text-muted hover:text-rouge">
-          Proposer un bon plan
+      <nav className="flex items-center gap-3 sm:gap-4 text-sm font-bold">
+        <Link
+          href="/soumettre"
+          className="rounded-full bg-gradient-to-br from-rouge to-orange text-white px-3 py-1.5 sm:px-4 sm:py-2 shadow-sm hover:shadow-md transition-shadow whitespace-nowrap"
+        >
+          <span className="sm:hidden" aria-hidden="true">
+            +
+          </span>
+          <span className="hidden sm:inline">+ Proposer un bon plan</span>
+          <span className="sr-only sm:hidden">Proposer un bon plan</span>
         </Link>
         {user ? (
           <details className="relative">
