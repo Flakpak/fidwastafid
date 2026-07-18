@@ -364,9 +364,14 @@ retour :
 ```
 Mise à jour du template optionnelle — l'ancien lien reste valable.
 
-**RESTE** : re-tester le parcours complet en prod avec un vrai chargement de
-`/reinitialiser-mot-de-passe?token_hash=...` (ou `/auth/reset?...`), pas
-seulement via l'API Supabase en direct comme la première passe.
+Re-test effectué après déploiement (compte jetable
+kamel.lazrek+resetfix@gmail.com) : cette fois un vrai chargement de page,
+pas seulement l'API Supabase en direct — `GET
+/reinitialiser-mot-de-passe?token_hash=...&type=recovery` sur
+fidwastafid.com → redirect `/auth/reset` → redirect `/reinitialiser-mot-de-passe`
+avec cookie de session posé → 200, formulaire affiché. Changement de mot
+de passe confirmé (ancien rejeté, nouveau accepté), compte supprimé via
+`DELETE /api/v1/me` en fin de test. Incident clos.
 
 **PROCHAINE TÂCHE** : clore 4 et 5 — (a) validation parité sur mobile réel, (b) soumission sitemap + test résultats enrichis. Ensuite : vérifications J-0 complètes de la Phase 6 (curl post-déploiement), puis surveillance J+1→J+7.
 
