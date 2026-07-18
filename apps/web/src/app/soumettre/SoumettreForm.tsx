@@ -1,11 +1,17 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { VILLES, CATEGORIES, type Enseigne } from "@fidwastafid/schemas";
 
 interface ApiErrorBody {
   error?: { code?: string; message?: string };
+}
+
+interface SubmitError {
+  message: string;
+  unauthenticated?: boolean;
 }
 
 declare global {
@@ -14,13 +20,85 @@ declare global {
   }
 }
 
+// Champs de formulaire uniquement (jamais le token Turnstile, à usage
+// unique et sans intérêt à survivre) — sessionStorage, jamais localStorage :
+// le brouillon n'a de sens que pour l'aller-retour connexion de cette
+// session d'onglet, pas au-delà.
+const DRAFT_KEY = "soumettre:brouillon";
+const DRAFT_FIELDS = [
+  "titre",
+  "enseigneSlug",
+  "type",
+  "ville",
+  "lien",
+  "categorie",
+  "prixPromo",
+  "prixNormal",
+  "dateFin",
+  "description",
+] as const;
+
 export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const draftRef = useRef<Record<string, string> | null>(null);
   const [type, setType] = useState<"physique" | "en_ligne" | "les_deux">("physique");
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<SubmitError | null>(null);
   const [done, setDone] = useState(false);
+  const [restoredOnce, setRestoredOnce] = useState(false);
+
+  // Restauration du brouillon au montage — deux passes : `type` pilote
+  // l'affichage conditionnel des champs ville/lien, donc les valeurs qui en
+  // dépendent ne peuvent être posées qu'une fois le DOM correspondant au
+  // type restauré effectivement rendu (cf. effet suivant, déclenché par
+  // `type` après ce commit).
+  useEffect(() => {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    if (raw) {
+      try {
+        const draft = JSON.parse(raw) as Record<string, string>;
+        draftRef.current = draft;
+        if (draft.type === "physique" || draft.type === "en_ligne" || draft.type === "les_deux") {
+          // Lecture d'un store externe (sessionStorage, inexistant en SSR) —
+          // ne peut pas se faire pendant le rendu sans provoquer un mismatch
+          // d'hydratation (cf. commentaire ci-dessus) ; ce setState post-montage
+          // est donc voulu, pas un raccourci.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setType(draft.type);
+        }
+      } catch {
+        // Brouillon corrompu — ignoré, formulaire vierge.
+      }
+    }
+    setRestoredOnce(true);
+  }, []);
+
+  useEffect(() => {
+    if (!restoredOnce || !draftRef.current) return;
+    const form = formRef.current;
+    if (!form) return;
+    for (const [name, value] of Object.entries(draftRef.current)) {
+      if (name === "type") continue;
+      const field = form.elements.namedItem(name);
+      if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
+        field.value = value;
+      }
+    }
+    draftRef.current = null;
+  }, [restoredOnce, type]);
+
+  function saveDraft() {
+    const form = formRef.current;
+    if (!form) return;
+    const data = new FormData(form);
+    const draft: Record<string, string> = {};
+    for (const field of DRAFT_FIELDS) {
+      const value = data.get(field);
+      if (typeof value === "string" && value) draft[field] = value;
+    }
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -69,10 +147,12 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
         // que soit la cause du premier échec.
         window.turnstile?.reset();
         let message = "Soumission impossible.";
+        let unauthenticated = false;
         try {
           const errBody = (await res.json()) as ApiErrorBody;
           if (errBody.error?.code === "UNAUTHENTICATED") {
             message = "Connecte-toi pour proposer un bon plan.";
+            unauthenticated = true;
           } else if (errBody.error?.code === "RATE_LIMITED") {
             message = "Trop de soumissions, réessaie plus tard.";
           } else if (errBody.error?.message) {
@@ -82,15 +162,16 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
           // Réponse d'erreur non structurée (ex. 500 hors format API) — le
           // message générique reste affiché plutôt que de rester silencieux.
         }
-        setError(message);
+        setError({ message, unauthenticated });
         return;
       }
 
+      sessionStorage.removeItem(DRAFT_KEY);
       setDone(true);
       router.refresh();
     } catch {
       window.turnstile?.reset();
-      setError("Soumission impossible, réessaie.");
+      setError({ message: "Soumission impossible, réessaie." });
     } finally {
       setPending(false);
     }
@@ -105,7 +186,28 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
   }
 
   return (
-    <form ref={formRef} onSubmit={submit} className="bg-white border border-bordure rounded-xl p-5 flex flex-col gap-3">
+    <form
+      ref={formRef}
+      onSubmit={submit}
+      onChange={saveDraft}
+      className="bg-white border border-bordure rounded-xl p-5 flex flex-col gap-3"
+    >
+      {error && (
+        <div role="alert" className="bg-white border border-rouge/40 rounded-lg p-3 flex flex-col gap-2 text-sm">
+          <p className="text-rouge font-bold">{error.message}</p>
+          {error.unauthenticated && (
+            <div className="flex gap-4 font-bold">
+              <Link href="/connexion?next=/soumettre" className="text-bleu hover:underline">
+                Se connecter
+              </Link>
+              <Link href="/inscription?next=/soumettre" className="text-bleu hover:underline">
+                Créer un compte
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
       <label className="flex flex-col gap-1 text-sm font-bold">
         Titre
         <input name="titre" required minLength={3} maxLength={200} className="border border-bordure rounded px-3 py-2 font-normal" />
@@ -212,7 +314,6 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       >
         Envoyer
       </button>
-      {error && <p className="text-sm text-rouge">{error}</p>}
     </form>
   );
 }
