@@ -304,6 +304,15 @@ volontairement limité à SITE_URL — le reste de la checklist J-0
 (/enseigne/marjane, en-têtes CSP, images, écriture de test) reste à faire
 en session de bascule dédiée (cf. case ci-dessus).
 
+**Réinitialisation de mot de passe — 18/07/2026** : trou fonctionnel post-
+bascule comblé (/mot-de-passe-oublie, /reinitialiser-mot-de-passe), même
+mécanisme `token_hash` + `verifyOtp` que la confirmation d'email
+(auth/confirm/route.ts). Action manuelle requise côté dashboard Supabase :
+le template email "Reset Password" doit être mis à jour pour construire un
+lien `token_hash` (voir contenu exact donné à Kamel en session) — sans ce
+changement, le lien envoyé par Supabase ne correspond pas à ce que
+/reinitialiser-mot-de-passe attend.
+
 **PROCHAINE TÂCHE** : clore 4 et 5 — (a) validation parité sur mobile réel, (b) soumission sitemap + test résultats enrichis. Ensuite : vérifications J-0 complètes de la Phase 6 (curl post-déploiement), puis surveillance J+1→J+7.
 
 ---
