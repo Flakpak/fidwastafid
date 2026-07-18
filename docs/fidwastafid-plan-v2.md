@@ -313,6 +313,21 @@ lien `token_hash` (voir contenu exact donné à Kamel en session) — sans ce
 changement, le lien envoyé par Supabase ne correspond pas à ce que
 /reinitialiser-mot-de-passe attend.
 
+Mécanisme testé de bout en bout en prod (compte jetable
+kamel.lazrek+resettest@gmail.com, supprimé en fin de test via DELETE
+/api/v1/me) : création, envoi réel de l'email de récupération (`recover`
+→ 200), vérification du token (`verify` type=recovery → 200, session
+posée), changement de mot de passe (`PUT /auth/v1/user` → 200), connexion
+avec le nouveau mot de passe (200) et échec avec l'ancien
+(`invalid_credentials`), suppression du compte confirmée (login post-
+suppression échoue). Réponse de `recover` identique (`{}`/200) pour un
+email réel et un email inexistant, cohérent avec le fait que
+`motDePasseOublieAction` ne branche jamais sur son résultat. Substitution
+assumée : le token a été obtenu via l'API Admin (`generate_link`) plutôt
+qu'en lisant l'email réel (aucun accès à la boîte de Kamel) — un email
+réel a bien été envoyé en parallèle (`recover`), à vérifier par Kamel pour
+confirmer le format du lien actuellement produit par le template.
+
 **PROCHAINE TÂCHE** : clore 4 et 5 — (a) validation parité sur mobile réel, (b) soumission sitemap + test résultats enrichis. Ensuite : vérifications J-0 complètes de la Phase 6 (curl post-déploiement), puis surveillance J+1→J+7.
 
 ---
