@@ -41,9 +41,20 @@ function readEnv(name: string): string {
   return value;
 }
 
+/**
+ * Migration clés API Supabase (18/07/2026, docs/MIGRATION-CLES-SUPABASE.md) :
+ * clé publishable en priorité, fallback sur l'ancienne clé anon (JWT) tant
+ * que les deux coexistent — même pattern que packages/auth/src/supabaseClient.ts.
+ */
+function readSupabaseKey(): string {
+  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (publishableKey) return publishableKey;
+  return readEnv("SUPABASE_ANON_KEY");
+}
+
 async function getRealAccessToken(): Promise<{ token: string; userId: string }> {
   const supabaseUrl = readEnv("SUPABASE_URL");
-  const anonKey = readEnv("SUPABASE_ANON_KEY");
+  const projectKey = readSupabaseKey();
   const email = readEnv("TEST_USER_EMAIL");
   const password = readEnv("TEST_USER_PASSWORD");
 
@@ -54,7 +65,7 @@ async function getRealAccessToken(): Promise<{ token: string; userId: string }> 
   try {
     response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
       method: "POST",
-      headers: { apikey: anonKey, "Content-Type": "application/json" },
+      headers: { apikey: projectKey, "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
   } catch (err) {

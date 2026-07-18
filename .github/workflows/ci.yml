@@ -89,7 +89,14 @@ jobs:
     env:
       DATABASE_URL: postgres://fidwastafid:fidwastafid@localhost:5432/fidwastafid
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      # Migration clés API Supabase (18/07/2026, docs/MIGRATION-CLES-SUPABASE.md) :
+      # nouvelles clés en priorité, legacy en fallback tant que les deux
+      # secrets GitHub coexistent — vide si le secret n'existe pas encore,
+      # le fallback applicatif prend le relai (voir packages/auth/src/supabaseClient.ts).
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
       TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
       # Clé de test PUBLIQUE Cloudflare ("always passes"), pas un secret.
