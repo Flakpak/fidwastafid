@@ -87,7 +87,12 @@ export default async function DealPage({ params }: PageParams) {
   const expire = deal.statut === "expire";
   const pct = reduction(deal);
   const urg = urgence(deal);
-  const aMeta = Boolean(deal.enseigneNom || deal.ville || urg);
+  const aMeta = Boolean(deal.enseigneNom || deal.nomVendeur || deal.ville || urg);
+  // Numéro jamais en texte dans la page (CONTRAT-V1 §4, amendement du
+  // 18/07/2026) — uniquement dans le href wa.me, présent seulement si
+  // whatsappContact est exposé (donc le soumetteur a consenti à sa
+  // publication publique).
+  const whatsappHref = deal.whatsappContact ? `https://wa.me/${deal.whatsappContact.replace(/^\+/, "")}` : null;
   const aPropos = Boolean(deal.description || deal.submitterPseudo);
 
   // Échappe `<` pour empêcher un titre/description soumis par un utilisateur
@@ -187,13 +192,19 @@ export default async function DealPage({ params }: PageParams) {
                 )}
               </div>
 
-              {/* e. Méta : enseigne/ville/urgence. */}
+              {/* e. Méta : enseigne/vendeur/ville/urgence. */}
               {aMeta && (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-bold text-muted">
-                  {deal.enseigneNom && (
+                  {deal.enseigneNom ? (
                     <span>
                       Dispo. chez <strong className="text-texte">{deal.enseigneNom}</strong>
                     </span>
+                  ) : (
+                    deal.nomVendeur && (
+                      <span>
+                        Chez <strong className="text-texte">{deal.nomVendeur}</strong>
+                      </span>
+                    )
                   )}
                   {deal.ville && <span>📍 {deal.ville}</span>}
                   {urg?.mode === "expiree" && (
@@ -206,17 +217,49 @@ export default async function DealPage({ params }: PageParams) {
                 </div>
               )}
 
-              {/* f. CTA proéminent — uniquement si lien externe (on est déjà sur la page du deal). */}
-              {deal.lien && (
-                <a
-                  href={deal.lien}
-                  target="_blank"
-                  rel="noopener noreferrer nofollow"
-                  className="font-arabic w-full text-center bg-rouge text-white rounded-2xl px-8 py-4 text-xl font-bold mt-2"
-                >
-                  شوف الدييل ↗
-                </a>
+              {/* e-bis. Adresse/repère + lien Maps — commerces informels sans
+                  enseigne curée (CONTRAT-V1 §3, amendement du 18/07/2026). */}
+              {(deal.adresse || deal.lienMaps) && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted">
+                  {deal.adresse && <span>📍 {deal.adresse}</span>}
+                  {deal.lienMaps && (
+                    <a
+                      href={deal.lienMaps}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-bleu font-bold hover:underline"
+                    >
+                      Voir sur la carte ↗
+                    </a>
+                  )}
+                </div>
               )}
+
+              {/* f. CTA — lien externe (principal, si présent) + WhatsApp
+                  vendeur (secondaire, CONTRAT-V1 §4 amendement du 18/07/2026 :
+                  visible uniquement si le soumetteur a consenti). */}
+              <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                {deal.lien && (
+                  <a
+                    href={deal.lien}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    className="font-arabic flex-1 text-center bg-rouge text-white rounded-2xl px-8 py-4 text-xl font-bold"
+                  >
+                    شوف الدييل ↗
+                  </a>
+                )}
+                {whatsappHref && (
+                  <a
+                    href={whatsappHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 text-center bg-white border border-bordure text-texte rounded-2xl px-8 py-4 text-base font-bold"
+                  >
+                    💬 Contacter sur WhatsApp
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         </div>

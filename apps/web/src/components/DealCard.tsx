@@ -91,11 +91,19 @@ export function DealCard({ deal }: { deal: Deal }) {
             {pct !== null && (
               <span className="font-bold bg-vert/10 text-vert rounded-full px-2 py-0.5">-{pct}%</span>
             )}
-            {(deal.enseigneNom || deal.ville) && <span aria-hidden="true" className="w-px h-3 bg-bordure" />}
-            {deal.enseigneNom && (
+            {(deal.enseigneNom || deal.nomVendeur || deal.ville) && (
+              <span aria-hidden="true" className="w-px h-3 bg-bordure" />
+            )}
+            {deal.enseigneNom ? (
               <span className="text-muted">
                 Dispo. chez <strong className="text-texte">{deal.enseigneNom}</strong>
               </span>
+            ) : (
+              deal.nomVendeur && (
+                <span className="text-muted">
+                  Chez <strong className="text-texte">{deal.nomVendeur}</strong>
+                </span>
+              )
             )}
             {deal.ville && <span className="text-muted">📍 {deal.ville}</span>}
             {deal.submitterPseudo && (
