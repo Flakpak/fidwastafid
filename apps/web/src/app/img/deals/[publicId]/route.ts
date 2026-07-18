@@ -24,6 +24,24 @@ function notFound(): NextResponse {
 }
 
 /**
+ * Nouvelles clés Supabase (sb_secret_...) : header `apikey` uniquement,
+ * jamais `Authorization: Bearer` (pas un JWT, doc migration des clés API).
+ * Fallback transitoire sur l'ancienne `service_role` (JWT, pattern
+ * Authorization historique de cette route) tant que les clés legacy ne
+ * sont pas désactivées côté Dashboard Supabase.
+ */
+function storageAuthHeaders(): HeadersInit {
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  if (secretKey) return { apikey: secretKey };
+
+  console.warn(
+    "[supabase-keys] SUPABASE_SECRET_KEY absent — fallback sur SUPABASE_SERVICE_ROLE_KEY (legacy). " +
+      "À retirer après migration complète (voir docs/MIGRATION-CLES-SUPABASE.md)."
+  );
+  return { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` };
+}
+
+/**
  * Seule fonction qui parle au backend de stockage actuel (Supabase Storage).
  * Fetch natif, pas de SDK Supabase, volontairement isolée : LE point à
  * réécrire le jour d'un changement de backend (VPS + stockage nu, R2, etc.
@@ -32,9 +50,7 @@ function notFound(): NextResponse {
 async function fetchImageFromStorage(imageKey: string): Promise<Response | null> {
   try {
     const url = `${process.env.SUPABASE_URL}/storage/v1/object/deals-images/${imageKey}`;
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
-    });
+    const response = await fetch(url, { headers: storageAuthHeaders() });
     return response.ok ? response : null;
   } catch {
     return null;
