@@ -43,6 +43,13 @@ export default function ConfidentialitePage() {
               <li>ton pseudo et la couleur de ton avatar, affichés à côté de tes contributions ;</li>
               <li>l&apos;historique de tes contributions (deals partagés, votes, commentaires) ;</li>
               <li>
+                le numéro WhatsApp d&apos;un vendeur, quand tu le renseignes en soumettant un bon plan — il
+                n&apos;est publié sur la page du deal que si tu as explicitement coché l&apos;autorisation
+                d&apos;affichage public au moment de la soumission ; sans cette case cochée, il reste visible
+                uniquement par la modération. Tu peux demander son retrait à tout moment en contactant la
+                modération : contact@fidwastafid.com ;
+              </li>
+              <li>
                 des données techniques minimales (adresse IP le temps d&apos;une requête) pour limiter les abus
                 (votes/commentaires en rafale) — jamais conservées au-delà de ce qui est nécessaire à cette
                 protection.

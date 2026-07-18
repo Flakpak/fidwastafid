@@ -84,6 +84,9 @@ export default async function ComptePage() {
                     <div className="min-w-0">
                       {titre}
                       <p className="text-xs text-muted">{relativeDate(d.createdAt)}</p>
+                      {d.statut === "rejete" && d.motifRejet && (
+                        <p className="text-xs text-rouge font-semibold mt-0.5">Rejeté : {d.motifRejet}</p>
+                      )}
                     </div>
                     <span className={`shrink-0 text-xs font-bold rounded-full px-2.5 py-1 ${badge.classes}`}>
                       {badge.label}
