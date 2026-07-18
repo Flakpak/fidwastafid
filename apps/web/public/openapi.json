@@ -37,6 +37,20 @@
             "minLength": 1,
             "maxLength": 60
           },
+          "nomVendeur": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "adresse": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "lienMaps": {
+            "type": "string",
+            "format": "uri"
+          },
           "ville": {
             "type": "string",
             "enum": [
@@ -91,6 +105,9 @@
           "lien": {
             "type": "string",
             "format": "uri"
+          },
+          "whatsappContact": {
+            "type": "string"
           },
           "imageKey": {
             "type": "string",
@@ -187,6 +204,20 @@
             "minLength": 1,
             "maxLength": 60
           },
+          "nomVendeur": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "adresse": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "lienMaps": {
+            "type": "string",
+            "format": "uri"
+          },
           "ville": {
             "type": "string",
             "enum": [
@@ -241,6 +272,12 @@
           "lien": {
             "type": "string",
             "format": "uri"
+          },
+          "whatsappContact": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "imageKey": {
             "type": "string",
@@ -303,7 +340,10 @@
             "type": "string",
             "format": "date-time"
           },
-          "whatsappContact": {
+          "whatsappPublic": {
+            "type": "boolean"
+          },
+          "motifRejet": {
             "type": [
               "string",
               "null"
@@ -316,6 +356,7 @@
           "categorie",
           "type",
           "prixPromo",
+          "whatsappContact",
           "statut",
           "score",
           "submitterPublicId",
@@ -324,7 +365,8 @@
           "commentairesCount",
           "createdAt",
           "updatedAt",
-          "whatsappContact"
+          "whatsappPublic",
+          "motifRejet"
         ]
       },
       "DealInput": {
@@ -339,6 +381,20 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 60
+          },
+          "nomVendeur": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "adresse": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "lienMaps": {
+            "type": "string",
+            "format": "uri"
           },
           "ville": {
             "type": "string",
@@ -394,6 +450,13 @@
           "lien": {
             "type": "string",
             "format": "uri"
+          },
+          "whatsappContact": {
+            "type": "string"
+          },
+          "whatsappPublic": {
+            "type": "boolean",
+            "default": false
           }
         },
         "required": [
@@ -415,6 +478,30 @@
               "rejete",
               "expire"
             ]
+          },
+          "motifRejet": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "nomVendeur": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "adresse": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "lienMaps": {
+            "type": "string",
+            "format": "uri"
+          },
+          "whatsappContact": {
+            "type": "string"
+          },
+          "whatsappPublic": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -572,6 +659,12 @@
                     "expire"
                   ]
                 },
+                "motifRejet": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "createdAt": {
                   "type": "string",
                   "format": "date-time"
@@ -581,6 +674,7 @@
                 "publicId",
                 "titre",
                 "statut",
+                "motifRejet",
                 "createdAt"
               ]
             }

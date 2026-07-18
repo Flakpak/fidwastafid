@@ -1,10 +1,18 @@
 import type { PoolClient } from "@fidwastafid/db";
 import { dealSchema, dealAdminSchema, type Deal, type DealAdmin } from "@fidwastafid/schemas";
 
-/** Colonnes lues pour toute représentation publique d'un deal (liste ou détail). */
+/**
+ * Colonnes lues pour toute représentation publique d'un deal (liste ou détail).
+ * `whatsapp_contact`/`whatsapp_public` sont lues ici (même pour les requêtes
+ * publiques) — nécessaires à toDeal() pour décider de l'exposition
+ * conditionnelle (CONTRAT-V1 §4, amendement du 18/07/2026), même si
+ * whatsapp_contact lui-même ne sort du payload que si whatsapp_public=true.
+ */
 export const DEAL_SELECT = `
-  d.public_id, d.titre, e.slug as enseigne_slug, e.nom as enseigne_nom, d.ville, d.categorie, d.type,
+  d.public_id, d.titre, e.slug as enseigne_slug, e.nom as enseigne_nom,
+  d.nom_vendeur, d.adresse, d.lien_maps, d.ville, d.categorie, d.type,
   d.prix_promo, d.prix_normal, d.date_fin, d.description, d.lien, d.image_key,
+  d.whatsapp_contact, d.whatsapp_public,
   d.statut, d.score, u.public_id as submitter_public_id, u.pseudo as submitter_pseudo,
   u.couleur_avatar as submitter_couleur_avatar,
   (select count(*) from commentaires c where c.deal_id = d.id)::int as commentaires_count,
@@ -27,6 +35,9 @@ export interface DealRow {
   titre: string;
   enseigne_slug: string | null;
   enseigne_nom: string | null;
+  nom_vendeur: string | null;
+  adresse: string | null;
+  lien_maps: string | null;
   ville: string | null;
   categorie: string;
   type: string;
@@ -36,6 +47,8 @@ export interface DealRow {
   description: string | null;
   lien: string | null;
   image_key: string | null;
+  whatsapp_contact: string | null;
+  whatsapp_public: boolean;
   statut: string;
   score: number;
   submitter_public_id: string | null;
@@ -56,6 +69,9 @@ export function toDeal(row: DealRow): Deal {
     titre: row.titre,
     enseigneSlug: row.enseigne_slug ?? undefined,
     enseigneNom: row.enseigne_nom ?? undefined,
+    nomVendeur: row.nom_vendeur ?? undefined,
+    adresse: row.adresse ?? undefined,
+    lienMaps: row.lien_maps ?? undefined,
     ville: row.ville ?? undefined,
     categorie: row.categorie,
     type: row.type,
@@ -64,6 +80,9 @@ export function toDeal(row: DealRow): Deal {
     dateFin: row.date_fin ?? undefined,
     description: row.description ?? undefined,
     lien: row.lien ?? undefined,
+    // Exposition conditionnelle (CONTRAT-V1 §4, amendement du 18/07/2026) :
+    // absent (jamais null) tant que le soumetteur n'a pas consenti.
+    whatsappContact: row.whatsapp_public && row.whatsapp_contact ? row.whatsapp_contact : undefined,
     imageKey: row.image_key ?? undefined,
     statut: row.statut,
     score: row.score,
@@ -80,19 +99,22 @@ export function toDeal(row: DealRow): Deal {
 export const PUBLIC_STATUTS = new Set(["publie", "expire"]);
 
 /**
- * Colonnes admin — ajoute whatsapp_contact, qui ne doit JAMAIS apparaître
- * hors de GET/PATCH /api/v1/admin/deals (CONTRAT-V1 §4).
+ * Colonnes admin — ajoute motif_rejet. whatsapp_contact/whatsapp_public sont
+ * déjà dans DEAL_SELECT (lus pour la décision d'exposition publique) ; ici on
+ * les rend TOUJOURS visibles, sans condition (CONTRAT-V1 §4).
  */
-export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.whatsapp_contact`;
+export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.motif_rejet`;
 
 export interface DealAdminRow extends DealRow {
-  whatsapp_contact: string | null;
+  motif_rejet: string | null;
 }
 
 export function toDealAdmin(row: DealAdminRow): DealAdmin {
   return dealAdminSchema.parse({
     ...toDeal(row),
     whatsappContact: row.whatsapp_contact,
+    whatsappPublic: row.whatsapp_public,
+    motifRejet: row.motif_rejet,
   });
 }
 

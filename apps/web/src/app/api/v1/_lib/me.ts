@@ -15,6 +15,7 @@ interface MeDealRow {
   public_id: string;
   titre: string;
   statut: string;
+  motif_rejet: string | null;
   created_at: string;
 }
 
@@ -41,7 +42,7 @@ export async function buildMe(user: AuthUser): Promise<Me> {
   if (!email) throw new Error("Email introuvable via l'API admin Supabase.");
 
   const dealRows = await query<MeDealRow>(
-    `select public_id, titre, statut, created_at from deals where submitter_id = $1 order by created_at desc`,
+    `select public_id, titre, statut, motif_rejet, created_at from deals where submitter_id = $1 order by created_at desc`,
     [user.id]
   );
 
@@ -57,6 +58,7 @@ export async function buildMe(user: AuthUser): Promise<Me> {
       publicId: d.public_id,
       titre: d.titre,
       statut: d.statut,
+      motifRejet: d.motif_rejet,
       createdAt: new Date(d.created_at).toISOString(),
     })),
   });

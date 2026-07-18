@@ -139,13 +139,17 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
   // base, hors de cet endpoint.
   await query(
     `insert into deals
-       (public_id, titre, enseigne_id, ville, categorie, type, prix_promo,
-        prix_normal, date_fin, description, lien, image_key, statut, submitter_id, score)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,null,'en_attente',$12,0)`,
+       (public_id, titre, enseigne_id, nom_vendeur, adresse, lien_maps, ville, categorie, type,
+        prix_promo, prix_normal, date_fin, description, lien, image_key,
+        whatsapp_contact, whatsapp_public, statut, submitter_id, score)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,null,$15,$16,'en_attente',$17,0)`,
     [
       publicId,
       input.titre,
       enseigneId,
+      input.nomVendeur ?? null,
+      input.adresse ?? null,
+      input.lienMaps ?? null,
       input.ville ?? null,
       input.categorie,
       input.type,
@@ -154,6 +158,8 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
       input.dateFin ?? null,
       input.description ?? null,
       input.lien ?? null,
+      input.whatsappContact ?? null,
+      input.whatsappPublic,
       user.id,
     ]
   );
