@@ -120,27 +120,35 @@ exception documentée, cf. `docs/IDEES.md`.
 ### PHASE 6 — Bascule en production *(1 session + 7 jours de surveillance)*
 
 **Chantiers à lever AVANT la session (lancés en parallèle des Phases 3-5) :**
-- [ ] Base de prod v2 : Postgres du projet Supabase aswbu (celui de l'auth),
-      connexion via Session pooler (IPv4). DATABASE_URL de prod câblée dans
-      Vercel. Migration 0001_init appliquée dessus. DÉCISION GRAVÉE — un
-      troisième store serait de la complexité gratuite.
-- [ ] Infra image (CONTRAT-V1 §6) : route `/img/deals/[public_id]` jamais
+- [x] Base de prod v2 : Postgres du projet Supabase aswbu (celui de l'auth,
+      renommé `fidwastafid-prod` à la clôture — cf. SUIVI), connexion via
+      Session pooler (IPv4). DATABASE_URL de prod câblée dans Vercel.
+      Migration 0001_init appliquée dessus. DÉCISION GRAVÉE — un troisième
+      store serait de la complexité gratuite.
+- [x] Infra image (CONTRAT-V1 §6) : route `/img/deals/[public_id]` jamais
       construite, `deals.image_key` jamais peuplé (pas de formulaire
       d'upload). Constaté lors de la mise en conformité charte (2026-07-14) :
       `DealCard` ne peut pas afficher d'image tant que cette infra n'existe
       pas. À lever avant bascule si le pipeline de scraping doit fournir des
-      photos de deals.
-- [ ] CNDP / loi 09-08 : la collecte démographique v1 (index.html ~l.2614)
+      photos de deals. Soldé le 15/07/2026 (cf. SUIVI « Dette infra images »).
+- [x] CNDP / loi 09-08 : la collecte démographique v1 (index.html ~l.2614)
       coupée par le commit fd913b1
       (https://github.com/Flakpak/fidwastafid/commit/fd913b1f45f517b0a3f7dcf86723c96bfc84ded6).
       Champs absents de l'inscription v2. B2B data reporté dans IDEES.md
       derrière consentement explicite + déclaration CNDP.
-- [ ] Vercel Pro effectif avant la bascule.
-- [ ] DNSSEC désactivé chez OVH (reliquat Phase 0).
-- [ ] Parité v1 ↔ v2 validée sur mobile réel.
-- [ ] Ignored Build Step configuré sur le projet Vercel v1 au moment de la
+- [ ] Vercel Pro effectif avant la bascule. Non vérifié cette session
+      (facturation hors visibilité) — à confirmer par Kamel.
+- [x] DNSSEC désactivé chez OVH (reliquat Phase 0) — actif côté Cloudflare
+      depuis la bascule DNS du 16/07/2026 (OVH n'est plus autoritaire).
+- [ ] Parité v1 ↔ v2 validée sur mobile réel. Action Kamel, hors visibilité
+      de cette session — cf. Phase 4 / PROCHAINE TÂCHE.
+- [x] Ignored Build Step configuré sur le projet Vercel v1 au moment de la
       bascule J-0 — un push sur le repo rebuild actuellement LES DEUX
-      projets, il faut que le gel du déploiement v1 soit réel.
+      projets, il faut que le gel du déploiement v1 soit réel. Superflu au
+      final : le projet v1 a été entièrement déconnecté de Git (pas
+      seulement un ignored build step) et renommé `*-v1-legacy` — plus
+      robuste, aucun push ne peut plus jamais le redéployer (cf. SUIVI
+      clôture).
 - [x] Bascule des URLs d'auth : `NEXT_PUBLIC_SITE_URL` (Vercel) et Supabase
       Site URL + Redirect URLs passent de la préversion à fidwastafid.com —
       sinon les emails de confirmation pointeront sur la préversion morte.
@@ -171,13 +179,15 @@ a été appliquée sur aswbu avant de passer au suivant — le filet CI
 - [x] Bascule du domaine : réassignation dans Vercel/Cloudflare (pas de TTL
       DNS à gérer, domaine proxifié Cloudflare — bascule et rollback quasi
       instantanés). Fait le 16/07/2026 (cf. SUIVI).
-- [ ] Vérifications : 200 sur /, /deal/[slug]-[public_id], /enseigne/marjane ;
+- [x] Vérifications : 200 sur /, /deal/[slug]-[public_id], /enseigne/marjane ;
       en-têtes CSP ; images via /img/deals/[public_id] ; une écriture de test
       (vote) de bout en bout.
-      Partiel fait le 18/07/2026 (périmètre SITE_URL uniquement, cf. SUIVI) :
-      sitemap.xml et robots.txt en https://fidwastafid.com, og:url/canonical/
-      JSON-LD d'une page deal corrects. RESTE pour clore cette case :
-      /enseigne/marjane, en-têtes CSP, images, écriture de test.
+      Partiel fait le 18/07/2026 (périmètre SITE_URL, cf. SUIVI) : sitemap.xml
+      et robots.txt en https://fidwastafid.com, og:url/canonical/JSON-LD
+      d'une page deal corrects. Complété le 18/07/2026 (cf. SUIVI clôture) :
+      /enseigne/marjane → 200, en-têtes CSP présents, image réelle → 200 via
+      le proxy, vote posé (score 1→2) puis retiré proprement (score 2→1) sur
+      un deal réel de fidwastafid.com, sans résidu.
 
 **J+1 → J+7** : 5xx, latence, échecs d'écriture, Search Console (indexation
 repart de zéro — attendu), remontées WhatsApp.
@@ -186,11 +196,18 @@ repart de zéro — attendu), remontées WhatsApp.
 - [ ] Suppression de index.html racine (⚠️ PAS src/App.jsx, prototype
       orphelin). Rollback dès lors dégradé mais pas perdu : redéploiement
       possible depuis le tag v1-legacy (~15 min au lieu d'instantané).
+      Réserve ouverte, groupée avec la suppression définitive des projets v1
+      — prévue ~23/07/2026 après une semaine pleine de stabilité (cf. SUIVI
+      clôture).
 - [ ] Analytics : vérifier que la v2 remonte dans Vercel Web Analytics
-      (@vercel/analytics côté Next, pas la balise script v1).
+      (@vercel/analytics côté Next, pas la balise script v1). `<Analytics/>`
+      ajouté et vérifié actif en prod le 18/07/2026 (script chargé, zéro
+      erreur console — cf. SUIVI) ; confirmation de remontée dans le
+      dashboard encore en attente côté Kamel (accès hors de cette session).
 - [ ] Nettoyer laqwg après bascule : `DROP VIEW public.v1_auth_users_audit;`
       puis supprimer le rôle `etl_reader` (cf. exception du 2026-07-14,
-      SUIVI).
+      SUIVI). Même fenêtre que la suppression définitive des projets v1,
+      ~23/07/2026.
 
 **Rollback J-0 → J+7** : repointer le domaine vers le projet v1. La base v1
 n'ayant jamais été modifiée ni migrée (pas d'ETL, cf. SUIVI), le rollback DNS
@@ -201,8 +218,19 @@ zéro régression signalée, rollback non déclenché.
 
 ### PHASE 7 — Pipeline & automatisation *(2 sessions)*
 - [ ] Pipeline `.mjs` rejoint le monorepo (`apps/pipeline`) — code inchangé, il utilise désormais les schémas zod partagés pour valider avant insertion.
-- [ ] Cron GitHub Actions quotidien : scraping Bringo + insertion + déclenchement de la revalidation des pages Next.js (contenu frais indexé automatiquement).
+- [ ] Cron GitHub Actions *(fréquence à confirmer — pas nécessairement quotidien, cf. note ci-dessous)* : scraping Bringo + insertion + déclenchement de la revalidation des pages Next.js (contenu frais indexé automatiquement).
 - [ ] Archivage des extractions conservé (dossiers horodatés — acquis à préserver).
+
+**État d'avancement (18/07/2026)** : le pipeline est déjà partiellement prêt
+hors monorepo (`fidwastafid-pipeline`, hors du repo principal) —
+`insert-deals.mjs` adapté au schéma v2, module image (`images.mjs`, haute
+résolution + repli thumbnail) et module fiche-produit (`fiche-produit.mjs`)
+déjà écrits et exercés en conditions réelles (cf. SUIVI, dette infra images
+du 15/07). RESTE : l'intégration monorepo (`apps/pipeline`) et le cron
+GitHub Actions — sa fréquence reste à calibrer sur une doctrine de
+curation à définir (pas forcément quotidienne : dépend du rythme réel de
+renouvellement du catalogue Bringo et de la charge de validation admin
+qu'on veut s'imposer).
 
 **Terminé quand** : un deal scrapé le matin est visible sur le site sans intervention manuelle autre que la validation admin.
 
@@ -241,14 +269,14 @@ zéro régression signalée, rollback non déclenché.
 
 | Phase | Statut | Notes |
 |---|---|---|
-| 0 — Protéger l'existant | ☑ fait | pg_dump quotidien GA, runbook 5 scénarios, tag v1-legacy, DNS → Cloudflare (Full Strict, reliquat : DNSSEC à désactiver chez OVH) |
+| 0 — Protéger l'existant | ☑ fait | pg_dump quotidien GA, runbook 5 scénarios, tag v1-legacy, DNS → Cloudflare (Full Strict) ; DNSSEC : reliquat OVH levé, actif côté Cloudflare depuis la bascule du 16/07/2026 |
 | 1 — Conception | ☑ fait | docs/CONTRAT-V1.md gravé |
 | 2 — Fondation | ☑ fait | monorepo pnpm, packages schemas/db/auth, Next 15, Docker, CSP nonce, CI verte, Dependabot |
 | 3 — API | ☑ fait | endpoints publics + écritures + rate limiting, CI verte |
 | 4 — Web | ◐ code complet | commits 06ca057→9d4718c ; RESTE : validation parité v1↔v2 sur mobile réel (critère "Terminé quand" — action Kamel) |
 | 5 — SEO | ◐ code complet | commits 94147b2→d3583ed ; RESTE : soumission sitemap Search Console + test résultats enrichis Google (actions externes) |
-| 6 — Bascule prod | ◐ en cours | pas d'ETL v1→v2 (décision 14/07/2026) ; base prod v2 aswbu provisionnée, seed de test purgé ; bascule DNS faite le 16/07/2026 (cf. SUIVI) ; RESTE : vérifications J-0 complètes, surveillance J+1→J+7, clôture J+7 |
-| 7 — Pipeline | ☐ à faire | 3 scripts .mjs opérationnels hors monorepo ; insert-deals.mjs déjà adapté au schéma v2 et images.mjs (module image haute résolution + fallback) déjà écrit — hors monorepo, 15/07/2026 ; l'intégration monorepo (apps/pipeline) reste à faire |
+| 6 — Bascule prod | ☑ fait | terminée le 18/07/2026, déclarée par anticipation des 7 jours pleins (cf. SUIVI clôture) ; bascule DNS 16/07, DNSSEC actif, sitemap soumis et traité (57 pages) ; v1 gelée (Git déconnecté, projets renommés `*-v1-legacy`) ; réserve ouverte : suppression définitive des projets v1 (Vercel + Supabase laqwg) ~23/07/2026 |
+| 7 — Pipeline | ☐ à faire | scripts .mjs opérationnels hors monorepo (insert-deals.mjs adapté v2, images.mjs, fiche-produit.mjs) ; RESTE : intégration monorepo (apps/pipeline) + cron GitHub Actions, fréquence à calibrer sur la doctrine de curation (pas nécessairement quotidienne) |
 | 8 — Mobile & ops | ☐ à faire | |
 | 9 — VPS | ☐ conditionnel | |
 
@@ -385,7 +413,44 @@ navigations réelles) — reste à confirmer côté Kamel que ces navigations
 apparaissent dans le dashboard Analytics (accès dashboard hors de portée
 de cette session).
 
-**PROCHAINE TÂCHE** : clore 4 et 5 — (a) validation parité sur mobile réel, (b) soumission sitemap + test résultats enrichis. Ensuite : vérifications J-0 complètes de la Phase 6 (curl post-déploiement), puis surveillance J+1→J+7.
+**Clôture Phase 6 — 18/07/2026** : bascule en production déclarée terminée,
+par anticipation des 7 jours pleins de surveillance prévus par le critère
+« Terminé quand » original (16→23/07) — le socle à risque (DNS, auth,
+emails, régions, CSP, écritures) est validé stable ; ce qui reste est du
+nettoyage de fermeture tracké ci-dessous, pas un blocant.
+
+Récapitulatif :
+- **Bascule DNS** : 16/07/2026 (cf. SUIVI). **DNSSEC** : reliquat Phase 0
+  levé, actif côté Cloudflare (OVH n'est plus autoritaire sur la zone).
+- **Sitemap** : soumis à Search Console et exploré, 57 pages retournées
+  par sitemap.xml (cf. vérification post-déploiement du 18/07 ci-dessus).
+- **v1 gelée** : projet Vercel et projet Supabase (laqwg) déconnectés de
+  Git — plus robuste que le seul « Ignored Build Step » prévu au plan,
+  aucun push ne peut plus jamais les redéployer — et renommés avec le
+  suffixe `-v1-legacy`. Le projet Supabase de prod v2 (aswbu) est renommé
+  `fidwastafid-prod`.
+- **Vérifications J-0** (case ci-dessus) closes au curl ce jour contre
+  fidwastafid.com : `/` → 200, une page deal → 200, `/enseigne/marjane` →
+  200 ; en-têtes CSP présents et corrects sur ces trois routes ; image
+  réelle servie en 200 via `/img/deals/[public_id]` ; écriture de test —
+  vote posé (score 1→2) puis retiré proprement (score 2→1) sur un deal
+  réel, sans résidu.
+- **Ajouts post-bascule**, hors périmètre initial de la Phase 6 mais
+  livrés dans la foulée (détail dans leurs entrées SUIVI respectives
+  ci-dessus) : réinitialisation de mot de passe oublié (flux
+  `/auth/reset`), Vercel Analytics, refonte UX de la soumission (bandeau
+  anonyme pour les non-connectés, brouillon sessionStorage, CTA header en
+  pilule dégradée).
+
+**Réserve ouverte** : suppression définitive des projets v1 (Vercel +
+Supabase laqwg) après une semaine complète de stabilité, vers le
+23/07/2026 — groupée avec le nettoyage laqwg restant (`DROP VIEW
+v1_auth_users_audit`, rôle `etl_reader`) et la suppression de
+`index.html` racine (checklist J+7 ci-dessus). Vercel Pro et la
+confirmation de remontée dans le dashboard Analytics restent également à
+valider côté Kamel — hors visibilité de cette session.
+
+**PROCHAINE TÂCHE** : clore 4 — validation parité v1↔v2 sur mobile réel (action Kamel). Phase 6 : réserve du ~23/07/2026 (suppression définitive des projets v1, nettoyage laqwg, index.html racine) ; confirmer Vercel Pro et la remontée Analytics au dashboard. Sinon : Phase 7 (intégration monorepo du pipeline + cron).
 
 ---
 

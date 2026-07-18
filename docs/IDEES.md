@@ -24,10 +24,23 @@ Page profil v1 (post-patch CNDP) réduite à une carte lecture seule dont
 les stats (`score_reputation`, `deals_soumis`, ...) n'existent pas dans
 le modèle v2. Absente en v2 — exception de parité consciente, cf.
 CONTRAT-V1 §2/§4 (aucune de ces routes n'y figure), amendement Phase 4
-ci-dessus. Post-Phase 6 : page profil minimale (pseudo, email) + "Mes
-deals" avec édition — nécessite un amendement du contrat API (`PATCH`
-deal par son auteur → repasse `en_attente`, hors de la liste fermée
-actuelle §4).
+ci-dessus.
+
+**Mise à jour (18/07/2026)** : la partie « page profil minimale (pseudo,
+email) + Mes deals » est livrée — `/compte` (4 cartes : identité avec
+couleur d'avatar, contributions avec compteurs et liste `mesDeals`,
+données/RGPD, suppression de compte). Ce qui reste une idée, pas encore
+fait : l'**édition** des deals depuis `/compte` — nécessite un amendement
+du contrat API (`PATCH` deal par son auteur → repasse `en_attente`, hors
+de la liste fermée actuelle §4).
+
+## Profil public /membre (2026-07-17)
+
+`/membre/[pseudo]-[public_id]` réservé au contrat §2 mais jamais
+construit — profil public consultable par tous (distinct de `/compte`,
+qui est privé et authentifié). Dépendance directe : les enrichissements
+« profil auteur » envisagés sur la page deal (membre depuis, nombre de
+deals partagés, cf. entrée « Page deal — profil auteur » ci-dessous).
 
 ## Images (15/07/2026)
 
@@ -57,6 +70,35 @@ Favoris/bookmark sur les cartes (type Dealabs) — nécessite table + endpoints
 
 Enrichissements profil auteur (membre depuis, nombre de deals partagés) :
 dépend du futur `/membre/[pseudo]-[public_id]` réservé au contrat §2.
+
+## Diversification des sources (2026-07-18)
+
+Le pipeline ne scrape aujourd'hui que Bringo (`scraper-bringo.mjs`).
+Marjane a déjà été exploré via `discover-site.mjs` (capture des appels API
++ rendu HTML, début juillet) sans suite donnée. Étendre à d'autres
+enseignes (Marjane, Carrefour direct hors Bringo, etc.) élargirait la
+couverture au-delà du catalogue actuel — chantier de découverte +
+adaptation par source, un par un, post-Phase 7.
+
+## Galerie multi-images (2026-07-18)
+
+Chaque deal n'a aujourd'hui qu'une seule image (`deals.image_key`, module
+pipeline `images.mjs`). Idée : galerie multi-images sur la page deal
+(plusieurs angles/photos par produit, façon Dealabs) — nécessite d'étendre
+le schéma (table `deal_images` ou tableau de clés sur `deals`) et le
+pipeline d'extraction pour produire plusieurs images par deal quand la
+source en fournit plusieurs.
+
+## Staging Supabase — flux recette/prod (2026-07-18)
+
+Aucun environnement de recette aujourd'hui : la seule base Postgres est
+la prod (`fidwastafid-prod`, ex-aswbu), testée uniquement via Docker local
+avant chaque déploiement. Idée : second projet Supabase gratuit dédié à
+la recette, avec les variables d'environnement Preview Vercel pointant
+vers ce projet staging plutôt que vers la prod — permettrait de tester des
+migrations et changements risqués sur une base isolée avant qu'ils
+n'atteignent la prod. Post-Phase 6, à évaluer contre le coût de
+maintenance (deux schémas à garder synchronisés) pour un projet solo.
 
 ## Monétisation
 
