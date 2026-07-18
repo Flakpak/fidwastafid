@@ -1,11 +1,13 @@
 import { withTransaction, closePool, query } from "@fidwastafid/db";
 import { POST as postDeal } from "../src/app/api/v1/deals/route.js";
+import { GET as getDeal } from "../src/app/api/v1/deals/[publicId]/route.js";
 import { POST as postVote, DELETE as deleteVote } from "../src/app/api/v1/deals/[publicId]/votes/route.js";
 import {
   POST as postComment,
   GET as getComments,
 } from "../src/app/api/v1/deals/[publicId]/commentaires/route.js";
 import { GET as getMe, PATCH as patchMe } from "../src/app/api/v1/me/route.js";
+import { PATCH as patchAdminDeal } from "../src/app/api/v1/admin/deals/[publicId]/route.js";
 
 /**
  * Tests d'intégration (plan v2, Phase 3 : "soumission, validation, vote") —
@@ -101,6 +103,16 @@ async function seedFixtures(userId: string): Promise<void> {
     await client.query(`insert into enseignes (slug, nom) values ($1, 'Test Integration') on conflict (slug) do nothing`, [
       ENSEIGNE_SLUG,
     ]);
+    // Projet de dev/test uniquement — nécessaire pour exercer PATCH
+    // /api/v1/admin/deals/:publicId (motifRejet, édition curateur des
+    // champs terrain) avec le même utilisateur/JWT que le reste du fichier.
+    await client.query(`insert into admins (id) values ($1) on conflict (id) do nothing`, [userId]);
+    // Ce fichier soumet plus de deals authentifiés (6) que la limite de
+    // RATE_LIMITS.soumission (5/heure, apps/web/_lib/rateLimit.ts) — sans
+    // ce reset, une ré-exécution locale rapprochée (ou un run précédent
+    // dans la même fenêtre) fait échouer la soumission valide avec un faux
+    // 429 sans rapport avec ce qui est testé ici.
+    await client.query(`delete from rate_limits where cle like 'soumission:%'`);
   });
 
   const enseigneRows = await query<{ id: number }>("select id from enseignes where slug = $1", [ENSEIGNE_SLUG]);
@@ -181,6 +193,158 @@ async function main() {
     noParams
   );
   check("soumission sans token -> 401 UNAUTHENTICATED", noAuthRes.status === 401);
+
+  // Ce bloc soumet à lui seul 4 deals authentifiés, en plus des 2 du bloc
+  // précédent — un deuxième reset garde chaque bloc sous la limite de
+  // RATE_LIMITS.soumission (5/heure) sans avoir à fusionner des scénarios
+  // de validation distincts en un seul appel.
+  await query(`delete from rate_limits where cle like 'soumission:%'`);
+
+  console.log("\nsoumission terrain — nomVendeur/adresse/lienMaps/whatsapp (CONTRAT-V1 §3/§4, amendement 18/07/2026)");
+
+  const terrainRes = await postDeal(
+    authedRequest("http://localhost/api/v1/deals", token, {
+      method: "POST",
+      headers: { "x-turnstile-token": "test" },
+      body: JSON.stringify({
+        titre: "Hanout test intégration",
+        categorie: "Autre",
+        type: "physique",
+        prixPromo: 15,
+        nomVendeur: "Hanout Test",
+        adresse: "12 Rue Test, Casablanca",
+        lienMaps: "https://www.google.com/maps/place/Hanout+Test",
+        whatsappContact: "0612345678",
+        whatsappPublic: true,
+      }),
+    }),
+    noParams
+  );
+  const terrainBody = (await terrainRes.json()) as {
+    publicId?: string;
+    nomVendeur?: string;
+    adresse?: string;
+    lienMaps?: string;
+    whatsappContact?: string;
+  };
+  check("soumission terrain valide -> 201", terrainRes.status === 201);
+  check("soumission terrain -> nomVendeur conservé", terrainBody.nomVendeur === "Hanout Test");
+  check("soumission terrain -> adresse conservée", terrainBody.adresse === "12 Rue Test, Casablanca");
+  check(
+    "soumission terrain -> lienMaps conservé",
+    terrainBody.lienMaps === "https://www.google.com/maps/place/Hanout+Test"
+  );
+  check("soumission terrain -> whatsappContact normalisé en +212", terrainBody.whatsappContact === "+212612345678");
+  const terrainPublicId = terrainBody.publicId;
+  if (!terrainPublicId) throw new Error("publicId du deal terrain manquant après soumission.");
+
+  const lienMapsInvalideRes = await postDeal(
+    authedRequest("http://localhost/api/v1/deals", token, {
+      method: "POST",
+      headers: { "x-turnstile-token": "test" },
+      body: JSON.stringify({
+        titre: "Deal lienMaps invalide",
+        categorie: "Autre",
+        type: "physique",
+        prixPromo: 15,
+        lienMaps: "https://example.com/maps/place/Faux",
+      }),
+    }),
+    noParams
+  );
+  check("lienMaps hors liste blanche -> 400 VALIDATION_ERROR", lienMapsInvalideRes.status === 400);
+
+  const whatsappSansNumeroRes = await postDeal(
+    authedRequest("http://localhost/api/v1/deals", token, {
+      method: "POST",
+      headers: { "x-turnstile-token": "test" },
+      body: JSON.stringify({
+        titre: "Deal whatsappPublic sans numéro",
+        categorie: "Autre",
+        type: "physique",
+        prixPromo: 15,
+        whatsappPublic: true,
+      }),
+    }),
+    noParams
+  );
+  check("whatsappPublic=true sans whatsappContact -> 400 VALIDATION_ERROR", whatsappSansNumeroRes.status === 400);
+
+  console.log("\nexposition whatsapp — absente en public si non consentie, présente si consentie");
+
+  const dealPriveRes = await postDeal(
+    authedRequest("http://localhost/api/v1/deals", token, {
+      method: "POST",
+      headers: { "x-turnstile-token": "test" },
+      body: JSON.stringify({
+        titre: "Deal whatsapp non public",
+        categorie: "Autre",
+        type: "physique",
+        prixPromo: 15,
+        whatsappContact: "+212612345678",
+        whatsappPublic: false,
+      }),
+    }),
+    noParams
+  );
+  const dealPriveBody = (await dealPriveRes.json()) as { publicId?: string };
+  const dealPrivePublicId = dealPriveBody.publicId;
+  if (!dealPrivePublicId) throw new Error("publicId du deal privé manquant après soumission.");
+
+  // Publie les deux deals — statut en_attente n'est jamais visible sans auth
+  // (GET /api/v1/deals/:publicId public exige publie|expire).
+  await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "publie" }),
+    }),
+    { params: Promise.resolve({ publicId: terrainPublicId }) }
+  );
+  await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${dealPrivePublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "publie" }),
+    }),
+    { params: Promise.resolve({ publicId: dealPrivePublicId }) }
+  );
+
+  const lectureConsentieRes = await getDeal(new Request(`http://localhost/api/v1/deals/${terrainPublicId}`), {
+    params: Promise.resolve({ publicId: terrainPublicId }),
+  });
+  const lectureConsentieBody = (await lectureConsentieRes.json()) as { whatsappContact?: string };
+  check(
+    "lecture publique -> whatsappContact présent quand whatsappPublic=true",
+    lectureConsentieBody.whatsappContact === "+212612345678"
+  );
+
+  const lectureNonConsentieRes = await getDeal(new Request(`http://localhost/api/v1/deals/${dealPrivePublicId}`), {
+    params: Promise.resolve({ publicId: dealPrivePublicId }),
+  });
+  const lectureNonConsentieBody = (await lectureNonConsentieRes.json()) as Record<string, unknown>;
+  check(
+    "lecture publique -> whatsappContact absent (pas null) quand whatsappPublic=false",
+    !("whatsappContact" in lectureNonConsentieBody)
+  );
+
+  console.log("\nPATCH admin — motifRejet + édition curateur des champs terrain");
+  const patchRejetRes = await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${dealPrivePublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "rejete", motifRejet: "Photo manquante" }),
+    }),
+    { params: Promise.resolve({ publicId: dealPrivePublicId }) }
+  );
+  const patchRejetBody = (await patchRejetRes.json()) as { statut?: string; motifRejet?: string };
+  check("PATCH admin motifRejet -> 200", patchRejetRes.status === 200);
+  check("PATCH admin motifRejet -> statut rejete", patchRejetBody.statut === "rejete");
+  check("PATCH admin motifRejet -> motifRejet conservé", patchRejetBody.motifRejet === "Photo manquante");
+
+  const meAvecRejetRes = await getMe(authedRequest("http://localhost/api/v1/me", token), noParams);
+  const meAvecRejetBody = (await meAvecRejetRes.json()) as {
+    mesDeals?: { publicId?: string; motifRejet?: string | null }[];
+  };
+  const dealRejeteDansMe = (meAvecRejetBody.mesDeals ?? []).find((d) => d.publicId === dealPrivePublicId);
+  check("GET /me -> motifRejet du deal rejeté visible", dealRejeteDansMe?.motifRejet === "Photo manquante");
 
   console.log("\nvote — recalcul de score synchrone");
   const context = { params: Promise.resolve({ publicId: DEAL_PUBLIC_ID }) };
