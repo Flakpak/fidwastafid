@@ -44,18 +44,24 @@ async function fetchFeed(): Promise<Deal[]> {
   return body.data;
 }
 
-type PageParams = { searchParams: Promise<{ compte?: string }> };
+type PageParams = { searchParams: Promise<{ compte?: string; motdepasse?: string }> };
 
 export default async function Home({ searchParams }: PageParams) {
-  const [deals, { compte }] = await Promise.all([fetchFeed(), searchParams]);
+  const [deals, { compte, motdepasse }] = await Promise.all([fetchFeed(), searchParams]);
+  const message =
+    compte === "supprime"
+      ? "Ton compte a bien été supprimé. Merci d'avoir fait partie de la communauté."
+      : motdepasse === "reinitialise"
+        ? "Ton mot de passe a bien été mis à jour."
+        : null;
 
   return (
     <div className="min-h-screen bg-creme text-texte">
       <SiteHeader />
-      {compte === "supprime" && (
+      {message && (
         <div className="max-w-2xl mx-auto mt-4 px-4">
           <div className="bg-white border border-vert/30 rounded-xl p-4 text-sm font-bold text-vert text-center">
-            Ton compte a bien été supprimé. Merci d&apos;avoir fait partie de la communauté.
+            {message}
           </div>
         </div>
       )}

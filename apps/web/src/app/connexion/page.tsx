@@ -48,6 +48,9 @@ export default async function ConnexionPage({
         >
           Pas de compte ? Inscris-toi
         </a>
+        <a href="/mot-de-passe-oublie" className="text-xs text-center text-muted hover:underline">
+          Mot de passe oublié ?
+        </a>
       </form>
     </main>
   );

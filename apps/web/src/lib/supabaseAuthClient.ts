@@ -19,3 +19,26 @@ export function getAuthClient() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
+
+/**
+ * Change le mot de passe de l'utilisateur identifié par `accessToken` —
+ * fetch nu vers l'API REST Supabase Auth plutôt que `getAuthClient().auth.updateUser()` :
+ * ce client est stateless (`persistSession: false`), `updateUser()` opère
+ * sur la session interne du client (`this.currentSession`), qu'on n'a
+ * jamais hydratée ici — il n'y a pas d'API du SDK pour lui passer un
+ * access token à la volée pour cet appel précis. `PUT /auth/v1/user` avec
+ * `Authorization: Bearer <access_token>` est le même endpoint que le SDK
+ * appelle en interne, donc un comportement identique sans ce détour.
+ */
+export async function updateUserPassword(accessToken: string, password: string): Promise<boolean> {
+  const response = await fetch(`${readEnv("SUPABASE_URL")}/auth/v1/user`, {
+    method: "PUT",
+    headers: {
+      apikey: readEnv("SUPABASE_ANON_KEY"),
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ password }),
+  });
+  return response.ok;
+}
