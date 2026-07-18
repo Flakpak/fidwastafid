@@ -82,6 +82,31 @@ Décision produit du 2026-07-14, remplace l'obligation implicite initiale. Pas d
 type "Autre" (rejeté explicitement — page `/enseigne/autre` absurde, données polluées) : un deal sans
 enseigne a `enseigne_id`/`enseigneSlug` réellement absents, partout (API, affichage, recherche).
 
+**Amendement du 18/07/2026 — soumission terrain** : `deals` gagne quatre colonnes, pour les
+commerces informels marocains (hanout, marché, boutique sans enseigne curée) :
+- **`nom_vendeur`** (texte libre, optionnel) — nom du commerce quand ce n'est pas une enseigne curée.
+  Les enseignes restent la table curée (`enseignes`, slug administré à la main) ; `nom_vendeur` est un
+  texte libre saisi par le soumetteur et **ne génère jamais de page `/enseigne`** — pas de croisement
+  entre les deux mécanismes, pas de pollution de la table curée par du texte non vérifié.
+- **`adresse`** (texte libre, optionnel) — adresse du commerce.
+- **`lien_maps`** (URL, optionnel) — lien Google Maps. Validation stricte à la soumission (liste
+  blanche de host + chemin, voir `packages/schemas`) : jamais une URL arbitraire stockée comme lien
+  de carte, pour éviter qu'un lien de phishing ou de redirection tierce se fasse passer pour une
+  adresse Maps.
+- **`motif_rejet`** (texte, optionnel, **admin uniquement en écriture**) — raison d'un rejet, saisie
+  par le curateur, visible par le soumetteur dans son espace membre (`GET /api/v1/me`) : la
+  communauté doit comprendre pourquoi son deal n'a pas été publié, pas juste constater le rejet.
+
+**Amendement du 18/07/2026 — consentement WhatsApp public** : la règle "`whatsapp_contact`
+n'apparaît jamais hors admin" (ci-dessous, §4) est remplacée par une règle conditionnée au
+consentement du soumetteur — voir §4. `deals` gagne **`whatsapp_public`** (booléen, `not null default
+false`) : `true` uniquement si le soumetteur a explicitement consenti à la publication de son contact
+WhatsApp. Sans consentement (valeur par défaut), le comportement reste celui d'origine — admin
+uniquement. Motivation : au Maroc, WhatsApp est le canal de vente standard des commerces informels ;
+l'interdiction totale d'affichage empêchait un usage commercial de base que le vendeur lui-même
+souhaite. **Deuxième amendement conscient** à la liste fermée du contrat (le premier était l'espace
+membre du 16/07/2026, §4 ci-dessous) — décision produit, pas une dérive.
+
 ## 4 — Contrat API v1
 
 **Erreurs** — format unique partout :
@@ -129,7 +154,12 @@ POST   /api/v1/admin/deals/bulk             actions groupées
 **Notes** :
 - Amendement du 16/07/2026 — espace membre : exercice des droits d'accès/rectification/effacement
   (loi 09-08). Premier amendement conscient de la liste fermée.
-- `whatsapp_contact` n'apparaît **jamais** hors de `GET /api/v1/admin/deals`.
+- Amendement du 18/07/2026 — consentement WhatsApp public (deuxième amendement conscient, voir §3) :
+  `whatsapp_contact` apparaît publiquement (`GET /api/v1/deals`, `GET /api/v1/deals/:publicId`) **si
+  et seulement si** le soumetteur a explicitement consenti à sa publication (`whatsapp_public =
+  true`). Sans consentement, la règle d'origine s'applique inchangée : admin uniquement (`GET`/`PATCH
+  /api/v1/admin/deals`). Absent du payload public quand non consenti — jamais `null`, l'exposition
+  conditionnelle ne doit pas se détecter en creux par la présence d'une clé à valeur nulle.
 - Le pipeline (`apps/pipeline`, `.mjs`) écrit **directement en base**, hors `/api/v1` — exception
   documentée (script d'infra dans un environnement de confiance), pas une entorse au principe
   « toutes les écritures utilisateur passent par l'API ».
