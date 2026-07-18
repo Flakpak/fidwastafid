@@ -14,8 +14,30 @@ function readEnv(name: string): string {
   return value;
 }
 
+/**
+ * Fallback transitoire sur l'ancienne clé `anon` (JWT) tant que les clés
+ * legacy ne sont pas désactivées côté Dashboard Supabase — mêmes clés que
+ * packages/auth/src/supabaseClient.ts, dupliqué ici volontairement (pas de
+ * dépendance croisée entre ce module web et le package auth, qui ne fait
+ * que vérifier des JWT entrants, CONTRAT-V1 §5).
+ */
+function readSupabaseKey(): string {
+  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (publishableKey) return publishableKey;
+
+  const legacyKey = process.env.SUPABASE_ANON_KEY;
+  if (!legacyKey) {
+    throw new Error("SUPABASE_PUBLISHABLE_KEY (ou SUPABASE_ANON_KEY en fallback) manquant.");
+  }
+  console.warn(
+    "[supabase-keys] SUPABASE_PUBLISHABLE_KEY absent — fallback sur SUPABASE_ANON_KEY (legacy). " +
+      "À retirer après migration complète (voir docs/MIGRATION-CLES-SUPABASE.md)."
+  );
+  return legacyKey;
+}
+
 export function getAuthClient() {
-  return createClient(readEnv("SUPABASE_URL"), readEnv("SUPABASE_ANON_KEY"), {
+  return createClient(readEnv("SUPABASE_URL"), readSupabaseKey(), {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
@@ -34,7 +56,7 @@ export async function updateUserPassword(accessToken: string, password: string):
   const response = await fetch(`${readEnv("SUPABASE_URL")}/auth/v1/user`, {
     method: "PUT",
     headers: {
-      apikey: readEnv("SUPABASE_ANON_KEY"),
+      apikey: readSupabaseKey(),
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
