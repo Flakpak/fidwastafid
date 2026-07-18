@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
-import type { EmailOtpType } from "@supabase/supabase-js";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getAuthClient } from "../../lib/supabaseAuthClient.js";
-import { setSessionCookie } from "../../lib/sessionCookie.js";
 import { resolveCurrentUser } from "../../lib/currentUser.js";
 import { reinitialiserMotDePasseAction } from "../../lib/authActions.js";
 
@@ -65,36 +62,27 @@ function LienInvalide() {
 }
 
 /**
- * `token_hash` + `verifyOtp({ type: "recovery" })` — même mécanisme que
- * /auth/confirm (voir ce fichier pour le détail : notre client Supabase
- * n'a jamais fixé `flowType`, donc `'implicit'` par défaut, PKCE hors jeu).
+ * Cette page ne vérifie plus jamais `token_hash` elle-même — un Server
+ * Component ne peut pas poser de cookie pendant son rendu (Next.js 15
+ * l'interdit hors Server Action / Route Handler). C'est /auth/reset/route.ts
+ * qui fait `verifyOtp` + pose le cookie de session, puis redirige ici sans
+ * paramètres. Incident du 18/07/2026 (digest 773635100) : la vérification
+ * vivait auparavant ici, et plantait en 500 dès qu'un vrai token passait.
  *
- * Le formulaire de nouveau mot de passe n'est rendu QUE dans la même
- * requête qu'une vérification `verifyOtp` réussie (`token_hash` valide) —
- * jamais via une simple présence de cookie de session, qui pourrait être
- * celui d'un utilisateur normal arrivé ici par hasard. Après un aller-retour
- * côté action (mismatch de confirmation, échec de mise à jour), la page est
- * revisitée sans `token_hash` : la session de récupération déjà posée en
- * cookie (par le premier passage) sert alors de preuve à la place.
+ * Si `token_hash`/`type` arrivent quand même sur CETTE page (ancien lien
+ * email déjà envoyé, ou gabarit Supabase pas encore mis à jour), on les
+ * relaie vers /auth/reset plutôt que de planter ou de les ignorer —
+ * `redirect()` ne touche pas aux cookies, autorisé n'importe où.
+ *
+ * Le formulaire de nouveau mot de passe n'est rendu QUE si une session de
+ * récupération est déjà posée en cookie (par /auth/reset) — jamais sur la
+ * seule foi d'un `token_hash` en query, qui n'a pas encore été vérifié ici.
  */
 export default async function ReinitialiserMotDePassePage({ searchParams }: PageParams) {
   const { token_hash: tokenHash, type, erreur } = await searchParams;
 
   if (tokenHash && type === "recovery") {
-    const { data, error } = await getAuthClient().auth.verifyOtp({
-      token_hash: tokenHash,
-      type: type as EmailOtpType,
-    });
-    if (error || !data.session) {
-      redirect("/reinitialiser-mot-de-passe?erreur=invalide");
-    }
-    await setSessionCookie(data.session.access_token, data.session.expires_in);
-
-    return (
-      <main className="min-h-screen bg-creme text-texte flex items-center justify-center p-6">
-        <NouveauMotDePasseForm />
-      </main>
-    );
+    redirect(`/auth/reset?token_hash=${encodeURIComponent(tokenHash)}&type=recovery`);
   }
 
   if (erreur === "invalide") {
@@ -105,17 +93,12 @@ export default async function ReinitialiserMotDePassePage({ searchParams }: Page
     );
   }
 
-  if (erreur === "confirmation" || erreur === "echec") {
-    const user = await resolveCurrentUser();
-    if (!user) redirect("/mot-de-passe-oublie");
+  const user = await resolveCurrentUser();
+  if (!user) redirect("/mot-de-passe-oublie");
 
-    return (
-      <main className="min-h-screen bg-creme text-texte flex items-center justify-center p-6">
-        <NouveauMotDePasseForm erreur={erreur} />
-      </main>
-    );
-  }
-
-  // Accès direct, sans lien — rien à vérifier ni à afficher ici.
-  redirect("/mot-de-passe-oublie");
+  return (
+    <main className="min-h-screen bg-creme text-texte flex items-center justify-center p-6">
+      <NouveauMotDePasseForm erreur={erreur === "confirmation" || erreur === "echec" ? erreur : undefined} />
+    </main>
+  );
 }

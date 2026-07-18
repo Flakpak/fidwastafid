@@ -328,6 +328,46 @@ qu'en lisant l'email réel (aucun accès à la boîte de Kamel) — un email
 réel a bien été envoyé en parallèle (`recover`), à vérifier par Kamel pour
 confirmer le format du lien actuellement produit par le template.
 
+**Incident production — 18/07/2026** : `/reinitialiser-mot-de-passe` plantait
+en 500 (`Cookies can only be modified in a Server Action or Route Handler`,
+digest `3137909927`/`773635100`) sur tout vrai lien d'email — la page (un
+Server Component) appelait `verifyOtp` puis `setSessionCookie` directement
+dans son rendu, ce que Next.js 15 interdit hors Server Action/Route
+Handler. Non détecté avant mise en prod car la vérification de bout en bout
+précédente appelait l'API Supabase en direct (curl), jamais la page elle-
+même. Reproduit en local avec un vrai token (généré via `generate_link`,
+un token bidon ne suffit pas : `verifyOtp` le rejette avant d'atteindre la
+ligne fautive).
+
+Correctif : la vérification `verifyOtp` + pose du cookie déménage dans un
+nouveau Route Handler, `auth/reset/route.ts`, sur le modèle exact de
+`auth/confirm/route.ts` (déjà correct, jamais touché par l'incident). La
+page ne fait plus que lire l'état déjà posé (`resolveCurrentUser`, en
+lecture seule) et redirige tout `token_hash`/`type` reçu directement sur
+elle-même vers `/auth/reset` (compat ascendante avec l'ancien template déjà
+en place). Trois cas vérifiés sans crash en Docker avec un vrai token : `/auth/reset`
+avec token valide → formulaire ; page directe sans paramètres → redirect
+`/mot-de-passe-oublie` ; paramètres malformés (`type` invalide, token
+absent, etc.) → même redirect, jamais de 500. Typecheck clean, 24/24 tests
+d'intégration verts.
+
+Gabarit email Supabase : l'ancien contenu donné à Kamel (pointant sur
+`/reinitialiser-mot-de-passe?token_hash=...`) continue de fonctionner grâce
+à la redirection de compatibilité, mais un lien direct vers
+`/auth/reset?token_hash={{ .TokenHash }}&type=recovery` évite un aller-
+retour :
+```html
+<h2>Réinitialise ton mot de passe</h2>
+<p>Clique sur ce lien pour choisir un nouveau mot de passe :</p>
+<p><a href="{{ .SiteURL }}/auth/reset?token_hash={{ .TokenHash }}&type=recovery">Réinitialiser mon mot de passe</a></p>
+<p>Si tu n'es pas à l'origine de cette demande, tu peux ignorer cet email — ton mot de passe ne changera pas.</p>
+```
+Mise à jour du template optionnelle — l'ancien lien reste valable.
+
+**RESTE** : re-tester le parcours complet en prod avec un vrai chargement de
+`/reinitialiser-mot-de-passe?token_hash=...` (ou `/auth/reset?...`), pas
+seulement via l'API Supabase en direct comme la première passe.
+
 **PROCHAINE TÂCHE** : clore 4 et 5 — (a) validation parité sur mobile réel, (b) soumission sitemap + test résultats enrichis. Ensuite : vérifications J-0 complètes de la Phase 6 (curl post-déploiement), puis surveillance J+1→J+7.
 
 ---
