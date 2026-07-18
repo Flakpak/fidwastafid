@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DealAdmin, DealStatut } from "@fidwastafid/schemas";
-import { joinMeta } from "../../lib/format.js";
+import { AdminDealItem, type TerrainFields } from "./AdminDealItem.js";
 
 interface ApiErrorBody {
   error?: { code?: string; message?: string };
@@ -56,12 +56,6 @@ const ONGLET_ACTIONS: Record<DealStatut, Action[]> = {
 
 /** Sélection groupée réservée aux deux onglets de modération initiale (v1 : idem). */
 const BULK_ONGLETS = new Set<DealStatut>(["auto_draft", "en_attente"]);
-
-const ACTION_CLASSES: Record<Action["variant"], string> = {
-  primaire: "bg-vert text-white",
-  danger: "border border-rouge text-rouge",
-  neutre: "border border-bordure text-muted",
-};
 
 export function AdminPipeline() {
   const [deals, setDeals] = useState<DealAdmin[] | null>(null);
@@ -123,18 +117,53 @@ export function AdminPipeline() {
     });
   }
 
-  async function updateStatut(publicId: string, statut: DealStatut) {
+  async function updateStatut(publicId: string, statut: DealStatut, motifRejet?: string) {
     setPending(true);
     setError(null);
     try {
       const res = await fetch(`/api/v1/admin/deals/${publicId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ statut }),
+        body: JSON.stringify({ statut, motifRejet: statut === "rejete" ? motifRejet : undefined }),
       });
       if (!res.ok) {
         const body = (await res.json()) as ApiErrorBody;
         setError(body.error?.message ?? "Action impossible.");
+        return;
+      }
+      await fetchDeals();
+    } finally {
+      setPending(false);
+    }
+  }
+
+  /**
+   * Édition curateur des champs terrain (CONTRAT-V1 §3, amendement du
+   * 18/07/2026) — statut inchangé (renvoyé tel quel, requis par le schéma
+   * de mise à jour admin), seuls les champs terrain sont transmis. Chaîne
+   * vide -> undefined : envoyer "" échouerait la validation (lienMaps,
+   * whatsappContact) là où omettre le champ laisse la valeur existante
+   * intacte (coalesce côté API), ce qui est le comportement voulu ici.
+   */
+  async function updateFields(publicId: string, statutActuel: DealStatut, fields: TerrainFields) {
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/admin/deals/${publicId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          statut: statutActuel,
+          nomVendeur: fields.nomVendeur || undefined,
+          adresse: fields.adresse || undefined,
+          lienMaps: fields.lienMaps || undefined,
+          whatsappContact: fields.whatsappContact || undefined,
+          whatsappPublic: fields.whatsappPublic,
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json()) as ApiErrorBody;
+        setError(body.error?.message ?? "Mise à jour des champs impossible.");
         return;
       }
       await fetchDeals();
@@ -222,42 +251,17 @@ export function AdminPipeline() {
 
       <ul className="flex flex-col gap-2">
         {parOnglet.map((deal) => (
-          <li key={deal.publicId} className="bg-white border border-bordure rounded-xl p-4 flex items-start gap-3">
-            {BULK_ONGLETS.has(onglet) && (
-              <input
-                type="checkbox"
-                checked={selected.has(deal.publicId)}
-                onChange={() => toggle(deal.publicId)}
-                className="mt-1"
-              />
-            )}
-            <div className="flex-1 flex flex-col gap-1">
-              <span className="font-bold">{deal.titre}</span>
-              <div className="text-xs text-muted">{joinMeta(deal.enseigneSlug, deal.ville, deal.categorie)}</div>
-              <div className="flex items-baseline gap-2">
-                <span className="font-black text-rouge">{deal.prixPromo} DH</span>
-                {deal.prixNormal && <span className="text-sm text-muted line-through">{deal.prixNormal} DH</span>}
-                {remise(deal) > 0 && (
-                  <span className="text-xs font-bold bg-rouge text-white rounded px-2 py-0.5">-{remise(deal)}%</span>
-                )}
-              </div>
-              {deal.whatsappContact && <div className="text-xs text-muted">WhatsApp : {deal.whatsappContact}</div>}
-              <div className="text-xs text-muted">Soumis par {deal.submitterPublicId ?? "collecte automatique"}</div>
-            </div>
-            <div className="flex flex-col gap-1 flex-shrink-0">
-              {ONGLET_ACTIONS[onglet].map((action) => (
-                <button
-                  key={action.label}
-                  type="button"
-                  onClick={() => void updateStatut(deal.publicId, action.statut)}
-                  disabled={pending}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${ACTION_CLASSES[action.variant]}`}
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
-          </li>
+          <AdminDealItem
+            key={deal.publicId}
+            deal={deal}
+            actions={ONGLET_ACTIONS[onglet]}
+            showCheckbox={BULK_ONGLETS.has(onglet)}
+            checked={selected.has(deal.publicId)}
+            onToggle={() => toggle(deal.publicId)}
+            pending={pending}
+            onAction={(statut, motifRejet) => updateStatut(deal.publicId, statut, motifRejet)}
+            onSaveFields={(fields) => updateFields(deal.publicId, deal.statut, fields)}
+          />
         ))}
       </ul>
     </div>
