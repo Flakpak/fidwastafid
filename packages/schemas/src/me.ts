@@ -9,6 +9,10 @@ export const meDealSchema = z.object({
   publicId: publicIdSchema,
   titre: z.string(),
   statut: dealStatutSchema,
+  /** Raison d'un rejet, saisie par le curateur (CONTRAT-V1 §3, amendement
+   *  du 18/07/2026) — le soumetteur doit comprendre pourquoi son deal n'a
+   *  pas été publié, pas juste constater le rejet. */
+  motifRejet: z.string().nullable(),
   createdAt: z.string().datetime(),
 });
 export type MeDeal = z.infer<typeof meDealSchema>;
