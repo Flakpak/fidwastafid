@@ -373,6 +373,18 @@ avec cookie de session posé → 200, formulaire affiché. Changement de mot
 de passe confirmé (ancien rejeté, nouveau accepté), compte supprimé via
 `DELETE /api/v1/me` en fin de test. Incident clos.
 
+**Vercel Analytics — 18/07/2026** : `<Analytics />` (`@vercel/analytics/next`)
+ajouté au layout racine, activation déjà faite côté dashboard. Aucun
+ajustement CSP requis : le script s'injecte dynamiquement depuis notre
+propre bundle nonce'd (couvert par `'strict-dynamic'`), et sa collecte vit
+sous `/_vercel/insights/*`, même origine que le site (déjà couvert par
+`connect-src 'self'`). Vérifié en Docker (404 normal hors Vercel, zéro
+violation CSP) puis en prod (script servi en 200 via un chemin réécrit
+par Vercel, `window.va` initialisé, zéro erreur console sur deux
+navigations réelles) — reste à confirmer côté Kamel que ces navigations
+apparaissent dans le dashboard Analytics (accès dashboard hors de portée
+de cette session).
+
 **PROCHAINE TÂCHE** : clore 4 et 5 — (a) validation parité sur mobile réel, (b) soumission sitemap + test résultats enrichis. Ensuite : vérifications J-0 complètes de la Phase 6 (curl post-déploiement), puis surveillance J+1→J+7.
 
 ---
