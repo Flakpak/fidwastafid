@@ -199,6 +199,18 @@ POST   /api/v1/admin/deals/:publicId/image  upload manuel (multipart/form-data, 
 - Le pipeline (`apps/pipeline`, `.mjs`) écrit **directement en base**, hors `/api/v1` — exception
   documentée (script d'infra dans un environnement de confiance), pas une entorse au principe
   « toutes les écritures utilisateur passent par l'API ».
+- Amendement du 20/07/2026 — cron quotidien (Phase 7B, quatrième amendement conscient) :
+  `POST /api/revalidate` (`apps/web/src/app/api/revalidate/route.ts`), **volontairement hors
+  `/api/v1`** — même statut d'exception que le pipeline ci-dessus : infrastructure (déclenchée
+  uniquement par `.github/workflows/pipeline-quotidien.yml` après la chaîne scraping/insertion),
+  jamais consommée par le client web/mobile, jamais soumise à la garantie de stabilité de la
+  liste fermée. Protégée par un jeton comparé en temps constant (hash SHA-256 des deux valeurs
+  puis `timingSafeEqual`, jamais un `===`), lu depuis `REVALIDATE_TOKEN` (variable d'environnement
+  Vercel **et** secret GitHub — jamais commitée, jamais journalisée). Revalide le feed, chaque
+  page enseigne et le sitemap. Le pipeline gagne aussi un script `expirer-auto-draft`
+  (`apps/pipeline/expiration.mjs`) : tout deal `auto_draft` de plus de 14 jours passe `expire`
+  (CONTRAT-V1 §1, jamais de suppression) — première étape de chaque run quotidien, avant le
+  scraping.
 - Amendement du 19/07/2026 — édition curateur complète + récupération d'image (troisième
   amendement conscient, voir §3) : `PATCH /api/v1/admin/deals/:publicId` couvre désormais tout
   le domaine métier du deal, pas seulement le statut. `POST /api/v1/admin/deals/:publicId/image-depuis-lien`

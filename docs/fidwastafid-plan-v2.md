@@ -218,21 +218,29 @@ zéro régression signalée, rollback non déclenché.
 
 ### PHASE 7 — Pipeline & automatisation *(2 sessions)*
 - [x] Pipeline `.mjs` rejoint le monorepo (`apps/pipeline`) — code inchangé, il utilise désormais les schémas zod partagés pour valider avant insertion. *(Phase 7A, 19/07/2026)*
-- [ ] Cron GitHub Actions *(fréquence à confirmer — pas nécessairement quotidien, cf. note ci-dessous)* : scraping Bringo + insertion + déclenchement de la revalidation des pages Next.js (contenu frais indexé automatiquement).
-- [ ] Archivage des extractions conservé (dossiers horodatés — acquis à préserver).
+- [x] Cron GitHub Actions quotidien : expiration auto_draft (>14 jours) + scraping Bringo + insertion + revalidation Next.js. *(Phase 7B, 20/07/2026)*
+- [x] Archivage des extractions conservé — artefacts GitHub Actions (rétention 30 jours), rien dans le repo. *(Phase 7B, 20/07/2026)*
 
-**État d'avancement (19/07/2026)** : Phase 7A terminée — le pipeline a
-rejoint le monorepo (`apps/pipeline`, workspace pnpm nommé `pipeline`),
-déménagement pur (code des scripts `.mjs` inchangé, seule la validation
-avant insertion a été centralisée sur les schémas zod partagés de
-`packages/schemas`, remplaçant la validation locale ad hoc). Archives
-d'extractions passées non rapatriées, restent hors dépôt (`.gitignore`
-dédié). RESTE (Phase 7B) : le cron GitHub Actions — sa fréquence reste à
-calibrer sur une doctrine de curation à définir (pas forcément
-quotidienne : dépend du rythme réel de renouvellement du catalogue Bringo
-et de la charge de validation admin qu'on veut s'imposer) ; nécessitera de
-configurer les secrets GitHub Actions (mêmes variables d'environnement que
-documentées dans `apps/pipeline/README.md`).
+**État d'avancement (20/07/2026)** : Phase 7A + 7B terminées. Phase 7A —
+le pipeline a rejoint le monorepo (`apps/pipeline`, workspace pnpm nommé
+`pipeline`), déménagement pur (code des scripts `.mjs` inchangé, seule la
+validation avant insertion a été centralisée sur les schémas zod partagés
+de `packages/schemas`). Phase 7B — `.github/workflows/pipeline-quotidien.yml`
+(cron `0 5 * * *` + `workflow_dispatch`) : `expirer-auto-draft` (nouveau
+script, `apps/pipeline/expiration.mjs` — deals `auto_draft` de plus de 14
+jours passent `expire`) → `scraper-bringo` → `insert-deals` → `POST
+/api/revalidate` (nouvelle route infra, hors `/api/v1`, quatrième
+amendement conscient — voir CONTRAT-V1 §4). Fréquence retenue : quotidienne
+(décision explicite, pas un défaut non questionné) — le catalogue Bringo
+change assez souvent pour justifier un run/jour, et la charge de
+modération reste absorbable à ce rythme. Automatisé uniquement
+`scraper-bringo` (auto-suffisant via `bringo-categories.txt`) —
+`extract-catalogue` reste un geste manuel ponctuel (pas de découverte
+automatique de catalogue). Archives d'extractions passées non rapatriées
+dans le repo, restent hors dépôt (`.gitignore` dédié) ; celles produites
+par le cron sont conservées 30 jours en artefact GitHub Actions.
+`REVALIDATE_TOKEN` (Vercel + secret GitHub) à générer par Kamel
+lui-même — non fourni par la session qui a livré ce lot.
 
 **Terminé quand** : un deal scrapé le matin est visible sur le site sans intervention manuelle autre que la validation admin.
 
@@ -278,7 +286,7 @@ documentées dans `apps/pipeline/README.md`).
 | 4 — Web | ◐ code complet | commits 06ca057→9d4718c ; RESTE : validation parité v1↔v2 sur mobile réel (critère "Terminé quand" — action Kamel) |
 | 5 — SEO | ◐ code complet | commits 94147b2→d3583ed ; RESTE : soumission sitemap Search Console + test résultats enrichis Google (actions externes) |
 | 6 — Bascule prod | ☑ fait | terminée le 18/07/2026, déclarée par anticipation des 7 jours pleins (cf. SUIVI clôture) ; bascule DNS 16/07, DNSSEC actif, sitemap soumis et traité (57 pages) ; v1 gelée (Git déconnecté, projets renommés `*-v1-legacy`) ; réserve ouverte : suppression définitive des projets v1 (Vercel + Supabase laqwg) ~23/07/2026 |
-| 7 — Pipeline | ◐ Phase 7A faite | pipeline intégré au monorepo (`apps/pipeline`, 19/07/2026), validation centralisée sur les schémas zod partagés ; RESTE (Phase 7B) : cron GitHub Actions, fréquence à calibrer sur la doctrine de curation (pas nécessairement quotidienne) |
+| 7 — Pipeline | ☑ fait | pipeline intégré au monorepo (`apps/pipeline`, 19/07/2026) ; cron quotidien GitHub Actions (20/07/2026) : expiration auto_draft + scraping + insertion + revalidation Next.js, artefacts d'extraction 30 jours ; `REVALIDATE_TOKEN` (Vercel + secret GitHub) reste à générer par Kamel |
 | 8 — Mobile & ops | ☐ à faire | |
 | 9 — VPS | ☐ conditionnel | |
 
@@ -452,7 +460,7 @@ v1_auth_users_audit`, rôle `etl_reader`) et la suppression de
 confirmation de remontée dans le dashboard Analytics restent également à
 valider côté Kamel — hors visibilité de cette session.
 
-**PROCHAINE TÂCHE** : clore 4 — validation parité v1↔v2 sur mobile réel (action Kamel). Phase 6 : réserve du ~23/07/2026 (suppression définitive des projets v1, nettoyage laqwg, index.html racine) ; confirmer Vercel Pro et la remontée Analytics au dashboard. Sinon : Phase 7B (cron GitHub Actions — intégration monorepo du pipeline faite le 19/07/2026, Phase 7A).
+**PROCHAINE TÂCHE** : clore 4 — validation parité v1↔v2 sur mobile réel (action Kamel). Phase 6 : réserve du ~23/07/2026 (suppression définitive des projets v1, nettoyage laqwg, index.html racine) ; confirmer Vercel Pro et la remontée Analytics au dashboard. Phase 7 terminée (7A + 7B, 20/07/2026) — action restante hors session : Kamel génère et configure `REVALIDATE_TOKEN` (Vercel + secret GitHub), puis lance le premier run manuel via l'onglet Actions. Sinon : Phase 8 (mobile & opérations).
 
 ---
 
