@@ -1,0 +1,100 @@
+# .github/workflows/pipeline-quotidien.yml
+#
+# Phase 7B — cron quotidien : purge du stock mort (expiration auto_draft)
+# -> scraping Bringo -> insertion (validation zod partagée, packages/schemas)
+# -> revalidation Next.js (feed, enseignes, sitemap).
+#
+# Automatisé uniquement : scraper-bringo (categories.txt auto-suffisant,
+# aucune saisie manuelle nécessaire) + insert-deals (qui fait lui-même
+# l'extraction de description via fiche-produit.mjs, cf. README). PAS
+# extract-catalogue : ce script attend une URL/chemin de catalogue précis à
+# chaque appel (aucun mécanisme de découverte automatique) — il ne peut pas
+# tourner sans surveillance, il reste un geste manuel ponctuel.
+#
+# Pas de continue-on-error nulle part : un échec à n'importe quelle étape
+# fait échouer le job franchement — GitHub notifie par email, suffisant à
+# cette échelle (pas d'astreinte).
+
+name: Pipeline quotidien
+
+on:
+  schedule:
+    # 05:00 UTC = 06:00 Casablanca (WET toute l'année, le Maroc n'observe
+    # pas le changement d'heure d'été/hiver comme l'Europe).
+    - cron: "0 5 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  # File d'attente, jamais d'annulation brutale : interrompre un run en
+  # pleine insertion (écritures individuelles, pas une transaction globale,
+  # cf. apps/pipeline/insert-deals.mjs) ne corromprait rien, mais autant
+  # laisser un run se terminer proprement plutôt que le tuer à mi-chemin.
+  group: pipeline-quotidien
+  cancel-in-progress: false
+
+env:
+  # SUPABASE_DB_URL (secret GitHub) -> DATABASE_URL (nom attendu par
+  # apps/pipeline, packages/db) : mapping explicite, les deux noms ne sont
+  # pas censés coïncider.
+  DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  # Pas de CLAUDE_MODEL : le pipeline utilise sa valeur par défaut (non
+  # utilisé par ce workflow de toute façon, extract-catalogue n'est pas
+  # automatisé — cf. note en tête de fichier).
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Expiration des deals auto_draft (> 14 jours)
+        run: pnpm --filter pipeline run expirer-auto-draft
+
+      - name: Scraping Bringo (Casablanca)
+        run: pnpm --filter pipeline run scraper-bringo -- bringo-categories.txt Casablanca
+
+      - name: Insertion en base (validation zod partagée)
+        working-directory: apps/pipeline
+        run: |
+          # find plutôt que `ls -t` (shellcheck SC2012) — un runner frais n'a
+          # de toute façon qu'un seul fichier ici (extractions/ est gitignoré,
+          # absent au checkout, et une seule invocation de scraper-bringo
+          # précède cette étape).
+          fichier=$(find extractions -maxdepth 1 -type f -name '*.json' | head -n1)
+          if [ -z "$fichier" ]; then
+            echo "Aucun fichier d'extraction trouvé dans extractions/." >&2
+            exit 1
+          fi
+          echo "Fichier d'extraction : $fichier"
+          pnpm --filter pipeline run insert-deals -- "$fichier"
+
+      - name: Revalidation Next.js (feed, enseignes, sitemap)
+        run: |
+          curl -sf -X POST "https://fidwastafid.com/api/revalidate" \
+            -H "x-revalidate-token: ${{ secrets.REVALIDATE_TOKEN }}"
+
+      # Préserve l'acquis d'archivage (dossiers horodatés) sans rien stocker
+      # dans le repo — artefact du run, pas un commit. `if: always()` :
+      # archiver ce qui a été produit même si une étape suivante échoue.
+      - name: Archive des extractions du jour
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extractions-${{ github.run_id }}
+          path: apps/pipeline/extractions/
+          retention-days: 30
+          if-no-files-found: ignore
