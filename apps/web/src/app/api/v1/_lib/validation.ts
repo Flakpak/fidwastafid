@@ -21,7 +21,15 @@ export async function parseJsonBody<T>(request: Request, schema: ZodType<T>): Pr
   const result = schema.safeParse(json);
   if (!result.success) {
     const message = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(" | ");
-    return { success: false, response: apiError("VALIDATION_ERROR", message) };
+    // Premier message par champ (path vide -> "_", erreur au niveau racine,
+    // ex. une superRefine sans path précis) — un champ n'a besoin que d'un
+    // message à afficher, pas de la liste complète de ce qui cloche dessus.
+    const fields: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const path = issue.path.join(".") || "_";
+      if (!(path in fields)) fields[path] = issue.message;
+    }
+    return { success: false, response: apiError("VALIDATION_ERROR", message, fields) };
   }
 
   return { success: true, data: result.data };

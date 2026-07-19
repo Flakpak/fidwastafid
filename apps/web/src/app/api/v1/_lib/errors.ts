@@ -11,8 +11,18 @@ const STATUS_BY_CODE: Record<ApiErrorCode, number> = {
   RATE_LIMITED: 429,
 };
 
-export function apiError(code: ApiErrorCode, message: string): NextResponse {
-  return NextResponse.json({ error: { code, message } }, { status: STATUS_BY_CODE[code] });
+/**
+ * `fields` (champ → message) : uniquement pour VALIDATION_ERROR issu d'un
+ * échec zod — permet au client de marquer individuellement les champs
+ * fautifs (cf. apiErrorSchema, packages/schemas). Omis du payload (pas
+ * `fields: undefined`) plutôt que toujours présent : un objet vide serait
+ * ambigu avec "aucun détail disponible".
+ */
+export function apiError(code: ApiErrorCode, message: string, fields?: Record<string, string>): NextResponse {
+  return NextResponse.json(
+    { error: { code, message, ...(fields ? { fields } : {}) } },
+    { status: STATUS_BY_CODE[code] }
+  );
 }
 
 /**

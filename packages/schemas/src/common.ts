@@ -35,6 +35,15 @@ export const apiErrorSchema = z.object({
   error: z.object({
     code: apiErrorCodeSchema,
     message: z.string(),
+    /**
+     * Détail champ → message, uniquement pour VALIDATION_ERROR issu d'un
+     * échec zod (packages/schemas via parseJsonBody) — absent sinon (ex.
+     * Turnstile, corps JSON invalide). Permet à un formulaire de marquer
+     * individuellement les champs fautifs plutôt que d'exposer seulement un
+     * message concaténé illisible (incident 19/07/2026 : soumission
+     * silencieuse en 400 sans qu'aucun champ ne soit désigné).
+     */
+    fields: z.record(z.string(), z.string()).optional(),
   }),
 });
 export type ApiError = z.infer<typeof apiErrorSchema>;
