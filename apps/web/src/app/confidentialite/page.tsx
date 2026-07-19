@@ -46,8 +46,11 @@ export default function ConfidentialitePage() {
                 le numéro WhatsApp d&apos;un vendeur, quand tu le renseignes en soumettant un bon plan — il
                 n&apos;est publié sur la page du deal que si tu as explicitement coché l&apos;autorisation
                 d&apos;affichage public au moment de la soumission ; sans cette case cochée, il reste visible
-                uniquement par la modération. Tu peux demander son retrait à tout moment en contactant la
-                modération : contact@fidwastafid.com ;
+                uniquement par la modération. Tu peux demander son retrait à tout moment en{" "}
+                <Link href="/contact" className="text-bleu font-bold hover:underline">
+                  contactant la modération
+                </Link>{" "}
+                ;
               </li>
               <li>
                 des données techniques minimales (adresse IP le temps d&apos;une requête) pour limiter les abus
@@ -90,13 +93,22 @@ export default function ConfidentialitePage() {
                 ton compte
               </Link>{" "}
               : consulter ton profil et tes contributions (accès), modifier ton pseudo ou ta couleur d&apos;avatar
-              (rectification), ou supprimer ton compte (effacement). Pour toute autre question, tu peux nous
-              contacter directement.
+              (rectification), ou supprimer ton compte (effacement). Pour toute autre question, tu peux{" "}
+              <Link href="/contact" className="text-bleu font-bold hover:underline">
+                nous contacter directement
+              </Link>
+              .
             </p>
           </Section>
 
           <Section titre="Contact">
-            <p>Une question sur tes données ? Écris-nous : contact@fidwastafid.com</p>
+            <p>
+              Une question sur tes données ?{" "}
+              <Link href="/contact" className="text-bleu font-bold hover:underline">
+                Contacte-nous
+              </Link>
+              .
+            </p>
           </Section>
         </div>
       </main>

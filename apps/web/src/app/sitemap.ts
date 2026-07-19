@@ -35,6 +35,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: SITE_URL, changeFrequency: "hourly", priority: 1 },
     { url: new URL("/concept", SITE_URL).toString(), changeFrequency: "monthly", priority: 0.3 },
     { url: new URL("/confidentialite", SITE_URL).toString(), changeFrequency: "yearly", priority: 0.2 },
+    { url: new URL("/contact", SITE_URL).toString(), changeFrequency: "yearly", priority: 0.2 },
     ...deals.map((d) => ({
       url: new URL(`/deal/${dealUrlSlug(d.titre, d.public_id)}`, SITE_URL).toString(),
       lastModified: new Date(d.updated_at),

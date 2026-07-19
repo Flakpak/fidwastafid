@@ -104,6 +104,14 @@ export default function ChartePage() {
             </p>
           </Section>
 
+          <p className="text-sm text-muted">
+            Une question sur une modération, ou un deal qui ne respecte pas cette charte ?{" "}
+            <Link href="/contact" className="text-bleu font-bold hover:underline">
+              Contacte-nous
+            </Link>
+            .
+          </p>
+
           <div className="pt-2">
             <Link href="/soumettre" className="inline-block bg-rouge text-white rounded-xl px-6 py-3 text-sm font-black">
               Proposer un bon plan →
