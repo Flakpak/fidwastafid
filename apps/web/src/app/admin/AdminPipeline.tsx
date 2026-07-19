@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { DealAdmin, DealStatut } from "@fidwastafid/schemas";
-import { AdminDealItem, type TerrainFields } from "./AdminDealItem.js";
+import type { DealAdmin, DealStatut, Enseigne } from "@fidwastafid/schemas";
+import { AdminDealItem, type DealEditFields, type SaveResult, type ImageFetchResult } from "./AdminDealItem.js";
 
 interface ApiErrorBody {
-  error?: { code?: string; message?: string };
+  error?: { code?: string; message?: string; fields?: Record<string, string> };
 }
 
 function remise(deal: DealAdmin): number {
@@ -57,7 +57,7 @@ const ONGLET_ACTIONS: Record<DealStatut, Action[]> = {
 /** Sélection groupée réservée aux deux onglets de modération initiale (v1 : idem). */
 const BULK_ONGLETS = new Set<DealStatut>(["auto_draft", "en_attente"]);
 
-export function AdminPipeline() {
+export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   const [deals, setDeals] = useState<DealAdmin[] | null>(null);
   // Total réel renvoyé par l'API (count(*) over(), toutes statuts confondus
   // — l'appel n'est pas filtré par statut). Sert uniquement à détecter une
@@ -138,14 +138,21 @@ export function AdminPipeline() {
   }
 
   /**
-   * Édition curateur des champs terrain (CONTRAT-V1 §3, amendement du
-   * 18/07/2026) — statut inchangé (renvoyé tel quel, requis par le schéma
-   * de mise à jour admin), seuls les champs terrain sont transmis. Chaîne
-   * vide -> undefined : envoyer "" échouerait la validation (lienMaps,
-   * whatsappContact) là où omettre le champ laisse la valeur existante
-   * intacte (coalesce côté API), ce qui est le comportement voulu ici.
+   * Édition curateur complète (CONTRAT-V1 §3/§4, troisième amendement
+   * conscient du 19/07/2026) — statut inchangé (renvoyé tel quel, requis par
+   * le schéma de mise à jour admin). Champs obligatoires (titre/prixPromo/
+   * categorie/type) envoyés tels quels : un champ vidé par erreur doit être
+   * rejeté par la validation serveur, pas silencieusement ignoré. Champs
+   * facultatifs : chaîne vide -> undefined (coalesce côté API laisse la
+   * valeur existante intacte, limite acceptée, même comportement que les
+   * champs terrain). `enseigneSlug` fait exception : "" -> `null`
+   * (déliaison explicite, distincte d'"inchangé").
+   *
+   * Retourne le résultat à AdminDealItem (au lieu de seulement peupler
+   * l'erreur de page) pour permettre l'affichage par champ (pattern
+   * `fields`, cf. SoumettreForm.tsx).
    */
-  async function updateFields(publicId: string, statutActuel: DealStatut, fields: TerrainFields) {
+  async function saveDeal(publicId: string, statutActuel: DealStatut, fields: DealEditFields): Promise<SaveResult> {
     setPending(true);
     setError(null);
     try {
@@ -154,6 +161,16 @@ export function AdminPipeline() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           statut: statutActuel,
+          titre: fields.titre,
+          description: fields.description || undefined,
+          prixPromo: Number(fields.prixPromo),
+          prixNormal: fields.prixNormal ? Number(fields.prixNormal) : undefined,
+          categorie: fields.categorie,
+          type: fields.type,
+          ville: fields.ville || undefined,
+          dateFin: fields.dateFin || undefined,
+          lien: fields.lien || undefined,
+          enseigneSlug: fields.enseigneSlug === "" ? null : fields.enseigneSlug,
           nomVendeur: fields.nomVendeur || undefined,
           adresse: fields.adresse || undefined,
           lienMaps: fields.lienMaps || undefined,
@@ -163,13 +180,27 @@ export function AdminPipeline() {
       });
       if (!res.ok) {
         const body = (await res.json()) as ApiErrorBody;
-        setError(body.error?.message ?? "Mise à jour des champs impossible.");
-        return;
+        return { ok: false, message: body.error?.message ?? "Mise à jour impossible.", fields: body.error?.fields };
       }
       await fetchDeals();
+      return { ok: true };
     } finally {
       setPending(false);
     }
+  }
+
+  /** Volet image (CONTRAT-V1 §4, troisième amendement conscient du
+   *  19/07/2026) — pas de `pending` global ici : l'état "en cours" reste
+   *  local à AdminDealItem, un fetch externe (page + image) peut prendre
+   *  plusieurs secondes et ne doit pas geler le reste du pipeline. */
+  async function fetchImageFromLink(publicId: string): Promise<ImageFetchResult> {
+    const res = await fetch(`/api/v1/admin/deals/${publicId}/image-depuis-lien`, { method: "POST" });
+    if (!res.ok) {
+      const body = (await res.json()) as ApiErrorBody;
+      return { ok: false, message: body.error?.message ?? "Récupération de l'image impossible." };
+    }
+    await fetchDeals();
+    return { ok: true };
   }
 
   async function bulk(statut: "publie" | "rejete") {
@@ -255,12 +286,14 @@ export function AdminPipeline() {
             key={deal.publicId}
             deal={deal}
             actions={ONGLET_ACTIONS[onglet]}
+            enseignes={enseignes}
             showCheckbox={BULK_ONGLETS.has(onglet)}
             checked={selected.has(deal.publicId)}
             onToggle={() => toggle(deal.publicId)}
             pending={pending}
             onAction={(statut, motifRejet) => updateStatut(deal.publicId, statut, motifRejet)}
-            onSaveFields={(fields) => updateFields(deal.publicId, deal.statut, fields)}
+            onSaveFields={(fields) => saveDeal(deal.publicId, deal.statut, fields)}
+            onFetchImageFromLink={() => fetchImageFromLink(deal.publicId)}
           />
         ))}
       </ul>

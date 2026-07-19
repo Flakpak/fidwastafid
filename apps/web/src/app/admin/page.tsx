@@ -1,8 +1,16 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import type { Enseigne } from "@fidwastafid/schemas";
 import { SiteHeader } from "../../components/SiteHeader.js";
 import { AdminPipeline } from "./AdminPipeline.js";
 import { resolveCurrentUser } from "../../lib/currentUser.js";
+import { GET as getEnseignesHandler } from "../api/v1/enseignes/route.js";
+
+async function fetchEnseignes(): Promise<Enseigne[]> {
+  const response = await getEnseignesHandler();
+  const body = (await response.json()) as { data: Enseigne[] };
+  return body.data;
+}
 
 /**
  * `metadata` en export statique ne suffit pas ici : un objet statique est
@@ -35,12 +43,16 @@ export default async function AdminPage() {
   if (!user) redirect("/connexion?next=/admin");
   if (!user.isAdmin) notFound();
 
+  // Liste des enseignes pour le <select> d'édition (AdminDealItem) — même
+  // source que SoumettreForm (GET /api/v1/enseignes).
+  const enseignes = await fetchEnseignes();
+
   return (
     <div className="min-h-screen bg-creme text-texte">
       <SiteHeader />
       <main className="max-w-2xl mx-auto p-4 flex flex-col gap-4">
         <h1 className="text-xl font-black">Pipeline</h1>
-        <AdminPipeline />
+        <AdminPipeline enseignes={enseignes} />
       </main>
     </div>
   );
