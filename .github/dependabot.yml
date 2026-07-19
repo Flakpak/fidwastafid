@@ -9,6 +9,15 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    ignore:
+      # Incident du 19/07/2026 : le PR Dependabot next-16.2.10 (major) casse le
+      # build Vercel — Next 16 active Turbopack par défaut, incompatible avec
+      # le webpack() custom de next.config.ts (transpilePackages/extensionAlias)
+      # sans migration explicite. La migration Next 16/Turbopack est un
+      # chantier à planifier volontairement, pas une mise à jour automatique à
+      # subir. Retirer cette règle (ou l'affiner) quand la migration sera prête.
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
