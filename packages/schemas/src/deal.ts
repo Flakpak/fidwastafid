@@ -128,6 +128,30 @@ const dealCoreShape = {
 };
 
 /**
+ * Cohérence physique/en_ligne + prix — CONTRAT-V1 §3. Extrait de
+ * dealInputSchema (ci-dessous) pour être réutilisé tel quel par le PATCH
+ * admin (packages/schemas ne connaît pas la route, mais la route doit
+ * appliquer exactement les mêmes règles sur l'état RÉSULTANT d'une édition
+ * partielle — pas uniquement sur les champs présents dans le corps de la
+ * requête, cf. dealAdminUpdateSchema plus bas).
+ */
+export function dealCoherenceIssues(val: {
+  type: DealType;
+  lien?: string;
+  prixPromo: number;
+  prixNormal?: number;
+}): { path: (string | number)[]; message: string }[] {
+  const issues: { path: (string | number)[]; message: string }[] = [];
+  if ((val.type === "en_ligne" || val.type === "les_deux") && !val.lien) {
+    issues.push({ path: ["lien"], message: "Un lien est requis pour un deal en ligne." });
+  }
+  if (val.prixNormal !== undefined && val.prixNormal < val.prixPromo) {
+    issues.push({ path: ["prixNormal"], message: "Le prix normal doit être supérieur ou égal au prix promo." });
+  }
+  return issues;
+}
+
+/**
  * POST /api/v1/deals — CONTRAT-V1 §3 :
  * - lien requis si type ∈ {en_ligne, les_deux} (un deal en ligne sans lien est inutilisable)
  * - prixNormal, si fourni, doit être ≥ prixPromo
@@ -143,19 +167,8 @@ export const dealInputSchema = z
   .object({ ...dealCoreShape, whatsappPublic: z.boolean().default(false) })
   .omit({ imageKey: true })
   .superRefine((val, ctx) => {
-    if ((val.type === "en_ligne" || val.type === "les_deux") && !val.lien) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["lien"],
-        message: "Un lien est requis pour un deal en ligne.",
-      });
-    }
-    if (val.prixNormal !== undefined && val.prixNormal < val.prixPromo) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["prixNormal"],
-        message: "Le prix normal doit être supérieur ou égal au prix promo.",
-      });
+    for (const issue of dealCoherenceIssues(val)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: issue.path, message: issue.message });
     }
     if (val.whatsappPublic && !val.whatsappContact) {
       ctx.addIssue({
@@ -213,13 +226,29 @@ export type DealAdmin = z.infer<typeof dealAdminSchema>;
 
 /**
  * PATCH /api/v1/admin/deals/:publicId — changement de statut (toujours
- * requis, comme avant) + édition curateur des champs terrain (CONTRAT-V1 §3,
- * amendement du 18/07/2026) : l'admin peut enrichir un deal du pipeline
- * (nom_vendeur/adresse/lien_maps/whatsapp) sans passer par une resoumission,
- * et motiver un rejet. Tous les champs terrain restent optionnels — un PATCH
- * qui ne fait que changer le statut reste valide, comme avant cet amendement.
+ * requis, comme avant) + édition curateur complète du deal (CONTRAT-V1 §3/§4,
+ * troisième amendement conscient du 19/07/2026) : l'admin peut corriger
+ * n'importe quel champ métier d'un deal (titre, prix, catégorie, type,
+ * ville, lien, enseigne...), en plus des champs terrain déjà éditables
+ * (nom_vendeur/adresse/lien_maps/whatsapp) et de motiver un rejet.
+ *
+ * Tous les champs métier restent optionnels ici — un PATCH qui ne fait que
+ * changer le statut reste valide (comportement d'origine inchangé). Comme
+ * pour les champs terrain, un champ omis laisse la valeur existante intacte
+ * (`coalesce` côté route) : pas de moyen de l'effacer, sauf `enseigneSlug`
+ * qui distingue explicitement omis (undefined, inchangé) de `null`
+ * (déliaison volontaire — "aucune enseigne").
+ *
+ * PAS de superRefine ici : la cohérence physique/en_ligne (dealCoherenceIssues)
+ * ne peut se vérifier que sur l'état RÉSULTANT de la fusion patch+existant
+ * (un PATCH peut ne changer que `ville` sans toucher à `type`/`lien`) — cette
+ * validation vit donc côté route, après lecture de la ligne existante.
+ *
+ * Champs jamais éditables ici (immuables ou pilotés par un autre flux) :
+ * publicId, score, submitterId, imageKey (volet image-depuis-lien dédié) —
+ * absents volontairement de ce schéma.
  */
-export const dealStatutUpdateSchema = z.object({
+export const dealAdminUpdateSchema = z.object({
   statut: dealStatutSchema,
   motifRejet: z.string().trim().max(500).optional(),
   nomVendeur: z.preprocess(blankToUndefined, z.string().trim().min(1).max(80).optional()),
@@ -227,4 +256,18 @@ export const dealStatutUpdateSchema = z.object({
   lienMaps: z.preprocess(blankToUndefined, lienMapsSchema.optional()),
   whatsappContact: z.preprocess(blankToUndefined, whatsappContactSchema.optional()),
   whatsappPublic: z.boolean().optional(),
+
+  titre: z.string().trim().min(3).max(200).optional(),
+  description: z.preprocess(blankToUndefined, z.string().max(2000).optional()),
+  prixPromo: z.number().positive().optional(),
+  prixNormal: z.number().positive().optional(),
+  categorie: categorieSchema.optional(),
+  type: dealTypeSchema.optional(),
+  ville: villeSchema.optional(),
+  dateFin: z.string().date().optional(),
+  lien: z.preprocess(blankToUndefined, z.string().url().optional()),
+  /** null = déliaison explicite ("aucune enseigne") ; undefined (absent du
+   *  corps) = inchangé ; string = résolue en enseigne_id côté route. */
+  enseigneSlug: z.string().min(1).max(60).nullable().optional(),
 });
+export type DealAdminUpdate = z.infer<typeof dealAdminUpdateSchema>;
