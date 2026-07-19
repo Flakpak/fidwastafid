@@ -203,6 +203,17 @@ export function AdminDealItem({
     <li className="bg-white border border-bordure rounded-xl p-4 flex flex-col gap-2">
       <div className="flex items-start gap-3">
         {showCheckbox && <input type="checkbox" checked={checked} onChange={onToggle} className="mt-1" />}
+        {/* Photo visible directement dans la ligne du pipeline (pas
+            seulement dans le panneau "Éditer le deal" replié) : l'admin doit
+            pouvoir juger la photo soumise avant de Valider/Rejeter, sans
+            devoir déplier le formulaire d'édition. */}
+        {deal.imageKey && (
+          <img
+            src={`/img/deals/${deal.publicId}`}
+            alt={deal.titre}
+            className="w-14 h-14 object-cover rounded-lg border border-bordure flex-shrink-0"
+          />
+        )}
         <div className="flex-1 flex flex-col gap-1">
           <span className="font-bold">{deal.titre}</span>
           <div className="text-xs text-muted">{joinMeta(deal.enseigneSlug ?? deal.nomVendeur, deal.ville, deal.categorie)}</div>
