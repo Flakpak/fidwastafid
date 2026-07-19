@@ -24,12 +24,25 @@ export function CommentForm({ publicId }: { publicId: string }) {
         body: JSON.stringify({ contenu }),
       });
       if (!res.ok) {
-        const body = (await res.json()) as ApiErrorBody;
-        setError(body.error?.code === "UNAUTHENTICATED" ? "Connecte-toi pour commenter." : "Envoi impossible.");
+        // res.json() peut lui-même échouer (réponse d'erreur non structurée,
+        // ex. 500 hors format API) — sans ce try imbriqué, l'exception
+        // remontait hors du bloc et `setError` n'était jamais appelé
+        // (même défaut que SoumettreForm, incident du 19/07/2026).
+        let message = "Envoi impossible.";
+        try {
+          const body = (await res.json()) as ApiErrorBody;
+          if (body.error?.code === "UNAUTHENTICATED") message = "Connecte-toi pour commenter.";
+          else if (body.error?.code === "RATE_LIMITED") message = "Trop de commentaires, réessaie plus tard.";
+        } catch {
+          // Message générique déjà posé ci-dessus.
+        }
+        setError(message);
         return;
       }
       setContenu("");
       router.refresh();
+    } catch {
+      setError("Envoi impossible, réessaie.");
     } finally {
       setPending(false);
     }
@@ -52,7 +65,7 @@ export function CommentForm({ publicId }: { publicId: string }) {
         disabled={pending}
         className="self-start bg-rouge text-white rounded px-4 py-2 font-bold text-sm disabled:opacity-50"
       >
-        Commenter
+        {pending ? "Envoi..." : "Commenter"}
       </button>
       {error && <p className="text-sm text-rouge">{error}</p>}
     </form>

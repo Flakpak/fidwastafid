@@ -3,6 +3,7 @@ import Script from "next/script";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { motDePasseOublieAction } from "../../lib/authActions.js";
+import { SubmitButton } from "../../components/SubmitButton.js";
 
 /** noindex — CONTRAT-V1 §2, même famille que /connexion. */
 export const metadata: Metadata = {
@@ -51,9 +52,9 @@ export default async function MotDePasseOubliePage({
           <input type="email" name="email" required className="border border-bordure rounded px-3 py-2" />
         </label>
         <div className="cf-turnstile" data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} />
-        <button type="submit" className="bg-rouge text-white rounded px-4 py-2 font-bold">
+        <SubmitButton pendingLabel="Envoi..." className="bg-rouge text-white rounded px-4 py-2 font-bold">
           Envoyer le lien
-        </button>
+        </SubmitButton>
         <Link href="/connexion" className="text-sm text-center text-muted underline">
           Retour à la connexion
         </Link>

@@ -27,6 +27,7 @@ export function IdentiteForm({ pseudoInitial, couleurInitiale }: IdentiteFormPro
   const [pendingCouleur, setPendingCouleur] = useState<CouleurAvatar | null>(null);
   const [erreurPseudo, setErreurPseudo] = useState<string | null>(null);
   const [succesPseudo, setSuccesPseudo] = useState(false);
+  const [erreurCouleur, setErreurCouleur] = useState<string | null>(null);
 
   async function enregistrerPseudo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,6 +47,8 @@ export function IdentiteForm({ pseudoInitial, couleurInitiale }: IdentiteFormPro
       }
       if (body.pseudo) setPseudo(body.pseudo);
       setSuccesPseudo(true);
+    } catch {
+      setErreurPseudo("Modification impossible, réessaie.");
     } finally {
       setPendingPseudo(false);
     }
@@ -54,13 +57,20 @@ export function IdentiteForm({ pseudoInitial, couleurInitiale }: IdentiteFormPro
   async function choisirCouleur(c: CouleurAvatar) {
     if (c === couleur || pendingCouleur) return;
     setPendingCouleur(c);
+    setErreurCouleur(null);
     try {
       const res = await fetch("/api/v1/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ couleurAvatar: c }),
       });
-      if (res.ok) setCouleur(c);
+      if (res.ok) {
+        setCouleur(c);
+      } else {
+        setErreurCouleur("Changement de couleur impossible.");
+      }
+    } catch {
+      setErreurCouleur("Changement de couleur impossible, réessaie.");
     } finally {
       setPendingCouleur(null);
     }
@@ -94,7 +104,7 @@ export function IdentiteForm({ pseudoInitial, couleurInitiale }: IdentiteFormPro
             disabled={pendingPseudo}
             className="bg-rouge text-white rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50"
           >
-            Enregistrer
+            {pendingPseudo ? "Enregistrement..." : "Enregistrer"}
           </button>
         </div>
         {erreurPseudo && <p className="text-sm text-rouge">{erreurPseudo}</p>}
@@ -118,6 +128,7 @@ export function IdentiteForm({ pseudoInitial, couleurInitiale }: IdentiteFormPro
             />
           ))}
         </div>
+        {erreurCouleur && <p className="text-sm text-rouge">{erreurCouleur}</p>}
       </div>
     </div>
   );

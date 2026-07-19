@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { resolveCurrentUser } from "../../lib/currentUser.js";
 import { reinitialiserMotDePasseAction } from "../../lib/authActions.js";
+import { SubmitButton } from "../../components/SubmitButton.js";
 
 /** noindex — CONTRAT-V1 §2, même famille que /connexion. */
 export const metadata: Metadata = {
@@ -39,9 +40,9 @@ function NouveauMotDePasseForm({ erreur }: { erreur?: string }) {
           className="border border-bordure rounded px-3 py-2"
         />
       </label>
-      <button type="submit" className="bg-rouge text-white rounded px-4 py-2 font-bold">
+      <SubmitButton pendingLabel="Enregistrement..." className="bg-rouge text-white rounded px-4 py-2 font-bold">
         Enregistrer
-      </button>
+      </SubmitButton>
     </form>
   );
 }

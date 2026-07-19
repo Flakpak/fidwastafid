@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { inscriptionAction } from "../../lib/authActions.js";
 import { safeNextPath } from "../../lib/nextPath.js";
+import { SubmitButton } from "../../components/SubmitButton.js";
 
 /** noindex — CONTRAT-V1 §2. */
 export const metadata: Metadata = {
@@ -49,9 +50,9 @@ export default async function InscriptionPage({
           Mot de passe
           <input type="password" name="password" required minLength={8} className="border border-bordure rounded px-3 py-2" />
         </label>
-        <button type="submit" className="bg-rouge text-white rounded px-4 py-2 font-bold">
+        <SubmitButton pendingLabel="Création du compte..." className="bg-rouge text-white rounded px-4 py-2 font-bold">
           Créer mon compte
-        </button>
+        </SubmitButton>
         <a
           href={next === "/" ? "/connexion" : `/connexion?next=${encodeURIComponent(next)}`}
           className="text-sm text-center text-muted underline"
