@@ -1,8 +1,25 @@
 import type { NextResponse } from "next/server";
-import type { ZodType, ZodTypeDef } from "zod";
+import type { ZodError, ZodType, ZodTypeDef } from "zod";
 import { apiError } from "./errors.js";
 
 export type ParseResult<T> = { success: true; data: T } | { success: false; response: NextResponse };
+
+/**
+ * Premier message par champ (path vide -> "_", erreur au niveau racine, ex.
+ * une superRefine sans path précis) — un champ n'a besoin que d'un message à
+ * afficher, pas de la liste complète de ce qui cloche dessus. Partagé entre
+ * parseJsonBody (corps JSON) et parseCandidate (objet déjà désérialisé, ex.
+ * depuis un FormData multipart) — même schéma zod, deux origines de corps.
+ */
+function zodErrorResponse(error: ZodError): NextResponse {
+  const message = error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(" | ");
+  const fields: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const path = issue.path.join(".") || "_";
+    if (!(path in fields)) fields[path] = issue.message;
+  }
+  return apiError("VALIDATION_ERROR", message, fields);
+}
 
 /**
  * Lit et valide le corps JSON d'une requête contre un schéma zod de
@@ -30,18 +47,19 @@ export async function parseJsonBody<T>(request: Request, schema: ZodType<T, ZodT
   }
 
   const result = schema.safeParse(json);
-  if (!result.success) {
-    const message = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(" | ");
-    // Premier message par champ (path vide -> "_", erreur au niveau racine,
-    // ex. une superRefine sans path précis) — un champ n'a besoin que d'un
-    // message à afficher, pas de la liste complète de ce qui cloche dessus.
-    const fields: Record<string, string> = {};
-    for (const issue of result.error.issues) {
-      const path = issue.path.join(".") || "_";
-      if (!(path in fields)) fields[path] = issue.message;
-    }
-    return { success: false, response: apiError("VALIDATION_ERROR", message, fields) };
-  }
+  if (!result.success) return { success: false, response: zodErrorResponse(result.error) };
+  return { success: true, data: result.data };
+}
 
+/**
+ * Même validation que parseJsonBody, mais sur un objet déjà construit (ex.
+ * reconstruit depuis un FormData multipart, POST /api/v1/deals avec photo)
+ * plutôt que désérialisé depuis un corps JSON — la lecture du corps diffère
+ * selon l'origine, la validation zod et le format d'erreur restent
+ * identiques dans les deux cas.
+ */
+export function parseCandidate<T>(candidate: unknown, schema: ZodType<T, ZodTypeDef, unknown>): ParseResult<T> {
+  const result = schema.safeParse(candidate);
+  if (!result.success) return { success: false, response: zodErrorResponse(result.error) };
   return { success: true, data: result.data };
 }

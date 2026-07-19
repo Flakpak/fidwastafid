@@ -1,16 +1,59 @@
 import { NextResponse } from "next/server";
 import { query } from "@fidwastafid/db";
 import { requireUser } from "@fidwastafid/auth";
-import { dealInputSchema, generatePublicId } from "@fidwastafid/schemas";
+import { dealInputSchema, generatePublicId, type DealInput } from "@fidwastafid/schemas";
 import { apiError, withAuthErrors } from "../_lib/errors.js";
-import { parseJsonBody } from "../_lib/validation.js";
+import { parseJsonBody, parseCandidate } from "../_lib/validation.js";
 import { isRateLimited, getClientIp } from "../_lib/rateLimit.js";
 import { verifyTurnstile } from "../_lib/turnstile.js";
 import { decodeCursor, encodeCursor, type TriDeals } from "../_lib/pagination.js";
 import { DEAL_SELECT, DEAL_FROM, PUBLIC_STATUTS, toDeal, type DealRow } from "../_lib/deals.js";
+import { processAndStoreDealImage, InvalidImageError, ImageProcessingError } from "../_lib/dealImage.js";
+
+export const runtime = "nodejs";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Reconstruit le candidat dealInputSchema depuis un FormData multipart
+ * (POST /api/v1/deals avec photo, CONTRAT-V1 §4/§6) — même schéma, même
+ * validation que le corps JSON ; seule la lecture du corps diffère.
+ * Chaîne vide -> undefined pour tous les champs texte (même convention que
+ * le corps JSON construit côté client, SoumettreForm.tsx) : un champ
+ * facultatif laissé vide ne doit jamais échouer une contrainte de forme
+ * (enum, url...) censée s'appliquer à une valeur réellement fournie.
+ */
+function formValue(form: FormData, name: string): string | undefined {
+  const value = form.get(name);
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+function formNumber(form: FormData, name: string): number | undefined {
+  const value = formValue(form, name);
+  return value !== undefined ? Number(value) : undefined;
+}
+
+function formDataToDealCandidate(form: FormData): Record<string, unknown> {
+  return {
+    titre: formValue(form, "titre"),
+    enseigneSlug: formValue(form, "enseigneSlug"),
+    nomVendeur: formValue(form, "nomVendeur"),
+    adresse: formValue(form, "adresse"),
+    lienMaps: formValue(form, "lienMaps"),
+    ville: formValue(form, "ville"),
+    categorie: formValue(form, "categorie"),
+    type: formValue(form, "type"),
+    prixPromo: formNumber(form, "prixPromo"),
+    prixNormal: formNumber(form, "prixNormal"),
+    dateFin: formValue(form, "dateFin"),
+    description: formValue(form, "description"),
+    lien: formValue(form, "lien"),
+    whatsappContact: formValue(form, "whatsappContact"),
+    whatsappPublic: form.get("whatsappPublic") === "true",
+  };
+}
 
 /**
  * Rang de gravité (Phase 5, style Dealabs/Hacker News) — tri par défaut de
@@ -162,6 +205,13 @@ export async function GET(request: Request): Promise<NextResponse> {
  * Toujours créé en `en_attente` (CONTRAT-V1 §4 : "la machine collecte,
  * l'humain publie" — la validation admin est un acte séparé, PATCH
  * /api/v1/admin/deals/:publicId).
+ *
+ * Accepte `application/json` (inchangé) OU `multipart/form-data` avec un
+ * champ "image" optionnel (photo terrain, ou contournement des sources qui
+ * bloquent image-depuis-lien — même module partagé que l'admin,
+ * `_lib/dealImage.ts`, mêmes garanties : magic bytes, WebP seul stocké,
+ * jamais l'original). Une soumission sans photo emprunte exactement le même
+ * chemin qu'avant ce lot, quel que soit le Content-Type utilisé.
  */
 export const POST = withAuthErrors(async (request: Request): Promise<NextResponse> => {
   const user = await requireUser(request);
@@ -178,9 +228,34 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
     return apiError("VALIDATION_ERROR", "Vérification anti-robot invalide.");
   }
 
-  const parsed = await parseJsonBody(request, dealInputSchema);
-  if (!parsed.success) return parsed.response;
-  const input = parsed.data;
+  const contentType = request.headers.get("content-type") ?? "";
+  let input: DealInput;
+  let imageFile: Blob | null = null;
+
+  if (contentType.includes("multipart/form-data")) {
+    let form: FormData;
+    try {
+      form = await request.formData();
+    } catch {
+      return apiError("VALIDATION_ERROR", "Corps multipart invalide.");
+    }
+
+    const parsed = parseCandidate(formDataToDealCandidate(form), dealInputSchema);
+    if (!parsed.success) return parsed.response;
+    input = parsed.data;
+
+    const file = form.get("image");
+    if (file instanceof Blob && file.size > 0) {
+      if (file.size > MAX_IMAGE_BYTES) {
+        return apiError("VALIDATION_ERROR", "Image trop volumineuse (5 Mo maximum).", { image: "5 Mo maximum." });
+      }
+      imageFile = file;
+    }
+  } else {
+    const parsed = await parseJsonBody(request, dealInputSchema);
+    if (!parsed.success) return parsed.response;
+    input = parsed.data;
+  }
 
   let enseigneId: number | null = null;
   if (input.enseigneSlug) {
@@ -195,16 +270,35 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
 
   const publicId = generatePublicId();
 
-  // image_key toujours null ici : dealInputSchema n'accepte plus imageKey
-  // (CONTRAT-V1 §6) — la soumission publique ne peut pas fixer sa propre
-  // clé d'image. Seul le pipeline écrit cette colonne, directement en
-  // base, hors de cet endpoint.
+  // Traitement + stockage AVANT l'insertion : un échec ici (type non
+  // reconnu, sharp en échec) fait échouer la soumission entière, jamais de
+  // deal créé sans sa photo annoncée. À l'inverse, image_key est inclus
+  // directement dans l'unique INSERT ci-dessous — jamais de deal existant
+  // sans sa photo déjà uploadée avec succès.
+  let imageKey: string | null = null;
+  if (imageFile) {
+    const buffer = Buffer.from(await imageFile.arrayBuffer());
+    try {
+      imageKey = await processAndStoreDealImage(publicId, buffer);
+    } catch (err) {
+      if (err instanceof InvalidImageError) {
+        return apiError("VALIDATION_ERROR", "Type de fichier non autorisé (jpeg/png/webp uniquement).", {
+          image: "Type de fichier non autorisé.",
+        });
+      }
+      if (err instanceof ImageProcessingError) {
+        return apiError("VALIDATION_ERROR", "Traitement de l'image impossible.", { image: "Traitement impossible." });
+      }
+      throw err;
+    }
+  }
+
   await query(
     `insert into deals
        (public_id, titre, enseigne_id, nom_vendeur, adresse, lien_maps, ville, categorie, type,
         prix_promo, prix_normal, date_fin, description, lien, image_key,
         whatsapp_contact, whatsapp_public, statut, submitter_id, score)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,null,$15,$16,'en_attente',$17,0)`,
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'en_attente',$18,0)`,
     [
       publicId,
       input.titre,
@@ -220,6 +314,7 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
       input.dateFin ?? null,
       input.description ?? null,
       input.lien ?? null,
+      imageKey,
       input.whatsappContact ?? null,
       input.whatsappPublic,
       user.id,
