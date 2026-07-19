@@ -89,14 +89,17 @@ jobs:
     env:
       DATABASE_URL: postgres://fidwastafid:fidwastafid@localhost:5432/fidwastafid
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      # Migration clés API Supabase (18/07/2026, docs/MIGRATION-CLES-SUPABASE.md) :
-      # nouvelles clés en priorité, legacy en fallback tant que les deux
-      # secrets GitHub coexistent — vide si le secret n'existe pas encore,
-      # le fallback applicatif prend le relai (voir packages/auth/src/supabaseClient.ts).
+      # Migration clés API Supabase (18/07/2026, docs/MIGRATION-CLES-SUPABASE.md).
+      # Legacy (SUPABASE_ANON_KEY/SUPABASE_SERVICE_ROLE_KEY) volontairement
+      # absentes ici depuis le 19/07/2026 : incident CI où SUPABASE_ANON_KEY
+      # (secret créé le 12/07, jamais renouvelé) s'est retrouvée révoquée
+      # côté Supabase sans que rien ne le signale — 18 runs rouges d'affilée
+      # avant diagnostic. Un fallback silencieux vers une clé morte n'est pas
+      # un filet de sécurité, juste un échec retardé et moins lisible. Ce job
+      # tourne confirmé sur les seules nouvelles clés (run 29686685477) — les
+      # réintroduire nécessiterait de recréer les secrets legacy à jour.
       SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
       TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
       # Clé de test PUBLIQUE Cloudflare ("always passes"), pas un secret.

@@ -45,8 +45,10 @@ deux n'est présente :
   de test réel via `/auth/v1/token?grant_type=password`.
 
 Les deux jeux de variables coexistent nativement côté Supabase (aucune
-bascule big-bang) — `docker-compose.yml` et `.github/workflows/ci.yml`
-passent déjà les quatre variables en parallèle.
+bascule big-bang) — `docker-compose.yml` passe les quatre variables en
+parallèle. `.github/workflows/ci.yml` (job `integration`) ne passe plus que
+les deux nouvelles depuis le 19/07/2026 (cf. section désactivation
+ci-dessous) : la coexistence reste utile en local/déploiement, plus en CI.
 
 ## Ce qui n'est PAS couvert par ce lot
 
@@ -79,13 +81,19 @@ Ne pas désactiver tant que la checklist suivante n'est pas cochée (reprise
 de la documentation Supabase sur la migration) :
 
 - [ ] `../fidwastafid-pipeline` migré vers `SUPABASE_SECRET_KEY`.
-- [ ] Secrets GitHub Actions `SUPABASE_PUBLISHABLE_KEY`/`SUPABASE_SECRET_KEY`
-      renseignés (le job `integration` de la CI fonctionne déjà avec les
-      deux jeux de variables, mais vérifier qu'il tourne bien sur les
-      nouvelles avant de couper les anciennes).
+- [x] Secrets GitHub Actions `SUPABASE_PUBLISHABLE_KEY`/`SUPABASE_SECRET_KEY`
+      renseignés et confirmés fonctionnels seuls (19/07/2026, run CI
+      29686685477 vert sans avertissement de fallback) — `SUPABASE_ANON_KEY`/
+      `SUPABASE_SERVICE_ROLE_KEY` retirées de l'env du job `integration`
+      (incident : `SUPABASE_ANON_KEY`, secret jamais renouvelé depuis sa
+      création, s'est retrouvée révoquée côté Supabase sans le signaler —
+      18 runs rouges avant diagnostic). Les secrets legacy restent
+      supprimables du repo GitHub à volonté, plus aucun code CI n'y touche.
 - [ ] Déploiement de prod (Vercel/VPS) basculé sur les nouvelles variables.
 - [ ] Aucune référence restante à `SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY`
-      dans ce repo hors code de fallback (`grep -rn` pour confirmer).
+      dans ce repo hors code de fallback (`grep -rn` pour confirmer) —
+      restent dans `docker-compose.yml` (dev local) et le code de fallback
+      lui-même, volontairement, tant que le pipeline et la prod ne sont pas migrés.
 - [ ] `index.html`/`src/App.jsx` (reliquat v1, hors périmètre) traité
       séparément si encore utilisé.
 
