@@ -1,6 +1,13 @@
 import { isPrivateOrReservedIp, assertPublicUrl, SsrfGuardError } from "../src/app/api/v1/_lib/ssrf.js";
 import { extractImageUrl } from "../src/app/api/v1/_lib/ogImage.js";
 import { sniffImageMime } from "../src/app/api/v1/_lib/dealImage.js";
+import { POST as postRevalidate } from "../src/app/api/revalidate/route.js";
+
+// Jeton de test purement local (Phase 7B) — jamais le vrai REVALIDATE_TOKEN,
+// qui n'existe que côté Vercel/secrets GitHub. Comparable au
+// TURNSTILE_SECRET_KEY "always passes" déjà en clair dans .github/workflows/
+// ci.yml : une valeur fixture, pas un secret.
+process.env.REVALIDATE_TOKEN = "jeton-de-test-local-jamais-reel";
 
 /**
  * Tests unitaires — offline, aucun réseau ni base de données (job CI
@@ -83,6 +90,18 @@ async function runAsyncChecks() {
   await checkAsyncResolves("https://exemple-litteral-ip-publique accepté (protocole + IP publique)", () =>
     assertPublicUrl("https://8.8.8.8/x")
   );
+
+  console.log("\nPOST /api/revalidate — jeton (cas d'erreur, avant tout accès base)");
+  const sansJetonRes = await postRevalidate(new Request("http://localhost/api/revalidate", { method: "POST" }));
+  check("sans jeton -> 401", sansJetonRes.status === 401);
+
+  const mauvaisJetonRes = await postRevalidate(
+    new Request("http://localhost/api/revalidate", {
+      method: "POST",
+      headers: { "x-revalidate-token": "mauvais-jeton" },
+    })
+  );
+  check("mauvais jeton -> 401", mauvaisJetonRes.status === 401);
 
   console.log(`\n${pass} passés, ${fail} échoués`);
   if (fail > 0) process.exit(1);

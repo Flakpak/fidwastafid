@@ -733,6 +733,17 @@ async function main() {
   );
   check("upload deal inconnu -> 404", uploadNotFoundRes.status === 404);
 
+  // Le cas "bon jeton -> 200" de POST /api/revalidate n'est PAS testable ici :
+  // revalidatePath() exige le contexte interne de Next.js ("static generation
+  // store"), absent quand le handler est appelé directement comme une
+  // fonction (constaté empiriquement — Invariant levée). Ce fichier appelle
+  // les handlers directement partout ailleurs (cf. commentaire en tête de
+  // fichier), sans serveur réel — non applicable à cette route précise. Les
+  // cas 401 (sans jeton / mauvais jeton) restent couverts offline dans
+  // tests/unit.ts (n'atteignent jamais revalidatePath). Le cas 200 est
+  // vérifié manuellement contre le serveur Docker réel (rapport de
+  // vérification), pas simulé ici.
+
   console.log("\nvote — recalcul de score synchrone");
   const context = { params: Promise.resolve({ publicId: DEAL_PUBLIC_ID }) };
 

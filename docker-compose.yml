@@ -49,6 +49,10 @@ services:
       # côté client) : la clé secrète, elle, est lue au runtime par l'API
       # (verifyTurnstile), donc ici en variable d'environnement du conteneur.
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY}
+      # POST /api/revalidate (Phase 7B) — pass-through pur depuis
+      # l'environnement hôte, jamais de valeur ici (même convention que les
+      # autres secrets ci-dessus).
+      REVALIDATE_TOKEN: ${REVALIDATE_TOKEN}
     ports:
       - "3000:3000"
     depends_on:
