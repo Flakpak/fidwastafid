@@ -6,18 +6,46 @@ import Link from "next/link";
 import { VILLES, CATEGORIES, type Enseigne } from "@fidwastafid/schemas";
 
 interface ApiErrorBody {
-  error?: { code?: string; message?: string };
+  error?: { code?: string; message?: string; fields?: Record<string, string> };
 }
 
 interface SubmitError {
   message: string;
   unauthenticated?: boolean;
+  /** Champ -> message, quand l'API le fournit (VALIDATION_ERROR zod) — permet
+   *  de marquer les champs fautifs individuellement, pas seulement l'encart. */
+  fields?: Record<string, string>;
 }
 
 declare global {
   interface Window {
     turnstile?: { reset: (widgetId?: string) => void };
   }
+}
+
+/**
+ * Best-effort : reset() peut jeter si le widget n'a jamais fini de se
+ * rendre (CSP/réseau/bloqueur de script) — sans cette garde, l'exception
+ * remontait hors du bloc `if (!res.ok)` et empêchait `setError` de
+ * s'exécuter plus bas. Incident du 19/07/2026 : 5 soumissions en 400 sans
+ * qu'aucun message n'apparaisse jamais côté utilisateur, qui a fini par
+ * marteler le bouton (silencieux, donc a priori "cassé").
+ */
+function safeResetTurnstile() {
+  try {
+    window.turnstile?.reset();
+  } catch {
+    // Ignoré volontairement — cf. commentaire ci-dessus.
+  }
+}
+
+function fieldClass(hasError: boolean): string {
+  return `border rounded px-3 py-2 font-normal ${hasError ? "border-rouge" : "border-bordure"}`;
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="text-rouge text-xs font-semibold mt-0.5">{message}</p>;
 }
 
 /** Sentinel du <select> enseigne — jamais un vrai slug (CONTRAT-V1 §3,
@@ -149,7 +177,10 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
     // la seule ligne de défense), mais un aller-retour réseau pour ça serait
     // une erreur évitable.
     if (whatsappPublic && !whatsappContact) {
-      setError({ message: "Indique un numéro WhatsApp pour autoriser son affichage public." });
+      setError({
+        message: "Indique un numéro WhatsApp pour autoriser son affichage public.",
+        fields: { whatsappContact: "Requis quand l'affichage public est autorisé." },
+      });
       setPending(false);
       return;
     }
@@ -187,9 +218,10 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
         // (succès ou échec côté serveur) — sans reset, le prochain essai part
         // avec un token périmé et échoue à la vérification anti-robot, quelle
         // que soit la cause du premier échec.
-        window.turnstile?.reset();
+        safeResetTurnstile();
         let message = "Soumission impossible.";
         let unauthenticated = false;
+        let fields: Record<string, string> | undefined;
         try {
           const errBody = (await res.json()) as ApiErrorBody;
           if (errBody.error?.code === "UNAUTHENTICATED") {
@@ -197,6 +229,9 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
             unauthenticated = true;
           } else if (errBody.error?.code === "RATE_LIMITED") {
             message = "Trop de soumissions, réessaie plus tard.";
+          } else if (errBody.error?.code === "VALIDATION_ERROR" && errBody.error.fields) {
+            fields = errBody.error.fields;
+            message = "Certains champs sont invalides — corrige-les ci-dessous.";
           } else if (errBody.error?.message) {
             message = errBody.error.message;
           }
@@ -204,7 +239,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
           // Réponse d'erreur non structurée (ex. 500 hors format API) — le
           // message générique reste affiché plutôt que de rester silencieux.
         }
-        setError({ message, unauthenticated });
+        setError({ message, unauthenticated, fields });
         return;
       }
 
@@ -212,7 +247,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       setDone(true);
       router.refresh();
     } catch {
-      window.turnstile?.reset();
+      safeResetTurnstile();
       setError({ message: "Soumission impossible, réessaie." });
     } finally {
       setPending(false);
@@ -265,7 +300,8 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
 
       <label className="flex flex-col gap-1 text-sm font-bold">
         Titre
-        <input name="titre" required minLength={3} maxLength={200} className="border border-bordure rounded px-3 py-2 font-normal" />
+        <input name="titre" required minLength={3} maxLength={200} className={fieldClass(Boolean(error?.fields?.titre))} />
+        <FieldError message={error?.fields?.titre} />
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-bold">
@@ -293,8 +329,9 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
             name="nomVendeur"
             maxLength={80}
             placeholder="ex. : Hanout Si Mohamed"
-            className="border border-bordure rounded px-3 py-2 font-normal"
+            className={fieldClass(Boolean(error?.fields?.nomVendeur))}
           />
+          <FieldError message={error?.fields?.nomVendeur} />
         </label>
       )}
 
@@ -315,7 +352,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       {type !== "en_ligne" && (
         <label className="flex flex-col gap-1 text-sm font-bold">
           Ville
-          <select name="ville" className="border border-bordure rounded px-3 py-2 font-normal">
+          <select name="ville" className={fieldClass(Boolean(error?.fields?.ville))}>
             <option value="">— non précisé —</option>
             {VILLES.map((v) => (
               <option key={v} value={v}>
@@ -323,6 +360,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
               </option>
             ))}
           </select>
+          <FieldError message={error?.fields?.ville} />
         </label>
       )}
 
@@ -335,8 +373,9 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
               name="adresse"
               maxLength={200}
               placeholder="ex. : marché Derb Ghallef, allée 3"
-              className="border border-bordure rounded px-3 py-2 font-normal"
+              className={fieldClass(Boolean(error?.fields?.adresse))}
             />
+            <FieldError message={error?.fields?.adresse} />
           </label>
           <label className="flex flex-col gap-1 text-sm font-bold">
             Lien Google Maps (facultatif)
@@ -344,9 +383,10 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
               name="lienMaps"
               type="url"
               placeholder="https://maps.app.goo.gl/..."
-              className="border border-bordure rounded px-3 py-2 font-normal"
+              className={fieldClass(Boolean(error?.fields?.lienMaps))}
             />
             <span className="text-xs text-muted font-normal">Depuis Maps : Partager → Copier le lien.</span>
+            <FieldError message={error?.fields?.lienMaps} />
           </label>
         </div>
       )}
@@ -354,19 +394,21 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       {type !== "physique" && (
         <label className="flex flex-col gap-1 text-sm font-bold">
           Lien de l&apos;offre
-          <input name="lien" type="url" required className="border border-bordure rounded px-3 py-2 font-normal" />
+          <input name="lien" type="url" required className={fieldClass(Boolean(error?.fields?.lien))} />
+          <FieldError message={error?.fields?.lien} />
         </label>
       )}
 
       <label className="flex flex-col gap-1 text-sm font-bold">
         Catégorie
-        <select name="categorie" required className="border border-bordure rounded px-3 py-2 font-normal">
+        <select name="categorie" required className={fieldClass(Boolean(error?.fields?.categorie))}>
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>
               {c}
             </option>
           ))}
         </select>
+        <FieldError message={error?.fields?.categorie} />
       </label>
 
       <div className="flex gap-3">
@@ -378,8 +420,9 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
             step="0.01"
             min="0.01"
             required
-            className="w-full min-w-0 border border-bordure rounded px-3 py-2 font-normal"
+            className={`w-full min-w-0 ${fieldClass(Boolean(error?.fields?.prixPromo))}`}
           />
+          <FieldError message={error?.fields?.prixPromo} />
         </label>
         <label className="flex-1 min-w-0 flex flex-col gap-1 text-sm font-bold">
           Prix normal (DH)
@@ -388,19 +431,27 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
             type="number"
             step="0.01"
             min="0.01"
-            className="w-full min-w-0 border border-bordure rounded px-3 py-2 font-normal"
+            className={`w-full min-w-0 ${fieldClass(Boolean(error?.fields?.prixNormal))}`}
           />
+          <FieldError message={error?.fields?.prixNormal} />
         </label>
       </div>
 
       <label className="flex flex-col gap-1 text-sm font-bold">
         Fin de l&apos;offre
-        <input name="dateFin" type="date" className="border border-bordure rounded px-3 py-2 font-normal" />
+        <input name="dateFin" type="date" className={fieldClass(Boolean(error?.fields?.dateFin))} />
+        <FieldError message={error?.fields?.dateFin} />
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-bold">
         Description
-        <textarea name="description" maxLength={2000} rows={3} className="border border-bordure rounded px-3 py-2 font-normal" />
+        <textarea
+          name="description"
+          maxLength={2000}
+          rows={3}
+          className={fieldClass(Boolean(error?.fields?.description))}
+        />
+        <FieldError message={error?.fields?.description} />
       </label>
 
       <div className="border border-bordure rounded-lg p-3 flex flex-col gap-3">
@@ -411,8 +462,9 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
             name="whatsappContact"
             type="tel"
             placeholder="0612345678 ou +212612345678"
-            className="border border-bordure rounded px-3 py-2 font-normal"
+            className={fieldClass(Boolean(error?.fields?.whatsappContact))}
           />
+          <FieldError message={error?.fields?.whatsappContact} />
         </label>
         <label className="flex items-start gap-2 text-sm font-normal">
           <input type="checkbox" name="whatsappPublic" className="mt-0.5" />
@@ -430,7 +482,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
         disabled={pending}
         className="self-start bg-rouge text-white rounded-lg px-5 py-2 font-bold disabled:opacity-50"
       >
-        Envoyer
+        {pending ? "Publication..." : "Envoyer"}
       </button>
     </form>
   );
