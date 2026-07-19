@@ -112,6 +112,20 @@ volontaire, "aucune enseigne") — seul champ de cet amendement à supporter l'e
 autres champs facultatifs restent sur la limite acceptée d'origine (omis = inchangé, pas de
 moyen de les vider via ce endpoint).
 
+**Extension du 19/07/2026 — upload manuel de secours** : certaines sources bloquent la
+récupération serveur d'`image-depuis-lien` (Jumia et similaires renvoient 403 aux IP
+datacenter, y compris depuis Vercel en prod — constaté en vérification). `POST
+/api/v1/admin/deals/:publicId/image` complète le même amendement : upload manuel
+(`multipart/form-data`) depuis le formulaire d'édition, sans dépendre du `lien` du deal ni
+d'aucun fetch serveur sortant. Le traitement + stockage (sharp, resize ≤1200px, WebP q80,
+upload `deals-images`) est factorisé dans un module partagé
+(`apps/web/src/app/api/v1/_lib/dealImage.ts`) commun aux deux endpoints — même résultat, même
+convention de clé, quelle que soit la voie d'entrée. Le fichier reçu est d'abord identifié par
+ses premiers octets (magic bytes JPEG/PNG/WebP), jamais par son Content-Type déclaré
+(falsifiable) ; seul le WebP ré-encodé par sharp est stocké, jamais le fichier original — le
+ré-encodage neutralise tout contenu malveillant qui y serait embarqué. Limite 5 Mo, rejet
+propre au-delà.
+
 **Amendement du 18/07/2026 — consentement WhatsApp public** : la règle "`whatsapp_contact`
 n'apparaît jamais hors admin" (ci-dessous, §4) est remplacée par une règle conditionnée au
 consentement du soumetteur — voir §4. `deals` gagne **`whatsapp_public`** (booléen, `not null default
@@ -168,6 +182,9 @@ POST   /api/v1/admin/deals/:publicId/image-depuis-lien
                                              récupère l'image produit depuis le lien du deal
                                              (og:image/twitter:image/image_src) — ajouté le
                                              19/07/2026, troisième amendement conscient
+POST   /api/v1/admin/deals/:publicId/image  upload manuel (multipart/form-data, jpeg/png/webp,
+                                             5 Mo max) — fallback si image-depuis-lien est
+                                             bloqué par la source ; même amendement du 19/07/2026
 ```
 
 **Notes** :
@@ -205,6 +222,12 @@ POST   /api/v1/admin/deals/:publicId/image-depuis-lien
     — pas de purge active. Non problématique pour le cas initial (deal sans image, aucun cache
     préexistant à purger) ; limite acceptée pour le cas replacement, pas un objectif de cet
     amendement.
+  - **Extension upload manuel** (même amendement, voir §3) : `POST /api/v1/admin/deals/:publicId/image`
+    couvre le cas où la source bloque `image-depuis-lien` (Jumia et similaires — 403 constaté
+    aux IP datacenter, y compris depuis Vercel en prod). Multipart, fichier identifié par ses
+    premiers octets (jamais le Content-Type déclaré), 5 Mo max, seul le WebP ré-encodé par sharp
+    est stocké — jamais le fichier original reçu. Traitement + stockage factorisés dans
+    `_lib/dealImage.ts`, partagés avec `image-depuis-lien`.
 - Rate limiting (Phase 3) ciblé sur les écritures non-admin (`POST votes/commentaires/deals`).
 - Vote et commentaire modélisés comme **sous-ressources** de deal (pas de ressources de premier
   niveau `/votes`, `/commentaires`) — un vote n'existe jamais sans son deal.

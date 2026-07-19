@@ -283,6 +283,32 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
+  path: "/admin/deals/{publicId}/image",
+  summary:
+    "Téléverse manuellement une image (jpeg/png/webp, 5 Mo max) — fallback à image-depuis-lien pour " +
+    "les sources qui bloquent la récupération serveur (CONTRAT-V1 §4, troisième amendement conscient du 19/07/2026)",
+  security: [{ [bearerAuth.name]: [] }],
+  request: {
+    params: z.object({ publicId: z.string() }),
+    body: {
+      content: {
+        "multipart/form-data": {
+          schema: z.object({ image: z.string().openapi({ format: "binary" }) }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: { description: "OK — image_key mis à jour", content: { "application/json": { schema: DealAdmin } } },
+    400: errorResponse("Fichier manquant, trop volumineux (>5 Mo) ou type non reconnu (jpeg/png/webp uniquement)"),
+    403: errorResponse("Accès refusé (non-admin)"),
+    404: errorResponse("Deal introuvable"),
+  },
+  tags: ["admin"],
+});
+
+registry.registerPath({
+  method: "post",
   path: "/admin/deals/bulk",
   summary: "Action groupée — statut appliqué à un lot de public_id (max 100)",
   security: [{ [bearerAuth.name]: [] }],

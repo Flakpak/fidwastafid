@@ -1646,6 +1646,89 @@
         }
       }
     },
+    "/admin/deals/{publicId}/image": {
+      "post": {
+        "summary": "Téléverse manuellement une image (jpeg/png/webp, 5 Mo max) — fallback à image-depuis-lien pour les sources qui bloquent la récupération serveur (CONTRAT-V1 §4, troisième amendement conscient du 19/07/2026)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "image"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK — image_key mis à jour",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealAdmin"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Fichier manquant, trop volumineux (>5 Mo) ou type non reconnu (jpeg/png/webp uniquement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/deals/bulk": {
       "post": {
         "summary": "Action groupée — statut appliqué à un lot de public_id (max 100)",
