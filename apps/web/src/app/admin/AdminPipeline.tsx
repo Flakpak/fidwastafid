@@ -203,6 +203,22 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     return { ok: true };
   }
 
+  /** Fallback manuel (extension du troisième amendement conscient, même
+   *  date) — sources qui bloquent image-depuis-lien (Jumia et similaires,
+   *  403 sur IP datacenter). Pas de header Content-Type : le navigateur
+   *  pose lui-même le boundary multipart pour un FormData. */
+  async function uploadImage(publicId: string, file: File): Promise<ImageFetchResult> {
+    const formData = new FormData();
+    formData.append("image", file);
+    const res = await fetch(`/api/v1/admin/deals/${publicId}/image`, { method: "POST", body: formData });
+    if (!res.ok) {
+      const body = (await res.json()) as ApiErrorBody;
+      return { ok: false, message: body.error?.message ?? "Téléversement impossible." };
+    }
+    await fetchDeals();
+    return { ok: true };
+  }
+
   async function bulk(statut: "publie" | "rejete") {
     if (selected.size === 0) return;
     setPending(true);
@@ -294,6 +310,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
             onAction={(statut, motifRejet) => updateStatut(deal.publicId, statut, motifRejet)}
             onSaveFields={(fields) => saveDeal(deal.publicId, deal.statut, fields)}
             onFetchImageFromLink={() => fetchImageFromLink(deal.publicId)}
+            onUploadImage={(file) => uploadImage(deal.publicId, file)}
           />
         ))}
       </ul>

@@ -84,6 +84,30 @@ function FieldError({ message }: { message?: string }) {
 }
 
 /**
+ * Détection (heuristique d'affichage, pas une validation) d'un lien Google
+ * Maps stocké par erreur dans le champ `lien` — le bouton "récupérer
+ * l'image du lien" n'a de sens que pour un lien produit, jamais une fiche
+ * Maps. Mêmes hôtes que `isLienMapsAutorise` (packages/schemas/src/deal.ts),
+ * dupliqué ici volontairement : fonction non exportée côté schémas, et un
+ * faux négatif ici ne fait qu'afficher un bouton en trop, jamais un risque
+ * de sécurité (la vraie validation vit côté serveur).
+ */
+function isGoogleMapsUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.hostname === "maps.app.goo.gl" || url.hostname === "maps.google.com") return true;
+  if ((url.hostname === "google.com" || url.hostname === "www.google.com") && url.pathname.startsWith("/maps")) {
+    return true;
+  }
+  if (url.hostname === "goo.gl" && url.pathname.startsWith("/maps")) return true;
+  return false;
+}
+
+/**
  * Ligne de deal du pipeline admin — le panneau `<details>` est un formulaire
  * d'édition complet (CONTRAT-V1 §3/§4, troisième amendement conscient du
  * 19/07/2026) : le curateur peut corriger n'importe quel champ métier du
@@ -102,6 +126,7 @@ export function AdminDealItem({
   onAction,
   onSaveFields,
   onFetchImageFromLink,
+  onUploadImage,
 }: {
   deal: DealAdmin;
   actions: Action[];
@@ -113,6 +138,7 @@ export function AdminDealItem({
   onAction: (statut: DealStatut, motifRejet?: string) => void | Promise<void>;
   onSaveFields: (fields: DealEditFields) => Promise<SaveResult>;
   onFetchImageFromLink: () => Promise<ImageFetchResult>;
+  onUploadImage: (file: File) => Promise<ImageFetchResult>;
 }) {
   const [fields, setFields] = useState<DealEditFields>(() => toEditFields(deal));
   const [motifRejet, setMotifRejet] = useState("");
@@ -122,6 +148,9 @@ export function AdminDealItem({
   const [imgState, setImgState] = useState<"idle" | "pending" | "error">("idle");
   const [imgError, setImgError] = useState<string | null>(null);
   const [imgCacheBust, setImgCacheBust] = useState(0);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadState, setUploadState] = useState<"idle" | "pending" | "error">("idle");
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   function set<K extends keyof DealEditFields>(key: K, value: DealEditFields[K]) {
     setFields((f) => ({ ...f, [key]: value }));
@@ -152,6 +181,21 @@ export function AdminDealItem({
     } else {
       setImgState("error");
       setImgError(result.message);
+    }
+  }
+
+  async function handleUploadImage() {
+    if (!uploadFile) return;
+    setUploadState("pending");
+    setUploadError(null);
+    const result = await onUploadImage(uploadFile);
+    if (result.ok) {
+      setUploadState("idle");
+      setUploadFile(null);
+      setImgCacheBust((n) => n + 1);
+    } else {
+      setUploadState("error");
+      setUploadError(result.message);
     }
   }
 
@@ -388,8 +432,8 @@ export function AdminDealItem({
             {savingFields ? "Enregistrement..." : "Enregistrer"}
           </button>
 
-          {deal.lien && (
-            <div className="border-t border-bordure pt-2 mt-1 flex flex-col gap-2">
+          <div className="border-t border-bordure pt-2 mt-1 flex flex-col gap-2">
+            {deal.lien && !isGoogleMapsUrl(deal.lien) && (
               <button
                 type="button"
                 onClick={() => void handleFetchImage()}
@@ -398,16 +442,35 @@ export function AdminDealItem({
               >
                 {imgState === "pending" ? "Récupération..." : "🖼️ Récupérer l'image du lien"}
               </button>
-              {imgState === "error" && imgError && <p className="text-rouge text-xs font-bold">{imgError}</p>}
-              {deal.imageKey && (
-                <img
-                  src={`/img/deals/${deal.publicId}?admin_preview=${imgCacheBust}`}
-                  alt="Aperçu"
-                  className="max-h-32 w-auto object-contain self-start border border-bordure rounded"
-                />
-              )}
+            )}
+            {imgState === "error" && imgError && <p className="text-rouge text-xs font-bold">{imgError}</p>}
+
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+                className="text-xs flex-1 min-w-0"
+              />
+              <button
+                type="button"
+                onClick={() => void handleUploadImage()}
+                disabled={!uploadFile || uploadState === "pending" || pending}
+                className="self-start bg-or text-texte rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50 flex-shrink-0"
+              >
+                {uploadState === "pending" ? "Téléversement..." : "Téléverser une image"}
+              </button>
             </div>
-          )}
+            {uploadState === "error" && uploadError && <p className="text-rouge text-xs font-bold">{uploadError}</p>}
+
+            {deal.imageKey && (
+              <img
+                src={`/img/deals/${deal.publicId}?admin_preview=${imgCacheBust}`}
+                alt="Aperçu"
+                className="max-h-32 w-auto object-contain self-start border border-bordure rounded"
+              />
+            )}
+          </div>
 
           <label className="flex flex-col gap-1 text-xs font-bold mt-1">
             Motif (visible par le soumetteur, envoyé avec « Rejeter »)
