@@ -112,17 +112,24 @@ registry.registerPath({
 registry.registerPath({
   method: "post",
   path: "/deals",
-  summary: "Soumission communautaire — toujours créé en_attente",
+  summary:
+    "Soumission communautaire — toujours créé en_attente. Accepte aussi multipart/form-data avec un " +
+    "champ \"image\" optionnel (photo terrain, jpeg/png/webp, 5 Mo max — mêmes champs que le JSON, en valeurs texte).",
   security: [{ [bearerAuth.name]: [] }],
   request: {
     headers: z.object({
       "X-Turnstile-Token": z.string().optional().openapi({ description: "Cloudflare Turnstile" }),
     }),
-    body: { content: { "application/json": { schema: DealInput } } },
+    body: {
+      content: {
+        "application/json": { schema: DealInput },
+        "multipart/form-data": { schema: DealInput },
+      },
+    },
   },
   responses: {
     201: { description: "Créé", content: { "application/json": { schema: Deal } } },
-    400: errorResponse("Corps invalide ou vérification anti-robot échouée"),
+    400: errorResponse("Corps invalide, vérification anti-robot échouée, ou image invalide/trop volumineuse"),
     401: errorResponse("Authentification requise"),
     429: errorResponse("Trop de soumissions"),
   },

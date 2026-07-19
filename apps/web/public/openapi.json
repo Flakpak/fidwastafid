@@ -941,7 +941,7 @@
         }
       },
       "post": {
-        "summary": "Soumission communautaire — toujours créé en_attente",
+        "summary": "Soumission communautaire — toujours créé en_attente. Accepte aussi multipart/form-data avec un champ \"image\" optionnel (photo terrain, jpeg/png/webp, 5 Mo max — mêmes champs que le JSON, en valeurs texte).",
         "security": [
           {
             "bearerAuth": []
@@ -967,6 +967,11 @@
               "schema": {
                 "$ref": "#/components/schemas/DealInput"
               }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/DealInput"
+              }
             }
           }
         },
@@ -982,7 +987,7 @@
             }
           },
           "400": {
-            "description": "Corps invalide ou vérification anti-robot échouée",
+            "description": "Corps invalide, vérification anti-robot échouée, ou image invalide/trop volumineuse",
             "content": {
               "application/json": {
                 "schema": {
