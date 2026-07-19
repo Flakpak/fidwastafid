@@ -36,17 +36,15 @@ services:
       # pour les mêmes valeurs) — packages/auth en a besoin pour vérifier
       # les JWT Supabase, y compris dans ce conteneur de test.
       SUPABASE_URL: ${SUPABASE_URL}
-      # Migration clés API Supabase (18/07/2026, docs/MIGRATION-CLES-SUPABASE.md) :
-      # nouvelles clés en pass-through au même titre que les legacy, qui
-      # restent le fallback tant que les deux coexistent. Vide côté hôte
-      # tant que non renseigné — le fallback applicatif prend le relai.
+      # Migration clés API Supabase terminée (19/07/2026,
+      # docs/MIGRATION-CLES-SUPABASE.md) : legacy (SUPABASE_ANON_KEY/
+      # SUPABASE_SERVICE_ROLE_KEY) désactivées côté Dashboard Supabase,
+      # retirées d'ici — plus de fallback applicatif à alimenter.
+      # Pass-through pur depuis l'environnement hôte, jamais de valeur ici.
       SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       # Route proxy /img/deals/[publicId] (apps/web/src/app/img/deals) et
-      # supabaseAdmin.ts — seuls consommateurs. Pass-through pur depuis
-      # l'environnement hôte, jamais de valeur ici.
+      # supabaseAdmin.ts — seuls consommateurs.
       SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       # Contrepartie du NEXT_PUBLIC_TURNSTILE_SITE_KEY (build arg ci-dessus,
       # côté client) : la clé secrète, elle, est lue au runtime par l'API
       # (verifyTurnstile), donc ici en variable d'environnement du conteneur.

@@ -41,20 +41,12 @@ function readEnv(name: string): string {
   return value;
 }
 
-/**
- * Migration clés API Supabase (18/07/2026, docs/MIGRATION-CLES-SUPABASE.md) :
- * clé publishable en priorité, fallback sur l'ancienne clé anon (JWT) tant
- * que les deux coexistent — même pattern que packages/auth/src/supabaseClient.ts.
- */
-function readSupabaseKey(): string {
-  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
-  if (publishableKey) return publishableKey;
-  return readEnv("SUPABASE_ANON_KEY");
-}
-
 async function getRealAccessToken(): Promise<{ token: string; userId: string }> {
   const supabaseUrl = readEnv("SUPABASE_URL");
-  const projectKey = readSupabaseKey();
+  // Migration clés API Supabase terminée (19/07/2026,
+  // docs/MIGRATION-CLES-SUPABASE.md) — plus de fallback vers l'ancienne clé
+  // anon, désactivée côté Dashboard Supabase.
+  const projectKey = readEnv("SUPABASE_PUBLISHABLE_KEY");
   const email = readEnv("TEST_USER_EMAIL");
   const password = readEnv("TEST_USER_PASSWORD");
 
@@ -93,7 +85,7 @@ async function getRealAccessToken(): Promise<{ token: string; userId: string }> 
     if (response.status === 401 || response.status === 403) {
       throw new Error(
         `Clé API Supabase rejetée (HTTP ${response.status}${detail ? ` — ${detail}` : ""}) : ` +
-          "SUPABASE_PUBLISHABLE_KEY/SUPABASE_ANON_KEY est absente, invalide ou révoquée côté secrets GitHub " +
+          "SUPABASE_PUBLISHABLE_KEY est absente, invalide ou révoquée côté secrets GitHub " +
           "— vérifie Settings > Secrets and variables > Actions, pas la peine de réveiller le projet Supabase."
       );
     }
