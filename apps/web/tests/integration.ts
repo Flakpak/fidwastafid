@@ -8,6 +8,7 @@ import {
 } from "../src/app/api/v1/deals/[publicId]/commentaires/route.js";
 import { GET as getMe, PATCH as patchMe } from "../src/app/api/v1/me/route.js";
 import { PATCH as patchAdminDeal } from "../src/app/api/v1/admin/deals/[publicId]/route.js";
+import { POST as postImageDepuisLien } from "../src/app/api/v1/admin/deals/[publicId]/image-depuis-lien/route.js";
 
 /**
  * Tests d'intégration (plan v2, Phase 3 : "soumission, validation, vote") —
@@ -422,6 +423,157 @@ async function main() {
   };
   const dealRejeteDansMe = (meAvecRejetBody.mesDeals ?? []).find((d) => d.publicId === dealPrivePublicId);
   check("GET /me -> motifRejet du deal rejeté visible", dealRejeteDansMe?.motifRejet === "Photo manquante");
+
+  console.log(
+    "\nPATCH admin — édition curateur complète (CONTRAT-V1 §3/§4, troisième amendement conscient du 19/07/2026)"
+  );
+  const editRes = await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({
+        statut: "publie",
+        titre: "Hanout test intégration modifié",
+        description: "Nouvelle description du test d'intégration",
+        prixPromo: 20,
+        prixNormal: 30,
+        categorie: "Maison",
+        dateFin: "2026-12-31",
+        ville: "Rabat",
+      }),
+    }),
+    { params: Promise.resolve({ publicId: terrainPublicId }) }
+  );
+  const editBody = (await editRes.json()) as {
+    titre?: string;
+    description?: string;
+    prixPromo?: number;
+    prixNormal?: number;
+    categorie?: string;
+    dateFin?: string;
+    ville?: string;
+  };
+  check("édition complète -> 200", editRes.status === 200);
+  check("édition complète -> titre modifié", editBody.titre === "Hanout test intégration modifié");
+  check("édition complète -> description modifiée", editBody.description === "Nouvelle description du test d'intégration");
+  check("édition complète -> prixPromo modifié", editBody.prixPromo === 20);
+  check("édition complète -> prixNormal modifié", editBody.prixNormal === 30);
+  check("édition complète -> categorie modifiée", editBody.categorie === "Maison");
+  check("édition complète -> dateFin modifiée", editBody.dateFin === "2026-12-31");
+  check("édition complète -> ville modifiée", editBody.ville === "Rabat");
+
+  const auditRows = await query<{ details: unknown }>(
+    "select details from journal_audit where cible_id = $1 and action = 'update_deal' order by created_at desc limit 1",
+    [terrainPublicId]
+  );
+  check("journal_audit -> édition admin tracée (action update_deal)", auditRows.length > 0);
+
+  console.log("\nédition complète — cohérence physique/en_ligne vérifiée sur l'état résultant (patch + existant)");
+  const coherenceViolationRes = await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "publie", type: "en_ligne" }),
+    }),
+    { params: Promise.resolve({ publicId: terrainPublicId }) }
+  );
+  const coherenceViolationBody = (await coherenceViolationRes.json()) as { error?: { fields?: Record<string, string> } };
+  check(
+    "type en_ligne sans lien existant ni fourni -> 400 VALIDATION_ERROR",
+    coherenceViolationRes.status === 400
+  );
+  check(
+    "cohérence violée -> détail du champ fautif fourni (fields.lien)",
+    typeof coherenceViolationBody.error?.fields?.lien === "string"
+  );
+
+  const typeAvecLienRes = await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "publie", type: "en_ligne", lien: "https://exemple.ma/produit" }),
+    }),
+    { params: Promise.resolve({ publicId: terrainPublicId }) }
+  );
+  const typeAvecLienBody = (await typeAvecLienRes.json()) as { type?: string; lien?: string };
+  check("type en_ligne avec lien fourni -> 200", typeAvecLienRes.status === 200);
+  check("type en_ligne avec lien fourni -> type modifié", typeAvecLienBody.type === "en_ligne");
+  check("type en_ligne avec lien fourni -> lien conservé", typeAvecLienBody.lien === "https://exemple.ma/produit");
+
+  const prixIncoherentRes = await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "publie", prixPromo: 100, prixNormal: 50 }),
+    }),
+    { params: Promise.resolve({ publicId: terrainPublicId }) }
+  );
+  const prixIncoherentBody = (await prixIncoherentRes.json()) as { error?: { fields?: Record<string, string> } };
+  check("prixNormal < prixPromo -> 400 VALIDATION_ERROR", prixIncoherentRes.status === 400);
+  check(
+    "prix incohérent -> détail du champ fautif fourni (fields.prixNormal)",
+    typeof prixIncoherentBody.error?.fields?.prixNormal === "string"
+  );
+
+  console.log("\nédition complète — enseigneSlug : résolution, déliaison explicite (null), slug inconnu");
+  const enseigneSetRes = await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "publie", enseigneSlug: ENSEIGNE_SLUG }),
+    }),
+    { params: Promise.resolve({ publicId: terrainPublicId }) }
+  );
+  const enseigneSetBody = (await enseigneSetRes.json()) as { enseigneSlug?: string; enseigneNom?: string };
+  check("enseigneSlug résolu -> 200", enseigneSetRes.status === 200);
+  check("enseigneSlug résolu -> enseigneNom peuplé", enseigneSetBody.enseigneNom === "Test Integration");
+
+  const enseigneClearRes = await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "publie", enseigneSlug: null }),
+    }),
+    { params: Promise.resolve({ publicId: terrainPublicId }) }
+  );
+  const enseigneClearBody = (await enseigneClearRes.json()) as Record<string, unknown>;
+  check("enseigneSlug: null -> 200 (déliaison explicite)", enseigneClearRes.status === 200);
+  check("enseigneSlug déliée -> enseigneSlug absent", !("enseigneSlug" in enseigneClearBody) || enseigneClearBody.enseigneSlug === undefined);
+
+  const enseigneInconnueRes = await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "publie", enseigneSlug: "slug-qui-nexiste-pas" }),
+    }),
+    { params: Promise.resolve({ publicId: terrainPublicId }) }
+  );
+  check("enseigneSlug inconnu -> 400 VALIDATION_ERROR", enseigneInconnueRes.status === 400);
+
+  console.log("\nimage-depuis-lien — garde SSRF et cas d'erreur (CONTRAT-V1 §4, troisième amendement conscient)");
+  const imgSansLienRes = await postImageDepuisLien(
+    authedRequest(`http://localhost/api/v1/admin/deals/${DEAL_PUBLIC_ID}/image-depuis-lien`, token, {
+      method: "POST",
+    }),
+    { params: Promise.resolve({ publicId: DEAL_PUBLIC_ID }) }
+  );
+  check("image-depuis-lien sur un deal sans lien -> 400", imgSansLienRes.status === 400);
+
+  await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${DEAL_PUBLIC_ID}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "publie", lien: "http://127.0.0.1:9/produit" }),
+    }),
+    { params: Promise.resolve({ publicId: DEAL_PUBLIC_ID }) }
+  );
+  const imgSsrfRes = await postImageDepuisLien(
+    authedRequest(`http://localhost/api/v1/admin/deals/${DEAL_PUBLIC_ID}/image-depuis-lien`, token, {
+      method: "POST",
+    }),
+    { params: Promise.resolve({ publicId: DEAL_PUBLIC_ID }) }
+  );
+  const imgSsrfBody = (await imgSsrfRes.json()) as { error?: { message?: string } };
+  check("image-depuis-lien vers une IP privée -> 400 (SSRF bloqué)", imgSsrfRes.status === 400);
+  check("image-depuis-lien SSRF -> message d'erreur clair", typeof imgSsrfBody.error?.message === "string");
+
+  const imgNotFoundRes = await postImageDepuisLien(
+    authedRequest("http://localhost/api/v1/admin/deals/zzzzzzzzzz/image-depuis-lien", token, { method: "POST" }),
+    { params: Promise.resolve({ publicId: "zzzzzzzzzz" }) }
+  );
+  check("image-depuis-lien deal inconnu -> 404", imgNotFoundRes.status === 404);
 
   console.log("\nvote — recalcul de score synchrone");
   const context = { params: Promise.resolve({ publicId: DEAL_PUBLIC_ID }) };
