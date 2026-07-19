@@ -15,29 +15,19 @@ function readEnv(name: string): string {
 }
 
 /**
- * Fallback transitoire sur l'ancienne clé `anon` (JWT) tant que les clés
- * legacy ne sont pas désactivées côté Dashboard Supabase — mêmes clés que
- * packages/auth/src/supabaseClient.ts, dupliqué ici volontairement (pas de
- * dépendance croisée entre ce module web et le package auth, qui ne fait
- * que vérifier des JWT entrants, CONTRAT-V1 §5).
+ * Migration des clés API Supabase terminée (19/07/2026, voir
+ * docs/MIGRATION-CLES-SUPABASE.md) — plus de fallback vers l'ancienne clé
+ * `anon`, désactivée côté Dashboard Supabase. Dupliqué de
+ * packages/auth/src/supabaseClient.ts volontairement (pas de dépendance
+ * croisée entre ce module web et le package auth, qui ne fait que vérifier
+ * des JWT entrants, CONTRAT-V1 §5).
  */
-function readSupabaseKey(): string {
-  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
-  if (publishableKey) return publishableKey;
-
-  const legacyKey = process.env.SUPABASE_ANON_KEY;
-  if (!legacyKey) {
-    throw new Error("SUPABASE_PUBLISHABLE_KEY (ou SUPABASE_ANON_KEY en fallback) manquant.");
-  }
-  console.warn(
-    "[supabase-keys] SUPABASE_PUBLISHABLE_KEY absent — fallback sur SUPABASE_ANON_KEY (legacy). " +
-      "À retirer après migration complète (voir docs/MIGRATION-CLES-SUPABASE.md)."
-  );
-  return legacyKey;
+function readSupabasePublishableKey(): string {
+  return readEnv("SUPABASE_PUBLISHABLE_KEY");
 }
 
 export function getAuthClient() {
-  return createClient(readEnv("SUPABASE_URL"), readSupabaseKey(), {
+  return createClient(readEnv("SUPABASE_URL"), readSupabasePublishableKey(), {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
@@ -56,7 +46,7 @@ export async function updateUserPassword(accessToken: string, password: string):
   const response = await fetch(`${readEnv("SUPABASE_URL")}/auth/v1/user`, {
     method: "PUT",
     headers: {
-      apikey: readSupabaseKey(),
+      apikey: readSupabasePublishableKey(),
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },

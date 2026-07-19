@@ -11,22 +11,14 @@
  * Nouvelles clés Supabase (sb_secret_...) : header `apikey` uniquement,
  * jamais `Authorization: Bearer` — ce ne sont pas des JWT, un envoi en
  * Bearer est rejeté (doc Supabase, migration des clés API, 18/07/2026).
- * Fallback transitoire sur l'ancienne `service_role` (JWT) tant que les
- * clés legacy ne sont pas désactivées côté Dashboard Supabase — on garde
- * pour ce cas précis le pattern apikey+Authorization historique, qui reste
- * ce que GoTrue attend d'une clé JWT legacy.
+ * Migration terminée (19/07/2026, voir docs/MIGRATION-CLES-SUPABASE.md) :
+ * plus de fallback vers l'ancienne `service_role`, désactivée côté
+ * Dashboard Supabase.
  */
 function adminHeaders(): HeadersInit {
   const secretKey = process.env.SUPABASE_SECRET_KEY;
-  if (secretKey) return { apikey: secretKey };
-
-  const legacyKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!legacyKey) throw new Error("SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_ROLE_KEY en fallback) manquant.");
-  console.warn(
-    "[supabase-keys] SUPABASE_SECRET_KEY absent — fallback sur SUPABASE_SERVICE_ROLE_KEY (legacy). " +
-      "À retirer après migration complète (voir docs/MIGRATION-CLES-SUPABASE.md)."
-  );
-  return { apikey: legacyKey, Authorization: `Bearer ${legacyKey}` };
+  if (!secretKey) throw new Error("SUPABASE_SECRET_KEY manquant.");
+  return { apikey: secretKey };
 }
 
 /** GET /api/v1/me — l'email ne vit que dans Supabase Auth, jamais dupliqué dans public.users. */

@@ -26,19 +26,14 @@ function notFound(): NextResponse {
 /**
  * Nouvelles clés Supabase (sb_secret_...) : header `apikey` uniquement,
  * jamais `Authorization: Bearer` (pas un JWT, doc migration des clés API).
- * Fallback transitoire sur l'ancienne `service_role` (JWT, pattern
- * Authorization historique de cette route) tant que les clés legacy ne
- * sont pas désactivées côté Dashboard Supabase.
+ * Migration terminée (19/07/2026, voir docs/MIGRATION-CLES-SUPABASE.md) :
+ * plus de fallback vers l'ancienne `service_role`, désactivée côté
+ * Dashboard Supabase.
  */
 function storageAuthHeaders(): HeadersInit {
   const secretKey = process.env.SUPABASE_SECRET_KEY;
-  if (secretKey) return { apikey: secretKey };
-
-  console.warn(
-    "[supabase-keys] SUPABASE_SECRET_KEY absent — fallback sur SUPABASE_SERVICE_ROLE_KEY (legacy). " +
-      "À retirer après migration complète (voir docs/MIGRATION-CLES-SUPABASE.md)."
-  );
-  return { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` };
+  if (!secretKey) throw new Error("SUPABASE_SECRET_KEY manquant.");
+  return { apikey: secretKey };
 }
 
 /**
