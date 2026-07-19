@@ -1,0 +1,26 @@
+{
+  "name": "pipeline",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pipeline de scraping/extraction de deals (Bringo/Carrefour, catalogues) — Phase 7A, rejoint le monorepo.",
+  "scripts": {
+    "test": "tsx tests/validation.test.mjs",
+    "discover-site": "tsx discover-site.mjs",
+    "scraper-bringo": "tsx scraper-bringo.mjs",
+    "extract-catalogue": "tsx extract-catalogue.mjs",
+    "insert-deals": "tsx insert-deals.mjs",
+    "rattrapage-descriptions": "tsx rattrapage-descriptions.mjs"
+  },
+  "dependencies": {
+    "@fidwastafid/schemas": "workspace:*",
+    "cheerio": "^1.2.0",
+    "pg": "^8.22.0",
+    "playwright": "^1.61.1",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.1"
+  }
+}

@@ -1,0 +1,15 @@
+# Archives horodatées des extractions passées — produites localement par
+# scraper-bringo.mjs/extract-catalogue.mjs, jamais committées (Phase 7A :
+# "code inchangé", le pipeline continue de les écrire au même endroit).
+extractions/
+
+# Artefacts de sortie/diagnostic ponctuels (discover-site.mjs, runs manuels)
+# — jamais committés.
+*-api-log.json
+*-rendu.html
+deals-extraits.json
+_rattrapage-log.txt
+_run-prod-log.txt
+
+# node_modules/, .env*.local et *.log sont déjà couverts par le
+# .gitignore racine (s'applique aussi ici).

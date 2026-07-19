@@ -1,0 +1,44 @@
+# FIDWASTAFID — Catégories Bringo à scraper (une URL par ligne)
+# Remplis ce fichier en copiant les URLs des catégories depuis le menu de bringo.ma
+# Garde ?limit=100 à la fin de chaque URL pour minimiser les requêtes.
+
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/high-tech-multimedia?limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=2&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=3&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=4&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=5&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=6&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=7&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=8&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=9&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=10&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=11&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=12&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=13&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=14&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=15&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=16&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=17&limit=100
+https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=18&limit=100
+
+# Ajoute ici les autres catégories (électroménager, épicerie, maison, etc.) :
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/...?limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=2&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=3&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=4&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=5&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=6&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=7&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=8&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=9&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=10&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=11&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=12&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=13&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=14&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=15&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=16&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=17&limit=100
+# https://www.bringo.ma/fr_MA/store/carrefour-hypermarket-carrefour-sidi-maarouf/tout-pour-votre-cuisine-4?page=18&limit=100

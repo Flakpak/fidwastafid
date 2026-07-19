@@ -39,4 +39,25 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  // apps/pipeline (Phase 7A) — scripts .mjs Node purs (aucun DOM/browser),
+  // ni .js/.jsx ni .ts/.tsx, non couverts par les deux blocs ci-dessus.
+  // Périmètre volontairement restreint à apps/pipeline : d'autres .mjs
+  // préexistants ailleurs dans le repo (scripts/audit-v1.mjs,
+  // postcss.config.mjs) ne sont pas concernés par ce lot.
+  {
+    files: ['apps/pipeline/**/*.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: globals.node,
+    },
+    rules: {
+      // ignoreRestSiblings : scraper-bringo.mjs déstructure volontairement
+      // ({ _key, discount, discount_rate, ...d }) pour les EXCLURE du rest
+      // spread — jamais des variables mortes, code du scraper inchangé
+      // (Phase 7A, "déménagement pas réécriture").
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', ignoreRestSiblings: true }],
+    },
+  },
 ])
