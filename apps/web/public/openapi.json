@@ -466,7 +466,7 @@
           "prixPromo"
         ]
       },
-      "DealStatutUpdate": {
+      "DealAdminUpdate": {
         "type": "object",
         "properties": {
           "statut": {
@@ -502,6 +502,74 @@
           },
           "whatsappPublic": {
             "type": "boolean"
+          },
+          "titre": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "prixPromo": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "prixNormal": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "categorie": {
+            "type": "string",
+            "enum": [
+              "Alimentaire",
+              "Électroménager",
+              "High-Tech",
+              "Mode",
+              "Maison",
+              "Beauté",
+              "Sport",
+              "Autre"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "physique",
+              "en_ligne",
+              "les_deux"
+            ]
+          },
+          "ville": {
+            "type": "string",
+            "enum": [
+              "National",
+              "Casablanca",
+              "Rabat",
+              "Marrakech",
+              "Fès",
+              "Tanger",
+              "Agadir",
+              "Meknès",
+              "Oujda"
+            ]
+          },
+          "dateFin": {
+            "type": "string",
+            "format": "date"
+          },
+          "lien": {
+            "type": "string",
+            "format": "uri"
+          },
+          "enseigneSlug": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 60
           }
         },
         "required": [
@@ -1441,7 +1509,7 @@
     },
     "/admin/deals/{publicId}": {
       "patch": {
-        "summary": "Changer le statut d'un deal (tracé dans journal_audit)",
+        "summary": "Édition curateur complète d'un deal + changement de statut (tracé dans journal_audit) — CONTRAT-V1 §3/§4, troisième amendement conscient du 19/07/2026",
         "security": [
           {
             "bearerAuth": []
@@ -1464,7 +1532,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DealStatutUpdate"
+                "$ref": "#/components/schemas/DealAdminUpdate"
               }
             }
           }
@@ -1481,7 +1549,72 @@
             }
           },
           "400": {
-            "description": "Statut invalide",
+            "description": "Corps invalide (statut/champ métier incohérent, enseigneSlug inconnu...)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/deals/{publicId}/image-depuis-lien": {
+      "post": {
+        "summary": "Récupère l'image produit depuis le lien existant du deal (og:image, repli twitter:image/image_src) — CONTRAT-V1 §4, troisième amendement conscient du 19/07/2026. Garde SSRF stricte sur chaque fetch.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK — image_key mis à jour",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealAdmin"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Deal sans lien, lien non autorisé (SSRF), page sans og:image, image invalide",
             "content": {
               "application/json": {
                 "schema": {

@@ -7,7 +7,7 @@ import {
   dealSchema,
   dealInputSchema,
   dealAdminSchema,
-  dealStatutUpdateSchema,
+  dealAdminUpdateSchema,
   enseigneSchema,
   voteInputSchema,
   commentaireInputSchema,
@@ -29,7 +29,7 @@ const registry = new OpenAPIRegistry();
 const Deal = registry.register("Deal", dealSchema);
 const DealAdmin = registry.register("DealAdmin", dealAdminSchema);
 const DealInput = registry.register("DealInput", dealInputSchema);
-const DealStatutUpdate = registry.register("DealStatutUpdate", dealStatutUpdateSchema);
+const DealAdminUpdate = registry.register("DealAdminUpdate", dealAdminUpdateSchema);
 const Enseigne = registry.register("Enseigne", enseigneSchema);
 const VoteInput = registry.register("VoteInput", voteInputSchema);
 const CommentaireInput = registry.register("CommentaireInput", commentaireInputSchema);
@@ -247,15 +247,34 @@ registry.registerPath({
 registry.registerPath({
   method: "patch",
   path: "/admin/deals/{publicId}",
-  summary: "Changer le statut d'un deal (tracé dans journal_audit)",
+  summary:
+    "Édition curateur complète d'un deal + changement de statut (tracé dans journal_audit) — " +
+    "CONTRAT-V1 §3/§4, troisième amendement conscient du 19/07/2026",
   security: [{ [bearerAuth.name]: [] }],
   request: {
     params: z.object({ publicId: z.string() }),
-    body: { content: { "application/json": { schema: DealStatutUpdate } } },
+    body: { content: { "application/json": { schema: DealAdminUpdate } } },
   },
   responses: {
     200: { description: "OK", content: { "application/json": { schema: DealAdmin } } },
-    400: errorResponse("Statut invalide"),
+    400: errorResponse("Corps invalide (statut/champ métier incohérent, enseigneSlug inconnu...)"),
+    403: errorResponse("Accès refusé (non-admin)"),
+    404: errorResponse("Deal introuvable"),
+  },
+  tags: ["admin"],
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/admin/deals/{publicId}/image-depuis-lien",
+  summary:
+    "Récupère l'image produit depuis le lien existant du deal (og:image, repli twitter:image/image_src) — " +
+    "CONTRAT-V1 §4, troisième amendement conscient du 19/07/2026. Garde SSRF stricte sur chaque fetch.",
+  security: [{ [bearerAuth.name]: [] }],
+  request: { params: z.object({ publicId: z.string() }) },
+  responses: {
+    200: { description: "OK — image_key mis à jour", content: { "application/json": { schema: DealAdmin } } },
+    400: errorResponse("Deal sans lien, lien non autorisé (SSRF), page sans og:image, image invalide"),
     403: errorResponse("Accès refusé (non-admin)"),
     404: errorResponse("Deal introuvable"),
   },
@@ -273,7 +292,7 @@ registry.registerPath({
         "application/json": {
           schema: z.object({
             publicIds: z.array(z.string()).min(1).max(100),
-            statut: dealStatutUpdateSchema.shape.statut,
+            statut: dealAdminUpdateSchema.shape.statut,
           }),
         },
       },

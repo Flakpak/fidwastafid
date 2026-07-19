@@ -97,6 +97,21 @@ commerces informels marocains (hanout, marché, boutique sans enseigne curée) :
   par le curateur, visible par le soumetteur dans son espace membre (`GET /api/v1/me`) : la
   communauté doit comprendre pourquoi son deal n'a pas été publié, pas juste constater le rejet.
 
+**Amendement du 19/07/2026 — édition curateur complète + récupération d'image (troisième
+amendement conscient de la liste fermée, voir §4 ci-dessous)** : `PATCH /api/v1/admin/deals/:publicId`
+s'étend de la simple mise à jour de statut à l'édition complète des champs métier du deal
+(titre, description, prixPromo, prixNormal, categorie, type, ville, dateFin, lien, enseigneSlug),
+en plus des champs terrain déjà éditables (amendement du 18/07/2026 ci-dessus). Toujours
+JAMAIS éditables via ce endpoint : `public_id`, `score`, `submitter_id`, `image_key` (celui-ci
+passe exclusivement par le nouvel endpoint `image-depuis-lien` ci-dessous). Les mêmes règles de
+cohérence physique/en_ligne que `POST /api/v1/deals` (`dealCoherenceIssues`, packages/schemas)
+s'appliquent, vérifiées sur l'état RÉSULTANT de la fusion patch + valeurs existantes — un PATCH
+partiel qui ne touche pas `type`/`lien` reste validé contre leurs valeurs actuelles en base.
+`enseigneSlug` distingue explicitement omis (`undefined`, inchangé) de `null` (déliaison
+volontaire, "aucune enseigne") — seul champ de cet amendement à supporter l'effacement, les
+autres champs facultatifs restent sur la limite acceptée d'origine (omis = inchangé, pas de
+moyen de les vider via ce endpoint).
+
 **Amendement du 18/07/2026 — consentement WhatsApp public** : la règle "`whatsapp_contact`
 n'apparaît jamais hors admin" (ci-dessous, §4) est remplacée par une règle conditionnée au
 consentement du soumetteur — voir §4. `deals` gagne **`whatsapp_public`** (booléen, `not null default
@@ -147,8 +162,12 @@ DELETE /api/v1/me                           suppression de compte (anonymisation
 
 # Admin (requireAdmin)
 GET    /api/v1/admin/deals                  pipeline complet (auto_draft en premier)
-PATCH  /api/v1/admin/deals/:publicId        { statut: "publie"|"rejete"|... }
+PATCH  /api/v1/admin/deals/:publicId        édition complète du deal + statut (voir §3, amendement du 19/07/2026)
 POST   /api/v1/admin/deals/bulk             actions groupées
+POST   /api/v1/admin/deals/:publicId/image-depuis-lien
+                                             récupère l'image produit depuis le lien du deal
+                                             (og:image/twitter:image/image_src) — ajouté le
+                                             19/07/2026, troisième amendement conscient
 ```
 
 **Notes** :
@@ -163,6 +182,29 @@ POST   /api/v1/admin/deals/bulk             actions groupées
 - Le pipeline (`apps/pipeline`, `.mjs`) écrit **directement en base**, hors `/api/v1` — exception
   documentée (script d'infra dans un environnement de confiance), pas une entorse au principe
   « toutes les écritures utilisateur passent par l'API ».
+- Amendement du 19/07/2026 — édition curateur complète + récupération d'image (troisième
+  amendement conscient, voir §3) : `PATCH /api/v1/admin/deals/:publicId` couvre désormais tout
+  le domaine métier du deal, pas seulement le statut. `POST /api/v1/admin/deals/:publicId/image-depuis-lien`
+  ajouté au même amendement : le serveur fetch la page du `lien` existant du deal (jamais fourni
+  par l'appelant, toujours relu depuis la base), en extrait une image (og:image, repli
+  twitter:image, repli `<link rel="image_src">`), la traite (sharp, resize ≤1200px, WebP q80) et
+  écrit `image_key` — même convention de clé (`deals/{public_id}.webp`) et même bucket
+  (`deals-images`) que le pipeline. Fonctionne sur un deal `publie` comme `en_attente` (aucun
+  filtre de statut) — cas de rattrapage d'un deal déjà publié sans photo.
+  - **Garde SSRF stricte** (apps/web/src/app/api/v1/_lib/ssrf.ts) : ce endpoint fait fetcher au
+    serveur une URL dérivée d'un `lien` potentiellement soumis par un utilisateur non admin lors
+    de la soumission d'origine — avant CHAQUE requête réseau (la page ET l'image, y compris
+    chaque hop de redirection revalidé), seuls `http`/`https` sont autorisés et l'hôte résolu est
+    rejeté s'il pointe vers une IP privée/loopback/link-local/de métadonnées (RFC1918, `127.0.0.0/8`,
+    `169.254.0.0/16`, `::1`, `fc00::/7`). Redirections plafonnées à 3 hops. Timeouts et plafonds de
+    taille (5 Mo HTML, 10 Mo image) appliqués en streaming, pas sur la seule foi d'un
+    `Content-Length` déclaré.
+  - **Limite de cache edge acceptée** : la route proxy `/img/deals/[publicId]` sert avec
+    `s-maxage=2592000` (30 jours, §6). Un remplacement d'image via ce endpoint peut donc mettre
+    jusqu'à 30 jours à apparaître publiquement si une version précédente était déjà en cache edge
+    — pas de purge active. Non problématique pour le cas initial (deal sans image, aucun cache
+    préexistant à purger) ; limite acceptée pour le cas replacement, pas un objectif de cet
+    amendement.
 - Rate limiting (Phase 3) ciblé sur les écritures non-admin (`POST votes/commentaires/deals`).
 - Vote et commentaire modélisés comme **sous-ressources** de deal (pas de ressources de premier
   niveau `/votes`, `/commentaires`) — un vote n'existe jamais sans son deal.
