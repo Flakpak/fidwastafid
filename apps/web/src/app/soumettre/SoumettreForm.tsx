@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { VILLES, CATEGORIES, type Enseigne } from "@fidwastafid/schemas";
@@ -76,9 +76,16 @@ const DRAFT_TEXT_FIELDS = [
 ] as const;
 const DRAFT_KEY = "soumettre:brouillon";
 
+/** 5 Mo — même plafond que le module partagé côté serveur
+ *  (_lib/dealImage.ts) ; le contrôle client n'est qu'un confort (message
+ *  immédiat, pas d'aller-retour réseau pour rien), le serveur reste la
+ *  seule autorité. */
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+
 export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const draftRef = useRef<Record<string, string> | null>(null);
   const [type, setType] = useState<"physique" | "en_ligne" | "les_deux">("physique");
   const [enseigneSlug, setEnseigneSlug] = useState("");
@@ -86,6 +93,20 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
   const [error, setError] = useState<SubmitError | null>(null);
   const [done, setDone] = useState(false);
   const [restoredOnce, setRestoredOnce] = useState(false);
+  // Photo jamais persistée dans le brouillon sessionStorage (File non
+  // sérialisable, et une image ne survit pas à un aller-retour connexion de
+  // toute façon) — absente volontairement de DRAFT_TEXT_FIELDS ci-dessus.
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  // Révoque l'URL d'objet en cours si l'utilisateur quitte la page sans
+  // retirer ni soumettre la photo sélectionnée.
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    };
+  }, [photoPreviewUrl]);
 
   // Restauration du brouillon au montage — deux passes : `type` et
   // `enseigneSlug` pilotent l'affichage conditionnel (ville/lien, nomVendeur),
@@ -151,6 +172,52 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
   }
 
+  function clearPhoto() {
+    setPhotoFile(null);
+    setPhotoPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    if (photoInputRef.current) photoInputRef.current.value = "";
+  }
+
+  function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setPhotoError(null);
+    if (!file) {
+      clearPhoto();
+      return;
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setPhotoError("Image trop volumineuse (5 Mo maximum) — choisis une autre photo.");
+      clearPhoto();
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  }
+
+  function handleRemovePhoto() {
+    setPhotoError(null);
+    clearPhoto();
+  }
+
+  /** Sérialise le corps JSON déjà construit en FormData (mêmes clés, valeurs
+   *  en chaînes) + la photo — évite de dupliquer toute l'extraction des
+   *  champs pour un second format de corps. */
+  function bodyToFormData(body: Record<string, unknown>, image: File): FormData {
+    const formData = new FormData();
+    for (const [key, value] of Object.entries(body)) {
+      if (value === undefined || value === null) continue;
+      formData.append(key, typeof value === "boolean" ? String(value) : String(value));
+    }
+    formData.append("image", image);
+    return formData;
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
@@ -203,14 +270,26 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       whatsappPublic,
     };
 
+    // multipart uniquement si une photo est jointe (CONTRAT-V1 §4/§6) — sans
+    // photo, le chemin JSON reste strictement celui d'avant ce lot (aucun
+    // Content-Type ajouté ici n'est nécessaire pour FormData : le navigateur
+    // pose lui-même le boundary multipart).
+    const headers: Record<string, string> = {
+      "x-turnstile-token": turnstileToken ? String(turnstileToken) : "",
+    };
+    let requestBody: BodyInit;
+    if (photoFile) {
+      requestBody = bodyToFormData(body, photoFile);
+    } else {
+      headers["Content-Type"] = "application/json";
+      requestBody = JSON.stringify(body);
+    }
+
     try {
       const res = await fetch("/api/v1/deals", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-turnstile-token": turnstileToken ? String(turnstileToken) : "",
-        },
-        body: JSON.stringify(body),
+        headers,
+        body: requestBody,
       });
 
       if (!res.ok) {
@@ -244,6 +323,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       }
 
       sessionStorage.removeItem(DRAFT_KEY);
+      clearPhoto();
       setDone(true);
       router.refresh();
     } catch {
@@ -303,6 +383,37 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
         <input name="titre" required minLength={3} maxLength={200} className={fieldClass(Boolean(error?.fields?.titre))} />
         <FieldError message={error?.fields?.titre} />
       </label>
+
+      <label className="flex flex-col gap-1 text-sm font-bold">
+        Photo (facultatif)
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handlePhotoChange}
+          className={fieldClass(Boolean(photoError ?? error?.fields?.image))}
+        />
+        <span className="text-xs text-muted font-normal">
+          Photographie l&apos;étiquette ou le produit — utile pour un hanout sans lien, ou si le lien ne fournit pas
+          d&apos;image (jpeg/png/webp, 5 Mo max).
+        </span>
+        <FieldError message={photoError ?? error?.fields?.image} />
+      </label>
+
+      {photoPreviewUrl && (
+        <div className="flex items-center gap-3">
+          {/* Aperçu local (URL d'objet, jamais envoyée au serveur telle
+              quelle) — même image que celle jointe au submit. */}
+          <img
+            src={photoPreviewUrl}
+            alt="Aperçu de la photo sélectionnée"
+            className="max-h-32 w-auto object-contain border border-bordure rounded"
+          />
+          <button type="button" onClick={handleRemovePhoto} className="text-xs font-bold text-rouge hover:underline">
+            Retirer la photo
+          </button>
+        </div>
+      )}
 
       <label className="flex flex-col gap-1 text-sm font-bold">
         Enseigne (facultatif)
