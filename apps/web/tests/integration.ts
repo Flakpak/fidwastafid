@@ -225,7 +225,9 @@ async function main() {
         nomVendeur: "Hanout Test",
         adresse: "12 Rue Test, Casablanca",
         lienMaps: "https://www.google.com/maps/place/Hanout+Test",
-        whatsappContact: "0612345678",
+        // Format humain réel (espaces), pas la forme déjà propre — bug prod
+        // du 19/07/2026 : ce format faisait échouer toute la soumission.
+        whatsappContact: "06 12 34 56 78",
         whatsappPublic: true,
       }),
     }),
@@ -263,7 +265,12 @@ async function main() {
     }),
     noParams
   );
+  const lienMapsInvalideBody = (await lienMapsInvalideRes.json()) as { error?: { fields?: Record<string, string> } };
   check("lienMaps hors liste blanche -> 400 VALIDATION_ERROR", lienMapsInvalideRes.status === 400);
+  check(
+    "lienMaps invalide -> détail du champ fautif fourni (fields)",
+    typeof lienMapsInvalideBody.error?.fields?.lienMaps === "string"
+  );
 
   const whatsappSansNumeroRes = await postDeal(
     authedRequest("http://localhost/api/v1/deals", token, {
@@ -280,6 +287,49 @@ async function main() {
     noParams
   );
   check("whatsappPublic=true sans whatsappContact -> 400 VALIDATION_ERROR", whatsappSansNumeroRes.status === 400);
+
+  // Troisième reset — ce bloc ajoute encore 2 soumissions authentifiées
+  // (normalisation whatsapp + variante lienMaps), au-delà des 4 déjà faites
+  // dans le bloc "soumission terrain" ci-dessus (limite 5/heure).
+  await query(`delete from rate_limits where cle like 'soumission:%'`);
+
+  console.log("\nnormalisation whatsapp — tirets, points, format international espacé");
+  const whatsappTiretsRes = await postDeal(
+    authedRequest("http://localhost/api/v1/deals", token, {
+      method: "POST",
+      headers: { "x-turnstile-token": "test" },
+      body: JSON.stringify({
+        titre: "Deal whatsapp tirets",
+        categorie: "Autre",
+        type: "physique",
+        prixPromo: 15,
+        whatsappContact: "0612-345-678",
+        whatsappPublic: true,
+      }),
+    }),
+    noParams
+  );
+  const whatsappTiretsBody = (await whatsappTiretsRes.json()) as { whatsappContact?: string };
+  check(
+    "whatsapp avec tirets -> normalisé en +212612345678",
+    whatsappTiretsBody.whatsappContact === "+212612345678"
+  );
+
+  const lienMapsGoogleComRes = await postDeal(
+    authedRequest("http://localhost/api/v1/deals", token, {
+      method: "POST",
+      headers: { "x-turnstile-token": "test" },
+      body: JSON.stringify({
+        titre: "Deal lienMaps maps.google.com",
+        categorie: "Autre",
+        type: "physique",
+        prixPromo: 15,
+        lienMaps: "https://maps.google.com/maps?q=Test&ll=33.5,-7.6",
+      }),
+    }),
+    noParams
+  );
+  check("lienMaps maps.google.com -> 201 (variante réelle de partage)", lienMapsGoogleComRes.status === 201);
 
   console.log("\nexposition whatsapp — absente en public si non consentie, présente si consentie");
 
