@@ -58,6 +58,16 @@ async function getRealAccessToken(): Promise<{ token: string; userId: string }> 
   const email = readEnv("TEST_USER_EMAIL");
   const password = readEnv("TEST_USER_PASSWORD");
 
+  // Deux causes d'échec bien distinctes à ce stade, longtemps confondues
+  // sous le même message générique (incident CI du 19/07/2026 : 18 runs
+  // rouges d'affilée, diagnostiqués à coup de fouille de logs faute de
+  // distinguer les deux) :
+  // - le `fetch` lui-même échoue (DNS/connexion/timeout) -> le projet
+  //   Supabase de dev est probablement en pause (free tier) ;
+  // - le `fetch` aboutit mais renvoie 401/403 -> la clé API elle-même est
+  //   absente, invalide ou révoquée (ex. secret GitHub manquant après une
+  //   migration de clés, ou clé legacy désactivée côté Dashboard) — un
+  //   redémarrage du projet ne change rien, il faut vérifier les secrets.
   const SUPABASE_DOWN_MESSAGE =
     "Supabase dev inaccessible : projet probablement en pause, le réveiller sur supabase.com.";
 
@@ -73,7 +83,21 @@ async function getRealAccessToken(): Promise<{ token: string; userId: string }> 
   }
 
   if (!response.ok) {
-    throw new Error(`${SUPABASE_DOWN_MESSAGE} (HTTP ${response.status})`);
+    let detail = "";
+    try {
+      const errBody = (await response.json()) as { message?: string; error?: string; error_description?: string };
+      detail = errBody.message || errBody.error_description || errBody.error || "";
+    } catch {
+      // Corps d'erreur non-JSON — le statut HTTP seul reste informatif.
+    }
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(
+        `Clé API Supabase rejetée (HTTP ${response.status}${detail ? ` — ${detail}` : ""}) : ` +
+          "SUPABASE_PUBLISHABLE_KEY/SUPABASE_ANON_KEY est absente, invalide ou révoquée côté secrets GitHub " +
+          "— vérifie Settings > Secrets and variables > Actions, pas la peine de réveiller le projet Supabase."
+      );
+    }
+    throw new Error(`${SUPABASE_DOWN_MESSAGE} (HTTP ${response.status}${detail ? ` — ${detail}` : ""})`);
   }
 
   const data = (await response.json()) as { access_token?: string; user?: { id?: string } };
