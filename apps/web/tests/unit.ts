@@ -1,5 +1,6 @@
 import { isPrivateOrReservedIp, assertPublicUrl, SsrfGuardError } from "../src/app/api/v1/_lib/ssrf.js";
 import { extractImageUrl } from "../src/app/api/v1/_lib/ogImage.js";
+import { sniffImageMime } from "../src/app/api/v1/_lib/dealImage.js";
 
 /**
  * Tests unitaires — offline, aucun réseau ni base de données (job CI
@@ -121,5 +122,23 @@ check(
   extractImageUrl("<meta property='og:image' content='https://ex.com/f.jpg'>", "https://ex.com/page") ===
     "https://ex.com/f.jpg"
 );
+
+console.log("\nsniffImageMime — détection par magic bytes (jamais le Content-Type déclaré)");
+const validJpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+const validPng = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d]);
+const validWebp = Buffer.concat([Buffer.from("RIFF"), Buffer.from([0x00, 0x00, 0x00, 0x00]), Buffer.from("WEBP")]);
+// .exe renommé .jpg — l'en-tête DOS "MZ" ne correspond à aucune signature
+// image, rejeté quel que soit le nom de fichier ou le Content-Type déclaré
+// par le client au moment de l'upload.
+const fakeExeAsJpg = Buffer.from([0x4d, 0x5a, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00]);
+const plainText = Buffer.from("Ceci n'est pas du tout une image, juste du texte brut.");
+
+check("JPEG valide -> image/jpeg", sniffImageMime(validJpeg) === "image/jpeg");
+check("PNG valide -> image/png", sniffImageMime(validPng) === "image/png");
+check("WebP valide -> image/webp", sniffImageMime(validWebp) === "image/webp");
+check(".exe renommé .jpg -> rejeté (null)", sniffImageMime(fakeExeAsJpg) === null);
+check("texte brut -> rejeté (null)", sniffImageMime(plainText) === null);
+check("buffer vide -> rejeté (null)", sniffImageMime(Buffer.alloc(0)) === null);
+check("buffer trop court pour toute signature -> rejeté (null)", sniffImageMime(Buffer.from([0xff, 0xd8])) === null);
 
 void runAsyncChecks();
