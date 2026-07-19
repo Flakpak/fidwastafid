@@ -43,6 +43,7 @@ export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React
   const [type, setType] = useState<Type>("tous");
   const [tri, setTri] = useState<Tri>("score");
   const [recherche, setRecherche] = useState("");
+  const filtresRef = useRef<HTMLDivElement>(null);
 
   /** Le premier rendu a déjà les données SSR (mêmes filtres par défaut) — refetch uniquement quand un filtre change réellement. */
   const premierRendu = useRef(true);
@@ -52,6 +53,13 @@ export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React
       premierRendu.current = false;
       return;
     }
+
+    // Un changement de filtre en cours de scroll ramène la barre (donc le
+    // haut de la liste filtrée) sous le header — comportement standard,
+    // sinon l'utilisateur reste bloqué au milieu d'une liste qui vient de
+    // changer sous ses yeux. La barre étant sticky, ce scroll s'arrête
+    // naturellement à son offset collé (top-[70px]).
+    filtresRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
     const params = new URLSearchParams({ limit: "24", tri });
     if (ville) params.set("ville", ville);
@@ -77,19 +85,11 @@ export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React
 
   return (
     <>
-      <div className="bg-white border-b border-bordure px-4 py-2">
-        <input
-          type="search"
-          value={recherche}
-          onChange={(e) => setRecherche(e.target.value)}
-          placeholder="Rechercher un deal, une enseigne..."
-          className="w-full max-w-2xl mx-auto block border border-bordure rounded-full px-4 py-1.5 text-sm"
-        />
-      </div>
-
       <div className="md:grid md:grid-cols-[220px_1fr] md:items-start">
-        {/* Sidebar desktop — cachée en mobile (les selects ci-dessous restent
-            seuls responsables du tri/filtrage) — parité v1 (.sidebar). */}
+        {/* Sidebar desktop — cachée en mobile (la barre de filtres collante
+            ci-dessous reste seule responsable du tri/filtrage) — parité v1
+            (.sidebar). Sticky indépendante de la barre de filtres : chacune
+            vit dans sa propre colonne de la grille, aucun chevauchement. */}
         <aside className="hidden md:flex md:flex-col md:sticky md:top-[70px] md:h-[calc(100vh-70px)] md:overflow-y-auto bg-white border-r border-bordure py-5">
           <div className="text-center px-4 pb-4 mb-3 border-b border-bordure">
             <Seal className="w-20 h-20 mx-auto mb-2" />
@@ -136,73 +136,105 @@ export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React
         <main className="max-w-2xl md:max-w-none mx-auto md:mx-0 p-4">
           {hero}
 
-          <div className="hidden md:flex items-center gap-2 mb-3 flex-wrap">
-            <button type="button" onClick={() => setCategorie("")} className={chipClass(categorie === "")}>
-              Tous
-            </button>
-            {CATEGORIES.slice(0, 4).map((c) => (
-              <button key={c} type="button" onClick={() => setCategorie(c)} className={chipClass(categorie === c)}>
-                {categorieIcon(c)} {c}
+          {/*
+           * Barre de filtres collante — chips catégorie + recherche/ville/
+           * type/tri, fusion de ce qui vivait avant en deux blocs séparés
+           * (chips desktop-only + barre de recherche pleine largeur hors
+           * grille). `top-[70px]` : même offset que la sidebar desktop
+           * (celle-ci l'utilise déjà pour se coller sous le header sticky,
+           * cf. <aside> ci-dessus) — active ici sur mobile ET desktop,
+           * contrairement à la sidebar qui reste desktop-only.
+           *
+           * Deux lignes à défilement horizontal (overflow-x-auto,
+           * flex-nowrap) plutôt que flex-wrap : borne la hauteur à deux
+           * lignes fixes quel que soit le nombre de contrôles ou la largeur
+           * d'écran, au lieu de laisser un retour à la ligne imprévisible
+           * grandir la barre collée. `position: sticky` ne provoque par
+           * nature aucun saut de layout à l'accrochage (contrairement à un
+           * `position: fixed` qui exigerait un espaceur).
+           *
+           * Fond opaque (bg-creme, même teinte que la page) + ombre légère +
+           * filet inférieur : sépare visuellement les cartes qui défilent
+           * dessous. `z-[5]` : sous le header (`z-10`, ne doit jamais être
+           * recouvert) et le menu compte du header (`z-20`), au-dessus des
+           * cartes (z-auto).
+           *
+           * Catégorie : chips uniquement (plus de <select> catégorie
+           * dupliqué) — la sidebar desktop garde sa propre liste de
+           * catégories, indépendante et non perturbée par ce changement.
+           */}
+          <div
+            ref={filtresRef}
+            className="sticky top-[70px] z-[5] -mx-4 px-4 bg-creme border-b border-bordure shadow-sm pt-3 pb-2 mb-3 flex flex-col gap-2"
+          >
+            <div className="flex items-center gap-2 overflow-x-auto">
+              <button type="button" onClick={() => setCategorie("")} className={`shrink-0 ${chipClass(categorie === "")}`}>
+                Tous
               </button>
-            ))}
-          </div>
-
-          <div className="bg-white border border-bordure rounded-lg px-4 py-2 flex flex-wrap items-center gap-2 text-sm mb-3">
-            <select
-              value={ville}
-              onChange={(e) => setVille(e.target.value)}
-              className="border border-bordure rounded-full px-3 py-1 font-bold text-xs"
-            >
-              <option value="">Toutes les villes</option>
-              {VILLES.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-            <select
-              value={categorie}
-              onChange={(e) => setCategorie(e.target.value)}
-              className="border border-bordure rounded-full px-3 py-1 font-bold text-xs"
-            >
-              <option value="">Toutes catégories</option>
               {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-            <div className="flex gap-1">
-              {(
-                [
-                  { value: "tous", label: "Tous" },
-                  { value: "physique", label: "🏪 Physique" },
-                  { value: "en_ligne", label: "🌐 En ligne" },
-                ] as const
-              ).map((t) => (
                 <button
-                  key={t.value}
+                  key={c}
                   type="button"
-                  onClick={() => setType(t.value)}
-                  className={`rounded-full px-3 py-1 font-bold text-xs ${
-                    type === t.value ? "bg-rouge text-white" : "bg-creme text-muted"
-                  }`}
+                  onClick={() => setCategorie(c)}
+                  className={`shrink-0 ${chipClass(categorie === c)}`}
                 >
-                  {t.label}
+                  {categorieIcon(c)} {c}
                 </button>
               ))}
             </div>
-            <select
-              value={tri}
-              onChange={(e) => setTri(e.target.value as Tri)}
-              className="border border-bordure rounded-full px-3 py-1 font-bold text-xs ml-auto"
-            >
-              {TRIS.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+
+            <div className="flex items-center gap-2 overflow-x-auto text-sm">
+              <input
+                type="search"
+                value={recherche}
+                onChange={(e) => setRecherche(e.target.value)}
+                placeholder="Rechercher un deal, une enseigne..."
+                className="shrink-0 w-44 md:flex-1 md:w-auto border border-bordure rounded-full px-4 py-1.5 text-sm"
+              />
+              <select
+                value={ville}
+                onChange={(e) => setVille(e.target.value)}
+                className="shrink-0 border border-bordure rounded-full px-3 py-1 font-bold text-xs"
+              >
+                <option value="">Toutes les villes</option>
+                {VILLES.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+              <div className="shrink-0 flex gap-1">
+                {(
+                  [
+                    { value: "tous", label: "Tous" },
+                    { value: "physique", label: "🏪 Physique" },
+                    { value: "en_ligne", label: "🌐 En ligne" },
+                  ] as const
+                ).map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => setType(t.value)}
+                    className={`rounded-full px-3 py-1 font-bold text-xs ${
+                      type === t.value ? "bg-rouge text-white" : "bg-white text-muted"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <select
+                value={tri}
+                onChange={(e) => setTri(e.target.value as Tri)}
+                className="shrink-0 border border-bordure rounded-full px-3 py-1 font-bold text-xs md:ml-auto"
+              >
+                {TRIS.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="flex flex-col gap-3">
