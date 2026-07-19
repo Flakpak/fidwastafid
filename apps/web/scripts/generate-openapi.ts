@@ -70,7 +70,7 @@ registry.registerPath({
       ville: z.string().optional(),
       categorie: z.string().optional(),
       type: z.string().optional(),
-      tri: z.string().optional().openapi({ description: "score|recent — score par défaut" }),
+      tri: z.string().optional().openapi({ description: "tendance|score|recent — tendance par défaut" }),
       cursor: z.string().optional(),
       limit: z.string().optional(),
     }),

@@ -820,7 +820,7 @@
           {
             "schema": {
               "type": "string",
-              "description": "score|recent — score par défaut"
+              "description": "tendance|score|recent — tendance par défaut"
             },
             "required": false,
             "name": "tri",

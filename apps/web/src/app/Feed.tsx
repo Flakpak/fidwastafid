@@ -8,10 +8,15 @@ import { Seal } from "../components/Seal.js";
 import { categorieIcon } from "../lib/format.js";
 
 type Type = "tous" | "physique" | "en_ligne";
-type Tri = "score" | "recent";
+type Tri = "tendance" | "score" | "recent";
 
+/** "Tendances" en tête (tri par défaut, Phase 5 : rang de gravité type
+ *  Dealabs/Hacker News côté API) — 🔥 lui revient (icône "chaud/tendance"
+ *  de la charte), "Les plus chauds" (score brut) passe à 👍 pour ne pas
+ *  dupliquer l'icône entre les deux tris. */
 const TRIS: { value: Tri; label: string; emoji: string }[] = [
-  { value: "score", label: "Les plus chauds", emoji: "🔥" },
+  { value: "tendance", label: "Tendances", emoji: "🔥" },
+  { value: "score", label: "Les plus chauds", emoji: "👍" },
   { value: "recent", label: "Les plus récents", emoji: "⚡" },
 ];
 
@@ -41,7 +46,7 @@ export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React
   const [ville, setVille] = useState<string>("");
   const [categorie, setCategorie] = useState<string>("");
   const [type, setType] = useState<Type>("tous");
-  const [tri, setTri] = useState<Tri>("score");
+  const [tri, setTri] = useState<Tri>("tendance");
   const [recherche, setRecherche] = useState("");
   const filtresRef = useRef<HTMLDivElement>(null);
 
