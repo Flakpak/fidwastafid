@@ -21,6 +21,13 @@ export type DealType = z.infer<typeof dealTypeSchema>;
  * en plus de `google.com` : c'est l'hôte réel des liens de partage Google Maps
  * produits en pratique — une liste blanche qui l'exclurait rendrait le champ
  * inutilisable pour l'immense majorité des liens réels.
+ *
+ * `maps.google.com` ajouté le 19/07/2026 (bug prod : soumissions rejetées à
+ * tort) — variante réelle de partage Google Maps (notamment Android,
+ * anciens liens "Partager" du type https://maps.google.com/maps?q=...),
+ * distincte de google.com/www.google.com. Sous-domaine dédié aux cartes :
+ * pas besoin d'exiger un chemin `/maps` en plus, contrairement à google.com
+ * qui sert aussi tout le reste du moteur de recherche.
  */
 function isLienMapsAutorise(value: string): boolean {
   let url: URL;
@@ -30,7 +37,7 @@ function isLienMapsAutorise(value: string): boolean {
     return false;
   }
   if (url.protocol !== "https:") return false;
-  if (url.hostname === "maps.app.goo.gl") return true;
+  if (url.hostname === "maps.app.goo.gl" || url.hostname === "maps.google.com") return true;
   if ((url.hostname === "google.com" || url.hostname === "www.google.com") && url.pathname.startsWith("/maps")) {
     return true;
   }
@@ -51,18 +58,39 @@ const lienMapsSchema = z
  * (+212XXXXXXXXX ou 0XXXXXXXXX), normalisé en +212 au stockage (CONTRAT-V1 §3,
  * amendement du 18/07/2026) : une seule forme canonique en base, indépendamment
  * de ce que le soumetteur a tapé.
+ *
+ * Séparateurs humains courants retirés avant validation (bug prod du
+ * 19/07/2026 : un numéro copié tel qu'affiché — "06 12 34 56 78",
+ * "+212 6 12 34 56 78", "0612-345-678" — échouait la regex stricte et
+ * rejetait la soumission entière sans qu'aucun message n'explique pourquoi).
+ * Espaces, points et tirets retirés ; le `+` initial (forme internationale)
+ * est conservé, ce n'est jamais un séparateur.
  */
 const WHATSAPP_LOCAL_REGEX = /^0[0-9]{9}$/;
 const WHATSAPP_INTL_REGEX = /^\+212[0-9]{9}$/;
 
 const whatsappContactSchema = z
   .string()
-  .trim()
+  .transform((value) => value.replace(/[\s.-]/g, ""))
   .refine(
     (value) => WHATSAPP_LOCAL_REGEX.test(value) || WHATSAPP_INTL_REGEX.test(value),
-    "whatsappContact : format attendu +212XXXXXXXXX ou 0XXXXXXXXX."
+    "whatsappContact : format attendu +212XXXXXXXXX ou 0XXXXXXXXX (espaces/tirets acceptés à la saisie)."
   )
   .transform((value) => (value.startsWith("0") ? `+212${value.slice(1)}` : value));
+
+/**
+ * Un champ facultatif "vide" côté formulaire peut arriver ici comme une
+ * chaîne d'un seul espace (espace tapé puis effacé, autofill navigateur) —
+ * jamais réellement `undefined`. Sans ce prétraitement, `min(1)`/l'URL/le
+ * regex le rejette comme un contenu significatif invalide, plutôt que de le
+ * traiter comme absent (bug prod du 19/07/2026 : soumission entière rejetée
+ * pour un champ terrain quasi vide). Appliqué uniquement aux champs texte
+ * libre optionnels de la soumission terrain — les selects (ville, enseigne)
+ * ne sont pas concernés, leur "" est déjà un sentinel géré côté client.
+ */
+function blankToUndefined(value: unknown): unknown {
+  return typeof value === "string" && value.trim() === "" ? undefined : value;
+}
 
 /** Champs communs à l'input utilisateur et à la représentation stockée. */
 const dealCoreShape = {
@@ -73,9 +101,9 @@ const dealCoreShape = {
   /** Nom du commerce en texte libre, quand ce n'est pas une enseigne curée
    *  (CONTRAT-V1 §3, amendement du 18/07/2026) — ne génère jamais de page
    *  /enseigne, aucun croisement avec la table enseignes. */
-  nomVendeur: z.string().trim().min(1).max(80).optional(),
-  adresse: z.string().trim().min(1).max(200).optional(),
-  lienMaps: lienMapsSchema.optional(),
+  nomVendeur: z.preprocess(blankToUndefined, z.string().trim().min(1).max(80).optional()),
+  adresse: z.preprocess(blankToUndefined, z.string().trim().min(1).max(200).optional()),
+  lienMaps: z.preprocess(blankToUndefined, lienMapsSchema.optional()),
   ville: villeSchema.optional(),
   categorie: categorieSchema,
   type: dealTypeSchema,
@@ -87,7 +115,7 @@ const dealCoreShape = {
   /** Contact WhatsApp du vendeur — présent en lecture publique uniquement
    *  si whatsappPublic est vrai (CONTRAT-V1 §4, amendement du 18/07/2026),
    *  voir dealSchema/dealAdminSchema plus bas pour l'exposition effective. */
-  whatsappContact: whatsappContactSchema.optional(),
+  whatsappContact: z.preprocess(blankToUndefined, whatsappContactSchema.optional()),
   /** Clé interne stricte — jamais une URL, format imposé `deals/{public_id}.webp`
    *  (CONTRAT-V1 §6 : "jamais une URL Supabase Storage directe"). L'URL publique
    *  se dérive en /img/deals/[publicId]. Seule écriture autorisée : le pipeline,
@@ -194,9 +222,9 @@ export type DealAdmin = z.infer<typeof dealAdminSchema>;
 export const dealStatutUpdateSchema = z.object({
   statut: dealStatutSchema,
   motifRejet: z.string().trim().max(500).optional(),
-  nomVendeur: z.string().trim().min(1).max(80).optional(),
-  adresse: z.string().trim().min(1).max(200).optional(),
-  lienMaps: lienMapsSchema.optional(),
-  whatsappContact: whatsappContactSchema.optional(),
+  nomVendeur: z.preprocess(blankToUndefined, z.string().trim().min(1).max(80).optional()),
+  adresse: z.preprocess(blankToUndefined, z.string().trim().min(1).max(200).optional()),
+  lienMaps: z.preprocess(blankToUndefined, lienMapsSchema.optional()),
+  whatsappContact: z.preprocess(blankToUndefined, whatsappContactSchema.optional()),
   whatsappPublic: z.boolean().optional(),
 });
