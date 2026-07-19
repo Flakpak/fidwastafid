@@ -4,6 +4,14 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+
+  /**
+   * `sharp` embarque des binaires natifs (libvips) — les exclure du bundle
+   * webpack (jamais transpilé/rollupé) est nécessaire pour que le build
+   * standalone les trace et copie correctement (image-depuis-lien,
+   * CONTRAT-V1 §4, troisième amendement conscient du 19/07/2026).
+   */
+  serverExternalPackages: ["sharp"],
   /** Monorepo pnpm : la racine de tracing doit remonter jusqu'au repo, sinon
    *  le build standalone ne voit pas packages/* (nécessaire pour Docker). */
   outputFileTracingRoot: path.join(process.cwd(), "../.."),
