@@ -111,8 +111,30 @@ function authedRequest(url: string, token: string | null, init: RequestInit = {}
   return new Request(url, { ...init, headers });
 }
 
+/**
+ * Distinct de authedRequest() : un corps FormData a besoin que fetch/undici
+ * pose lui-même le Content-Type multipart avec boundary — authedRequest()
+ * forcerait "application/json" dès qu'un corps est présent sans en-tête
+ * explicite, ce qui casserait le parsing multipart côté route.
+ */
+function authedFormRequest(url: string, token: string, formData: FormData, extraHeaders: HeadersInit = {}): Request {
+  return new Request(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, ...extraHeaders },
+    body: formData,
+  });
+}
+
 const ENSEIGNE_SLUG = "test-integration";
 const DEAL_PUBLIC_ID = "itgd2a9qa2";
+
+// 1x1 PNG transparent minimal — juste assez pour que sharp le décode et que
+// le sniffing magic bytes le reconnaisse comme un vrai PNG. Module-scope :
+// réutilisé par la soumission publique avec photo (POST /api/v1/deals) et
+// par l'upload manuel admin (POST /api/v1/admin/deals/:publicId/image).
+const TINY_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+const TINY_PNG_BUFFER = Buffer.from(TINY_PNG_BASE64, "base64");
 // Fixture pure DB, jamais authentifié — sert uniquement à occuper un pseudo
 // pour tester le rejet d'un doublon (contrainte unique users.pseudo, migration 0006).
 const AUTRE_USER_ID = "00000000-0000-4000-8000-000000000042";
@@ -350,6 +372,82 @@ async function main() {
   );
   check("lienMaps maps.google.com -> 201 (variante réelle de partage)", lienMapsGoogleComRes.status === 201);
 
+  // Quatrième reset — le bloc "soumission avec photo" ci-dessous ajoute 3
+  // soumissions authentifiées (1 valide + 2 rejetées), au-delà de celles
+  // déjà comptabilisées dans les blocs précédents (limite 5/heure).
+  await query(`delete from rate_limits where cle like 'soumission:%'`);
+
+  console.log("\nsoumission avec photo — multipart/form-data (CONTRAT-V1 §4/§6)");
+
+  const photoForm = new FormData();
+  photoForm.append("titre", "Deal avec photo test intégration");
+  photoForm.append("categorie", "Autre");
+  photoForm.append("type", "physique");
+  photoForm.append("prixPromo", "42");
+  photoForm.append("image", new File([TINY_PNG_BUFFER], "photo.png", { type: "image/png" }));
+
+  const photoRes = await postDeal(
+    authedFormRequest("http://localhost/api/v1/deals", token, photoForm, { "x-turnstile-token": "test" }),
+    noParams
+  );
+  const photoBody = (await photoRes.json()) as { publicId?: string; imageKey?: string; statut?: string };
+  check("soumission avec photo valide -> 201", photoRes.status === 201);
+  check("soumission avec photo valide -> statut en_attente", photoBody.statut === "en_attente");
+  const photoPublicId = photoBody.publicId;
+  if (!photoPublicId) throw new Error("publicId manquant après soumission avec photo.");
+  check("soumission avec photo valide -> imageKey peuplé", photoBody.imageKey === `deals/${photoPublicId}.webp`);
+
+  const photoProxyRes = await getImgProxy(new Request(`http://localhost/img/deals/${photoPublicId}`), {
+    params: Promise.resolve({ publicId: photoPublicId }),
+  });
+  check("photo soumise servie par le proxy -> 200", photoProxyRes.status === 200);
+  check(
+    "photo soumise servie par le proxy -> content-type webp",
+    photoProxyRes.headers.get("content-type") === "image/webp"
+  );
+
+  console.log("\nsoumission avec photo — cas d'erreur (rouge -> vert : aucun deal créé)");
+
+  const TITRE_PHOTO_INVALIDE = "Deal photo invalide test intégration";
+  const invalidPhotoForm = new FormData();
+  invalidPhotoForm.append("titre", TITRE_PHOTO_INVALIDE);
+  invalidPhotoForm.append("categorie", "Autre");
+  invalidPhotoForm.append("type", "physique");
+  invalidPhotoForm.append("prixPromo", "10");
+  invalidPhotoForm.append(
+    "image",
+    new File([Buffer.from("pas une image, juste du texte.")], "malware.jpg", { type: "image/jpeg" })
+  );
+  const invalidPhotoRes = await postDeal(
+    authedFormRequest("http://localhost/api/v1/deals", token, invalidPhotoForm, { "x-turnstile-token": "test" }),
+    noParams
+  );
+  check("soumission photo magic bytes invalides -> 400 VALIDATION_ERROR", invalidPhotoRes.status === 400);
+  const dealsPhotoInvalide = await query<{ id: string }>("select id from deals where titre = $1", [
+    TITRE_PHOTO_INVALIDE,
+  ]);
+  check("photo invalide -> aucun deal créé", dealsPhotoInvalide.length === 0);
+
+  const TITRE_PHOTO_TROP_GROSSE = "Deal photo trop grosse test intégration";
+  const oversizedPhotoForm = new FormData();
+  oversizedPhotoForm.append("titre", TITRE_PHOTO_TROP_GROSSE);
+  oversizedPhotoForm.append("categorie", "Autre");
+  oversizedPhotoForm.append("type", "physique");
+  oversizedPhotoForm.append("prixPromo", "10");
+  oversizedPhotoForm.append(
+    "image",
+    new File([new Uint8Array(5 * 1024 * 1024 + 1)], "trop-gros.png", { type: "image/png" })
+  );
+  const oversizedPhotoRes = await postDeal(
+    authedFormRequest("http://localhost/api/v1/deals", token, oversizedPhotoForm, { "x-turnstile-token": "test" }),
+    noParams
+  );
+  check("soumission photo > 5 Mo -> 400 VALIDATION_ERROR", oversizedPhotoRes.status === 400);
+  const dealsPhotoTropGrosse = await query<{ id: string }>("select id from deals where titre = $1", [
+    TITRE_PHOTO_TROP_GROSSE,
+  ]);
+  check("photo trop volumineuse -> aucun deal créé", dealsPhotoTropGrosse.length === 0);
+
   console.log("\nexposition whatsapp — absente en public si non consentie, présente si consentie");
 
   const dealPriveRes = await postDeal(
@@ -579,25 +677,12 @@ async function main() {
 
   console.log("\nupload manuel d'image — POST /api/v1/admin/deals/:publicId/image (fallback Jumia)");
 
-  // 1x1 PNG transparent minimal — juste assez pour que sharp le décode et
-  // que le sniffing magic bytes le reconnaisse comme un vrai PNG.
-  const TINY_PNG_BASE64 =
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
-  const tinyPngBuffer = Buffer.from(TINY_PNG_BASE64, "base64");
-
-  // Distinct de authedRequest() : un corps FormData a besoin que fetch/undici
-  // pose lui-même le Content-Type multipart avec boundary — authedRequest()
-  // forcerait "application/json" dès qu'un corps est présent sans en-tête
-  // explicite, ce qui casserait le parsing multipart côté route.
-  function authedFormRequest(url: string, formData: FormData): Request {
-    return new Request(url, { method: "POST", headers: { authorization: `Bearer ${token}` }, body: formData });
-  }
-
   const uploadForm = new FormData();
-  uploadForm.append("image", new File([tinyPngBuffer], "test.png", { type: "image/png" }));
-  const uploadRes = await postDealImage(authedFormRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}/image`, uploadForm), {
-    params: Promise.resolve({ publicId: terrainPublicId }),
-  });
+  uploadForm.append("image", new File([TINY_PNG_BUFFER], "test.png", { type: "image/png" }));
+  const uploadRes = await postDealImage(
+    authedFormRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}/image`, token, uploadForm),
+    { params: Promise.resolve({ publicId: terrainPublicId }) }
+  );
   const uploadBody = (await uploadRes.json()) as { imageKey?: string };
   check("upload image valide -> 200", uploadRes.status === 200);
   check("upload image valide -> imageKey peuplé", uploadBody.imageKey === `deals/${terrainPublicId}.webp`);
@@ -616,7 +701,7 @@ async function main() {
     new File([new Uint8Array(5 * 1024 * 1024 + 1)], "trop-gros.png", { type: "image/png" })
   );
   const oversizedRes = await postDealImage(
-    authedFormRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}/image`, oversizedForm),
+    authedFormRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}/image`, token, oversizedForm),
     { params: Promise.resolve({ publicId: terrainPublicId }) }
   );
   check("upload > 5 Mo -> 400 VALIDATION_ERROR", oversizedRes.status === 400);
@@ -627,7 +712,7 @@ async function main() {
     new File([Buffer.from("MZ ceci n'est pas une image, juste du texte.")], "malware.jpg", { type: "image/jpeg" })
   );
   const invalidMimeRes = await postDealImage(
-    authedFormRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}/image`, invalidMimeForm),
+    authedFormRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}/image`, token, invalidMimeForm),
     { params: Promise.resolve({ publicId: terrainPublicId }) }
   );
   check(
@@ -637,14 +722,15 @@ async function main() {
 
   const missingFileForm = new FormData();
   const missingFileRes = await postDealImage(
-    authedFormRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}/image`, missingFileForm),
+    authedFormRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}/image`, token, missingFileForm),
     { params: Promise.resolve({ publicId: terrainPublicId }) }
   );
   check("upload sans fichier -> 400 VALIDATION_ERROR", missingFileRes.status === 400);
 
-  const uploadNotFoundRes = await postDealImage(authedFormRequest("http://localhost/api/v1/admin/deals/zzzzzzzzzz/image", new FormData()), {
-    params: Promise.resolve({ publicId: "zzzzzzzzzz" }),
-  });
+  const uploadNotFoundRes = await postDealImage(
+    authedFormRequest("http://localhost/api/v1/admin/deals/zzzzzzzzzz/image", token, new FormData()),
+    { params: Promise.resolve({ publicId: "zzzzzzzzzz" }) }
+  );
   check("upload deal inconnu -> 404", uploadNotFoundRes.status === 404);
 
   console.log("\nvote — recalcul de score synchrone");
