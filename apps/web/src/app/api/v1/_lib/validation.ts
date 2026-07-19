@@ -1,5 +1,5 @@
 import type { NextResponse } from "next/server";
-import type { ZodType } from "zod";
+import type { ZodType, ZodTypeDef } from "zod";
 import { apiError } from "./errors.js";
 
 export type ParseResult<T> = { success: true; data: T } | { success: false; response: NextResponse };
@@ -9,8 +9,19 @@ export type ParseResult<T> = { success: true; data: T } | { success: false; resp
  * packages/schemas. Résultat explicite plutôt qu'une exception : chaque
  * route décide elle-même quoi faire du cas invalide (toujours un early
  * return de `response` ici).
+ *
+ * Troisième paramètre générique de `ZodType` (Input) explicitement `any` :
+ * un schéma avec plusieurs champs `z.preprocess` (Input `unknown` avant
+ * transformation) a un `_input` réel qui diverge de son `_output` — avec le
+ * défaut `ZodType<T>` (Input = Output = T), l'inférence de T depuis un
+ * schéma à plusieurs champs `preprocess` peut tomber sur `unknown` au lieu
+ * de la forme réelle (limite constatée empiriquement sur
+ * dealAdminUpdateSchema, packages/schemas, qui cumule assez de champs
+ * `preprocess` pour la faire basculer). `parseJsonBody` ne se sert jamais du
+ * type Input (seul `.safeParse(json: unknown)` est appelé) — le desserrer
+ * ici n'affaiblit aucune garantie.
  */
-export async function parseJsonBody<T>(request: Request, schema: ZodType<T>): Promise<ParseResult<T>> {
+export async function parseJsonBody<T>(request: Request, schema: ZodType<T, ZodTypeDef, unknown>): Promise<ParseResult<T>> {
   let json: unknown;
   try {
     json = await request.json();
