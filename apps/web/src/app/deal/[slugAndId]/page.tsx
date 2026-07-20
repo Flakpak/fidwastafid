@@ -67,6 +67,12 @@ const IMAGE_OG_GENERIQUE = { url: new URL("/opengraph-image", SITE_URL).toString
  * lecture Storage échoue (jamais casser generateMetadata pour un souci
  * d'image — cf. fetchDealImageBytes qui avale déjà ses propres erreurs).
  *
+ * URL sur un chemin dédié SANS query string (`/og.jpg`, pas
+ * `?format=jpeg`) — incident du 21/07/2026 : le crawler Meta fetchait
+ * og:image en tronquant la query string (vérifié par curl en prod, ni la
+ * route ni le cache Vercel ne perdaient le paramètre) et recevait le WebP
+ * servi par défaut sur ce chemin, rejeté à l'affichage.
+ *
  * Dimensions lues à la volée (imageDimensions) plutôt que stockées en base :
  * le resize à l'upload est `fit: "inside"` (ratio préservé, jamais un carré
  * forcé) donc variable par deal — pas de raccourci sans lire l'image.
@@ -81,7 +87,7 @@ async function dealOgImages(deal: Deal): Promise<NonNullable<NonNullable<Metadat
 
   try {
     const { width, height } = await imageDimensions(bytes);
-    const url = new URL(`/img/deals/${deal.publicId}?format=jpeg`, SITE_URL).toString();
+    const url = new URL(`/img/deals/${deal.publicId}/og.jpg`, SITE_URL).toString();
     return [{ url, width, height, type: "image/jpeg" }];
   } catch {
     return [IMAGE_OG_GENERIQUE];
