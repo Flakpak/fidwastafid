@@ -2,6 +2,8 @@ import { isPrivateOrReservedIp, assertPublicUrl, SsrfGuardError } from "../src/a
 import { extractImageUrl } from "../src/app/api/v1/_lib/ogImage.js";
 import { sniffImageMime } from "../src/app/api/v1/_lib/dealImage.js";
 import { POST as postRevalidate } from "../src/app/api/revalidate/route.js";
+import { dealOgDescription, truncateOgTitle } from "../src/app/deal/[slugAndId]/seo.js";
+import { buildShareText } from "../src/components/shareText.js";
 
 // Jeton de test purement local (Phase 7B) — jamais le vrai REVALIDATE_TOKEN,
 // qui n'existe que côté Vercel/secrets GitHub. Comparable au
@@ -159,5 +161,66 @@ check(".exe renommé .jpg -> rejeté (null)", sniffImageMime(fakeExeAsJpg) === n
 check("texte brut -> rejeté (null)", sniffImageMime(plainText) === null);
 check("buffer vide -> rejeté (null)", sniffImageMime(Buffer.alloc(0)) === null);
 check("buffer trop court pour toute signature -> rejeté (null)", sniffImageMime(Buffer.from([0xff, 0xd8])) === null);
+
+console.log("\ndealOgDescription — incident du 20/07/2026 : jamais le titre, jamais la description produit");
+check(
+  "prix barré + enseigne -> \"{prix} DH au lieu de {prix barré} DH (-{remise}%) · {enseigne}\"",
+  dealOgDescription({ prixPromo: 599, prixNormal: 999, enseigneNom: "Decathlon", nomVendeur: undefined }) ===
+    "599 DH au lieu de 999 DH (-40%) · Decathlon"
+);
+check(
+  "prix barré sans enseigne (ni enseigneNom ni nomVendeur) -> pas de \"·\" final",
+  dealOgDescription({ prixPromo: 599, prixNormal: 999, enseigneNom: undefined, nomVendeur: undefined }) ===
+    "599 DH au lieu de 999 DH (-40%)"
+);
+check(
+  "enseigneNom absent -> repli sur nomVendeur (vendeur informel, CONTRAT-V1 §3)",
+  dealOgDescription({ prixPromo: 50, prixNormal: 100, enseigneNom: undefined, nomVendeur: "Hanout Rachid" }) ===
+    "50 DH au lieu de 100 DH (-50%) · Hanout Rachid"
+);
+check(
+  "pas de prix barré + enseigne -> \"Bon plan chez {enseigne}\"",
+  dealOgDescription({ prixPromo: 99, prixNormal: undefined, enseigneNom: "Marjane", nomVendeur: undefined }) ===
+    "Bon plan chez Marjane"
+);
+check(
+  "ni prix barré ni enseigne -> repli minimal \"{prix} DH\"",
+  dealOgDescription({ prixPromo: 99, prixNormal: undefined, enseigneNom: undefined, nomVendeur: undefined }) === "99 DH"
+);
+check(
+  "prixNormal <= prixPromo (donnée incohérente) -> traité comme \"pas de remise\", jamais un pourcentage négatif/nul",
+  dealOgDescription({ prixPromo: 100, prixNormal: 80, enseigneNom: "Jumia", nomVendeur: undefined }) ===
+    "Bon plan chez Jumia"
+);
+
+console.log("\ntruncateOgTitle — coupe sur un espace, jamais en plein mot, ~70 caractères");
+const titreCourt = "Bodyboard BB 500 confirmé";
+check("titre court (<70) -> inchangé", truncateOgTitle(titreCourt) === titreCourt);
+const titreLong =
+  "Bodyboard BB 500 confirmé Double stringer - Grey yellow Jaune gris avec leash biceps poignet fourni et housse";
+const tronque = truncateOgTitle(titreLong);
+check("titre long (>70) -> tronqué avec ellipse finale", tronque.endsWith("…") && tronque.length <= 71);
+check("titre long -> jamais coupé en plein mot (se termine par …, pas par un mot amputé collé)", !tronque.slice(0, -1).endsWith(" "));
+check(
+  "aucun espace exploitable avant `max` -> coupe brute plutôt qu'un titre quasi vide",
+  truncateOgTitle("a".repeat(50) + " b", 10, 20).length <= 11
+);
+
+console.log("\nbuildShareText — sans titre, sans préfixe \"Fidwastafid :\" (incident du 20/07/2026)");
+check(
+  "avec remise -> \"{prix} DH (-{remise}%)\\n{url}\"",
+  buildShareText(599, 999, "https://fidwastafid.com/deal/x-abc123defg") ===
+    "599 DH (-40%)\nhttps://fidwastafid.com/deal/x-abc123defg"
+);
+check(
+  "sans prixNormal -> pas de parenthèse de remise",
+  buildShareText(99, undefined, "https://fidwastafid.com/deal/y-hij456klmn") ===
+    "99 DH\nhttps://fidwastafid.com/deal/y-hij456klmn"
+);
+check(
+  "prixNormal <= prixPromo (incohérent) -> traité comme sans remise",
+  buildShareText(100, 80, "https://fidwastafid.com/deal/z") === "100 DH\nhttps://fidwastafid.com/deal/z"
+);
+check("jamais \"Fidwastafid :\" dans le texte", !buildShareText(599, 999, "https://fidwastafid.com/deal/x").includes("Fidwastafid"));
 
 void runAsyncChecks();

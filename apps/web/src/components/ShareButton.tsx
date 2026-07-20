@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { buildShareText } from "./shareText.js";
 
 interface ShareButtonProps {
   titre: string;
@@ -25,15 +26,18 @@ export function ShareButton({ titre, prixPromo, prixNormal, dealHref }: ShareBut
 
   async function partager(e: React.MouseEvent) {
     e.preventDefault();
-    const pct = prixNormal && prixNormal > prixPromo ? Math.round((1 - prixPromo / prixNormal) * 100) : null;
     const url = `${window.location.origin}${dealHref}`;
-    const text = `Fidwastafid : ${titre} à ${prixPromo} DH${pct !== null ? ` (-${pct}%)` : ""}`;
+    const text = buildShareText(prixPromo, prixNormal, url);
 
     if (canShare) {
-      void navigator.share({ title: titre, text, url });
+      // `text` inclut déjà l'URL (buildShareText) : pas de champ `url`
+      // séparé, pour ne jamais risquer un doublon selon la façon dont
+      // l'app receveuse recompose `text`+`url` (incident du 20/07/2026,
+      // même logique que la suppression du titre/préfixe redondants).
+      void navigator.share({ title: titre, text });
       return;
     }
-    await navigator.clipboard.writeText(url);
+    await navigator.clipboard.writeText(text);
     setCopie(true);
     setTimeout(() => setCopie(false), 2000);
   }

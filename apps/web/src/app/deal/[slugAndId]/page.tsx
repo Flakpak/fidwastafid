@@ -11,9 +11,12 @@ import { ShareButton } from "../../../components/ShareButton.js";
 import { UrgenceCountdown } from "../../../components/UrgenceCountdown.js";
 import { Avatar } from "../../../components/Avatar.js";
 import { CommentForm } from "./CommentForm.js";
-import { dealDescription, dealJsonLd } from "./seo.js";
+import { dealDescription, dealJsonLd, dealOgDescription, truncateOgTitle } from "./seo.js";
 import { categorieIcon, dealTypeLabel, relativeDate, shortDate } from "../../../lib/format.js";
 import { urgence } from "../../../lib/urgence.js";
+import { SITE_URL } from "../../../lib/siteUrl.js";
+import { fetchDealImageBytes } from "../../../lib/dealImageStorage.js";
+import { imageDimensions } from "../../../lib/ogImageJpeg.js";
 
 /** SSR par requête — mêmes raisons que la page d'accueil (voir app/page.tsx). */
 export const dynamic = "force-dynamic";
@@ -51,6 +54,40 @@ async function fetchCommentaires(publicId: string): Promise<Commentaire[]> {
   return body.data;
 }
 
+/** Image OG générique du site (app/opengraph-image.tsx — mêmes valeurs que
+ *  ses exports `size`/`contentType`, dupliquées ici volontairement : ce
+ *  fichier de convention Next.js n'est pas fait pour être importé ailleurs). */
+const IMAGE_OG_GENERIQUE = { url: new URL("/opengraph-image", SITE_URL).toString(), width: 1200, height: 630, type: "image/png" };
+
+/**
+ * og:image du deal — incident du 20/07/2026 : generateMetadata ne renseignait
+ * jamais `openGraph.images`, aucune image n'apparaissait jamais dans un
+ * partage (ni la photo du deal, ni le repli générique du site pourtant déjà
+ * câblé). Repli sur l'image générique si le deal n'a pas de photo, ou si la
+ * lecture Storage échoue (jamais casser generateMetadata pour un souci
+ * d'image — cf. fetchDealImageBytes qui avale déjà ses propres erreurs).
+ *
+ * Dimensions lues à la volée (imageDimensions) plutôt que stockées en base :
+ * le resize à l'upload est `fit: "inside"` (ratio préservé, jamais un carré
+ * forcé) donc variable par deal — pas de raccourci sans lire l'image.
+ * Coût accepté : un aller-retour Storage de plus par rendu de page deal
+ * (force-dynamic), pour une image de quelques dizaines à ~200 Ko.
+ */
+async function dealOgImages(deal: Deal): Promise<NonNullable<NonNullable<Metadata["openGraph"]>["images"]>> {
+  if (!deal.imageKey) return [IMAGE_OG_GENERIQUE];
+
+  const bytes = await fetchDealImageBytes(deal.imageKey);
+  if (!bytes) return [IMAGE_OG_GENERIQUE];
+
+  try {
+    const { width, height } = await imageDimensions(bytes);
+    const url = new URL(`/img/deals/${deal.publicId}?format=jpeg`, SITE_URL).toString();
+    return [{ url, width, height, type: "image/jpeg" }];
+  } catch {
+    return [IMAGE_OG_GENERIQUE];
+  }
+}
+
 export async function generateMetadata({ params }: PageParams): Promise<Metadata> {
   const { slugAndId } = await params;
   const deal = await fetchDeal(extractPublicId(slugAndId));
@@ -63,7 +100,14 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
     title: deal.titre,
     description,
     alternates: { canonical },
-    openGraph: { title: deal.titre, description, url: canonical, type: "website" },
+    openGraph: {
+      siteName: "Fidwastafid",
+      title: truncateOgTitle(deal.titre),
+      description: dealOgDescription(deal),
+      url: canonical,
+      type: "website",
+      images: await dealOgImages(deal),
+    },
   };
 }
 

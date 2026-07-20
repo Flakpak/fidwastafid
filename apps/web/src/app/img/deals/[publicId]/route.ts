@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { query } from "@fidwastafid/db";
+import { fetchDealImageBytes } from "../../../../lib/dealImageStorage.js";
+import { toOgImageJpeg } from "../../../../lib/ogImageJpeg.js";
 
 /**
  * GET /img/deals/[publicId] — proxy d'images, volontairement hors /api/v1
@@ -23,37 +25,17 @@ function notFound(): NextResponse {
   return new NextResponse(null, { status: 404, headers: NOT_FOUND_HEADERS });
 }
 
-/**
- * Nouvelles clés Supabase (sb_secret_...) : header `apikey` uniquement,
- * jamais `Authorization: Bearer` (pas un JWT, doc migration des clés API).
- * Migration terminée (19/07/2026, voir docs/MIGRATION-CLES-SUPABASE.md) :
- * plus de fallback vers l'ancienne `service_role`, désactivée côté
- * Dashboard Supabase.
- */
-function storageAuthHeaders(): HeadersInit {
-  const secretKey = process.env.SUPABASE_SECRET_KEY;
-  if (!secretKey) throw new Error("SUPABASE_SECRET_KEY manquant.");
-  return { apikey: secretKey };
-}
+const IMAGE_HEADERS = { "Cache-Control": "public, max-age=86400, s-maxage=2592000" };
 
 /**
- * Seule fonction qui parle au backend de stockage actuel (Supabase Storage).
- * Fetch natif, pas de SDK Supabase, volontairement isolée : LE point à
- * réécrire le jour d'un changement de backend (VPS + stockage nu, R2, etc.
- * — CONTRAT-V1 §6, "backend interchangeable").
+ * `?format=jpeg` — variante dédiée aux aperçus sociaux (og:image, incident du
+ * 20/07/2026 : WhatsApp/Facebook gèrent mal ou pas le WebP servi par défaut
+ * aux visiteurs du site, cf. lib/ogImageJpeg.ts). Les visiteurs normaux du
+ * site (balise <img>, apps/web/src/app/deal/[slugAndId]/page.tsx) ne passent
+ * jamais ce paramètre et continuent de recevoir le WebP d'origine.
  */
-async function fetchImageFromStorage(imageKey: string): Promise<Response | null> {
-  try {
-    const url = `${process.env.SUPABASE_URL}/storage/v1/object/deals-images/${imageKey}`;
-    const response = await fetch(url, { headers: storageAuthHeaders() });
-    return response.ok ? response : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ publicId: string }> }
 ): Promise<NextResponse> {
   const { publicId } = await params;
@@ -67,14 +49,20 @@ export async function GET(
   const imageKey = rows[0]?.image_key;
   if (!imageKey) return notFound();
 
-  const upstream = await fetchImageFromStorage(imageKey);
-  if (!upstream?.body) return notFound();
+  const bytes = await fetchDealImageBytes(imageKey);
+  if (!bytes) return notFound();
 
-  return new NextResponse(upstream.body, {
+  const wantsJpeg = new URL(request.url).searchParams.get("format") === "jpeg";
+  if (wantsJpeg) {
+    const jpeg = await toOgImageJpeg(bytes);
+    return new NextResponse(new Uint8Array(jpeg), {
+      status: 200,
+      headers: { "Content-Type": "image/jpeg", ...IMAGE_HEADERS },
+    });
+  }
+
+  return new NextResponse(new Uint8Array(bytes), {
     status: 200,
-    headers: {
-      "Content-Type": "image/webp",
-      "Cache-Control": "public, max-age=86400, s-maxage=2592000",
-    },
+    headers: { "Content-Type": "image/webp", ...IMAGE_HEADERS },
   });
 }
