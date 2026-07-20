@@ -64,23 +64,50 @@ jobs:
       - name: Expiration des deals auto_draft (> 14 jours)
         run: pnpm --filter pipeline run expirer-auto-draft
 
+      # Incident du 20/07/2026 : `pnpm --filter pipeline run <script> -- <args>`
+      # transmet le "--" LITTÉRALEMENT au script sous-jacent (constaté
+      # empiriquement) — argv[2] devenait "--" au lieu du premier argument
+      # réel, d'où "ENOENT: open '--'" côté insert-deals.mjs. Plus aucun "--"
+      # dans ce fichier, sur aucune étape.
+      #
+      # Passage explicite du fichier produit (au lieu de deviner via `find`) :
+      # cette étape capture la ligne "→ Archive : <chemin>" déjà loguée par
+      # scraper-bringo.mjs (code du scraper inchangé), vérifie que le fichier
+      # existe réellement, compte les deals qu'il contient (log de synthèse)
+      # et échoue EXPLICITEMENT si ce compte est 0 — un run qui n'a rien
+      # scrapé doit être rouge, jamais rattrapé silencieusement par un
+      # fichier vide ou périmé.
       - name: Scraping Bringo (Casablanca)
-        run: pnpm --filter pipeline run scraper-bringo -- bringo-categories.txt Casablanca
-
-      - name: Insertion en base (validation zod partagée)
-        working-directory: apps/pipeline
+        id: scraping
         run: |
-          # find plutôt que `ls -t` (shellcheck SC2012) — un runner frais n'a
-          # de toute façon qu'un seul fichier ici (extractions/ est gitignoré,
-          # absent au checkout, et une seule invocation de scraper-bringo
-          # précède cette étape).
-          fichier=$(find extractions -maxdepth 1 -type f -name '*.json' | head -n1)
-          if [ -z "$fichier" ]; then
-            echo "Aucun fichier d'extraction trouvé dans extractions/." >&2
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run scraper-bringo bringo-categories.txt Casablanca | tee /dev/stderr)
+
+          fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
+          if [ -z "$fichier_relatif" ]; then
+            echo "::error::scraper-bringo n'a annoncé aucun fichier d'archive (ligne \"→ Archive : ...\" absente des logs) — run marqué en échec."
             exit 1
           fi
-          echo "Fichier d'extraction : $fichier"
-          pnpm --filter pipeline run insert-deals -- "$fichier"
+
+          fichier="apps/pipeline/$fichier_relatif"
+          if [ ! -f "$fichier" ]; then
+            echo "::error::Fichier annoncé par scraper-bringo introuvable sur disque : $fichier"
+            exit 1
+          fi
+
+          nb_deals=$(jq 'length' "$fichier")
+          echo "Deals extraits : $nb_deals"
+          if [ "$nb_deals" -eq 0 ]; then
+            echo "::error::0 deal extrait par scraper-bringo — run marqué en échec (rien à insérer)."
+            exit 1
+          fi
+
+          echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
+
+      - name: Insertion en base (validation zod partagée)
+        env:
+          FICHIER_EXTRACTION: ${{ steps.scraping.outputs.fichier }}
+        run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION"
 
       - name: Revalidation Next.js (feed, enseignes, sitemap)
         run: |
