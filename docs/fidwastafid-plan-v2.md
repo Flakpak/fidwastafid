@@ -242,7 +242,13 @@ par le cron sont conservées 30 jours en artefact GitHub Actions.
 `REVALIDATE_TOKEN` (Vercel + secret GitHub) à générer par Kamel
 lui-même — non fourni par la session qui a livré ce lot.
 
-**Terminé quand** : un deal scrapé le matin est visible sur le site sans intervention manuelle autre que la validation admin.
+**Clôture (20/07/2026)** : premier run complet du cron vert de bout en
+bout (déclenché manuellement via l'onglet Actions, `REVALIDATE_TOKEN`
+configuré par Kamel) — chaîne expiration → scraping → insertion →
+revalidation intégralement exécutée sans erreur, 78 deals insérés
+confirmés en base. Phase 7 close.
+
+**Terminé quand** : un deal scrapé le matin est visible sur le site sans intervention manuelle autre que la validation admin. *(Vérifié 20/07/2026.)*
 
 ### PHASE 8 — Mobile & opérations *(2-3 sessions)*
 - [ ] PWA : manifest, service worker, installable (Android prioritaire — marché principal).
@@ -286,7 +292,7 @@ lui-même — non fourni par la session qui a livré ce lot.
 | 4 — Web | ◐ code complet | commits 06ca057→9d4718c ; RESTE : validation parité v1↔v2 sur mobile réel (critère "Terminé quand" — action Kamel) |
 | 5 — SEO | ◐ code complet | commits 94147b2→d3583ed ; RESTE : soumission sitemap Search Console + test résultats enrichis Google (actions externes) |
 | 6 — Bascule prod | ☑ fait | terminée le 18/07/2026, déclarée par anticipation des 7 jours pleins (cf. SUIVI clôture) ; bascule DNS 16/07, DNSSEC actif, sitemap soumis et traité (57 pages) ; v1 gelée (Git déconnecté, projets renommés `*-v1-legacy`) ; réserve ouverte : suppression définitive des projets v1 (Vercel + Supabase laqwg) ~23/07/2026 |
-| 7 — Pipeline | ☑ fait | pipeline intégré au monorepo (`apps/pipeline`, 19/07/2026) ; cron quotidien GitHub Actions (20/07/2026) : expiration auto_draft + scraping + insertion + revalidation Next.js, artefacts d'extraction 30 jours ; `REVALIDATE_TOKEN` (Vercel + secret GitHub) reste à générer par Kamel |
+| 7 — Pipeline | ☑ **close** | pipeline intégré au monorepo (`apps/pipeline`, 19/07/2026) ; cron quotidien GitHub Actions (20/07/2026) : expiration auto_draft + scraping + insertion + revalidation Next.js, artefacts d'extraction 30 jours ; **premier run cron complet vert le 20/07/2026** — chaîne expiration → scraping → insertion → revalidation vérifiée, 78 deals insérés confirmés en base |
 | 8 — Mobile & ops | ☐ à faire | |
 | 9 — VPS | ☐ conditionnel | |
 
@@ -460,7 +466,7 @@ v1_auth_users_audit`, rôle `etl_reader`) et la suppression de
 confirmation de remontée dans le dashboard Analytics restent également à
 valider côté Kamel — hors visibilité de cette session.
 
-**PROCHAINE TÂCHE** : clore 4 — validation parité v1↔v2 sur mobile réel (action Kamel). Phase 6 : réserve du ~23/07/2026 (suppression définitive des projets v1, nettoyage laqwg, index.html racine) ; confirmer Vercel Pro et la remontée Analytics au dashboard. Phase 7 terminée (7A + 7B, 20/07/2026) — action restante hors session : Kamel génère et configure `REVALIDATE_TOKEN` (Vercel + secret GitHub), puis lance le premier run manuel via l'onglet Actions. Sinon : Phase 8 (mobile & opérations).
+**PROCHAINE TÂCHE** : Rendez-vous 23/07 — suppression v1 (volet Supabase `laqwg` principalement ; le projet Vercel legacy s'appelle "fidwastafid", hors périmètre du connecteur) ; puis Phase 8. Reste en parallèle : clore 4 — validation parité v1↔v2 sur mobile réel (action Kamel) ; confirmer Vercel Pro et la remontée Analytics au dashboard.
 
 ---
 

@@ -103,3 +103,44 @@ maintenance (deux schémas à garder synchronisés) pour un projet solo.
 ## Monétisation
 
 Deals sponsorisés = colonne `sponsorise` boolean + badge sur la carte + critère de tri, post-Phase 6, quand il y aura un premier annonceur réel. Affiliation = paramètre de tracking sur le champ `lien` existant. Display ads (AdSense & co) : ÉCARTÉ — incompatible CSP par nonce, contraire au positionnement premium, rentable uniquement à fort volume.
+
+## Stratégie d'audience (2026-07-20)
+
+Cible primaire : Marocains résidents. Segment secondaire **stratégique**
+(pas juste accessoire) : les MRE (Marocains résidant à l'étranger).
+
+- **Pics saisonniers** : trafic MRE concentré sur l'été (retour au pays),
+  période de forte consommation locale — à garder en tête pour tout
+  calendrier éditorial ou opération commerciale future.
+- **Rôle prescripteur** : un MRE qui repère un bon plan avant/pendant son
+  séjour le partage à ses proches résidents (mécanique de partage
+  WhatsApp, déjà le canal de diffusion naturel du site) — un lecteur MRE
+  génère de la portée au-delà de sa propre lecture.
+- **Langue** : le français est leur langue primaire de recherche/lecture,
+  le site les sert donc déjà nativement, sans adaptation de contenu.
+- **Implication GEO** : le déploiement Google AI Overviews/AI Mode en
+  France (annoncé avant le 23/09/2026) concerne les recherches
+  préparatoires des MRE **depuis la France** — le Maroc est déjà couvert
+  par ce type de résultat depuis 2025, donc sans nouveauté à anticiper
+  côté résidents.
+
+**Décision** : pas de catégorie ni de contenu « spécial MRE » créé par
+anticipation, sans données d'usage réelles pour le justifier — même
+doctrine que la catégorie "Enfants" (absente de l'enum `categorie`,
+réexaminée seulement si les données le justifient un jour, cf. Phase 7A).
+Un segment stratégique n'est pas une raison de complexifier le modèle de
+données à l'aveugle.
+
+**Micro-actions GEO retenues** (coût zéro, à faire après le 23/07/2026— pas
+avant, cf. Phase 6/rendez-vous suppression v1 en priorité) :
+1. Vérifier le balisage `schema.org` `Product`/`Offer` sur les pages deal
+   (présent ? complet ? conforme aux attentes actuelles des moteurs
+   génératifs).
+2. Autoriser explicitement les crawlers IA dans `robots.txt` (GPTBot,
+   Google-Extended, ClaudeBot, etc. — à lister précisément le moment venu).
+3. Mettre en place une surveillance des rapports "résultats génératifs" de
+   Search Console (dès qu'ils sont disponibles pour le site).
+
+**SEA** : non-sujet avant l'existence d'un revenu — même logique que la
+décision Vercel Pro (pas de dépense avant qu'il y ait quelque chose à
+rentabiliser).
