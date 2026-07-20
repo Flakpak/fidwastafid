@@ -28,6 +28,7 @@ import pg from "pg";
 import { traiterImage, storageDisponible } from "./images.mjs";
 import { extraireDescription } from "./fiche-produit.mjs";
 import { validateDeal } from "./validation.mjs";
+import { resoudreFichierArgument } from "./argv.mjs";
 
 // ---------- Description depuis la fiche produit (Bringo uniquement) ----------
 const BRINGO_LIEN_RE = /^https:\/\/(www\.)?bringo\.ma\//i;
@@ -63,11 +64,14 @@ const STATUT_AUTO = "auto_draft";   // doit être autorisé par la contrainte CH
 const TYPE_DEFAUT = "physique";     // minuscule — imposé par deals_type_check
 const VILLE_DEFAUT = "National";
 
-const [, , fichier] = process.argv;
-if (!fichier) {
-  console.error("Usage : node insert-deals.mjs deals-extraits.json");
+const USAGE = "Usage : node insert-deals.mjs deals-extraits.json";
+const resolution = resoudreFichierArgument(process.argv.slice(2), USAGE);
+if (!resolution.ok) {
+  console.error(`Erreur : ${resolution.message}`);
   process.exit(1);
 }
+const { fichier } = resolution;
+
 if (!process.env.DATABASE_URL) {
   console.error("Erreur : variable d'environnement DATABASE_URL manquante.");
   process.exit(1);
