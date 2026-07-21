@@ -133,14 +133,28 @@ données à l'aveugle.
 
 **Micro-actions GEO retenues** (coût zéro, à faire après le 23/07/2026— pas
 avant, cf. Phase 6/rendez-vous suppression v1 en priorité) :
-1. Vérifier le balisage `schema.org` `Product`/`Offer` sur les pages deal
-   (présent ? complet ? conforme aux attentes actuelles des moteurs
-   génératifs).
-2. Autoriser explicitement les crawlers IA dans `robots.txt` (GPTBot,
-   Google-Extended, ClaudeBot, etc. — à lister précisément le moment venu).
+1. ~~Vérifier le balisage `schema.org` `Product`/`Offer` sur les pages deal~~
+   — **fait le 21/07/2026** : `image` pointait vers le PNG générique du
+   site même quand le deal avait une vraie photo, `seller` absent malgré
+   une enseigne renseignée, `availability` d'un deal expiré en
+   `OutOfStock` plutôt que `SoldOut` — corrigés (cf. section SEO ci-dessous).
+2. ~~Autoriser explicitement les crawlers IA dans `robots.txt`~~ — **fait
+   le 21/07/2026** : blocs explicites `Allow: /` pour GPTBot, OAI-SearchBot,
+   ChatGPT-User, ClaudeBot, Claude-Web, anthropic-ai, PerplexityBot,
+   Google-Extended, Applebot-Extended, CCBot, meta-externalagent.
 3. Mettre en place une surveillance des rapports "résultats génératifs" de
    Search Console (dès qu'ils sont disponibles pour le site).
 
 **SEA** : non-sujet avant l'existence d'un revenu — même logique que la
 décision Vercel Pro (pas de dépense avant qu'il y ait quelque chose à
 rentabiliser).
+
+## SEO (2026-07-21)
+
+URLs fantômes de l'ancien propriétaire du domaine
+(`www.fidwastafid.com/*.htm`, petites annonces Algérie) encore présentes
+dans l'index Google — constaté lors du lot GEO (vérification robots.txt/
+redirection www). Décision : laisser mourir en 404 naturellement, vérifier
+la redirection www→apex plus tard (constat fait, comportement actuel :
+`http(s)://www.` redirige en 308 vers l'apex `https://fidwastafid.com/`,
+correctif hors périmètre de ce lot). Aucun chantier immédiat.
