@@ -34,9 +34,11 @@ function catBtnClass(active: boolean): string {
   }`;
 }
 
-/** Pill catégorie au-dessus du feed — porté depuis .filter-pill (index.html racine, v1). */
+/** Chip catégorie du carrousel mobile — porté depuis .filter-pill (index.html
+ *  racine, v1). `min-h-[40px]` : cible tactile ≥40px (lot UX filtres du
+ *  21/07/2026), le padding vertical seul (py-1.5) ne suffisait pas. */
 function chipClass(active: boolean): string {
-  return `rounded-full px-3.5 py-1.5 text-xs font-bold border ${
+  return `flex items-center min-h-[40px] rounded-full px-3.5 text-xs font-bold border ${
     active ? "bg-rouge text-white border-rouge" : "bg-white text-muted border-bordure hover:border-rouge hover:text-rouge"
   }`;
 }
@@ -49,6 +51,40 @@ export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React
   const [tri, setTri] = useState<Tri>("tendance");
   const [recherche, setRecherche] = useState("");
   const filtresRef = useRef<HTMLDivElement>(null);
+
+  /** Carrousel mobile de chips catégorie (lot UX filtres, 21/07/2026) : la
+   *  sidebar (desktop, ≥768px) est l'unique navigation catégories dès qu'elle
+   *  est visible, ce carrousel n'existe donc que sous ce seuil (`md:hidden`
+   *  ci-dessous) — mais son état (scroll, refs) reste inoffensif à calculer
+   *  même caché, pas besoin de le conditionner en JS. */
+  const chipsScrollRef = useRef<HTMLDivElement>(null);
+  const chipRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [chipsAtStart, setChipsAtStart] = useState(true);
+  const [chipsAtEnd, setChipsAtEnd] = useState(true);
+
+  function updateChipsEdges() {
+    const el = chipsScrollRef.current;
+    if (!el) return;
+    setChipsAtStart(el.scrollLeft <= 0);
+    setChipsAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+  }
+
+  useEffect(() => {
+    updateChipsEdges();
+    window.addEventListener("resize", updateChipsEdges);
+    return () => window.removeEventListener("resize", updateChipsEdges);
+  }, []);
+
+  /** À la sélection (sidebar comprise, même état partagé), la chip active du
+   *  carrousel mobile est ramenée dans le champ visible — y compris quand la
+   *  sélection vient d'ailleurs que du carrousel lui-même. */
+  useEffect(() => {
+    chipRefs.current[categorie || "__tous__"]?.scrollIntoView({
+      behavior: "smooth",
+      inline: "nearest",
+      block: "nearest",
+    });
+  }, [categorie]);
 
   /** Le premier rendu a déjà les données SSR (mêmes filtres par défaut) — refetch uniquement quand un filtre change réellement. */
   const premierRendu = useRef(true);
@@ -164,28 +200,66 @@ export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React
            * recouvert) et le menu compte du header (`z-20`), au-dessus des
            * cartes (z-auto).
            *
-           * Catégorie : chips uniquement (plus de <select> catégorie
-           * dupliqué) — la sidebar desktop garde sa propre liste de
-           * catégories, indépendante et non perturbée par ce changement.
+           * Catégorie : carrousel de chips en mobile UNIQUEMENT (`md:hidden`
+           * ci-dessous, lot UX filtres du 21/07/2026) — la sidebar (≥768px)
+           * est la seule navigation catégories dès qu'elle est visible ;
+           * plus de <select> catégorie dupliqué. Desktop : pas de pilules
+           * dans cette barre, elle ne garde que recherche/ville/type/tri.
            */}
           <div
             ref={filtresRef}
             className="sticky top-[70px] z-[5] -mx-4 px-4 bg-creme border-b border-bordure shadow-sm pt-3 pb-2 mb-3 flex flex-col gap-2"
           >
-            <div className="flex items-center gap-2 overflow-x-auto">
-              <button type="button" onClick={() => setCategorie("")} className={`shrink-0 ${chipClass(categorie === "")}`}>
-                Tous
-              </button>
-              {CATEGORIES.map((c) => (
+            {/* Carrousel catégories — mobile uniquement (<768px). Scrollbar
+                masquée (.no-scrollbar, globals.css) + défilement tactile
+                inertiel natif (-webkit-overflow-scrolling) ; fondu de bord
+                gauche/droit conditionné à la position de scroll réelle
+                (chipsAtStart/chipsAtEnd, calculés par onScroll) plutôt
+                qu'affiché en permanence — sinon le fondu de droite resterait
+                visible même une fois arrivé en bout de liste, signalant à
+                tort qu'il reste du contenu. */}
+            <div className="relative md:hidden">
+              <div
+                ref={chipsScrollRef}
+                onScroll={updateChipsEdges}
+                className="no-scrollbar flex items-center gap-2 overflow-x-auto scroll-smooth [-webkit-overflow-scrolling:touch]"
+              >
                 <button
-                  key={c}
                   type="button"
-                  onClick={() => setCategorie(c)}
-                  className={`shrink-0 ${chipClass(categorie === c)}`}
+                  ref={(el) => {
+                    chipRefs.current.__tous__ = el;
+                  }}
+                  onClick={() => setCategorie("")}
+                  className={`shrink-0 ${chipClass(categorie === "")}`}
                 >
-                  {categorieIcon(c)} {c}
+                  Tous
                 </button>
-              ))}
+                {CATEGORIES.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    ref={(el) => {
+                      chipRefs.current[c] = el;
+                    }}
+                    onClick={() => setCategorie(c)}
+                    className={`shrink-0 ${chipClass(categorie === c)}`}
+                  >
+                    {categorieIcon(c)} {c}
+                  </button>
+                ))}
+              </div>
+              {!chipsAtStart && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-creme to-transparent"
+                />
+              )}
+              {!chipsAtEnd && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-creme to-transparent"
+                />
+              )}
             </div>
 
             <div className="flex items-center gap-2 overflow-x-auto text-sm">

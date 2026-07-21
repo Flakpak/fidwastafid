@@ -80,6 +80,16 @@ body {
   animation-play-state: paused;
 }
 
+/* Carrousel de chips catégorie mobile (lot UX filtres, 21/07/2026) : masque
+   la barre de scroll native sur un overflow-x tactile, sans désactiver le
+   défilement lui-même — cross-browser (Firefox, Chromium/WebKit). */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* CSP/perf : pas d'animation infinie pour les utilisateurs qui la refusent. */
 @media (prefers-reduced-motion: reduce) {
   .hero-fr-anim, .hero-steps-anim, .hero-cursor { animation: none; }
