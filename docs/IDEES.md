@@ -158,3 +158,41 @@ redirection www). Décision : laisser mourir en 404 naturellement, vérifier
 la redirection www→apex plus tard (constat fait, comportement actuel :
 `http(s)://www.` redirige en 308 vers l'apex `https://fidwastafid.com/`,
 correctif hors périmètre de ce lot). Aucun chantier immédiat.
+
+## Diffusion communautaire (canaux sociaux)
+
+Statut : chantier accepté, planifié après le 23/07.
+
+Constat fondateur : les Marocains vivent sur WhatsApp ; les réseaux sont
+le point d'entrée, le site est la destination. La communauté se
+construira plus vite dans les groupes que par le trafic web direct.
+
+Liens officiels (future source de vérité code : `config/community.ts`,
+consommé par footer + bouton Diffuser ; liens publics d'invitation, pas
+des secrets, constantes en clair acceptées ; toute révocation = mise à
+jour de la constante unique) :
+- WhatsApp : https://chat.whatsapp.com/GKxwVwHnc9b5rgxhvSXalC
+- Telegram : https://t.me/+THGAhGachec2NzM0
+  (@fidwastafid indisponible — lien d'invitation privé assumé en v1)
+- Discord : https://discord.gg/w4dVspdmKS (invitation permanente)
+
+Architecture décidée :
+- v1 = curation manuelle : bouton « Diffuser » dans l'admin sur chaque
+  deal publié. Pas de seuil de votes automatique en v1 (base de votes
+  quasi nulle au lancement — la diffusion crée le volume de votes, pas
+  l'inverse).
+- Telegram : automatisé (Bot API officielle, `sendPhoto` + légende).
+- Discord : automatisé (webhook entrant, embed image/prix/lien).
+- WhatsApp : semi-manuel assumé (message formaté prêt à coller) — l'API
+  officielle Meta ne poste pas dans les groupes ; libs non officielles =
+  risque de ban du numéro, refusé.
+- Traçabilité : table `diffusions` (`deal_id`, `canal`, `diffuse_at`) —
+  anti-double-publication + historique.
+- Mesure : tout lien diffusé porte
+  `utm_source=whatsapp|telegram|discord&utm_medium=social&utm_campaign=diffusion`,
+  lecture Vercel Analytics. Les données UTM décident de la v2.
+- v2 (conditionnée aux données) : seuil automatique paramétrable,
+  WhatsApp Channels si API officielle, reprise de @fidwastafid si le nom
+  se libère.
+- Secrets futurs (token bot Telegram, URL webhook Discord) : variables
+  d'environnement uniquement.
