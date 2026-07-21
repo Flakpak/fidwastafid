@@ -80,9 +80,11 @@ body {
   animation-play-state: paused;
 }
 
-/* Carrousel de chips catégorie mobile (lot UX filtres, 21/07/2026) : masque
-   la barre de scroll native sur un overflow-x tactile, sans désactiver le
-   défilement lui-même — cross-browser (Firefox, Chromium/WebKit). */
+/* Conteneur à défilement horizontal tactile de la barre de filtres — chips
+   catégorie mobile (lot UX filtres, 21/07/2026) et ligne recherche/ville/
+   type/tri (micro-lot suivi, 22/07/2026, défaut 1) : masque la barre de
+   scroll native sur un overflow-x tactile, sans désactiver le défilement
+   lui-même — cross-browser (Firefox, Chromium/WebKit). */
 .no-scrollbar {
   scrollbar-width: none;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { VILLES, CATEGORIES, type Deal } from "@fidwastafid/schemas";
 import { DealCard } from "../components/DealCard.js";
@@ -43,6 +43,63 @@ function chipClass(active: boolean): string {
   }`;
 }
 
+/**
+ * Bord de dépassement d'un conteneur à défilement horizontal (micro-lot
+ * suivi UX filtres, 22/07/2026) : `atStart`/`atEnd` pilotent un fondu vers
+ * le fond blanc réel de la barre (défaut 2 de ce micro-lot — jamais une
+ * couleur arbitraire, sinon le fondu se voit comme un bandeau au lieu de se
+ * fondre) plutôt qu'un affichage permanent, pour ne pas laisser le fondu de
+ * droite visible une fois arrivé en bout de liste (signalerait à tort qu'il
+ * reste du contenu). Généralisé depuis le carrousel de chips catégorie (lot
+ * précédent, 3f0cc06) pour être réutilisé tel quel par la ligne recherche/
+ * ville/type/tri (défaut 1), sans dupliquer la logique. Les deux lignes de
+ * la barre partagent désormais le même fond blanc (défaut 2 ci-dessous),
+ * donc un seul jeu de classes de fondu (FADE_LEFT_WHITE/FADE_RIGHT_WHITE)
+ * suffit — pas de variante crème à maintenir.
+ */
+/** Le ref est créé et passé par l'appelant (pas retourné par ce hook) :
+ *  `react-hooks/refs` (eslint-plugin-react-hooks) interdit d'accéder à une
+ *  propriété nommée `ref` — ou toute autre propriété d'un objet qui en
+ *  contient une — au moment du rendu, y compris via un objet renvoyé par un
+ *  hook custom. En gardant le ref local au composant (`useRef` direct) et
+ *  ce hook purement dérivé (état + handler, aucun ref dans sa valeur de
+ *  retour), l'objet renvoyé reste lisible en JSX sans déclencher la règle. */
+function useScrollEdges(ref: React.RefObject<HTMLElement | null>) {
+  const [atStart, setAtStart] = useState(true);
+  const [atEnd, setAtEnd] = useState(true);
+
+  const update = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    setAtStart(el.scrollLeft <= 0);
+    setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+  }, [ref]);
+
+  useEffect(() => {
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [update]);
+
+  return { atStart, atEnd, onScroll: update };
+}
+
+/** Classes statiques et complètes (jamais construites par interpolation de
+ *  chaîne : le scanner Tailwind ne détecte que des noms de classe entiers
+ *  littéralement présents dans le code source, `from-${x}` ne matcherait
+ *  aucune règle générée). */
+const FADE_LEFT_WHITE = "pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent";
+const FADE_RIGHT_WHITE = "pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent";
+
+function EdgeFades({ atStart, atEnd }: { atStart: boolean; atEnd: boolean }) {
+  return (
+    <>
+      {!atStart && <div aria-hidden="true" className={FADE_LEFT_WHITE} />}
+      {!atEnd && <div aria-hidden="true" className={FADE_RIGHT_WHITE} />}
+    </>
+  );
+}
+
 export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React.ReactNode }) {
   const [deals, setDeals] = useState(initialDeals);
   const [ville, setVille] = useState<string>("");
@@ -58,22 +115,14 @@ export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React
    *  ci-dessous) — mais son état (scroll, refs) reste inoffensif à calculer
    *  même caché, pas besoin de le conditionner en JS. */
   const chipsScrollRef = useRef<HTMLDivElement>(null);
+  const chipsEdges = useScrollEdges(chipsScrollRef);
   const chipRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const [chipsAtStart, setChipsAtStart] = useState(true);
-  const [chipsAtEnd, setChipsAtEnd] = useState(true);
 
-  function updateChipsEdges() {
-    const el = chipsScrollRef.current;
-    if (!el) return;
-    setChipsAtStart(el.scrollLeft <= 0);
-    setChipsAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
-  }
-
-  useEffect(() => {
-    updateChipsEdges();
-    window.addEventListener("resize", updateChipsEdges);
-    return () => window.removeEventListener("resize", updateChipsEdges);
-  }, []);
+  /** Ligne recherche/ville/type/tri (micro-lot suivi UX filtres, 22/07/2026,
+   *  défaut 1) : même mécanisme de bord de dépassement que le carrousel de
+   *  chips ci-dessus, réutilisé via useScrollEdges plutôt que dupliqué. */
+  const filtresRowRef = useRef<HTMLDivElement>(null);
+  const filtresRowEdges = useScrollEdges(filtresRowRef);
 
   /** À la sélection (sidebar comprise, même état partagé), la chip active du
    *  carrousel mobile est ramenée dans le champ visible — y compris quand la
@@ -194,11 +243,15 @@ export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React
            * nature aucun saut de layout à l'accrochage (contrairement à un
            * `position: fixed` qui exigerait un espaceur).
            *
-           * Fond opaque (bg-creme, même teinte que la page) + ombre légère +
-           * filet inférieur : sépare visuellement les cartes qui défilent
-           * dessous. `z-[5]` : sous le header (`z-10`, ne doit jamais être
-           * recouvert) et le menu compte du header (`z-20`), au-dessus des
-           * cartes (z-auto).
+           * Fond blanc (micro-lot suivi UX filtres, 22/07/2026, défaut 2 —
+           * remplace l'ancien bg-creme qui se confondait avec le fond de
+           * page, #f8f6f2 sur #f8f6f2, aussi bien décollée qu'en position
+           * normale puisque ce style est statique, pas conditionné au
+           * scroll) + ombre légère + filet inférieur : sépare visuellement
+           * la barre des cartes qui défilent dessous ET de la page derrière.
+           * `z-[5]` : sous le header (`z-10`, ne doit jamais être recouvert)
+           * et le menu compte du header (`z-20`), au-dessus des cartes
+           * (z-auto).
            *
            * Catégorie : carrousel de chips en mobile UNIQUEMENT (`md:hidden`
            * ci-dessous, lot UX filtres du 21/07/2026) — la sidebar (≥768px)
@@ -208,20 +261,20 @@ export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React
            */}
           <div
             ref={filtresRef}
-            className="sticky top-[70px] z-[5] -mx-4 px-4 bg-creme border-b border-bordure shadow-sm pt-3 pb-2 mb-3 flex flex-col gap-2"
+            className="sticky top-[70px] z-[5] -mx-4 px-4 bg-white border-b border-bordure shadow-sm pt-3 pb-2 mb-3 flex flex-col gap-2"
           >
             {/* Carrousel catégories — mobile uniquement (<768px). Scrollbar
                 masquée (.no-scrollbar, globals.css) + défilement tactile
                 inertiel natif (-webkit-overflow-scrolling) ; fondu de bord
                 gauche/droit conditionné à la position de scroll réelle
-                (chipsAtStart/chipsAtEnd, calculés par onScroll) plutôt
+                (chipsEdges.atStart/atEnd, calculés par onScroll) plutôt
                 qu'affiché en permanence — sinon le fondu de droite resterait
                 visible même une fois arrivé en bout de liste, signalant à
                 tort qu'il reste du contenu. */}
             <div className="relative md:hidden">
               <div
                 ref={chipsScrollRef}
-                onScroll={updateChipsEdges}
+                onScroll={chipsEdges.onScroll}
                 className="no-scrollbar flex items-center gap-2 overflow-x-auto scroll-smooth [-webkit-overflow-scrolling:touch]"
               >
                 <button
@@ -248,71 +301,72 @@ export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React
                   </button>
                 ))}
               </div>
-              {!chipsAtStart && (
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-creme to-transparent"
-                />
-              )}
-              {!chipsAtEnd && (
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-creme to-transparent"
-                />
-              )}
+              <EdgeFades atStart={chipsEdges.atStart} atEnd={chipsEdges.atEnd} />
             </div>
 
-            <div className="flex items-center gap-2 overflow-x-auto text-sm">
-              <input
-                type="search"
-                value={recherche}
-                onChange={(e) => setRecherche(e.target.value)}
-                placeholder="Rechercher un deal, une enseigne..."
-                className="shrink-0 w-44 md:flex-1 md:w-auto border border-bordure rounded-full px-4 py-1.5 text-sm"
-              />
-              <select
-                value={ville}
-                onChange={(e) => setVille(e.target.value)}
-                className="shrink-0 border border-bordure rounded-full px-3 py-1 font-bold text-xs"
+            {/* Recherche/ville/type/tri — même traitement de bord de
+                dépassement que le carrousel ci-dessus (micro-lot suivi UX
+                filtres, 22/07/2026, défaut 1) : cette ligne défilait avec
+                une scrollbar native visible, seul le carrousel de chips
+                avait été corrigé au lot précédent. */}
+            <div className="relative">
+              <div
+                ref={filtresRowRef}
+                onScroll={filtresRowEdges.onScroll}
+                className="no-scrollbar flex items-center gap-2 overflow-x-auto text-sm [-webkit-overflow-scrolling:touch]"
               >
-                <option value="">Toutes les villes</option>
-                {VILLES.map((v) => (
-                  <option key={v} value={v}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-              <div className="shrink-0 flex gap-1">
-                {(
-                  [
-                    { value: "tous", label: "Tous" },
-                    { value: "physique", label: "🏪 Physique" },
-                    { value: "en_ligne", label: "🌐 En ligne" },
-                  ] as const
-                ).map((t) => (
-                  <button
-                    key={t.value}
-                    type="button"
-                    onClick={() => setType(t.value)}
-                    className={`rounded-full px-3 py-1 font-bold text-xs ${
-                      type === t.value ? "bg-rouge text-white" : "bg-white text-muted"
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
+                <input
+                  type="search"
+                  value={recherche}
+                  onChange={(e) => setRecherche(e.target.value)}
+                  placeholder="Rechercher un deal, une enseigne..."
+                  className="shrink-0 w-44 md:flex-1 md:w-auto border border-bordure rounded-full px-4 py-1.5 text-sm"
+                />
+                <select
+                  value={ville}
+                  onChange={(e) => setVille(e.target.value)}
+                  className="shrink-0 border border-bordure rounded-full px-3 py-1 font-bold text-xs"
+                >
+                  <option value="">Toutes les villes</option>
+                  {VILLES.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+                <div className="shrink-0 flex gap-1">
+                  {(
+                    [
+                      { value: "tous", label: "Tous" },
+                      { value: "physique", label: "🏪 Physique" },
+                      { value: "en_ligne", label: "🌐 En ligne" },
+                    ] as const
+                  ).map((t) => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => setType(t.value)}
+                      className={`rounded-full border px-3 py-1 font-bold text-xs ${
+                        type === t.value ? "bg-rouge text-white border-rouge" : "bg-white text-muted border-bordure"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                <select
+                  value={tri}
+                  onChange={(e) => setTri(e.target.value as Tri)}
+                  className="shrink-0 border border-bordure rounded-full px-3 py-1 font-bold text-xs md:ml-auto"
+                >
+                  {TRIS.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <select
-                value={tri}
-                onChange={(e) => setTri(e.target.value as Tri)}
-                className="shrink-0 border border-bordure rounded-full px-3 py-1 font-bold text-xs md:ml-auto"
-              >
-                {TRIS.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+              <EdgeFades atStart={filtresRowEdges.atStart} atEnd={filtresRowEdges.atEnd} />
             </div>
           </div>
 
