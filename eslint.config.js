@@ -42,8 +42,8 @@ export default defineConfig([
   // apps/pipeline (Phase 7A) — scripts .mjs Node purs (aucun DOM/browser),
   // ni .js/.jsx ni .ts/.tsx, non couverts par les deux blocs ci-dessus.
   // Périmètre volontairement restreint à apps/pipeline : d'autres .mjs
-  // préexistants ailleurs dans le repo (scripts/audit-v1.mjs,
-  // postcss.config.mjs) ne sont pas concernés par ce lot.
+  // préexistants ailleurs dans le repo (postcss.config.mjs) ne sont pas
+  // concernés par ce lot.
   {
     files: ['apps/pipeline/**/*.mjs'],
     extends: [js.configs.recommended],
