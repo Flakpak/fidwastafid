@@ -34,7 +34,11 @@ export const VILLE_SLUGS: Record<Ville, string> = {
   Oujda: "oujda",
 };
 
-/** Valeurs réelles en production (extraites de index.html, const CATEGORIES). */
+/** Valeurs réelles en production (extraites de index.html, const CATEGORIES).
+ *  Étendu le 21/07/2026 (taxonomie v2, CONTRAT-V1 §3 cinquième amendement) :
+ *  +4 valeurs alimentables par le futur pipeline multi-sources. Les 8
+ *  premières sont conservées à l'identique (libellés/valeurs/casse) — aucun
+ *  renommage, aucune migration destructive. */
 export const CATEGORIES = [
   "Alimentaire",
   "Électroménager",
@@ -44,6 +48,10 @@ export const CATEGORIES = [
   "Beauté",
   "Sport",
   "Autre",
+  "Téléphonie & Internet",
+  "Gaming",
+  "Bricolage & Jardin",
+  "Voyages",
 ] as const;
 
 export const categorieSchema = z.enum(CATEGORIES);
@@ -59,6 +67,10 @@ export const CATEGORIE_SLUGS: Record<Categorie, string> = {
   Beauté: "beaute",
   Sport: "sport",
   Autre: "autre",
+  "Téléphonie & Internet": "telephonie-internet",
+  Gaming: "gaming",
+  "Bricolage & Jardin": "bricolage-jardin",
+  Voyages: "voyages",
 };
 
 /** Couleurs d'avatar — espace membre (CONTRAT-V1 §4, amendement 16/07/2026).

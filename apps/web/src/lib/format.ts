@@ -20,7 +20,9 @@ export function shortDate(isoDate: string): string {
 }
 
 /** Mapping catégorie → emoji, porté tel quel depuis CAT_ICONS (index.html
- *  racine, v1). Fallback 🛍️ identique à v1 (dc-img-placeholder). */
+ *  racine, v1). Fallback 🛍️ identique à v1 (dc-img-placeholder).
+ *  +4 entrées le 21/07/2026 (taxonomie v2) — même registre emoji que
+ *  l'existant, aucun doublon avec les 8 icônes v1. */
 export const CAT_ICONS: Record<string, string> = {
   Alimentaire: "🛒",
   Électroménager: "🏠",
@@ -30,6 +32,10 @@ export const CAT_ICONS: Record<string, string> = {
   Beauté: "💄",
   Sport: "⚽",
   Autre: "✨",
+  "Téléphonie & Internet": "📶",
+  Gaming: "🎮",
+  "Bricolage & Jardin": "🛠️",
+  Voyages: "✈️",
 };
 export function categorieIcon(categorie: string): string {
   return CAT_ICONS[categorie] ?? "🛍️";

@@ -46,6 +46,13 @@ check("titre absent -> rejeté", !validateDeal({ ...DEAL_VALIDE, titre: undefine
 console.log("\nvalidateDeal — catégorie hors référentiel (jamais de repli silencieux sur \"Autre\")");
 check("catégorie \"Enfants\" (absente de l'enum) -> rejeté", !validateDeal({ ...DEAL_VALIDE, categorie: "Enfants" }).ok);
 
+console.log("\nvalidateDeal — taxonomie v2 (21/07/2026, +4 catégories, CONTRAT-V1 §3 cinquième amendement)");
+check("catégorie \"Gaming\" (nouvelle, taxonomie v2) -> accepté", validateDeal({ ...DEAL_VALIDE, categorie: "Gaming" }).ok);
+check(
+  "catégorie \"Famille & Enfants\" (jamais ajoutée à l'enum, décision gravée) -> rejeté",
+  !validateDeal({ ...DEAL_VALIDE, categorie: "Famille & Enfants" }).ok
+);
+
 console.log("\nvalidateDeal — cohérence physique/en_ligne (mêmes règles que POST /api/v1/deals)");
 check("type en_ligne sans lien -> rejeté", !validateDeal({ ...DEAL_VALIDE, type: "en_ligne", lien: null }).ok);
 check(
