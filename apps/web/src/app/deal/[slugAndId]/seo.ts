@@ -69,27 +69,52 @@ export function truncateOgTitle(titre: string, max = 70, minCut = 20): string {
  * Product + Offer (schema.org) — CONTRAT-V1 §1 : un deal expiré reste 200
  * et affiché (jamais 404), donc les données structurées doivent rester
  * honnêtes avec ce que la page montre réellement, pas prétendre que
- * l'offre est encore active. `availability` reflète le statut réel ;
- * `priceValidUntil` n'est jamais renseigné sur une offre expirée (Google
- * pénalise les rich results trompeurs).
+ * l'offre est encore active. `availability` reflète le statut réel.
+ *
+ * Lot GEO du 21/07/2026 (constat par curl sur 3 deals prod réels,
+ * `Bodyboard`/`iPhone 16`/`Cafetière Evora`) — deux défauts confirmés :
+ * - `image` pointait toujours sur le PNG générique du site, même pour un
+ *   deal ayant une vraie photo (`imageKey` posé, `<img src="/img/deals/...">`
+ *   déjà rendu dans la page) — jamais lu ici. Corrigé : URL absolue vers la
+ *   photo réelle du deal quand `imageKey` existe (jamais une URL Supabase,
+ *   toujours via la route proxy, CONTRAT-V1 §6), repli sur le générique sinon.
+ * - Aucun `seller` malgré une enseigne renseignée et déjà visible ailleurs
+ *   sur la page (`dealDescription()` affichait "chez carrefour" pour le
+ *   deal Cafetière sans que le JSON-LD n'en dise rien). `seller` (pas
+ *   `brand` : l'enseigne est le POINT DE VENTE, pas le fabricant du
+ *   produit) ajouté sur l'Offer quand `enseigneNom` existe — jamais
+ *   `nomVendeur` (texte libre non curé, mauvaise source pour un nom
+ *   d'organisation structuré).
+ *
+ * Deux changements de comportement demandés explicitement par ce lot par
+ * rapport à la version précédente :
+ * - `availability` d'un deal expiré passe de `OutOfStock` à `SoldOut` (offre
+ *   définitivement terminée, pas "de retour en stock plus tard").
+ * - `priceValidUntil` est désormais inclus dès que `dateFin` existe, même
+ *   sur une offre expirée : une date de fin passée est un fait honnête sur
+ *   une offre déjà marquée `SoldOut`, pas une promesse trompeuse.
  */
 export function dealJsonLd(deal: Deal, canonicalPath: string) {
   const expire = deal.statut === "expire";
   const url = new URL(canonicalPath, SITE_URL).toString();
+  const image = deal.imageKey
+    ? new URL(`/img/deals/${deal.publicId}`, SITE_URL).toString()
+    : new URL("/opengraph-image", SITE_URL).toString();
 
   return {
     "@context": "https://schema.org",
     "@type": "Product",
     name: deal.titre,
     description: dealDescription(deal),
-    image: new URL("/opengraph-image", SITE_URL).toString(),
+    image,
     offers: {
       "@type": "Offer",
       url,
       priceCurrency: "MAD",
       price: deal.prixPromo,
-      availability: expire ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
-      ...(!expire && deal.dateFin ? { priceValidUntil: deal.dateFin } : {}),
+      availability: expire ? "https://schema.org/SoldOut" : "https://schema.org/InStock",
+      ...(deal.dateFin ? { priceValidUntil: deal.dateFin } : {}),
+      ...(deal.enseigneNom ? { seller: { "@type": "Organization", name: deal.enseigneNom } } : {}),
     },
   };
 }

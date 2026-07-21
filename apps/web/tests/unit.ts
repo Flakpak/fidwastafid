@@ -2,8 +2,9 @@ import { isPrivateOrReservedIp, assertPublicUrl, SsrfGuardError } from "../src/a
 import { extractImageUrl } from "../src/app/api/v1/_lib/ogImage.js";
 import { sniffImageMime } from "../src/app/api/v1/_lib/dealImage.js";
 import { POST as postRevalidate } from "../src/app/api/revalidate/route.js";
-import { dealOgDescription, truncateOgTitle } from "../src/app/deal/[slugAndId]/seo.js";
+import { dealOgDescription, truncateOgTitle, dealJsonLd } from "../src/app/deal/[slugAndId]/seo.js";
 import { buildShareText } from "../src/components/shareText.js";
+import type { Deal } from "@fidwastafid/schemas";
 
 // Jeton de test purement local (Phase 7B) — jamais le vrai REVALIDATE_TOKEN,
 // qui n'existe que côté Vercel/secrets GitHub. Comparable au
@@ -222,5 +223,66 @@ check(
   buildShareText(100, 80, "https://fidwastafid.com/deal/z") === "100 DH\nhttps://fidwastafid.com/deal/z"
 );
 check("jamais \"Fidwastafid :\" dans le texte", !buildShareText(599, 999, "https://fidwastafid.com/deal/x").includes("Fidwastafid"));
+
+console.log("\ndealJsonLd — Product/Offer schema.org (lot GEO du 21/07/2026, constats curl prod)");
+const dealJsonLdBase: Deal = {
+  publicId: "abc23456de",
+  titre: "Deal test JSON-LD",
+  categorie: "Autre",
+  type: "en_ligne",
+  prixPromo: 100,
+  statut: "publie",
+  score: 0,
+  submitterPublicId: null,
+  submitterPseudo: null,
+  submitterCouleurAvatar: null,
+  commentairesCount: 0,
+  createdAt: "2026-07-21T00:00:00.000Z",
+  updatedAt: "2026-07-21T00:00:00.000Z",
+};
+
+const avecPhoto = dealJsonLd({ ...dealJsonLdBase, imageKey: "deals/abc23456de.webp" }, "/deal/x-abc23456de");
+check(
+  "deal avec imageKey -> image = URL absolue /img/deals/{publicId} (jamais opengraph-image générique, jamais Supabase)",
+  avecPhoto.image === "https://fidwastafid.com/img/deals/abc23456de"
+);
+
+const sansPhoto = dealJsonLd(dealJsonLdBase, "/deal/x-abc23456de");
+check(
+  "deal sans imageKey -> repli sur l'image générique du site",
+  sansPhoto.image === "https://fidwastafid.com/opengraph-image"
+);
+
+const publie = dealJsonLd({ ...dealJsonLdBase, statut: "publie" }, "/deal/x-abc23456de");
+check("statut publie -> availability InStock", publie.offers.availability === "https://schema.org/InStock");
+
+const expire = dealJsonLd({ ...dealJsonLdBase, statut: "expire", dateFin: "2026-01-01" }, "/deal/x-abc23456de");
+check(
+  "statut expire -> availability SoldOut (pas OutOfStock, offre définitivement terminée)",
+  expire.offers.availability === "https://schema.org/SoldOut"
+);
+check(
+  "statut expire + dateFin présente -> priceValidUntil quand même inclus (fait honnête, pas une promesse)",
+  expire.offers.priceValidUntil === "2026-01-01"
+);
+
+const sansDateFin = dealJsonLd(dealJsonLdBase, "/deal/x-abc23456de");
+check("pas de dateFin -> pas de priceValidUntil", !("priceValidUntil" in sansDateFin.offers));
+
+const avecEnseigne = dealJsonLd({ ...dealJsonLdBase, enseigneNom: "Carrefour" }, "/deal/x-abc23456de");
+check(
+  "enseigneNom présent -> offers.seller Organization (constat : \"chez carrefour\" visible en description mais absent du JSON-LD avant ce lot)",
+  JSON.stringify(avecEnseigne.offers.seller) === JSON.stringify({ "@type": "Organization", name: "Carrefour" })
+);
+
+const sansEnseigne = dealJsonLd(dealJsonLdBase, "/deal/x-abc23456de");
+check("enseigneNom absent -> pas de champ seller inventé", !("seller" in sansEnseigne.offers));
+
+check("offers.priceCurrency toujours MAD", publie.offers.priceCurrency === "MAD");
+check("offers.price est un nombre (pas une chaîne, pas de symbole)", typeof publie.offers.price === "number" && publie.offers.price === 100);
+check(
+  "JSON-LD sérialisable et re-parsable (forme réellement injectée dans le <script>)",
+  JSON.parse(JSON.stringify(publie))["@type"] === "Product" && JSON.parse(JSON.stringify(publie)).offers["@type"] === "Offer"
+);
 
 void runAsyncChecks();
