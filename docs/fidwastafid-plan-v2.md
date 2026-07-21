@@ -204,10 +204,11 @@ repart de zéro — attendu), remontées WhatsApp.
       ajouté et vérifié actif en prod le 18/07/2026 (script chargé, zéro
       erreur console — cf. SUIVI) ; confirmation de remontée dans le
       dashboard encore en attente côté Kamel (accès hors de cette session).
-- [ ] Nettoyer laqwg après bascule : `DROP VIEW public.v1_auth_users_audit;`
+- [x] Nettoyer laqwg après bascule : `DROP VIEW public.v1_auth_users_audit;`
       puis supprimer le rôle `etl_reader` (cf. exception du 2026-07-14,
       SUIVI). Même fenêtre que la suppression définitive des projets v1,
-      ~23/07/2026.
+      ~23/07/2026. **Obsolète — projet laqwg supprimé définitivement le
+      21/07/2026, la vue a disparu avec la base.**
 
 **Rollback J-0 → J+7** : repointer le domaine vers le projet v1. La base v1
 n'ayant jamais été modifiée ni migrée (pas d'ETL, cf. SUIVI), le rollback DNS
@@ -291,7 +292,7 @@ confirmés en base. Phase 7 close.
 | 3 — API | ☑ fait | endpoints publics + écritures + rate limiting, CI verte |
 | 4 — Web | ◐ code complet | commits 06ca057→9d4718c ; RESTE : validation parité v1↔v2 sur mobile réel (critère "Terminé quand" — action Kamel) |
 | 5 — SEO | ◐ code complet | commits 94147b2→d3583ed ; RESTE : soumission sitemap Search Console + test résultats enrichis Google (actions externes) |
-| 6 — Bascule prod | ☑ fait | terminée le 18/07/2026, déclarée par anticipation des 7 jours pleins (cf. SUIVI clôture) ; bascule DNS 16/07, DNSSEC actif, sitemap soumis et traité (57 pages) ; v1 gelée (Git déconnecté, projets renommés `*-v1-legacy`) ; réserve ouverte : suppression définitive des projets v1 (Vercel + Supabase laqwg) ~23/07/2026 |
+| 6 — Bascule prod | ☑ fait | terminée le 18/07/2026, déclarée par anticipation des 7 jours pleins (cf. SUIVI clôture) ; bascule DNS 16/07, DNSSEC actif, sitemap soumis et traité (57 pages) ; v1 gelée (Git déconnecté, projets renommés `*-v1-legacy`) ; suppression définitive des projets v1 (Vercel + Supabase laqwg) exécutée le 21/07/2026, 2 jours d'avance sur le 23/07 prévu (cf. SUIVI clôture) |
 | 7 — Pipeline | ☑ **close** | pipeline intégré au monorepo (`apps/pipeline`, 19/07/2026) ; cron quotidien GitHub Actions (20/07/2026) : expiration auto_draft + scraping + insertion + revalidation Next.js, artefacts d'extraction 30 jours ; **premier run cron complet vert le 20/07/2026** — chaîne expiration → scraping → insertion → revalidation vérifiée, 78 deals insérés confirmés en base |
 | 8 — Mobile & ops | ☐ à faire | |
 | 9 — VPS | ☐ conditionnel | |
@@ -466,7 +467,24 @@ v1_auth_users_audit`, rôle `etl_reader`) et la suppression de
 confirmation de remontée dans le dashboard Analytics restent également à
 valider côté Kamel — hors visibilité de cette session.
 
-**PROCHAINE TÂCHE** : Rendez-vous 23/07 — suppression v1 (volet Supabase `laqwg` principalement ; le projet Vercel legacy s'appelle "fidwastafid", hors périmètre du connecteur) ; puis Phase 8. Reste en parallèle : clore 4 — validation parité v1↔v2 sur mobile réel (action Kamel) ; confirmer Vercel Pro et la remontée Analytics au dashboard.
+**Suppression v1 exécutée — 21/07/2026** (avec 2 jours d'avance sur le
+23/07) : Vercel v1 supprimé, Supabase laqwg supprimé, projet fantôme
+yruqv supprimé, secrets GitHub revus (sains), `.env` locaux purgés,
+backup vérifié avant suppression (`public_id` présent dans le dump du
+21/07). Suivi du lot nettoyage outillage mort dans le même commit doc :
+`scripts/audit-v1.mjs` et `packages/db/.env.migration.local.example`
+supprimés. `index.html` racine **non supprimé** — vérification a révélé
+qu'il reste la référence active du scaffold Vite/React racine
+(`vite.config.js`, `src/App.jsx`, scripts `dev`/`build`/`preview` du
+`package.json` racine) : `pnpm build` casse sans lui. Décommissionner ce
+scaffold est un chantier à part entière (au-delà d'un simple `git rm`),
+noté dans `IDEES.md`.
+
+**PROCHAINE TÂCHE** : canari du 22/07 matin (cron pipeline + backup
+verts = zéro résidu fonctionnel laqwg), puis lot Diffusion v1 (code),
+puis Phase 8. Reste en parallèle : clore 4 — validation parité v1↔v2 sur
+mobile réel (action Kamel) ; confirmer Vercel Pro et la remontée
+Analytics au dashboard.
 
 ---
 

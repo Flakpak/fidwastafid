@@ -10,6 +10,22 @@
   Turnstile en préversion (post-Bloc 5). À retirer une fois la cause
   confirmée via les logs Vercel.
 
+## Scaffold Vite/React racine résiduel (2026-07-21)
+
+`index.html`, `vite.config.js`, `src/App.jsx`, `src/main.jsx`,
+`src/index.css`, `src/assets` à la racine du repo, plus les scripts
+`dev`/`build`/`preview` (et les dépendances `vite`/`react`/`react-dom`)
+du `package.json` racine : reliquat du prototype v1 (avant le passage à
+Next.js dans `apps/web`, cf. `docs/fidwastafid-plan-v2.md` — « PAS
+src/App.jsx, prototype orphelin »). Découvert lors du lot nettoyage
+outillage mort du 21/07/2026 : `index.html` s'est révélé être une
+référence active (`pnpm build` racine dépend de lui via la convention
+d'entrée par défaut de Vite), donc non supprimable par un simple `git
+rm`. Décommissionner proprement nécessite de retirer aussi
+`vite.config.js`, `src/`, les scripts et les dépendances associées du
+`package.json` racine — plus gros qu'une suppression isolée, chantier à
+part.
+
 ## UX auth
 
 - Inscription avec un email déjà utilisé (non confirmé) : Supabase
