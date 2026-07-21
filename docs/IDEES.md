@@ -212,3 +212,27 @@ Architecture décidée :
   se libère.
 - Secrets futurs (token bot Telegram, URL webhook Discord) : variables
   d'environnement uniquement.
+
+## Taxonomie — réserve v3 (2026-07-21)
+
+Suite à l'extension 8→12 catégories (`CONTRAT-V1` §3, cinquième amendement
+conscient du 21/07/2026 : `Téléphonie & Internet`, `Gaming`, `Bricolage &
+Jardin`, `Voyages`), quatre candidates supplémentaires identifiées mais
+**gelées**, pas ajoutées à l'enum tant que l'usage réel ne les justifie
+pas :
+
+- Auto & Moto
+- Culture & Loisirs
+- Services & Abonnements
+- Famille & Enfants — **gelée par décision produit** : pas sans données
+  (le mapping Bringo `mapCategorie()` retombe déjà par erreur sur une
+  valeur `"Enfants"` absente de l'enum sur les mots-clés bébé/enfant/jouet,
+  systématiquement rejetée à la validation — cf. `validation.test.mjs`.
+  Ce n'est pas un précédent : aucune catégorie enfants/famille tant que
+  des données d'usage réelles ne motivent la décision).
+
+Déblocage : uniquement piloté par les données réelles d'usage (recherche
+Search Console, répartition des soumissions/deals catalogue une fois le
+pipeline multi-sources actif), jamais spéculativement — même principe que
+les facettes croisées et les tables ville/catégorie dédiées (CONTRAT-V1,
+« Ce que ce contrat NE couvre PAS »).

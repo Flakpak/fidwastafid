@@ -297,6 +297,15 @@ confirmés en base. Phase 7 close.
 | 8 — Mobile & ops | ☐ à faire | |
 | 9 — VPS | ☐ conditionnel | |
 
+**Taxonomie v2 — 21/07/2026** : grille de catégories étendue de 8 à 12
+(`Téléphonie & Internet`, `Gaming`, `Bricolage & Jardin`, `Voyages`),
+décision produit, `CONTRAT-V1` §3 cinquième amendement conscient.
+`categorie` restant du texte libre validé zod seulement (pas d'enum
+PostgreSQL, pas de CHECK) : aucune migration SQL pour ce lot. Les 8
+catégories existantes inchangées. Réserve v3 (Auto & Moto, Culture &
+Loisirs, Services & Abonnements, Famille & Enfants — gelée) consignée
+dans `IDEES.md`.
+
 **Décision — 14/07/2026** : pas d'ETL v1 → v2. La v2 démarre sur base vide.
 L'audit (`docs/AUDIT-V1.md`) a établi le contenu réel de la v1 : 580 deals de
 catalogue périssables (dont 559 scrapés, régénérables par le pipeline), 3

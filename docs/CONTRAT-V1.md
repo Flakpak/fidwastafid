@@ -126,6 +126,20 @@ ses premiers octets (magic bytes JPEG/PNG/WebP), jamais par son Content-Type dé
 ré-encodage neutralise tout contenu malveillant qui y serait embarqué. Limite 5 Mo, rejet
 propre au-delà.
 
+**Amendement du 21/07/2026 — taxonomie v2 (cinquième amendement conscient de la liste
+fermée)** : la grille de 8 catégories (`Alimentaire`, `Électroménager`, `High-Tech`, `Mode`,
+`Maison`, `Beauté`, `Sport`, `Autre`) s'étend à 12, +4 valeurs alimentables par le futur
+pipeline multi-sources : `Téléphonie & Internet`, `Gaming`, `Bricolage & Jardin`, `Voyages`.
+Les 8 valeurs existantes sont conservées à l'identique (libellés, casse, valeurs stockées) —
+aucun renommage, aucune migration de données. Exactement le cas anticipé plus haut dans cette
+section (*« enum zod fermé, pas de table dédiée en v1 — upgradable sans casse »*) : `categorie`
+est une colonne `text not null` sans contrainte DB (ni enum PostgreSQL, ni CHECK), contrainte
+fermée uniquement côté zod (`packages/schemas`) — aucune migration SQL pour ce lot. La
+catégorie reste hors schéma d'URL en v1 (`/categorie/[slug]` demeure réservé, non actif, §2) :
+extension purement applicative, zéro impact SEO structurel. Décision produit du 21/07/2026 —
+explicitement bornée à ces 4 valeurs, pas de catégorie `Enfants`/`Famille` (pas sans données,
+voir `IDEES.md`).
+
 **Amendement du 18/07/2026 — consentement WhatsApp public** : la règle "`whatsapp_contact`
 n'apparaît jamais hors admin" (ci-dessous, §4) est remplacée par une règle conditionnée au
 consentement du soumetteur — voir §4. `deals` gagne **`whatsapp_public`** (booléen, `not null default
