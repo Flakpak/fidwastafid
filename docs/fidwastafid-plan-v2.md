@@ -297,6 +297,22 @@ confirmés en base. Phase 7 close.
 | 8 — Mobile & ops | ☐ à faire | |
 | 9 — VPS | ☐ conditionnel | |
 
+**Incident sécurité — advisor Supabase `rls_disabled_in_public` (22/07/2026)** :
+les 9 tables du schéma public (`deals`, `users`, `votes`, `commentaires`,
+`enseignes`, `admins`, `journal_audit`, `rate_limits`, `schema_migrations`)
+étaient exposées sans RLS, grants par défaut complets pour anon/authenticated
+côté API Data (PostgREST) — canal jamais utilisé par l'app (accès exclusif
+par `DATABASE_URL`, rôle propriétaire des tables). Correctif : migration
+`0008_rls_public_tables.sql`, `ENABLE ROW LEVEL SECURITY` sans policy sur
+les 9 tables (deny-all pour PostgREST), pas de `FORCE ROW LEVEL SECURITY`
+(le propriétaire — identique au rôle de connexion de l'app en local et en
+prod, cf. commentaire de la migration — continue de tout voir/écrire).
+Vérifié en local : `pg_class.relrowsecurity = true` sur les 9 tables,
+suite d'intégration (82 tests) verte après migration, feed/détail
+deal/connexion/admin chargés sans erreur. Application en prod : geste
+humain (Kamel) via `pnpm migrate` avec `DATABASE_URL` de prod, comme les
+7 migrations précédentes (CONTRAT-V1 §7) — non exécutée par cette session.
+
 **Taxonomie v2 — 21/07/2026** : grille de catégories étendue de 8 à 12
 (`Téléphonie & Internet`, `Gaming`, `Bricolage & Jardin`, `Voyages`),
 décision produit, `CONTRAT-V1` §3 cinquième amendement conscient.
