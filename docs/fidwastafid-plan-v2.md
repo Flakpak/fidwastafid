@@ -313,6 +313,17 @@ deal/connexion/admin chargés sans erreur. Application en prod : geste
 humain (Kamel) via `pnpm migrate` avec `DATABASE_URL` de prod, comme les
 7 migrations précédentes (CONTRAT-V1 §7) — non exécutée par cette session.
 
+**Résolution — 22/07/2026** : exposition contenue en 12 min (schéma public
+retiré de l'API Data, test `curl` confirmant 404) ; correctif durable
+(`0008_rls_public_tables.sql`) migré en prod le jour même. Advisor
+Supabase reconfirmé après application : 9 `ERROR` `rls_disabled_in_public`
+éteintes, remplacées par 9 `INFO` `rls_enabled_no_policy` — état nominal
+voulu (RLS sans policy = deny-all, l'app continue d'accéder en direct par
+le rôle propriétaire). Principe et routine gravés au sixième amendement
+conscient (`CONTRAT-V1` §9, sécurité by design — surface plateforme) :
+revue sécurité mensuelle rejouable, checklist dans
+`docs/RUNBOOK-securite.md` (première revue = cette séance).
+
 **Taxonomie v2 — 21/07/2026** : grille de catégories étendue de 8 à 12
 (`Téléphonie & Internet`, `Gaming`, `Bricolage & Jardin`, `Voyages`),
 décision produit, `CONTRAT-V1` §3 cinquième amendement conscient.
@@ -505,11 +516,15 @@ qu'il reste la référence active du scaffold Vite/React racine
 scaffold est un chantier à part entière (au-delà d'un simple `git rm`),
 noté dans `IDEES.md`.
 
-**PROCHAINE TÂCHE** : canari du 22/07 matin (cron pipeline + backup
-verts = zéro résidu fonctionnel laqwg), puis lot Diffusion v1 (code),
-puis Phase 8. Reste en parallèle : clore 4 — validation parité v1↔v2 sur
-mobile réel (action Kamel) ; confirmer Vercel Pro et la remontée
-Analytics au dashboard.
+**Dossier v1 scellé définitivement — 22/07/2026** : canari post-suppression
+laqwg vert — premiers runs GitHub Actions après la suppression du
+21/07/2026 confirmés sains, *Pipeline quotidien* #6 et *Backup* #15, zéro
+résidu fonctionnel. Le dossier v1 (suppression des projets Vercel/Supabase
+legacy, canari de confirmation) est clos.
+
+**PROCHAINE TÂCHE** : lot Diffusion v1 (code), puis Phase 8. Reste en
+parallèle : clore 4 — validation parité v1↔v2 sur mobile réel (action
+Kamel) ; confirmer Vercel Pro et la remontée Analytics au dashboard.
 
 ---
 

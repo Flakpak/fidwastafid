@@ -328,6 +328,40 @@ est inchangé — seul l'opérateur de cache diffère selon la phase d'hébergem
 Palette rouge/or/crème, typographie Scheherazade New, sceau calligraphique arabe.
 Référence directe pour la config Tailwind de la Phase 4.
 
+## 9 — Sécurité by design
+
+**Amendement du 22/07/2026 — surface plateforme (sixième amendement conscient de la
+liste fermée)** : fait générateur, incident advisor Supabase `rls_disabled_in_public`
+— les 9 tables du schéma public étaient exposées sans RLS, grants par défaut complets
+pour `anon`/`authenticated`, via l'API Data (PostgREST), un canal que l'app n'a jamais
+utilisé (accès exclusif par `DATABASE_URL`, rôle propriétaire — §7) mais qui restait
+ouvert par défaut. Exposition contenue en 12 min (schéma public retiré de l'API Data,
+vérifié par un `curl` renvoyant 404) ; correctif durable migré en prod le jour même
+(`0008_rls_public_tables.sql`, RLS sans policy sur les 9 tables). Leçon : la surface de
+sécurité auditée jusqu'ici (revues de code, CI) était limitée au code — la dérive
+vivait dans la configuration plateforme, hors de ce périmètre.
+
+Principes gravés par cet amendement :
+
+- **Surface de sécurité = code ET configuration des plateformes** (Supabase, Vercel,
+  Cloudflare, GitHub) — un audit de code seul ne couvre pas les réglages par défaut
+  d'une plateforme managée.
+- **Moindre exposition** : tout canal d'accès non utilisé par l'architecture est fermé
+  par défaut, pas seulement non documenté. Fait générateur de cette règle : l'API Data
+  Supabase, ouverte par défaut sur un projet qui n'en a jamais eu l'usage.
+- **Les advisors de plateforme font partie de la définition de « terminé »** d'un lot
+  touchant la base ou l'infra : advisor sécurité vérifié avant clôture, pas seulement
+  build/lint/tests.
+- **État nominal advisor**, référence pour toute revue future : **9 `INFO`
+  `rls_enabled_no_policy`** (RLS sans policy = deny-all voulu pour PostgREST, l'app
+  accède en direct par le rôle propriétaire) + **1 `WARN`
+  `auth_leaked_password_protection`** (assumé, décision produit — voir `IDEES.md`).
+  Toute **nouvelle** entrée advisor au-delà de cet état est une anomalie à instruire,
+  pas un bruit de fond à ignorer.
+
+Routine associée : revue sécurité mensuelle, checklist rejouable — voir
+`docs/RUNBOOK-securite.md`.
+
 ---
 
 ## Ce que ce contrat NE couvre PAS (volontairement)

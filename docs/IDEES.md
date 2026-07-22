@@ -236,3 +236,14 @@ Search Console, répartition des soumissions/deals catalogue une fois le
 pipeline multi-sources actif), jamais spéculativement — même principe que
 les facettes croisées et les tables ville/catégorie dédiées (CONTRAT-V1,
 « Ce que ce contrat NE couvre PAS »).
+
+## Sécurité — leaked password protection différée (2026-07-22)
+
+Leaked password protection (vérification HaveIBeenPwned à l'inscription/
+changement de mot de passe) : fonctionnalité Supabase Pro — activation
+différée au passage Pro, groupé avec Vercel Pro au premier revenu (même
+logique de bascule que le reste de l'infra managée, cf.
+`fidwastafid-plan-v2.md`). `WARN` `auth_leaked_password_protection` assumé
+d'ici là dans l'advisor Supabase — état nominal documenté au CONTRAT-V1 §9
+(constat du 22/07/2026, revue sécurité mensuelle,
+`docs/RUNBOOK-securite.md`), pas un oubli.
