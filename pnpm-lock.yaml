@@ -84,7 +84,7 @@ importers:
     dependencies:
       '@asteasolutions/zod-to-openapi':
         specifier: ^7.3.0
-        version: 7.3.4(zod@3.25.76)
+        version: 7.3.4(zod@4.4.3)
       '@fidwastafid/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -113,8 +113,8 @@ importers:
         specifier: ^0.34.5
         version: 0.34.5
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.0.0
@@ -185,8 +185,8 @@ importers:
         specifier: ^5.0.9
         version: 5.1.16
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^22.10.0
@@ -2086,14 +2086,17 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
 snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@asteasolutions/zod-to-openapi@7.3.4(zod@3.25.76)':
+  '@asteasolutions/zod-to-openapi@7.3.4(zod@4.4.3)':
     dependencies:
       openapi3-ts: 4.6.0
-      zod: 3.25.76
+      zod: 4.4.3
 
   '@babel/code-frame@7.29.7':
     dependencies:
@@ -3716,3 +3719,5 @@ snapshots:
       zod: 3.25.76
 
   zod@3.25.76: {}
+
+  zod@4.4.3: {}
