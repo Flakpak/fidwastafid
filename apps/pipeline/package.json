@@ -5,11 +5,12 @@
   "type": "module",
   "description": "Pipeline de scraping/extraction de deals (Bringo/Carrefour, catalogues) — Phase 7A, rejoint le monorepo.",
   "scripts": {
-    "test": "tsx tests/validation.test.mjs && tsx tests/expiration.test.mjs && tsx tests/schema-guard.test.mjs && tsx tests/argv.test.mjs && tsx tests/scraper-inwi.test.mjs && tsx tests/scraper-universparadiscount.test.mjs",
+    "test": "tsx tests/validation.test.mjs && tsx tests/expiration.test.mjs && tsx tests/schema-guard.test.mjs && tsx tests/argv.test.mjs && tsx tests/scraper-inwi.test.mjs && tsx tests/scraper-universparadiscount.test.mjs && tsx tests/scraper-decathlon.test.mjs",
     "discover-site": "tsx discover-site.mjs",
     "scraper-bringo": "tsx scraper-bringo.mjs",
     "scraper-inwi": "tsx scraper-inwi.mjs",
     "scraper-universparadiscount": "tsx scraper-universparadiscount.mjs",
+    "scraper-decathlon": "tsx scraper-decathlon.mjs",
     "extract-catalogue": "tsx extract-catalogue.mjs",
     "insert-deals": "tsx insert-deals.mjs",
     "rattrapage-descriptions": "tsx rattrapage-descriptions.mjs",

@@ -90,10 +90,19 @@ réel était celui d'un produit **`universparadiscount.ma`** (cible #5 de ce mê
 lien `href="https://universparadiscount.ma/"` dans le menu affiché. Bug de cache/edge partagé entre
 tenants d'une même infra, pas un artefact de méthode.
 
-**Verdict : ORANGE.** Développable en cheerio, surcoût en deux volets : (1) validation obligatoire
-du contenu reçu par page (title/breadcrumb/JSON-LD cohérents avec l'URL demandée) + retry, à cause
-du bug de cache croisé constaté ; (2) ignorer `/content/179-soldes` (Alpine.js), utiliser uniquement
-les catégories natives type `/5080-promotions`.
+**Verdict : ~~ORANGE~~ → VERT, DÉVELOPPÉ (révisé le 23/07/2026).** Reconstat avec le client réel
+du pipeline (Node `fetch`/undici — leçon mrbricolage) : **200 partout** (robots.txt, listing,
+produit, image CDN), `x-bot: YES` toujours présent mais contenu servi complet, aucun mur. **Bug de
+cache inter-tenant non reproduit** sur 5 requêtes successives (titre Decathlon correct, zéro
+marqueur étranger à chaque fois). Les deux surcoûts du verdict ORANGE sont traités dans le scraper
+livré (`apps/pipeline/scraper-decathlon.mjs`) : (1) garde `pageEstDecathlon()` — chaque page est
+validée (titre + absence de marqueur étranger connu) avant parsing, page polluée sautée, jamais
+parsée ; (2) source = `/5080-promotions` uniquement (jamais `/content/179-soldes`). Écart notable :
+le `data-value` de `current-price` est tronqué à l'entier — les prix sont parsés depuis le texte
+affiché (précision complète). Pagination bornée (`MAX_PAGES=5`, ~120 produits/run sur ~1580 — cap
+délibéré de source secondaire). Vérifié en local : 120 offres extraites (0 rejet, 0 page polluée),
+119 insérées en `auto_draft` avec images (1 doublon intra-archive dédupliqué), ré-insertion = 120
+doublons.
 
 ---
 
@@ -407,7 +416,7 @@ vérifiée, absence de test de rate-limiting à volume réel.
 | Cible | Promo dédiée | Prix barrés réels | Cheerio-compatible | Plateforme | Anti-bot | Volume | Verdict |
 |---|---|---|---|---|---|---|---|
 | electroplanet.ma | Inconnu | Inconnu | Inconnu | Inconnu | **Cloudflare, domaine entier** | — | **ROUGE** |
-| decathlon.ma | Oui (`/5080-promotions`) | Oui | Oui (page catégorie native) | PrestaShop "oneshop" | Détection sans blocage + **bug cache inter-tenant** | ~1580 | **ORANGE** |
+| decathlon.ma | Oui (`/5080-promotions`) | Oui | Oui (Node fetch OK) | PrestaShop "oneshop" | Détection sans blocage ; bug cache non reproduit (garde par page dans le scraper) | ~1580 (cap 120/run) | ~~ORANGE~~ **VERT — DÉVELOPPÉ** (23/07) |
 | marwa.com | Non évalué | Non évalué | Non évalué | Non évalué | Aucun mur technique constaté | — | **ROUGE** (gouvernance : `Disallow: ClaudeBot`) |
 | kitea.ma | Non évalué | Non évalué | Non évalué | Non évalué | **Timeout réseau (ambigu)** | — | **ROUGE** (provisoire, à réévaluer) |
 | universparadiscount.ma | Oui (homepage : ~94 remisés uniques) | Oui | Oui (Node fetch OK) | PrestaShop | Aucun (Node fetch 200) | ~94 | ~~ORANGE~~ **VERT — DÉVELOPPÉ** (23/07) |
@@ -447,11 +456,12 @@ en revue.**
    requête — le surcoût « scan catégorie » du spike était inutile. Scraper livré
    (`scraper-universparadiscount.mjs`). Reste : ajout de l'enseigne `universparadiscount` en prod
    (geste Kamel, `docs/RUNBOOK-donnees.md`) + intégration cron (lot séparé).
-4. **decathlon.ma (ORANGE)** — Volume le plus élevé de tout le spike (~1580 produits), mais nécessite
-   une garde de validation/retry à cause du bug de cache inter-tenant constaté (partagé avec
-   universparadiscount.ma — possible mutualisation de cette garde entre les deux adaptateurs
-   PrestaShop, à investiguer si les deux sont développés). Prioriser après (3) une fois la stratégie
-   PrestaShop générique rodée.
+4. ~~**decathlon.ma (ORANGE)**~~ — **DÉVELOPPÉ (23/07/2026, verdict relevé VERT)** : Node fetch
+   passe (200 partout), bug de cache inter-tenant non reproduit sur 5 requêtes successives ; la
+   garde de validation par page recommandée est implémentée dans le scraper (`pageEstDecathlon()`),
+   source `/5080-promotions` uniquement, cap délibéré 120 produits/run. Scraper livré
+   (`scraper-decathlon.mjs`). Reste : ajout de l'enseigne `decathlon` en prod (geste Kamel,
+   `docs/RUNBOOK-donnees.md`) + intégration cron (lot séparé).
 5. **bricoma.ma (ORANGE)** — technique la plus simple (Magento, `data-price-amount` fiable), mais
    volume quasi nul (~6 produits, non paginé) sans crawl catalogue complet via sitemap — rapport
    effort/valeur peu attractif tant que le crawl catalogue n'est pas justifié par ailleurs.

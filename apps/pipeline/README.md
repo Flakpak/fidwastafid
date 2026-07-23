@@ -16,6 +16,7 @@ pnpm --filter pipeline run discover-site -- <url> <nom-court>
 pnpm --filter pipeline run scraper-bringo -- <url-listing-ou-fichier.txt> <ville> [--tous]
 pnpm --filter pipeline run scraper-inwi
 pnpm --filter pipeline run scraper-universparadiscount
+pnpm --filter pipeline run scraper-decathlon
 pnpm --filter pipeline run extract-catalogue -- <url-ou-chemin> <enseigne>
 pnpm --filter pipeline run insert-deals -- <fichier-deals-extraits.json>
 pnpm --filter pipeline run rattrapage-descriptions -- [--dry-run]
@@ -48,6 +49,17 @@ que de les interpréter lui-même.
   `extractions/AAAA-MM-JJ_HH-mm_universparadiscount.json`. Aucune variable
   d'environnement requise. Prérequis d'insertion : l'enseigne curée
   `universparadiscount` doit exister en base (`docs/RUNBOOK-donnees.md`).
+- **scraper-decathlon** — scrape la catégorie promotions native de
+  decathlon.ma (`/5080-promotions`, Sport, spike `docs/SPIKE-SOURCES.md` —
+  verdict ORANGE levé au reconstat). Pagination bornée (`MAX_PAGES=5`, cap
+  délibéré : le catalogue promo fait ~66 pages, on n'en prend qu'une tranche
+  par run pour ne pas noyer la file admin). Garde anti-pollution
+  inter-tenant (`pageEstDecathlon`, surcoût #1 du spike) : une page servie
+  qui n'est pas du Decathlon est sautée, jamais parsée. Prix parsés depuis le
+  texte affiché (le `data-value` est tronqué à l'entier). Écrit
+  `extractions/AAAA-MM-JJ_HH-mm_decathlon.json`. Aucune variable
+  d'environnement requise. Prérequis d'insertion : l'enseigne curée
+  `decathlon` doit exister en base (`docs/RUNBOOK-donnees.md`).
 - **extract-catalogue** — extrait les deals d'un catalogue (PDF/image) via
   l'API Claude. Écrit une archive dans `extractions/AAAA-MM-JJ_HH-mm_<enseigne>.json`.
 - **insert-deals** — valide (schémas partagés `packages/schemas`) puis insère
