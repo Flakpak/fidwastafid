@@ -90,12 +90,13 @@ que de les interpréter lui-même.
 `.github/workflows/pipeline-quotidien.yml` exécute chaque jour à 05:00 UTC
 (06:00 Casablanca), + `workflow_dispatch` pour un run manuel de test :
 `expirer-auto-draft` → `scraper-bringo` (Casablanca, `bringo-categories.txt`)
-→ `insert-deals` → `scraper-inwi` + `insert-deals` (source secondaire
-**isolée** : `continue-on-error`, un échec inwi ne fait jamais échouer le
-run Bringo — lot du 23/07/2026) → `POST /api/revalidate` (feed, enseignes,
-sitemap — `apps/web/src/app/api/revalidate/route.ts`, endpoint hors
-`/api/v1`, exception documentée au même titre que ce pipeline, voir
-CONTRAT-V1 §4).
+→ `insert-deals` → trois sources secondaires **isolées** (`scraper-inwi`,
+`scraper-universparadiscount`, `scraper-decathlon`, chacune suivie de son
+`insert-deals` ; `continue-on-error` sur chacune : un échec d'une source
+secondaire ne fait jamais échouer le run Bringo ni les autres sources —
+lots du 23/07/2026) → `POST /api/revalidate` (feed, enseignes, sitemap —
+`apps/web/src/app/api/revalidate/route.ts`, endpoint hors `/api/v1`,
+exception documentée au même titre que ce pipeline, voir CONTRAT-V1 §4).
 
 **Automatisé uniquement le chemin qui peut tourner sans surveillance** :
 `extract-catalogue` attend une URL/chemin de catalogue précis à chaque appel

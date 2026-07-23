@@ -4,25 +4,29 @@
 # -> scraping Bringo -> insertion (validation zod partagée, packages/schemas)
 # -> scraping inwi -> insertion (source secondaire isolée, lot du 23/07/2026)
 # -> scraping universparadiscount -> insertion (source secondaire isolée,
-#    lot du 23/07/2026) -> revalidation Next.js (feed, enseignes, sitemap).
+#    lot du 23/07/2026) -> scraping decathlon -> insertion (source secondaire
+#    isolée, lot du 23/07/2026) -> revalidation Next.js (feed, enseignes,
+#    sitemap).
 #
 # Automatisé uniquement : scraper-bringo (categories.txt auto-suffisant),
 # scraper-inwi (page unique auto-suffisante), scraper-universparadiscount
-# (homepage auto-suffisante) + insert-deals (qui fait lui-même l'extraction
-# de description via fiche-produit.mjs, cf. README). PAS extract-catalogue :
-# ce script attend une URL/chemin de catalogue précis à chaque appel (aucun
-# mécanisme de découverte automatique) — il ne peut pas tourner sans
-# surveillance, il reste un geste manuel ponctuel.
+# (homepage auto-suffisante), scraper-decathlon (catégorie /5080-promotions
+# auto-suffisante, pagination bornée) + insert-deals (qui fait lui-même
+# l'extraction de description via fiche-produit.mjs, cf. README). PAS
+# extract-catalogue : ce script attend une URL/chemin de catalogue précis à
+# chaque appel (aucun mécanisme de découverte automatique) — il ne peut pas
+# tourner sans surveillance, il reste un geste manuel ponctuel.
 #
 # Pas de continue-on-error sur la chaîne PRINCIPALE (expiration -> Bringo ->
 # insertion -> revalidation) : un échec y fait échouer le job franchement —
 # GitHub notifie par email, suffisant à cette échelle (pas d'astreinte).
-# EXCEPTION documentée (lots inwi + universparadiscount, 23/07/2026) : les
-# étapes de ces deux sources SECONDAIRES portent continue-on-error — leur
-# échec ne doit jamais faire échouer le travail Bringo déjà accompli, ni les
-# unes des autres, ni bloquer la revalidation. Contrepartie assumée : un
-# échec d'une source secondaire ne déclenche PAS d'email (job vert) — il se
-# signale par une annotation ::warning:: sur la page du run.
+# EXCEPTION documentée (lots inwi + universparadiscount + decathlon,
+# 23/07/2026) : les étapes de ces sources SECONDAIRES portent
+# continue-on-error — leur échec ne doit jamais faire échouer le travail
+# Bringo déjà accompli, ni les unes des autres, ni bloquer la revalidation.
+# Contrepartie assumée : un échec d'une source secondaire ne déclenche PAS
+# d'email (job vert) — il se signale par une annotation ::warning:: sur la
+# page du run.
 
 name: Pipeline quotidien
 
@@ -204,6 +208,52 @@ jobs:
         env:
           FICHIER_EXTRACTION_UPD: ${{ steps.scraping_upd.outputs.fichier }}
         run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_UPD"
+
+      # Source secondaire decathlon (lot du 23/07/2026) — pattern strictement
+      # identique à inwi/universparadiscount ci-dessus : continue-on-error
+      # (échec isolé, ne casse ni Bringo ni les autres sources ni la
+      # revalidation), ::warning:: au lieu de ::error:: (0 deal = catégorie
+      # promo vide ce jour-là, plausible — signal à surveiller, pas un
+      # incident). Le scraper porte en plus sa garde anti-pollution
+      # inter-tenant (pageEstDecathlon, cf. scraper-decathlon.mjs) : une page
+      # servie qui n'est pas du Decathlon est sautée en amont, jamais parsée.
+      # Prérequis prod : l'enseigne `decathlon` doit exister en base
+      # (docs/RUNBOOK-donnees.md) — sinon insert-deals rejette proprement
+      # chaque deal (enseigne inconnue), sans erreur.
+      - name: Scraping decathlon (catégorie promotions)
+        id: scraping_deca
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run scraper-decathlon | tee /dev/stderr)
+
+          fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
+          if [ -z "$fichier_relatif" ]; then
+            echo "::warning::scraper-decathlon n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            exit 1
+          fi
+
+          fichier="apps/pipeline/$fichier_relatif"
+          if [ ! -f "$fichier" ]; then
+            echo "::warning::Fichier annoncé par scraper-decathlon introuvable sur disque : $fichier — source sautée."
+            exit 1
+          fi
+
+          nb_deals=$(jq 'length' "$fichier")
+          echo "Deals decathlon extraits : $nb_deals"
+          if [ "$nb_deals" -eq 0 ]; then
+            echo "::warning::0 deal extrait par scraper-decathlon — rien à insérer pour cette source ce run."
+            exit 1
+          fi
+
+          echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
+
+      - name: Insertion decathlon en base (validation zod partagée)
+        if: steps.scraping_deca.outcome == 'success'
+        continue-on-error: true
+        env:
+          FICHIER_EXTRACTION_DECA: ${{ steps.scraping_deca.outputs.fichier }}
+        run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_DECA"
 
       - name: Revalidation Next.js (feed, enseignes, sitemap)
         run: |
