@@ -2,7 +2,16 @@ import { NextResponse } from "next/server";
 import { query } from "@fidwastafid/db";
 import { requireAdmin } from "@fidwastafid/auth";
 import { withAuthErrors } from "../../_lib/errors.js";
-import { DEAL_ADMIN_SELECT, DEAL_FROM, toDealAdmin, type DealAdminRow } from "../../_lib/deals.js";
+import {
+  DEAL_ADMIN_SELECT,
+  DEAL_FROM,
+  DEAL_DOUBLON_JOIN,
+  DEAL_DOUBLON_SELECT,
+  toDealAdmin,
+  toDoublon,
+  type DealAdminRow,
+  type DoublonColumns,
+} from "../../_lib/deals.js";
 
 /**
  * Pas de pagination complète (curseur) — usage admin solo, CONTRAT-V1 §4
@@ -38,10 +47,13 @@ export const GET = withAuthErrors(async (request: Request): Promise<NextResponse
 
   // count(*) over() : total réel des lignes qui matchent le WHERE, calculé
   // avant l'application du LIMIT — une seule requête, pas de second aller-
-  // retour DB.
-  const rows = await query<DealAdminRow & { total_count: number }>(
-    `select ${DEAL_ADMIN_SELECT}, count(*) over()::int as total_count
+  // retour DB. DEAL_DOUBLON_JOIN ajoute (par ligne) l'info de doublon produit
+  // — visibilité admin seule, aucune modification automatique (lot du
+  // 23/07/2026, voir _lib/deals.ts).
+  const rows = await query<DealAdminRow & DoublonColumns & { total_count: number }>(
+    `select ${DEAL_ADMIN_SELECT}, ${DEAL_DOUBLON_SELECT}, count(*) over()::int as total_count
      ${DEAL_FROM}
+     ${DEAL_DOUBLON_JOIN}
      ${where}
      order by (d.statut = 'auto_draft') desc, d.score desc, d.public_id desc
      limit $${limitIdx}`,
@@ -50,5 +62,9 @@ export const GET = withAuthErrors(async (request: Request): Promise<NextResponse
 
   const total = rows[0]?.total_count ?? 0;
 
-  return NextResponse.json({ data: rows.map(toDealAdmin), total });
+  // `doublon` attaché hors dealAdminSchema (enrichissement d'affichage admin,
+  // pas un champ du modèle de domaine — cf. _lib/deals.ts).
+  const data = rows.map((row) => ({ ...toDealAdmin(row), doublon: toDoublon(row) }));
+
+  return NextResponse.json({ data, total });
 });

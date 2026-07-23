@@ -119,6 +119,85 @@ export function toDealAdmin(row: DealAdminRow): DealAdmin {
 }
 
 /**
+ * Détection de doublon produit — VISIBILITÉ ADMIN SEULE (lot du 23/07/2026).
+ * Le pipeline déduplique sur titre+enseigne+prix (insert-deals.mjs) alors que
+ * l'identité stable d'un produit est son `lien` : toute variation de prix
+ * crée un doublon, y compris en dupliquant un deal déjà `publie` par un
+ * nouvel `auto_draft`. Ce LATERAL ne CORRIGE rien (aucune modification
+ * automatique — l'admin reste seul décisionnaire) ; il expose, pour chaque
+ * deal affiché, l'AUTRE deal le plus pertinent du même produit.
+ *
+ * Rapprochement : même `enseigne_id` ET (même `lien` si présent — fort),
+ * sinon repli sur `lower(titre)` quand `lien` est null (ex. inwi, dont les
+ * deals n'ont pas de lien produit vérifiable — rapprochement faible, marqué
+ * `par_lien = false` pour l'affichage). Priorité au `publie` (le plus
+ * important à signaler : « déjà publié »), sinon le plus récent. `count(*)
+ * over()` compte tous les autres, avant le LIMIT 1 du représentant.
+ *
+ * Perf : une exécution par ligne affichée ; `deals_enseigne_idx` restreint
+ * par enseigne avant le filtre lien/titre. Acceptable à l'échelle actuelle
+ * (admin solo, table bornée par l'expiration auto_draft > 14 j). Un index
+ * dédié sur (enseigne_id, lien) serait un follow-up si le volume grandit.
+ */
+export const DEAL_DOUBLON_JOIN = `
+  left join lateral (
+    select o.public_id, o.titre, o.statut, o.prix_promo,
+           (d.lien is not null and o.lien = d.lien) as par_lien,
+           (count(*) over())::int as nb
+    from deals o
+    where o.id <> d.id
+      and o.enseigne_id = d.enseigne_id
+      and (
+        (d.lien is not null and o.lien = d.lien)
+        or (d.lien is null and lower(o.titre) = lower(d.titre))
+      )
+    order by (o.statut = 'publie') desc, o.created_at desc
+    limit 1
+  ) dup on true
+`;
+
+export const DEAL_DOUBLON_SELECT = `
+  dup.public_id as dup_public_id, dup.titre as dup_titre, dup.statut as dup_statut,
+  dup.prix_promo as dup_prix_promo, dup.par_lien as dup_par_lien, dup.nb as dup_nb
+`;
+
+export interface DoublonColumns {
+  dup_public_id: string | null;
+  dup_titre: string | null;
+  dup_statut: string | null;
+  dup_prix_promo: string | null;
+  dup_par_lien: boolean | null;
+  dup_nb: number | null;
+}
+
+/**
+ * Info de doublon attachée à un deal admin — hors `dealAdminSchema` (donc
+ * hors contrat openapi) : c'est un enrichissement d'affichage admin, pas un
+ * champ du modèle de domaine. `parLien` distingue le rapprochement fort (même
+ * lien produit) du repli faible (titre, quand lien null).
+ */
+export interface DoublonInfo {
+  publicId: string;
+  titre: string;
+  statut: string;
+  prixPromo: number;
+  parLien: boolean;
+  nb: number;
+}
+
+export function toDoublon(row: DoublonColumns): DoublonInfo | null {
+  if (!row.dup_public_id) return null;
+  return {
+    publicId: row.dup_public_id,
+    titre: row.dup_titre ?? "",
+    statut: row.dup_statut ?? "",
+    prixPromo: Number(row.dup_prix_promo),
+    parLien: row.dup_par_lien ?? false,
+    nb: row.dup_nb ?? 1,
+  };
+}
+
+/**
  * `deals.id` (bigint) revient en string via pg (évite la perte de précision
  * JS) — jamais renvoyé au client, uniquement pour les requêtes internes de
  * la même transaction (vote, recalcul de score).

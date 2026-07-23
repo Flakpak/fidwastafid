@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DealAdmin, DealStatut, Enseigne } from "@fidwastafid/schemas";
+import type { DoublonInfo } from "../api/v1/_lib/deals.js";
 import { AdminDealItem, type DealEditFields, type SaveResult, type ImageFetchResult } from "./AdminDealItem.js";
+
+/** Deal admin enrichi de l'info de doublon produit (visibilité seule, lot du
+ *  23/07/2026) — `doublon` vit hors du modèle de domaine (cf. _lib/deals.ts),
+ *  d'où ce type local plutôt qu'un champ de DealAdmin. */
+type DealAdminAvecDoublon = DealAdmin & { doublon: DoublonInfo | null };
 
 interface ApiErrorBody {
   error?: { code?: string; message?: string; fields?: Record<string, string> };
@@ -58,7 +64,7 @@ const ONGLET_ACTIONS: Record<DealStatut, Action[]> = {
 const BULK_ONGLETS = new Set<DealStatut>(["auto_draft", "en_attente"]);
 
 export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
-  const [deals, setDeals] = useState<DealAdmin[] | null>(null);
+  const [deals, setDeals] = useState<DealAdminAvecDoublon[] | null>(null);
   // Total réel renvoyé par l'API (count(*) over(), toutes statuts confondus
   // — l'appel n'est pas filtré par statut). Sert uniquement à détecter une
   // troncature par LIMIT ; ce n'est pas un total par onglet (l'API ne le
@@ -82,7 +88,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       setDeals(null);
       return;
     }
-    const body = (await res.json()) as { data: DealAdmin[]; total: number };
+    const body = (await res.json()) as { data: DealAdminAvecDoublon[]; total: number };
     setDeals(body.data);
     setTotal(body.total);
   }, []);
@@ -301,6 +307,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
           <AdminDealItem
             key={deal.publicId}
             deal={deal}
+            doublon={deal.doublon}
             actions={ONGLET_ACTIONS[onglet]}
             enseignes={enseignes}
             showCheckbox={BULK_ONGLETS.has(onglet)}

@@ -1,8 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { VILLES, CATEGORIES, type DealAdmin, type DealStatut, type Enseigne } from "@fidwastafid/schemas";
+import { VILLES, CATEGORIES, dealUrlSlug, type DealAdmin, type DealStatut, type Enseigne } from "@fidwastafid/schemas";
+import type { DoublonInfo } from "../api/v1/_lib/deals.js";
 import { joinMeta } from "../../lib/format.js";
+
+/** Libellés courts de statut pour le badge de doublon (l'onglet où retrouver
+ *  l'existant). Le deal page public ne résout que publie/expire — pour les
+ *  autres statuts, pas de fiche publique (cf. rendu du badge). */
+const STATUT_LABEL: Record<DealStatut, string> = {
+  auto_draft: "pipeline",
+  en_attente: "en attente",
+  publie: "publié",
+  rejete: "rejeté",
+  expire: "expiré",
+};
+
+/** Le deal existant a-t-il une fiche publique atteignable ? (CONTRAT-V1 §1 :
+ *  seuls publie/expire répondent 200 ; auto_draft/en_attente/rejete → 404.) */
+const STATUT_PUBLIC = new Set<string>(["publie", "expire"]);
 
 /** Édition curateur complète d'un deal (CONTRAT-V1 §3/§4, troisième
  *  amendement conscient du 19/07/2026) — un champ vidé côté formulaire pour
@@ -117,6 +133,7 @@ function isGoogleMapsUrl(value: string): boolean {
  */
 export function AdminDealItem({
   deal,
+  doublon,
   actions,
   enseignes,
   showCheckbox,
@@ -129,6 +146,9 @@ export function AdminDealItem({
   onUploadImage,
 }: {
   deal: DealAdmin;
+  /** Autre deal du même produit s'il en existe un (visibilité seule, lot du
+   *  23/07/2026) — jamais d'action automatique, l'admin décide. */
+  doublon?: DoublonInfo | null;
   actions: Action[];
   enseignes: Enseigne[];
   showCheckbox: boolean;
@@ -224,6 +244,40 @@ export function AdminDealItem({
               <span className="text-xs font-bold bg-rouge text-white rounded px-2 py-0.5">-{remise(deal)}%</span>
             )}
           </div>
+          {/* Badge doublon produit — INFORMATIF, aucune action automatique
+              (lot du 23/07/2026) : signale un autre deal du même produit
+              (même lien+enseigne, ou repli titre+enseigne si lien null).
+              L'admin décide seul (valider, rejeter, ou éditer l'existant). */}
+          {doublon && (
+            <div className="text-xs bg-[#fff8e6] border border-or rounded-lg px-2.5 py-1.5 text-texte flex flex-col gap-0.5">
+              <span className="font-bold">
+                ⚠️ Produit déjà existant ({STATUT_LABEL[doublon.statut as DealStatut] ?? doublon.statut})
+                {doublon.nb > 1 && ` — +${doublon.nb - 1} autre${doublon.nb - 1 > 1 ? "s" : ""}`}
+              </span>
+              <span className="text-muted">
+                son prix : <strong className="text-texte">{doublon.prixPromo} DH</strong>
+                {doublon.prixPromo !== deal.prixPromo && (
+                  <> — ce deal : <strong className="text-texte">{deal.prixPromo} DH</strong></>
+                )}
+                {!doublon.parLien && <> · rapproché par titre (lien absent)</>}
+              </span>
+              {STATUT_PUBLIC.has(doublon.statut) ? (
+                <a
+                  href={`/deal/${dealUrlSlug(doublon.titre, doublon.publicId)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-rouge font-semibold hover:underline w-fit"
+                >
+                  Voir sa fiche ↗
+                </a>
+              ) : (
+                <span className="text-muted">
+                  réf. <code className="font-mono">{doublon.publicId}</code> — onglet «{" "}
+                  {STATUT_LABEL[doublon.statut as DealStatut] ?? doublon.statut} »
+                </span>
+              )}
+            </div>
+          )}
           <div className="text-xs text-muted">Soumis par {deal.submitterPublicId ?? "collecte automatique"}</div>
         </div>
         <div className="flex flex-col gap-1 flex-shrink-0">
