@@ -2,18 +2,24 @@
 #
 # Phase 7B — cron quotidien : purge du stock mort (expiration auto_draft)
 # -> scraping Bringo -> insertion (validation zod partagée, packages/schemas)
+# -> scraping inwi -> insertion (source secondaire isolée, lot du 23/07/2026)
 # -> revalidation Next.js (feed, enseignes, sitemap).
 #
-# Automatisé uniquement : scraper-bringo (categories.txt auto-suffisant,
-# aucune saisie manuelle nécessaire) + insert-deals (qui fait lui-même
-# l'extraction de description via fiche-produit.mjs, cf. README). PAS
-# extract-catalogue : ce script attend une URL/chemin de catalogue précis à
-# chaque appel (aucun mécanisme de découverte automatique) — il ne peut pas
+# Automatisé uniquement : scraper-bringo (categories.txt auto-suffisant),
+# scraper-inwi (page unique auto-suffisante) + insert-deals (qui fait
+# lui-même l'extraction de description via fiche-produit.mjs, cf. README).
+# PAS extract-catalogue : ce script attend une URL/chemin de catalogue précis
+# à chaque appel (aucun mécanisme de découverte automatique) — il ne peut pas
 # tourner sans surveillance, il reste un geste manuel ponctuel.
 #
-# Pas de continue-on-error nulle part : un échec à n'importe quelle étape
-# fait échouer le job franchement — GitHub notifie par email, suffisant à
-# cette échelle (pas d'astreinte).
+# Pas de continue-on-error sur la chaîne PRINCIPALE (expiration -> Bringo ->
+# insertion -> revalidation) : un échec y fait échouer le job franchement —
+# GitHub notifie par email, suffisant à cette échelle (pas d'astreinte).
+# EXCEPTION documentée (lot inwi, 23/07/2026) : les deux étapes inwi portent
+# continue-on-error — source SECONDAIRE en rodage, son échec ne doit jamais
+# faire échouer le travail Bringo déjà accompli ni bloquer la revalidation.
+# Contrepartie assumée : un échec inwi ne déclenche PAS d'email (job vert) —
+# il se signale par une annotation ::warning:: sur la page du run.
 
 name: Pipeline quotidien
 
@@ -108,6 +114,50 @@ jobs:
         env:
           FICHIER_EXTRACTION: ${{ steps.scraping.outputs.fichier }}
         run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION"
+
+      # Source secondaire inwi (lot du 23/07/2026) — même pattern de capture/
+      # vérification que l'étape Bringo ci-dessus, avec deux divergences
+      # voulues : continue-on-error (un échec inwi ne fait jamais échouer le
+      # run Bringo déjà accompli — cf. exception documentée en tête de
+      # fichier) et ::warning:: au lieu de ::error:: (0 deal inwi = page promo
+      # vide ce jour-là, plausible pour une petite page d'offres — signal à
+      # surveiller, pas un incident). Prérequis prod : l'enseigne `inwi` doit
+      # exister en base (docs/RUNBOOK-donnees.md) — sinon insert-deals rejette
+      # proprement chaque deal (enseigne inconnue), sans erreur.
+      - name: Scraping inwi (Offres du moment)
+        id: scraping_inwi
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run scraper-inwi | tee /dev/stderr)
+
+          fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
+          if [ -z "$fichier_relatif" ]; then
+            echo "::warning::scraper-inwi n'a annoncé aucun fichier d'archive — source inwi sautée pour ce run."
+            exit 1
+          fi
+
+          fichier="apps/pipeline/$fichier_relatif"
+          if [ ! -f "$fichier" ]; then
+            echo "::warning::Fichier annoncé par scraper-inwi introuvable sur disque : $fichier — source inwi sautée."
+            exit 1
+          fi
+
+          nb_deals=$(jq 'length' "$fichier")
+          echo "Deals inwi extraits : $nb_deals"
+          if [ "$nb_deals" -eq 0 ]; then
+            echo "::warning::0 deal extrait par scraper-inwi — rien à insérer pour cette source ce run."
+            exit 1
+          fi
+
+          echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
+
+      - name: Insertion inwi en base (validation zod partagée)
+        if: steps.scraping_inwi.outcome == 'success'
+        continue-on-error: true
+        env:
+          FICHIER_EXTRACTION_INWI: ${{ steps.scraping_inwi.outputs.fichier }}
+        run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_INWI"
 
       - name: Revalidation Next.js (feed, enseignes, sitemap)
         run: |

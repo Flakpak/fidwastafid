@@ -14,6 +14,7 @@ Toujours lancés depuis la racine du monorepo, via `pnpm --filter pipeline` :
 ```
 pnpm --filter pipeline run discover-site -- <url> <nom-court>
 pnpm --filter pipeline run scraper-bringo -- <url-listing-ou-fichier.txt> <ville> [--tous]
+pnpm --filter pipeline run scraper-inwi
 pnpm --filter pipeline run extract-catalogue -- <url-ou-chemin> <enseigne>
 pnpm --filter pipeline run insert-deals -- <fichier-deals-extraits.json>
 pnpm --filter pipeline run rattrapage-descriptions -- [--dry-run]
@@ -31,6 +32,13 @@ que de les interpréter lui-même.
   ne garde que les produits remisés. Écrit une archive dans
   `extractions/AAAA-MM-JJ_HH-mm_bringo-<ville>.json` (jamais committée,
   voir `.gitignore`). Aucune variable d'environnement requise.
+- **scraper-inwi** — scrape la page inwi « Offres du moment » (Téléphonie &
+  Internet, spike `docs/SPIKE-SOURCES.md`). Ne garde que les cartes avec un
+  vrai prix barré (jamais de prix deviné — carte incomplète rejetée avec
+  log). Écrit `extractions/AAAA-MM-JJ_HH-mm_inwi.json`, même format que
+  scraper-bringo. Aucune variable d'environnement requise. Prérequis
+  d'insertion : l'enseigne curée `inwi` doit exister en base
+  (`docs/RUNBOOK-donnees.md`).
 - **extract-catalogue** — extrait les deals d'un catalogue (PDF/image) via
   l'API Claude. Écrit une archive dans `extractions/AAAA-MM-JJ_HH-mm_<enseigne>.json`.
 - **insert-deals** — valide (schémas partagés `packages/schemas`) puis insère
@@ -61,9 +69,12 @@ que de les interpréter lui-même.
 `.github/workflows/pipeline-quotidien.yml` exécute chaque jour à 05:00 UTC
 (06:00 Casablanca), + `workflow_dispatch` pour un run manuel de test :
 `expirer-auto-draft` → `scraper-bringo` (Casablanca, `bringo-categories.txt`)
-→ `insert-deals` → `POST /api/revalidate` (feed, enseignes, sitemap —
-`apps/web/src/app/api/revalidate/route.ts`, endpoint hors `/api/v1`,
-exception documentée au même titre que ce pipeline, voir CONTRAT-V1 §4).
+→ `insert-deals` → `scraper-inwi` + `insert-deals` (source secondaire
+**isolée** : `continue-on-error`, un échec inwi ne fait jamais échouer le
+run Bringo — lot du 23/07/2026) → `POST /api/revalidate` (feed, enseignes,
+sitemap — `apps/web/src/app/api/revalidate/route.ts`, endpoint hors
+`/api/v1`, exception documentée au même titre que ce pipeline, voir
+CONTRAT-V1 §4).
 
 **Automatisé uniquement le chemin qui peut tourner sans surveillance** :
 `extract-catalogue` attend une URL/chemin de catalogue précis à chaque appel
