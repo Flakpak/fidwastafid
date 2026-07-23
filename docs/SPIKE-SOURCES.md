@@ -233,12 +233,30 @@ Rank Math, plugin multi-magasins.
 cibler `.wd-single-price`), SKU `.sku_wrapper .sku`, image `meta[property=og:image]`.
 
 **f. Anti-bot** — Cloudflare en façade, `cf-cache-status: HIT`, aucun challenge rencontré sur ce
-volume de test.
+volume de test **en `curl`**.
 
 **g. Volume** — *"Affichage de 1–12 sur 698 résultats"* — élevé, paginé clairement (~59 pages).
 
-**Verdict mrbricolage.ma : VERT.** Cheerio-compatible, page promo dédiée avec vrais prix barrés,
-volume important et paginé.
+**Verdict mrbricolage.ma : ~~VERT~~ → NON RETENU (révisé le 23/07/2026).** Le contenu et les prix
+barrés sont bien server-rendered et lisibles **en `curl`** (200) — mais lors du lot de
+développement du scraper (23/07/2026), constat que le **client HTTP de Node (`fetch`/undici) est
+hard-bloqué par Cloudflare** : `403 « Attention Required! | Cloudflare — Sorry, you have been
+blocked »` (page de blocage dure, pas un challenge JS), de façon déterministe, sur toutes les pages
+de contenu (homepage, `/boutique/`, listing promo), alors que `curl` renvoie 200 au même instant,
+depuis la même IP, avec le même User-Agent. Discrimination par **empreinte TLS/HTTP** (JA3/JA4) :
+Cloudflare bot-management flague la pile `undici`, pas `curl`. Un jeu d'en-têtes navigateur complet
+(Accept, Sec-Fetch-*, sec-ch-ua…) ne change rien — c'est bien la couche TLS, pas les en-têtes.
+
+Tension notable : le `robots.txt` de mrbricolage.ma **autorise explicitement** `anthropic-ai`/
+`Claude-Web` (`Allow: /`) — la politique de crawl *déclarée* nous permet l'accès, mais la couche
+Cloudflare bloque notre client par défaut. Le spike d'origine, mené en `curl`, n'avait pas testé un
+client HTTP applicatif (Node) : d'où la révision du verdict.
+
+Décision produit (23/07/2026) : **source abandonnée**, pas développée. La faire fonctionner
+imposerait soit un sous-processus `curl` (router autour d'un `403` — écarté comme trop proche du
+contournement anti-bot que le pipeline s'interdit), soit une impersonation TLS/navigateur headless
+(idem, plus lourd) — deux voies non retenues. Réévaluable si un jour un client HTTP applicatif
+passe sans forgerie, ou si le site retire ce filtrage.
 
 **Mutualisation bricoma.ma / mrbricolage.ma : NON** au niveau sélecteurs/parsing (Magento vs
 WooCommerce, deux DOM totalement différents) — nécessite deux adaptateurs distincts. Mutualisable
@@ -388,7 +406,7 @@ vérifiée, absence de test de rate-limiting à volume réel.
 | kitea.ma | Non évalué | Non évalué | Non évalué | Non évalué | **Timeout réseau (ambigu)** | — | **ROUGE** (provisoire, à réévaluer) |
 | universparadiscount.ma | Non (bannière événementielle seulement) | Oui | Oui | PrestaShop | Aucun | Non chiffré | **ORANGE** |
 | bricoma.ma | Non (widget homepage, 6 produits) | Oui | Oui | Magento 2 | Aucun | ~6 (très faible) | **ORANGE** |
-| mrbricolage.ma | Oui (`?stock_status=onsale`) | Oui | Oui | WordPress/WooCommerce | Aucun | 698 | **VERT** |
+| mrbricolage.ma | Oui (`?stock_status=onsale`) | Oui | Oui (en `curl`) | WordPress/WooCommerce | **Cloudflare 403 sur client HTTP Node** (curl OK) | 698 | ~~VERT~~ **NON RETENU** (Node `fetch` bloqué, révisé 23/07) |
 | iam.ma | Non évalué | Non évalué | Non évalué | Non évalué | Aucun mur technique constaté | — | **ROUGE** (gouvernance : `Disallow: ClaudeBot`) |
 | orange.ma | Ambigu | Non constatés | Ambigu (catalogue probablement CSR) | eZ Publish/Ibexa + Next.js | WAF F5 (vigilance) | Non confirmé | **ORANGE** |
 | inwi.ma | Oui (`/particuliers/offres-du-moment`) | Oui (JSON `regularPrice`/`finalPrice`) | Oui (JSON dans HTML brut) | Next.js/RSC | Aucun | ~10 offres actives | **VERT** |
@@ -401,9 +419,17 @@ vérifiée, absence de test de rate-limiting à volume réel.
 **Aucune décision d'implémentation n'est prise ici — cette recommandation éclaire, la décision reste
 en revue.**
 
-1. **mrbricolage.ma (VERT)** — meilleur rapport clarté/volume/risque : page promo dédiée, 698
-   résultats paginés, prix barré WooCommerce standard (`<del>`/`<ins>`), aucun anti-bot. Premier
-   choix naturel pour étendre le pattern "cheerio + fetch" au-delà de Bringo.
+> **Mise à jour du 23/07/2026** : `inwi.ma` a été développé et intégré au cron (commits
+> `e32b0e5`, `205e350`). `mrbricolage.ma`, tenté ensuite, s'est révélé **non développable sans
+> forgerie** : le client HTTP de Node est hard-bloqué par Cloudflare (403 déterministe) alors que
+> `curl` passe — voir section 6 révisée. Source **abandonnée**. L'ordre ci-dessous garde sa valeur
+> pour les cibles restantes, mais mrbricolage n'est plus le choix n°1.
+
+1. ~~**mrbricolage.ma (VERT)**~~ — **écarté (révisé 23/07/2026)** : contenu lisible en `curl` mais
+   Cloudflare bot-management renvoie `403` au client HTTP de Node (empreinte TLS), et le
+   contourner (sous-processus curl / impersonation) est exclu par le principe anti-contournement du
+   pipeline. Leçon : un verdict de scrapabilité doit tester le **client réellement utilisé en prod**
+   (Node `fetch`), pas seulement `curl`.
 2. **inwi.ma (VERT)** — seul VERT de la catégorie Téléphonie & Internet (nouvelle catégorie taxonomie
    v2, zéro couverture pipeline actuelle) : page promo dédiée, vraie structure prix barré en JSON
    directement dans le HTML brut, aucun anti-bot. Prioriser tôt car ouvre une catégorie entière sans
