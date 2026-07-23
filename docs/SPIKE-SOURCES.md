@@ -174,9 +174,15 @@ formaté, pas d'attribut numérique séparé).
 **g. Volume** — Non déterminé dans le budget du spike (pas de pagination visible sur la catégorie
 testée) — à vérifier via `1_index_sitemap.xml`.
 
-**Verdict : ORANGE.** Cheerio-compatible, HTML riche (JSON-LD complet), aucun anti-bot, mais pas de
-page promo unique et stable — nécessite un scan de catalogue plus large que Bringo, et un volume
-total encore à chiffrer.
+**Verdict : ~~ORANGE~~ → VERT, DÉVELOPPÉ (révisé le 23/07/2026).** Reconstat avec le client réel
+du pipeline (Node `fetch`/undici, pas seulement `curl` — leçon mrbricolage) : **200 partout, aucun
+blocage Cloudflare**. Le surcoût ORANGE (« pas de page promo stable, volume à chiffrer ») est
+**levé** : la **homepage** agrège en une seule requête **94 produits remisés uniques** (cartes
+`.js-product-miniature` avec `.regular-price` + `.price`), aucun scan catalogue nécessaire. La
+catégorie `/428-les-bons-deals` s'est révélée un leurre (3 deals épinglés répétés à chaque page) —
+non retenue. Scraper livré : `apps/pipeline/scraper-universparadiscount.mjs` (homepage-only,
+filtre `.regular-price`, rejet des non-remisés). Vérifié en local : 94 offres extraites/insérées en
+`auto_draft`, images traitées, dédup OK.
 
 ---
 
@@ -404,7 +410,7 @@ vérifiée, absence de test de rate-limiting à volume réel.
 | decathlon.ma | Oui (`/5080-promotions`) | Oui | Oui (page catégorie native) | PrestaShop "oneshop" | Détection sans blocage + **bug cache inter-tenant** | ~1580 | **ORANGE** |
 | marwa.com | Non évalué | Non évalué | Non évalué | Non évalué | Aucun mur technique constaté | — | **ROUGE** (gouvernance : `Disallow: ClaudeBot`) |
 | kitea.ma | Non évalué | Non évalué | Non évalué | Non évalué | **Timeout réseau (ambigu)** | — | **ROUGE** (provisoire, à réévaluer) |
-| universparadiscount.ma | Non (bannière événementielle seulement) | Oui | Oui | PrestaShop | Aucun | Non chiffré | **ORANGE** |
+| universparadiscount.ma | Oui (homepage : ~94 remisés uniques) | Oui | Oui (Node fetch OK) | PrestaShop | Aucun (Node fetch 200) | ~94 | ~~ORANGE~~ **VERT — DÉVELOPPÉ** (23/07) |
 | bricoma.ma | Non (widget homepage, 6 produits) | Oui | Oui | Magento 2 | Aucun | ~6 (très faible) | **ORANGE** |
 | mrbricolage.ma | Oui (`?stock_status=onsale`) | Oui | Oui (en `curl`) | WordPress/WooCommerce | **Cloudflare 403 sur client HTTP Node** (curl OK) | 698 | ~~VERT~~ **NON RETENU** (Node `fetch` bloqué, révisé 23/07) |
 | iam.ma | Non évalué | Non évalué | Non évalué | Non évalué | Aucun mur technique constaté | — | **ROUGE** (gouvernance : `Disallow: ClaudeBot`) |
@@ -419,11 +425,12 @@ vérifiée, absence de test de rate-limiting à volume réel.
 **Aucune décision d'implémentation n'est prise ici — cette recommandation éclaire, la décision reste
 en revue.**
 
-> **Mise à jour du 23/07/2026** : `inwi.ma` a été développé et intégré au cron (commits
-> `e32b0e5`, `205e350`). `mrbricolage.ma`, tenté ensuite, s'est révélé **non développable sans
-> forgerie** : le client HTTP de Node est hard-bloqué par Cloudflare (403 déterministe) alors que
-> `curl` passe — voir section 6 révisée. Source **abandonnée**. L'ordre ci-dessous garde sa valeur
-> pour les cibles restantes, mais mrbricolage n'est plus le choix n°1.
+> **Mise à jour du 23/07/2026** : `inwi.ma` développé et intégré au cron (commits `e32b0e5`,
+> `205e350`). `mrbricolage.ma`, tenté ensuite, **abandonné** : client HTTP Node hard-bloqué par
+> Cloudflare (403 déterministe) alors que `curl` passe — voir section 6 révisée.
+> `universparadiscount.ma` développé (Beauté) : verdict ORANGE **levé** au reconstat (Node fetch OK,
+> homepage = ~94 remisés en une requête) — voir section 5 révisée. Intégration cron :
+> lot séparé à venir.
 
 1. ~~**mrbricolage.ma (VERT)**~~ — **écarté (révisé 23/07/2026)** : contenu lisible en `curl` mais
    Cloudflare bot-management renvoie `403` au client HTTP de Node (empreinte TLS), et le
@@ -435,8 +442,11 @@ en revue.**
    directement dans le HTML brut, aucun anti-bot. Prioriser tôt car ouvre une catégorie entière sans
    scraper existant, et la technique d'extraction JSON streamé (Next.js RSC) développée ici est
    réutilisable pour retenter orange.ma plus tard (même famille technique, cf. ci-dessous).
-3. **universparadiscount.ma (ORANGE)** — PrestaShop propre, JSON-LD riche, aucun anti-bot ; seul
-   surcoût : stratégie de scan catégorie au lieu d'une page promo unique. Prochain candidat naturel.
+3. ~~**universparadiscount.ma (ORANGE)**~~ — **DÉVELOPPÉ (23/07/2026, verdict relevé VERT)** :
+   au reconstat, Node fetch passe (200) et la homepage agrège ~94 produits remisés uniques en une
+   requête — le surcoût « scan catégorie » du spike était inutile. Scraper livré
+   (`scraper-universparadiscount.mjs`). Reste : ajout de l'enseigne `universparadiscount` en prod
+   (geste Kamel, `docs/RUNBOOK-donnees.md`) + intégration cron (lot séparé).
 4. **decathlon.ma (ORANGE)** — Volume le plus élevé de tout le spike (~1580 produits), mais nécessite
    une garde de validation/retry à cause du bug de cache inter-tenant constaté (partagé avec
    universparadiscount.ma — possible mutualisation de cette garde entre les deux adaptateurs

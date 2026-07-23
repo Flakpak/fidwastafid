@@ -15,6 +15,7 @@ Toujours lancés depuis la racine du monorepo, via `pnpm --filter pipeline` :
 pnpm --filter pipeline run discover-site -- <url> <nom-court>
 pnpm --filter pipeline run scraper-bringo -- <url-listing-ou-fichier.txt> <ville> [--tous]
 pnpm --filter pipeline run scraper-inwi
+pnpm --filter pipeline run scraper-universparadiscount
 pnpm --filter pipeline run extract-catalogue -- <url-ou-chemin> <enseigne>
 pnpm --filter pipeline run insert-deals -- <fichier-deals-extraits.json>
 pnpm --filter pipeline run rattrapage-descriptions -- [--dry-run]
@@ -39,6 +40,14 @@ que de les interpréter lui-même.
   scraper-bringo. Aucune variable d'environnement requise. Prérequis
   d'insertion : l'enseigne curée `inwi` doit exister en base
   (`docs/RUNBOOK-donnees.md`).
+- **scraper-universparadiscount** — scrape la homepage universparadiscount.ma
+  (Beauté, spike `docs/SPIKE-SOURCES.md` — verdict ORANGE levé au reconstat :
+  la homepage agrège ~94 produits remisés uniques, pas de scan catalogue
+  nécessaire). Ne garde que les cartes remisées (`.regular-price` + `.price`)
+  — un produit non remisé est ignoré, jamais complété. Écrit
+  `extractions/AAAA-MM-JJ_HH-mm_universparadiscount.json`. Aucune variable
+  d'environnement requise. Prérequis d'insertion : l'enseigne curée
+  `universparadiscount` doit exister en base (`docs/RUNBOOK-donnees.md`).
 - **extract-catalogue** — extrait les deals d'un catalogue (PDF/image) via
   l'API Claude. Écrit une archive dans `extractions/AAAA-MM-JJ_HH-mm_<enseigne>.json`.
 - **insert-deals** — valide (schémas partagés `packages/schemas`) puis insère
