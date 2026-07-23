@@ -121,10 +121,16 @@ exception documentée, cf. `docs/IDEES.md`.
 
 **Chantiers à lever AVANT la session (lancés en parallèle des Phases 3-5) :**
 - [x] Base de prod v2 : Postgres du projet Supabase aswbu (celui de l'auth,
-      renommé `fidwastafid-prod` à la clôture — cf. SUIVI), connexion via
-      Session pooler (IPv4). DATABASE_URL de prod câblée dans Vercel.
-      Migration 0001_init appliquée dessus. DÉCISION GRAVÉE — un troisième
-      store serait de la complexité gratuite.
+      renommé `fidwastafid-prod` à la clôture — cf. SUIVI). DATABASE_URL de
+      prod câblée dans Vercel. Migration 0001_init appliquée dessus. DÉCISION
+      GRAVÉE — un troisième store serait de la complexité gratuite.
+      **Pooling (révisé le 23/07/2026, incident EMAXCONNSESSION)** : app
+      runtime (Vercel serverless) = **Transaction pooler, port 6543** —
+      obligatoire, la connexion est rendue à chaque fin de transaction, jamais
+      retenue par une instance gelée. Scripts manuels/CI (migrate,
+      ajouter-enseigne, seed, check-migrations-sync) = **Session pooler, port
+      5432** — connexion one-shot séquentielle. Ne jamais remettre 5432 sur la
+      DATABASE_URL de l'app (détail + règle dans `docs/RUNBOOK-securite.md`).
 - [x] Infra image (CONTRAT-V1 §6) : route `/img/deals/[public_id]` jamais
       construite, `deals.image_key` jamais peuplé (pas de formulaire
       d'upload). Constaté lors de la mise en conformité charte (2026-07-14) :
@@ -323,6 +329,32 @@ le rôle propriétaire). Principe et routine gravés au sixième amendement
 conscient (`CONTRAT-V1` §9, sécurité by design — surface plateforme) :
 revue sécurité mensuelle rejouable, checklist dans
 `docs/RUNBOOK-securite.md` (première revue = cette séance).
+
+**Diversification pipeline — 23/07/2026** : quatre sources de scraping en
+plus de Bringo, développées, testées isolément et intégrées au cron
+quotidien (sources secondaires isolées, `continue-on-error`) — inwi
+(Téléphonie & Internet), universparadiscount (Beauté), decathlon (Sport)
+en prod ; mrbricolage abandonné (Cloudflare bloque le client HTTP Node par
+empreinte TLS, cf. `docs/SPIKE-SOURCES.md`). Canal versionné d'ajout
+d'enseigne curée gravé (`ajouter-enseigne`, `docs/RUNBOOK-donnees.md`).
+
+**Trois incidents du 23/07/2026 — tous résolus** (détail et règles gravées
+dans `docs/RUNBOOK-securite.md`) :
+1. **Régression CI** — le correctif RLS 0008 avait cassé la lecture de
+   `schema_migrations` par le rôle d'audit CI (deny-all → 0 ligne
+   silencieuse, CI rouge sur toute branche) ; corrigé par
+   `0009_ci_migrations_check_bypassrls.sql` (BYPASSRLS de visibilité,
+   privilèges inchangés). Règle des 3 consommateurs gravée.
+2. **Mot de passe DB exposé + confusion de variable** — chaîne de connexion
+   collée en clair dans un chat d'agent (rotation immédiate), puis confusion
+   `SUPABASE_URL`/`DATABASE_URL` → 500 (`28P01`) pendant ~15 min. Règles :
+   jamais de secret dans un chat ; vérifier le nom exact de variable.
+3. **Saturation du pool Session Mode** (`EMAXCONNSESSION`, `XX000`) — après
+   plusieurs redeploys, le Session pooler (5432, plafond 15) saturé de
+   connexions gelées entre invocations serverless (récidive du 15/07).
+   Correctif définitif : `DATABASE_URL` app (Vercel Prod + Preview) basculée
+   sur le **Transaction pooler (6543)** ; le Session pooler (5432) reste
+   réservé aux scripts manuels/CI one-shot.
 
 **Taxonomie v2 — 21/07/2026** : grille de catégories étendue de 8 à 12
 (`Téléphonie & Internet`, `Gaming`, `Bricolage & Jardin`, `Voyages`),

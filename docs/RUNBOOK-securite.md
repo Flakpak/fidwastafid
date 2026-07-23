@@ -135,6 +135,76 @@ sans erreur est un mensonge silencieux, jamais un état acceptable.
 
 ---
 
+## Secrets — mot de passe DB exposé + confusion de variable (incident du 23/07/2026)
+
+**Fait générateur** : lors des manipulations post-0009, une chaîne de connexion
+Postgres complète (mot de passe inclus) a été **collée en clair dans un chat
+d'agent**. Rotation immédiate du mot de passe DB côté Supabase. Dans la foulée du
+recâblage, **confusion entre `SUPABASE_URL` et `DATABASE_URL`** (deux variables au rôle
+distinct : la première est l'URL de l'API Supabase, la seconde la chaîne de connexion
+Postgres) — la mauvaise valeur posée sur la mauvaise variable a provoqué des **500
+(`28P01`, authentification Postgres échouée)** pendant ~15 min, jusqu'au rétablissement
+de la bonne paire nom↔valeur.
+
+**Règles gravées** :
+- **Jamais** de chaîne de connexion (ni aucun secret) collée dans un chat, un agent, un
+  ticket ou un commit — un secret qui a transité par un canal non maîtrisé est
+  compromis et doit être tourné, point. Pour partager une config, ne partager que le
+  **nom** de la variable, jamais la valeur.
+- Avant toute modification d'une variable d'environnement, **vérifier le nom exact**
+  (`SUPABASE_URL` ≠ `DATABASE_URL` ≠ `SUPABASE_SECRET_KEY`…) : une valeur correcte sur
+  la mauvaise clé casse la prod aussi sûrement qu'une valeur fausse.
+
+---
+
+## Saturation du pool Session Mode — EMAXCONNSESSION (incident du 23/07/2026)
+
+**Fait générateur** : après plusieurs redeploys successifs le 23/07, le pool **Session
+Mode** Supabase (port **5432**, plafond **15** connexions) s'est saturé de connexions
+**idle**, provoquant des **500 en cascade** (`EMAXCONNSESSION`, `XX000`) sur le site
+public et l'admin.
+
+**Cause structurelle** : l'app **serverless** (Vercel) utilisait le **Session pooler**,
+conçu pour un petit nombre de connexions **longues**, alors que le profil serverless
+crée de **nombreuses instances concurrentes** dont les connexions restent **gelées**
+(pas fermées) entre invocations — Vercel gèle l'instance, ses timers JS (dont
+`idleTimeoutMillis`, `packages/db/src/client.ts`) ne tournent plus, la connexion reste
+ouverte côté pooler. Chaque redeploy fait cohabiter les générations d'instances,
+chacune tenant ses connexions idle → le plafond de 15 se remplit par accumulation.
+**RÉCIDIVE** d'un incident déjà partiellement traité le 15/07/2026 (`pool max` réduit à
+2 par instance) — un pansement sur la taille du pool qui n'adressait pas la cause de
+fond (mode de pooling inadapté au serverless).
+
+**Correctif définitif** : `DATABASE_URL` de l'app (Vercel, **Production + Preview**)
+basculée du port **5432 (Session pooler)** vers **6543 (Transaction pooler)** — adapté
+au profil serverless : la connexion est **rendue au pool à la fin de chaque
+transaction**, jamais retenue par une instance gelée. Compatibilité vérifiée sur le
+code applicatif avant bascule : `pg` nu (pas de prepared statements **nommés** qui
+casseraient en mode transaction), **aucun** `LISTEN`/`NOTIFY`, **aucun** `SET` de
+session / `search_path` / advisory lock / temp table, et les **4 usages de
+`withTransaction`** (`votes`, `PATCH` et `bulk` admin, `DELETE /me`) restent atomiques
+`BEGIN`→`COMMIT` — l'unité de routage native du mode transaction, épinglée sur un seul
+backend le temps de la transaction.
+
+**Règle gravée — deux ports, deux usages, ne jamais les confondre** :
+- **6543 (Transaction pooler)** : **obligatoire** pour toute app serverless (Vercel,
+  futures fonctions). C'est la valeur de `DATABASE_URL` en prod app depuis le
+  23/07/2026.
+- **5432 (Session pooler)** : réservé aux **scripts manuels one-shot** lancés
+  séquentiellement depuis une machine locale ou un runner CI — `migrate`,
+  `ajouter-enseigne`, `seed`, `check-migrations-sync`. Connexion unique éphémère,
+  fermée en fin de script : le mode session leur convient et ils n'ont pas besoin du
+  routage par transaction.
+- **Ne jamais remettre 5432 sur la `DATABASE_URL` de l'app** pour une « cohérence »
+  apparente avec les scripts : c'est précisément l'erreur qui a causé cet incident.
+
+**Surveillance recommandée** : dans les jours qui suivent ce correctif, constat passif
+après **chaque déploiement** — naviguer le site et l'admin manuellement, confirmer
+l'absence de nouvelle 500. Le mécanisme étant structurel, un retour d'`EMAXCONNSESSION`
+signalerait soit un retour à 5432, soit un nouveau facteur à instruire.
+
+---
+
 ## SUIVI DES REVUES
 
 | Date | Fait par | Résultat | Notes |
