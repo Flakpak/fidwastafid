@@ -359,6 +359,17 @@ Principes gravés par cet amendement :
   Toute **nouvelle** entrée advisor au-delà de cet état est une anomalie à instruire,
   pas un bruit de fond à ignorer.
 
+**Complément du 23/07/2026 — régression CI du correctif 0008** : le RLS sans policy a
+aussi filtré silencieusement à 0 ligne les lectures du rôle CI d'audit
+`ci_migrations_check` sur `schema_migrations` (non-propriétaire, non-BYPASSRLS) — CI
+rouge sur toute branche, docs comprises (runs #191-#204), jusqu'au correctif
+`0009_ci_migrations_check_bypassrls.sql`. Principe gravé par cette régression : **rôle
+d'audit = BYPASSRLS explicite, jamais un retour silencieux à zéro lignes** ; et avant
+d'activer RLS sur une table, lister ses lecteurs — les 3 consommateurs connus de la
+base sont l'app (propriétaire), le pipeline (propriétaire) et la CI d'audit
+(`ci_migrations_check`, BYPASSRLS). Détail et règle rejouable :
+`docs/RUNBOOK-securite.md`.
+
 Routine associée : revue sécurité mensuelle, checklist rejouable — voir
 `docs/RUNBOOK-securite.md`.
 

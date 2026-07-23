@@ -1,0 +1,35 @@
+-- Correctif de la régression CI auto-infligée par 0008_rls_public_tables.sql
+-- (diagnostic du 23/07/2026, runs CI #191-#204 rouges sur toute branche).
+--
+-- Fait générateur : 0008 a activé RLS sans policy sur les 9 tables public,
+-- dont schema_migrations — la table que le job migrations-check lit via le
+-- rôle ci_migrations_check (0005). Ce rôle n'étant ni propriétaire ni
+-- BYPASSRLS, sa requête `select id from schema_migrations` réussissait mais
+-- était filtrée SILENCIEUSEMENT à 0 ligne (RLS filtre, ne lève pas d'erreur)
+-- : le garde-fou exit 2 "VÉRIFICATION IMPOSSIBLE" de checkMigrationsSync.ts
+-- ne se déclenchait pas, et les 8 migrations étaient déclarées "non
+-- appliquées". Le commentaire de 0008 avait anticipé le rôle propriétaire
+-- (exempt de RLS) mais oublié le troisième consommateur de la table : le
+-- rôle CI d'audit.
+--
+-- Principe (gravé par ce lot, RUNBOOK-securite.md + CONTRAT-V1 §9) :
+-- rôle d'audit = BYPASSRLS explicite, jamais un retour silencieux à zéro
+-- lignes. Pas de policy SELECT dédiée : une policy rouvrirait un chemin où
+-- un resserrement futur re-filtrerait silencieusement l'audit, et elle
+-- casserait l'état advisor nominal de référence (9 INFO
+-- rls_enabled_no_policy, CONTRAT-V1 §9). BYPASSRLS dit exactement ce qu'on
+-- veut : ce rôle voit tout ce que ses GRANTS permettent — et rien de plus.
+--
+-- Portée : visibilité RLS uniquement. Les droits d'écriture/lecture restent
+-- ceux de 0005 (CONNECT + USAGE sur public + SELECT sur schema_migrations,
+-- rien d'autre) : BYPASSRLS ne contourne pas les privilèges, les 8 autres
+-- tables RLS restent inaccessibles à ce rôle (permission denied). Aucun
+-- default_transaction_read_only n'existe sur ce rôle (constat du 23/07) —
+-- son caractère read-only tient aux grants, inchangés ici.
+--
+-- Applicabilité Supabase (prod aswbu, PG 17.6) : postgres y est
+-- NON-superuser alors que PostgreSQL réserve en principe BYPASSRLS aux
+-- superusers — vérifié le 23/07/2026 par sonde transactionnelle annulée
+-- (begin/alter/rollback) : l'ALTER passe pour le rôle postgres de Supabase.
+
+alter role ci_migrations_check bypassrls;
