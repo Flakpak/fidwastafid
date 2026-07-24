@@ -355,9 +355,9 @@ scrapé, non maîtrisé) : l'UI est un cadre plâtre + encre à ~90 %, jamais un
 | `ink-subtle` | `#736B61` | aides, horodatages, placeholders |
 | `accent` | `#2C5545` | interactif, marque, focus (argan) |
 | `accent-soft` | `#E7EFE9` | fond du badge de remise |
-| `hot` | `#AD4527` | température chaude — **rien d'autre** |
+| `hot` | `#AD4527` | score chaud (≥ seuil) — **rien d'autre** |
 | `hot-soft` | `#F7E9E2` | fond du badge « Tendance » |
-| `cold` | `#4C6674` | température froide — **rien d'autre** |
+| `cold` | `#4C6674` | froideur d'un deal : score négatif **ou** expiré |
 | `cold-soft` | `#E9EEF1` | fond des états expirés |
 | `warn` | `#7C6015` | file d'attente, alertes de prix |
 | `warn-soft` | `#F5EEDD` | fond associé |
@@ -379,7 +379,8 @@ mesurés ≥ 4,5:1.
 1. **Une seule action pleine (`variant="primary"`) par écran.**
 2. **Le gris pâle est interdit sur tout élément cliquable** — un cliquable porte toujours un contour
    `border-strong` et une encre lisible, jamais un gris d'inertie.
-3. **`hot` et `cold` sont réservés à la température des deals.** Toute autre utilisation est un bug.
+3. **`hot` est réservé au score chaud (≥ seuil). `cold` couvre la froideur d'un deal au sens large :
+   score négatif et état expiré.** Toute autre utilisation de l'un ou l'autre est un bug.
 
 Référence directe pour la config Tailwind (`@theme`, `apps/web/src/app/globals.css`) et les primitives
 UI (`apps/web/src/components`). La refonte est portée en trois lots : lot 1 = ce contrat + tokens +

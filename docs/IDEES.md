@@ -10,6 +10,13 @@
   Turnstile en préversion (post-Bloc 5). À retirer une fois la cause
   confirmée via les logs Vercel.
 
+## Refonte Tadelakt — suites (2026-07-24)
+
+- Brancher le vote courant en SSR/API pour un état voté persistant — lot
+  données post-refonte. `CardVote` affiche aujourd'hui un état « voté » (fond
+  plein `hot`/`cold`) optimiste côté client : il ne reçoit que le score, pas le
+  sens du vote de l'utilisateur, donc l'état ne survit pas à un rechargement.
+
 ## Scaffold Vite/React racine résiduel (2026-07-21)
 
 `index.html`, `vite.config.js`, `src/App.jsx`, `src/main.jsx`,
