@@ -35,6 +35,34 @@ const variants: Record<ButtonVariant, string> = {
 const heights: Record<ButtonSize, string> = { md: "h-10", sm: "h-8" };
 const paddings: Record<ButtonSize, string> = { md: "px-4", sm: "px-3" };
 
+/**
+ * Chaîne de classes d'un bouton, exposée à part : beaucoup de « boutons » du
+ * site sont en réalité des `<Link>`/`<a>` de navigation (le primitif `Button`
+ * rend un `<button>`, il ne peut donc pas les porter). Ils réutilisent ce
+ * même look via `className={buttonClasses({ variant: "primary" })}`.
+ */
+export function buttonClasses({
+  variant = "secondary",
+  size = "md",
+  arabic = false,
+  className,
+}: {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  arabic?: boolean;
+  className?: string;
+} = {}): string {
+  const height = variant === "ghost" ? "h-[34px]" : heights[size];
+  const padding = variant === "ghost" ? "px-3" : paddings[size];
+  const typography = arabic
+    ? "font-arabic [direction:rtl] text-[16px] pb-[3px]"
+    : size === "sm"
+      ? "text-[13px]"
+      : "text-sm";
+
+  return [base, variants[variant], height, padding, typography, className].filter(Boolean).join(" ");
+}
+
 export function Button({
   variant = "secondary",
   size = "md",
@@ -47,17 +75,5 @@ export function Button({
   size?: ButtonSize;
   arabic?: boolean;
 }) {
-  const height = variant === "ghost" ? "h-[34px]" : heights[size];
-  const padding = variant === "ghost" ? "px-3" : paddings[size];
-  const typography = arabic
-    ? "font-arabic [direction:rtl] text-[16px] pb-[3px]"
-    : size === "sm"
-      ? "text-[13px]"
-      : "text-sm";
-
-  const classes = [base, variants[variant], height, padding, typography, className]
-    .filter(Boolean)
-    .join(" ");
-
-  return <button type={type} className={classes} {...props} />;
+  return <button type={type} className={buttonClasses({ variant, size, arabic, className })} {...props} />;
 }

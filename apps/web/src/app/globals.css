@@ -32,15 +32,17 @@
   --color-warn-soft: #f5eedd;      /* fond associé */
 
   /* ─── Anciens tokens v1 — EN COURS DE RETRAIT ────────────────────────────
-     rouge / orange / vert / bleu SUPPRIMÉS par le lot 1, sans alias : les
-     utilitaires text-rouge/-orange/-vert/-bleu (et var(--color-rouge) de
-     .hero-cursor) cessent de résoudre, pour que le lot 2 migre chaque
-     occurrence sans angle mort. rouge-clair / or / creme / texte / muted /
-     bordure / sombre restent en place le temps des lots 2-3 (body{} et le
-     sceau les référencent encore). */
+     rouge / orange / vert / bleu supprimés au lot 1 ; `or` supprimé ici au
+     lot 2a — ses seuls usages restants (admin/, soumettre/) sont hors
+     périmètre assumé. `creme` est CONSERVÉ à dessein : contrairement à
+     l'hypothèse du lot 2a, il n'est pas propre au chrome — c'est le fond de
+     page (`bg-creme`) d'une quinzaine de vues encore non migrées (connexion,
+     inscription, enseigne, admin, compte, deal…). Le supprimer viderait leur
+     fond en silence ; retrait reporté au lot qui migre ces vues en
+     surface-base. rouge-clair / texte / muted / bordure / sombre : idem,
+     migrés vue par vue. */
   --color-rouge-clair: #ff6b6b; /* --rouge2 */
-  --color-or: #ffd43b; /* --yellow */
-  --color-creme: #f8f6f2; /* --bg */
+  --color-creme: #f8f6f2; /* --bg — fond de page legacy, retrait différé (voir ci-dessus) */
   --color-texte: #1a1a1a; /* --text */
   --color-muted: #888888; /* --muted */
   --color-bordure: #e8e4de; /* --border */
@@ -69,8 +71,8 @@
 }
 
 body {
-  background-color: var(--color-creme);
-  color: var(--color-texte);
+  background-color: var(--color-surface-base);
+  color: var(--color-ink);
 }
 
 /* Hero + ticker — animations CSS pures, portées telles quelles depuis
@@ -94,7 +96,7 @@ body {
   display: inline-block;
   width: 2px;
   height: 1em;
-  background: var(--color-rouge);
+  background: var(--color-ink);
   margin-left: 2px;
   vertical-align: middle;
   animation: hero-cursor-blink 0.7s ease infinite;
