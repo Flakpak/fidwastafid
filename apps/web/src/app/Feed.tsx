@@ -4,59 +4,49 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { VILLES, CATEGORIES, type Deal } from "@fidwastafid/schemas";
 import { DealCard } from "../components/DealCard.js";
+import { Chip } from "../components/Chip.js";
 import { Seal } from "../components/Seal.js";
-import { categorieIcon } from "../lib/format.js";
 import { construireParamsFeed, fusionnerSansDoublon, messageErreurFeed } from "../lib/feedPagination.js";
 
 type Type = "tous" | "physique" | "en_ligne";
 type Tri = "tendance" | "score" | "recent";
 
 /** "Tendances" en tête (tri par défaut, Phase 5 : rang de gravité type
- *  Dealabs/Hacker News côté API) — 🔥 lui revient (icône "chaud/tendance"
- *  de la charte), "Les plus chauds" (score brut) passe à 👍 pour ne pas
- *  dupliquer l'icône entre les deux tris. */
-const TRIS: { value: Tri; label: string; emoji: string }[] = [
-  { value: "tendance", label: "Tendances", emoji: "🔥" },
-  { value: "score", label: "Les plus chauds", emoji: "👍" },
-  { value: "recent", label: "Les plus récents", emoji: "⚡" },
+ *  Dealabs/Hacker News côté API). Les pastilles emoji des libellés sont
+ *  retirées (charte Tadelakt : pas d'emoji dans le chrome) — le libellé seul
+ *  suffit, ici comme dans le <select> de tri. */
+const TRIS: { value: Tri; label: string }[] = [
+  { value: "tendance", label: "Tendances" },
+  { value: "score", label: "Les plus chauds" },
+  { value: "recent", label: "Les plus récents" },
 ];
 
 /** Bouton vertical de la sidebar — porté depuis .sidebar-btn (index.html racine, v1). */
 function sidebarBtnClass(active: boolean): string {
   return `flex items-center gap-2 px-4 py-2 text-xs font-bold text-left border-l-[3px] w-full ${
-    active ? "text-rouge bg-[#fff5f5] border-l-rouge" : "text-muted border-l-transparent hover:bg-creme hover:text-texte"
+    active ? "text-ink bg-surface-subtle border-l-accent" : "text-ink-muted border-l-transparent hover:bg-[#efebe3] hover:text-ink"
   }`;
 }
 
 /** Bouton catégorie de la sidebar — porté depuis .cat-btn (index.html racine, v1). */
 function catBtnClass(active: boolean): string {
   return `flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-bold text-left ${
-    active ? "bg-[#fff0f0] text-rouge" : "text-muted hover:bg-[#fff0f0] hover:text-rouge"
-  }`;
-}
-
-/** Chip catégorie du carrousel mobile — porté depuis .filter-pill (index.html
- *  racine, v1). `min-h-[40px]` : cible tactile ≥40px (lot UX filtres du
- *  21/07/2026), le padding vertical seul (py-1.5) ne suffisait pas. */
-function chipClass(active: boolean): string {
-  return `flex items-center min-h-[40px] rounded-full px-3.5 text-xs font-bold border ${
-    active ? "bg-rouge text-white border-rouge" : "bg-white text-muted border-bordure hover:border-rouge hover:text-rouge"
+    active ? "bg-accent-soft text-accent" : "text-ink-muted hover:bg-surface-subtle hover:text-ink"
   }`;
 }
 
 /**
  * Bord de dépassement d'un conteneur à défilement horizontal (micro-lot
  * suivi UX filtres, 22/07/2026) : `atStart`/`atEnd` pilotent un fondu vers
- * le fond blanc réel de la barre (défaut 2 de ce micro-lot — jamais une
- * couleur arbitraire, sinon le fondu se voit comme un bandeau au lieu de se
- * fondre) plutôt qu'un affichage permanent, pour ne pas laisser le fondu de
- * droite visible une fois arrivé en bout de liste (signalerait à tort qu'il
- * reste du contenu). Généralisé depuis le carrousel de chips catégorie (lot
- * précédent, 3f0cc06) pour être réutilisé tel quel par la ligne recherche/
- * ville/type/tri (défaut 1), sans dupliquer la logique. Les deux lignes de
- * la barre partagent désormais le même fond blanc (défaut 2 ci-dessous),
- * donc un seul jeu de classes de fondu (FADE_LEFT_WHITE/FADE_RIGHT_WHITE)
- * suffit — pas de variante crème à maintenir.
+ * le fond réel de la barre — désormais plâtre (surface-base, charte Tadelakt),
+ * jamais une couleur arbitraire, sinon le fondu se voit comme un bandeau au
+ * lieu de se fondre — plutôt qu'un affichage permanent, pour ne pas laisser le
+ * fondu de droite visible une fois arrivé en bout de liste (signalerait à tort
+ * qu'il reste du contenu). Généralisé depuis le carrousel de chips catégorie
+ * (lot précédent, 3f0cc06) pour être réutilisé tel quel par la ligne recherche/
+ * ville/type/tri (défaut 1), sans dupliquer la logique. Les deux lignes de la
+ * barre partagent le même fond, donc un seul jeu de classes de fondu
+ * (FADE_LEFT/FADE_RIGHT) suffit.
  */
 /** Le ref est créé et passé par l'appelant (pas retourné par ce hook) :
  *  `react-hooks/refs` (eslint-plugin-react-hooks) interdit d'accéder à une
@@ -88,15 +78,16 @@ function useScrollEdges(ref: React.RefObject<HTMLElement | null>) {
 /** Classes statiques et complètes (jamais construites par interpolation de
  *  chaîne : le scanner Tailwind ne détecte que des noms de classe entiers
  *  littéralement présents dans le code source, `from-${x}` ne matcherait
- *  aucune règle générée). */
-const FADE_LEFT_WHITE = "pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent";
-const FADE_RIGHT_WHITE = "pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent";
+ *  aucune règle générée). Fondu vers le plâtre de la barre (surface-base) —
+ *  affordance de défilement, pas un dégradé de marque. */
+const FADE_LEFT = "pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-surface-base to-transparent";
+const FADE_RIGHT = "pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-surface-base to-transparent";
 
 function EdgeFades({ atStart, atEnd }: { atStart: boolean; atEnd: boolean }) {
   return (
     <>
-      {!atStart && <div aria-hidden="true" className={FADE_LEFT_WHITE} />}
-      {!atEnd && <div aria-hidden="true" className={FADE_RIGHT_WHITE} />}
+      {!atStart && <div aria-hidden="true" className={FADE_LEFT} />}
+      {!atEnd && <div aria-hidden="true" className={FADE_RIGHT} />}
     </>
   );
 }
@@ -243,46 +234,46 @@ export function Feed({
             ci-dessous reste seule responsable du tri/filtrage) — parité v1
             (.sidebar). Sticky indépendante de la barre de filtres : chacune
             vit dans sa propre colonne de la grille, aucun chevauchement. */}
-        <aside className="hidden md:flex md:flex-col md:sticky md:top-[70px] md:h-[calc(100vh-70px)] md:overflow-y-auto bg-white border-r border-bordure py-5">
-          <div className="text-center px-4 pb-4 mb-3 border-b border-bordure">
+        <aside className="hidden md:flex md:flex-col md:sticky md:top-[70px] md:h-[calc(100vh-70px)] md:overflow-y-auto bg-surface border-r border-border py-5">
+          <div className="text-center px-4 pb-4 mb-3 border-b border-border">
             <Seal className="w-20 h-20 mx-auto mb-2" />
-            <p className="text-[10px] text-muted font-semibold">Bons plans marocains 🇲🇦</p>
+            <p className="text-[10px] text-ink-muted font-semibold">Bons plans marocains</p>
           </div>
 
           <Link
             href="/concept"
-            className="mx-3 mb-1 rounded-[10px] border border-[#e8dcc8] bg-gradient-to-br from-[#fff8f5] to-white text-left text-xs font-extrabold px-3.5 py-2.5 text-texte"
+            className="mx-3 mb-1 rounded-[10px] border border-border-strong bg-surface text-left text-xs font-extrabold px-3.5 py-2.5 text-ink hover:bg-surface-subtle transition-colors duration-[130ms] motion-reduce:transition-none"
           >
-            💡 Le concept Fidwastafid
+            Le concept Fidwastafid
           </Link>
 
-          <p className="px-4 pt-2 pb-1 text-[9px] font-extrabold tracking-wider uppercase text-[#ccc]">Trier par</p>
+          <p className="px-4 pt-2 pb-1 text-[9px] font-extrabold tracking-wider uppercase text-ink-subtle">Trier par</p>
           {TRIS.map((t) => (
             <button key={t.value} type="button" onClick={() => setTri(t.value)} className={sidebarBtnClass(tri === t.value)}>
-              {t.emoji} {t.label}
+              {t.label}
             </button>
           ))}
 
-          <p className="px-4 pt-3 pb-1 text-[9px] font-extrabold tracking-wider uppercase text-[#ccc]">Catégories</p>
+          <p className="px-4 pt-3 pb-1 text-[9px] font-extrabold tracking-wider uppercase text-ink-subtle">Catégories</p>
           <div className="px-4 flex flex-col gap-0.5">
             <button type="button" onClick={() => setCategorie("")} className={catBtnClass(categorie === "")}>
-              🔥 Tous les deals
+              Tous les deals
             </button>
             {CATEGORIES.map((c) => (
               <button key={c} type="button" onClick={() => setCategorie(c)} className={catBtnClass(categorie === c)}>
-                {categorieIcon(c)} {c}
+                {c}
               </button>
             ))}
           </div>
 
           <Link
             href="/soumettre"
-            className="mx-3 mt-4 rounded-2xl bg-gradient-to-br from-rouge to-orange text-white text-center p-3.5"
+            className="mx-3 mt-4 rounded-2xl border border-accent-soft bg-accent-soft text-center p-3.5 hover:bg-[#dbe7df] transition-colors duration-[130ms] motion-reduce:transition-none"
           >
-            <span dir="rtl" className="font-arabic block text-lg font-bold">
+            <span dir="rtl" className="font-arabic block text-lg font-bold text-accent">
               فيد و ستافيد
             </span>
-            <span className="block text-[10px] opacity-80 mt-0.5">Partage un bon plan →</span>
+            <span className="block text-[10px] text-accent/80 mt-0.5">Partage un bon plan →</span>
           </Link>
         </aside>
 
@@ -306,12 +297,10 @@ export function Feed({
            * nature aucun saut de layout à l'accrochage (contrairement à un
            * `position: fixed` qui exigerait un espaceur).
            *
-           * Fond blanc (micro-lot suivi UX filtres, 22/07/2026, défaut 2 —
-           * remplace l'ancien bg-creme qui se confondait avec le fond de
-           * page, #f8f6f2 sur #f8f6f2, aussi bien décollée qu'en position
-           * normale puisque ce style est statique, pas conditionné au
-           * scroll) + ombre légère + filet inférieur : sépare visuellement
-           * la barre des cartes qui défilent dessous ET de la page derrière.
+           * Fond plâtre (surface-base, charte Tadelakt : la barre est posée
+           * sur le fond de page, pas sur blanc) + filet inférieur, SANS ombre :
+           * elle se distingue des cartes blanches qui défilent dessous par le
+           * seul contraste plâtre/blanc, et de la page derrière par le filet.
            * `z-[5]` : sous le header (`z-10`, ne doit jamais être recouvert)
            * et le menu compte du header (`z-20`), au-dessus des cartes
            * (z-auto).
@@ -324,7 +313,7 @@ export function Feed({
            */}
           <div
             ref={filtresRef}
-            className="sticky top-[70px] z-[5] -mx-4 px-4 bg-white border-b border-bordure shadow-sm pt-3 pb-2 mb-3 flex flex-col gap-2"
+            className="sticky top-[70px] z-[5] -mx-4 px-4 bg-surface-base border-b border-border pt-3 pb-2 mb-3 flex flex-col gap-2"
           >
             {/* Carrousel catégories — mobile uniquement (<768px). Scrollbar
                 masquée (.no-scrollbar, globals.css) + défilement tactile
@@ -340,28 +329,28 @@ export function Feed({
                 onScroll={chipsEdges.onScroll}
                 className="no-scrollbar flex items-center gap-2 overflow-x-auto scroll-smooth [-webkit-overflow-scrolling:touch]"
               >
-                <button
-                  type="button"
+                <Chip
                   ref={(el) => {
                     chipRefs.current.__tous__ = el;
                   }}
+                  active={categorie === ""}
                   onClick={() => setCategorie("")}
-                  className={`shrink-0 ${chipClass(categorie === "")}`}
+                  className="shrink-0"
                 >
                   Tous
-                </button>
+                </Chip>
                 {CATEGORIES.map((c) => (
-                  <button
+                  <Chip
                     key={c}
-                    type="button"
                     ref={(el) => {
                       chipRefs.current[c] = el;
                     }}
+                    active={categorie === c}
                     onClick={() => setCategorie(c)}
-                    className={`shrink-0 ${chipClass(categorie === c)}`}
+                    className="shrink-0"
                   >
-                    {categorieIcon(c)} {c}
-                  </button>
+                    {c}
+                  </Chip>
                 ))}
               </div>
               <EdgeFades atStart={chipsEdges.atStart} atEnd={chipsEdges.atEnd} />
@@ -383,12 +372,12 @@ export function Feed({
                   value={recherche}
                   onChange={(e) => setRecherche(e.target.value)}
                   placeholder="Rechercher un deal, une enseigne..."
-                  className="shrink-0 w-44 md:flex-1 md:w-auto border border-bordure rounded-full px-4 py-1.5 text-sm"
+                  className="shrink-0 w-44 md:flex-1 md:w-auto border border-border-strong bg-surface rounded-full px-4 py-1.5 text-sm text-ink placeholder:text-ink-subtle focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(44,85,69,0.13)] transition-[border-color,box-shadow] duration-[130ms] motion-reduce:transition-none"
                 />
                 <select
                   value={ville}
                   onChange={(e) => setVille(e.target.value)}
-                  className="shrink-0 border border-bordure rounded-full px-3 py-1 font-bold text-xs"
+                  className="shrink-0 border border-border-strong bg-surface rounded-full px-3 py-1 font-bold text-xs text-ink-muted focus:border-accent focus:outline-none"
                 >
                   <option value="">Toutes les villes</option>
                   {VILLES.map((v) => (
@@ -401,26 +390,19 @@ export function Feed({
                   {(
                     [
                       { value: "tous", label: "Tous" },
-                      { value: "physique", label: "🏪 Physique" },
-                      { value: "en_ligne", label: "🌐 En ligne" },
+                      { value: "physique", label: "Physique" },
+                      { value: "en_ligne", label: "En ligne" },
                     ] as const
                   ).map((t) => (
-                    <button
-                      key={t.value}
-                      type="button"
-                      onClick={() => setType(t.value)}
-                      className={`rounded-full border px-3 py-1 font-bold text-xs ${
-                        type === t.value ? "bg-rouge text-white border-rouge" : "bg-white text-muted border-bordure"
-                      }`}
-                    >
+                    <Chip key={t.value} active={type === t.value} onClick={() => setType(t.value)}>
                       {t.label}
-                    </button>
+                    </Chip>
                   ))}
                 </div>
                 <select
                   value={tri}
                   onChange={(e) => setTri(e.target.value as Tri)}
-                  className="shrink-0 border border-bordure rounded-full px-3 py-1 font-bold text-xs md:ml-auto"
+                  className="shrink-0 border border-border-strong bg-surface rounded-full px-3 py-1 font-bold text-xs text-ink-muted focus:border-accent focus:outline-none md:ml-auto"
                 >
                   {TRIS.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -435,7 +417,7 @@ export function Feed({
 
           <div className="flex flex-col gap-3">
             {visibles.length === 0 && !chargement && !erreur && (
-              <p className="text-center text-muted py-16">Aucun bon plan pour l&apos;instant.</p>
+              <p className="text-center text-ink-muted py-16">Aucun bon plan pour l&apos;instant.</p>
             )}
             {visibles.map((deal) => (
               <DealCard key={deal.publicId} deal={deal} />
@@ -448,14 +430,14 @@ export function Feed({
           {erreur && (
             <div
               role="alert"
-              className="mt-4 bg-white border border-rouge/40 rounded-xl p-4 flex flex-col items-center gap-2 text-sm"
+              className="mt-4 bg-surface border border-warn/40 rounded-xl p-4 flex flex-col items-center gap-2 text-sm"
             >
-              <p className="text-rouge font-bold text-center">{erreur}</p>
+              <p className="text-warn font-bold text-center">{erreur}</p>
               <button
                 type="button"
                 onClick={() => void chargerPlus()}
                 disabled={chargement}
-                className="rounded-full border border-bordure bg-white px-4 py-2 text-xs font-bold text-texte disabled:opacity-50"
+                className="rounded-full border border-border-strong bg-surface px-4 py-2 text-xs font-bold text-ink hover:bg-surface-subtle disabled:opacity-50"
               >
                 Réessayer
               </button>
@@ -472,7 +454,7 @@ export function Feed({
                 onClick={() => void chargerPlus()}
                 disabled={chargement}
                 aria-busy={chargement}
-                className="min-h-11 rounded-full border border-bordure bg-white px-6 py-2 text-sm font-bold text-texte hover:bg-creme disabled:opacity-50 disabled:cursor-default"
+                className="min-h-11 rounded-full border border-border-strong bg-surface px-6 py-2 text-sm font-bold text-ink hover:bg-surface-subtle disabled:opacity-50 disabled:cursor-default"
               >
                 {chargement ? "Chargement…" : "Charger plus de deals"}
               </button>
@@ -482,7 +464,7 @@ export function Feed({
           {/* Fin de liste explicite : sans elle, l'absence de bouton est
               ambiguë (fin réelle ou bouton disparu ?). */}
           {!cursor && !erreur && visibles.length > 0 && (
-            <p className="text-center text-muted text-xs py-6">Tu as vu tous les bons plans du moment.</p>
+            <p className="text-center text-ink-subtle text-xs py-6">Tu as vu tous les bons plans du moment.</p>
           )}
         </main>
       </div>

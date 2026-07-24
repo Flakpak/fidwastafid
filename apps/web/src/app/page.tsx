@@ -62,11 +62,11 @@ export default async function Home({ searchParams }: PageParams) {
         : null;
 
   return (
-    <div className="min-h-screen bg-creme text-texte">
+    <div className="min-h-screen bg-surface-base text-ink">
       <SiteHeader />
       {message && (
         <div className="max-w-2xl mx-auto mt-4 px-4">
-          <div className="bg-white border border-vert/30 rounded-xl p-4 text-sm font-bold text-vert text-center">
+          <div className="bg-surface border border-accent/30 rounded-xl p-4 text-sm font-bold text-accent text-center">
             {message}
           </div>
         </div>
