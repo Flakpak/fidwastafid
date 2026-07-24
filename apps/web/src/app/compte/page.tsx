@@ -109,7 +109,7 @@ export default async function ComptePage() {
                 l'e-mail vit dans Supabase Auth, pas en base. Si l'API admin est
                 momentanément indisponible, le reste du profil est parfaitement
                 utilisable — on affiche l'indisponibilité plutôt que de casser
-                toute la page. Tokens Tadelakt (`creme` a été purgé au lot 2b). */}
+                toute la page. Tokens Tadelakt : les tokens légués ont été purgés au lot 2b. */}
             {me.email ? (
               <p className="text-sm text-ink-muted bg-surface-subtle rounded-lg px-3 py-2">{me.email}</p>
             ) : (
