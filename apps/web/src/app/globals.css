@@ -1,17 +1,45 @@
 @import "tailwindcss";
 
 /**
- * Tokens extraits tels quels de index.html (racine du repo, :root, lignes 14-27) —
- * seule source de vérité de la charte tant que l'app v1 tourne. Ne pas inventer
- * de nouvelles teintes ici ; si une couleur manque, retourner à index.html.
+ * Design tokens. Source de vérité : CONTRAT-V1 §8 (direction « Tadelakt »,
+ * amendement 2026-07-24). Les tokens Tadelakt priment ; les anciens tokens v1
+ * (issus d'index.html) sont en cours de retrait sur les lots 2-3.
  */
 @theme {
-  --color-rouge: #f03e3e; /* --rouge */
+  /* ─── Palette Tadelakt (CONTRAT-V1 §8) ───────────────────────────────────
+     Noms sémantiques, jamais des noms de couleur : c'est ce qui empêche la
+     dérive. accent = interactif/marque ; hot = température chaude et rien
+     d'autre ; cold = température froide et rien d'autre (§8, règle 3).
+     Deux valeurs divergent volontairement de la maquette HTML pour passer
+     l'AA : ink-subtle #736B61 (au lieu de #8B8378 : 3,74:1 → 5,24:1 sur blanc)
+     et cold #4C6674 (au lieu de #54707F : 4,49:1 → 5,19:1 sur cold-soft).
+     Tous les couples texte/fond sont mesurés ≥ 4,5:1. */
+  --color-surface-base: #f4f1ec;   /* fond de page (plâtre) */
+  --color-surface: #ffffff;        /* cartes, panneaux, champs */
+  --color-surface-subtle: #faf8f4; /* survol de surface, zones inertes */
+  --color-border: #e3ded4;         /* filets par défaut */
+  --color-border-strong: #d2cabb;  /* contour de tout élément cliquable */
+  --color-ink: #1a1815;            /* texte principal, bouton primaire */
+  --color-ink-muted: #5c554b;      /* texte secondaire, icônes de méta */
+  --color-ink-subtle: #736b61;     /* aides, horodatages, placeholders (AA) */
+  --color-accent: #2c5545;         /* interactif, marque, focus (argan) */
+  --color-accent-soft: #e7efe9;    /* fond du badge de remise */
+  --color-hot: #ad4527;            /* température chaude — rien d'autre */
+  --color-hot-soft: #f7e9e2;       /* fond du badge « Tendance » */
+  --color-cold: #4c6674;           /* température froide — rien d'autre (AA) */
+  --color-cold-soft: #e9eef1;      /* fond des états expirés */
+  --color-warn: #7c6015;           /* file d'attente, alertes de prix */
+  --color-warn-soft: #f5eedd;      /* fond associé */
+
+  /* ─── Anciens tokens v1 — EN COURS DE RETRAIT ────────────────────────────
+     rouge / orange / vert / bleu SUPPRIMÉS par le lot 1, sans alias : les
+     utilitaires text-rouge/-orange/-vert/-bleu (et var(--color-rouge) de
+     .hero-cursor) cessent de résoudre, pour que le lot 2 migre chaque
+     occurrence sans angle mort. rouge-clair / or / creme / texte / muted /
+     bordure / sombre restent en place le temps des lots 2-3 (body{} et le
+     sceau les référencent encore). */
   --color-rouge-clair: #ff6b6b; /* --rouge2 */
   --color-or: #ffd43b; /* --yellow */
-  --color-orange: #ff922b; /* --orange */
-  --color-vert: #20c997; /* --green */
-  --color-bleu: #339af0; /* --blue */
   --color-creme: #f8f6f2; /* --bg */
   --color-texte: #1a1a1a; /* --text */
   --color-muted: #888888; /* --muted */
