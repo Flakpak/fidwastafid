@@ -43,8 +43,28 @@ export function ShareButton({ titre, prixPromo, prixNormal, dealHref }: ShareBut
   }
 
   return (
-    <button type="button" onClick={(e) => void partager(e)} className="text-muted hover:text-rouge">
-      {copie ? "✅ Copié" : "🔗 Partager"}
+    <button
+      type="button"
+      onClick={(e) => void partager(e)}
+      className="flex items-center gap-1 text-ink-muted hover:text-ink"
+    >
+      {copie ? (
+        <>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true" className="h-3.5 w-3.5">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+          Copié
+        </>
+      ) : (
+        <>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true" className="h-3.5 w-3.5">
+            <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" />
+            <path d="M12 3v13" />
+            <path d="m8 7 4-4 4 4" />
+          </svg>
+          Partager
+        </>
+      )}
     </button>
   );
 }
