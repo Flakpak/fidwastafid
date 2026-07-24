@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { Enseigne } from "@fidwastafid/schemas";
-import { SiteHeader } from "../../components/SiteHeader.js";
 import { AdminPipeline } from "./AdminPipeline.js";
 import { resolveCurrentUser } from "../../lib/currentUser.js";
 import { GET as getEnseignesHandler } from "../api/v1/enseignes/route.js";
@@ -48,8 +48,20 @@ export default async function AdminPage() {
   const enseignes = await fetchEnseignes();
 
   return (
-    <div className="min-h-screen bg-creme text-texte">
-      <SiteHeader />
+    <div className="min-h-screen bg-surface-base text-ink">
+      {/* Chrome admin volontairement INVERSÉ en encre (charte Tadelakt, écran
+          08) : impossible de confondre l'admin et le site public d'un coup
+          d'œil — seul écart assumé au système clair. */}
+      <header className="bg-ink flex items-center gap-3 h-[60px] px-4 sm:px-6">
+        <Link href="/" aria-label="فيد و ستافيد" className="shrink-0">
+          <span dir="rtl" className="font-arabic text-surface-base text-xl leading-none pb-[5px] inline-block">
+            فيد و ستافيد
+          </span>
+        </Link>
+        <span className="text-[11px] font-medium tracking-[0.14em] uppercase text-surface-base/60 border border-surface-base/25 rounded px-2 py-0.5">
+          Admin
+        </span>
+      </header>
       <main className="max-w-2xl mx-auto p-4 flex flex-col gap-4">
         <h1 className="text-xl font-black">Pipeline</h1>
         <AdminPipeline enseignes={enseignes} />
