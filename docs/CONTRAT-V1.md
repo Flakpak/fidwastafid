@@ -325,8 +325,65 @@ est inchangé — seul l'opérateur de cache diffère selon la phase d'hébergem
 
 ## 8 — Design tokens (déjà tranchés, non-négociables)
 
-Palette rouge/or/crème, typographie Scheherazade New, sceau calligraphique arabe.
-Référence directe pour la config Tailwind de la Phase 4.
+**Amendement du 2026-07-24 — abandon de la palette rouge/or/crème pour la direction « Tadelakt ».**
+Motif : la triade rouge + or saturés lisait « marketplace bas de gamme », l'or à plat n'existe pas en
+digital, et le rouge de marque entrait en collision avec le rouge « promotion » — rendant impossible
+toute signalisation d'urgence réelle. La couleur passe désormais au service de la photo produit (feed
+scrapé, non maîtrisé) : l'UI est un cadre plâtre + encre à ~90 %, jamais un concurrent chromatique.
+
+### Direction Tadelakt — trois principes
+
+1. **Faible charge chromatique** — la page est plâtre + encre à ~90 %. La couleur vient des photos
+   produits, que nous ne contrôlons pas. L'UI est un cadre, pas un concurrent.
+2. **Trois rôles chromatiques, un métier chacun, aucun recouvrement** — `accent` (argan) = interactif
+   et marque ; `hot` (braise) = température chaude et rien d'autre ; `cold` (glacé) = température
+   froide et rien d'autre.
+3. **L'affordance vient du contraste, du contour et de l'état**, pas de la saturation. Le prix n'est
+   plus coloré : sa taille le hiérarchise.
+
+### Palette (source de vérité — noms sémantiques, jamais des noms de couleur)
+
+| Token | Hex | Usage |
+|---|---|---|
+| `surface-base` | `#F4F1EC` | fond de page (plâtre) |
+| `surface` | `#FFFFFF` | cartes, panneaux, champs |
+| `surface-subtle` | `#FAF8F4` | survol de surface, zones inertes |
+| `border` | `#E3DED4` | filets par défaut |
+| `border-strong` | `#D2CABB` | contour de tout élément **cliquable** |
+| `ink` | `#1A1815` | texte principal, bouton primaire |
+| `ink-muted` | `#5C554B` | texte secondaire, icônes de méta |
+| `ink-subtle` | `#736B61` | aides, horodatages, placeholders |
+| `accent` | `#2C5545` | interactif, marque, focus (argan) |
+| `accent-soft` | `#E7EFE9` | fond du badge de remise |
+| `hot` | `#AD4527` | température chaude — **rien d'autre** |
+| `hot-soft` | `#F7E9E2` | fond du badge « Tendance » |
+| `cold` | `#4C6674` | température froide — **rien d'autre** |
+| `cold-soft` | `#E9EEF1` | fond des états expirés |
+| `warn` | `#7C6015` | file d'attente, alertes de prix |
+| `warn-soft` | `#F5EEDD` | fond associé |
+
+Deux valeurs divergent **volontairement** de la maquette HTML validée, pour passer le contraste AA :
+`ink-subtle` vaut `#736B61` (et non `#8B8378` : 3,74:1 → 5,24:1 sur blanc) et `cold` vaut `#4C6674`
+(et non `#54707F` : 4,49:1 → 5,19:1 sur `cold-soft`). Tous les couples texte/fond de la palette sont
+mesurés ≥ 4,5:1.
+
+### Non-négociables (inchangés par cet amendement)
+
+- **Sceau calligraphique `فيد و ستافيد`** — médaillon SVG autonome (`Seal.tsx`), jamais un asset externe.
+- **Typographie Scheherazade New** pour tout rendu arabe.
+- **Libellés de vote `ربح`** (vote chaud) **/ `خسارة`** (vote froid).
+- **CTA en darija.**
+
+### Règles d'application chromatique (gravées)
+
+1. **Une seule action pleine (`variant="primary"`) par écran.**
+2. **Le gris pâle est interdit sur tout élément cliquable** — un cliquable porte toujours un contour
+   `border-strong` et une encre lisible, jamais un gris d'inertie.
+3. **`hot` et `cold` sont réservés à la température des deals.** Toute autre utilisation est un bug.
+
+Référence directe pour la config Tailwind (`@theme`, `apps/web/src/app/globals.css`) et les primitives
+UI (`apps/web/src/components`). La refonte est portée en trois lots : lot 1 = ce contrat + tokens +
+primitives ; lots 2 et 3 = migration de `DealCard`, des pages et du chrome.
 
 ## 9 — Sécurité by design
 
