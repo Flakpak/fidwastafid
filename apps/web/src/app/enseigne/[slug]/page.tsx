@@ -50,13 +50,13 @@ export default async function EnseignePage({ params }: PageParams) {
   const deals = await fetchDeals(slug);
 
   return (
-    <div className="min-h-screen bg-creme text-texte">
+    <div className="min-h-screen bg-surface-base text-ink">
       <SiteHeader />
 
       <main className="max-w-2xl mx-auto p-4 flex flex-col gap-3">
         <h1 className="text-xl font-black">{enseigne.nom}</h1>
         {deals.length === 0 && (
-          <p className="text-center text-muted py-16">Aucun bon plan pour {enseigne.nom} pour l&apos;instant.</p>
+          <p className="text-center text-ink-muted py-16">Aucun bon plan pour {enseigne.nom} pour l&apos;instant.</p>
         )}
         {deals.map((deal) => (
           <DealCard key={deal.publicId} deal={deal} />

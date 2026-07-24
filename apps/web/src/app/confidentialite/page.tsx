@@ -17,20 +17,20 @@ function Section({ titre, children }: { titre: string; children: React.ReactNode
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-base font-black">{titre}</h2>
-      <div className="text-sm text-muted leading-relaxed flex flex-col gap-2">{children}</div>
+      <div className="text-sm text-ink-muted leading-relaxed flex flex-col gap-2">{children}</div>
     </section>
   );
 }
 
 export default function ConfidentialitePage() {
   return (
-    <div className="min-h-screen bg-creme text-texte">
+    <div className="min-h-screen bg-surface-base text-ink">
       <SiteHeader />
       <main className="max-w-3xl mx-auto p-4">
-        <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 flex flex-col gap-6">
+        <div className="bg-surface rounded-2xl border border-border shadow-[0_1px_2px_rgba(26,24,21,0.05)] p-6 md:p-8 flex flex-col gap-6">
           <div>
             <h1 className="text-2xl font-black mb-1">Confidentialité</h1>
-            <p className="text-sm text-muted">
+            <p className="text-sm text-ink-muted">
               Cette page explique simplement quelles données Fidwastafid conserve à ton sujet, pourquoi, et
               comment garder la main dessus.
             </p>
@@ -47,7 +47,7 @@ export default function ConfidentialitePage() {
                 n&apos;est publié sur la page du deal que si tu as explicitement coché l&apos;autorisation
                 d&apos;affichage public au moment de la soumission ; sans cette case cochée, il reste visible
                 uniquement par la modération. Tu peux demander son retrait à tout moment en{" "}
-                <Link href="/contact" className="text-bleu font-bold hover:underline">
+                <Link href="/contact" className="text-accent font-bold hover:underline">
                   contactant la modération
                 </Link>{" "}
                 ;
@@ -89,12 +89,12 @@ export default function ConfidentialitePage() {
             <p>
               La loi marocaine 09-08 te donne le droit d&apos;accéder à tes données, de les rectifier, et de les
               faire effacer. Tu peux exercer ces trois droits directement, à tout moment, depuis{" "}
-              <Link href="/compte" className="text-bleu font-bold hover:underline">
+              <Link href="/compte" className="text-accent font-bold hover:underline">
                 ton compte
               </Link>{" "}
               : consulter ton profil et tes contributions (accès), modifier ton pseudo ou ta couleur d&apos;avatar
               (rectification), ou supprimer ton compte (effacement). Pour toute autre question, tu peux{" "}
-              <Link href="/contact" className="text-bleu font-bold hover:underline">
+              <Link href="/contact" className="text-accent font-bold hover:underline">
                 nous contacter directement
               </Link>
               .
@@ -104,7 +104,7 @@ export default function ConfidentialitePage() {
           <Section titre="Contact">
             <p>
               Une question sur tes données ?{" "}
-              <Link href="/contact" className="text-bleu font-bold hover:underline">
+              <Link href="/contact" className="text-accent font-bold hover:underline">
                 Contacte-nous
               </Link>
               .
