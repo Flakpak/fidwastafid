@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fidwastafid — maquette complète · Tadelakt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Scheherazade+New:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --plat:#F4F1EC; --surf:#FFFFFF; --surf-2:#FAF8F4;
+  --rule:#E3DED4; --rule-2:#D2CABB;
+  --ink:#1A1815; --ink-2:#5C554B; --muted:#8B8378;
+  --argan:#2C5545; --argan-soft:#E7EFE9;
+  --braise:#AD4527; --braise-soft:#F7E9E2;
+  --glace:#54707F; --glace-soft:#E9EEF1;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:#111;color:#e6e3de;font-family:'Instrument Sans',system-ui,sans-serif;font-size:15px;line-height:1.62;padding:34px 20px 90px}
+.page{max-width:1120px;margin:0 auto}
+.doc-h1{font-size:27px;font-weight:600;letter-spacing:-.025em;margin-bottom:13px}
+.doc-intro{max-width:680px;margin-bottom:44px;color:#9d978e;font-size:14.5px}
+.doc-intro strong{color:#e6e3de;font-weight:600}
+.screen{margin-bottom:54px}
+.screen-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px;margin-bottom:6px}
+.screen-tag{font-size:10.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:#6b655c;border:1px solid #332f2a;padding:3px 9px;border-radius:2px}
+.screen-name{font-size:19px;font-weight:600;letter-spacing:-.015em}
+.screen-url{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#6b655c}
+.screen-why{color:#9d978e;font-size:14.5px;max-width:700px;margin-bottom:16px}
+.frame{border-radius:12px;overflow:hidden;border:1px solid #2b2b2b;background:var(--plat);color:var(--ink)}
+.verdict{border-left:2px solid var(--argan);padding:18px 0 18px 22px;max-width:700px;color:#c3bdb4;font-size:14.5px}
+.verdict h2{font-size:16.5px;font-weight:600;color:#e6e3de;margin-bottom:9px}
+.verdict p{margin-bottom:11px}.verdict p:last-child{margin-bottom:0}
+.verdict code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#9d978e}
+
+/* ════════ SYSTÈME ════════ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:0 18px;border-radius:9px;font-family:inherit;font-size:13.5px;font-weight:500;letter-spacing:-.005em;border:1px solid transparent;cursor:pointer;text-decoration:none;transition:background .13s,border-color .13s,transform .08s,box-shadow .13s}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible{outline:2px solid var(--argan);outline-offset:2px}
+.btn-1{background:var(--ink);color:var(--plat);box-shadow:0 1px 2px rgba(26,24,21,.18)}
+.btn-1:hover{background:#332e28}
+.btn-2{background:var(--surf);color:var(--ink);border-color:var(--rule-2);box-shadow:0 1px 1px rgba(26,24,21,.05)}
+.btn-2:hover{background:var(--surf-2);border-color:#b9b0a0}
+.btn-3{background:transparent;color:var(--ink-2);padding:0 10px;min-height:34px}
+.btn-3:hover{background:#EAE5DC;color:var(--ink)}
+.btn-danger{background:var(--surf);color:var(--braise);border-color:#E4C3B7}
+.btn-danger:hover{background:var(--braise-soft)}
+.btn[disabled]{opacity:.4;pointer-events:none}
+.btn svg{width:15px;height:15px;stroke-width:1.7;flex-shrink:0}
+.btn-ar{font-family:'Scheherazade New',serif;font-size:16px;direction:rtl;padding-bottom:3px}
+.btn-sm{min-height:32px;padding:0 12px;font-size:12.5px;border-radius:7px}
+
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);background:var(--surf);border:1px solid var(--rule-2);padding:6px 14px;border-radius:20px;cursor:pointer;transition:all .13s}
+.chip:hover{border-color:#b9b0a0;background:var(--surf-2)}
+.chip.on{color:#fff;background:var(--argan);border-color:var(--argan);font-weight:500}
+.chip-sm{padding:4px 11px;font-size:12px}
+
+.field{display:flex;flex-direction:column;gap:6px}
+.lab{font-size:12px;font-weight:500;color:var(--ink);letter-spacing:-.005em}
+.lab s{text-decoration:none;color:var(--muted);font-weight:400}
+.inp{height:42px;padding:0 13px;border:1px solid var(--rule-2);border-radius:9px;background:var(--surf);font-family:inherit;font-size:14px;color:var(--ink);transition:border-color .13s,box-shadow .13s}
+textarea.inp{height:auto;padding:11px 13px;resize:vertical;line-height:1.55}
+.inp::placeholder{color:#ABA398}
+.inp:hover{border-color:#b9b0a0}
+.inp:focus{outline:none;border-color:var(--argan);box-shadow:0 0 0 3px rgba(44,85,69,.13)}
+.hint{font-size:11.5px;color:var(--muted);line-height:1.5}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:var(--ink-2);line-height:1.5;cursor:pointer}
+.check i{width:17px;height:17px;flex-shrink:0;margin-top:2px;border:1px solid var(--rule-2);border-radius:4px;background:var(--surf);display:block}
+.check.on i{background:var(--argan);border-color:var(--argan);position:relative}
+.check.on i::after{content:"";position:absolute;left:5px;top:2px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(43deg)}
+
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:5px}
+.badge svg{width:12px;height:12px;stroke-width:1.8}
+.b-hot{background:var(--braise-soft);color:var(--braise)}
+.b-end{background:transparent;color:var(--ink-2);border:1px solid var(--rule-2)}
+.b-new{background:var(--argan-soft);color:var(--argan)}
+.b-wait{background:#F5EEDD;color:#7C6015}
+
+/* vote en ligne — structure inchangée */
+.vote{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--rule-2);border-radius:20px;padding:2px 5px;background:var(--surf)}
+.vbtn{width:30px;height:27px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;border-radius:7px;cursor:pointer;color:var(--ink-2);transition:all .13s}
+.vbtn svg{width:16px;height:16px;stroke-width:2.1}
+.vbtn:hover{background:var(--braise-soft);color:var(--braise)}
+.vbtn.dn:hover{background:var(--glace-soft);color:var(--glace)}
+.vbtn.on{background:var(--braise);color:#fff}
+.vbtn.dn.on{background:var(--glace);color:#fff}
+.tnum{font-size:14.5px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums;min-width:34px;text-align:center}
+.t-hot .tnum{color:var(--braise)} .t-mid .tnum{color:var(--ink)} .t-cold .tnum{color:var(--glace)}
+.gauge{width:30px;height:3px;border-radius:2px;background:var(--rule);overflow:hidden;display:inline-block;vertical-align:2px;margin-left:4px}
+.gauge i{display:block;height:100%}
+.t-hot .gauge i{background:var(--braise)} .t-mid .gauge i{background:var(--ink-2)} .t-cold .gauge i{background:var(--glace)}
+
+/* ════════ CHROME ════════ */
+.app{background:var(--plat)}
+.hdr{display:flex;align-items:center;gap:12px;padding:0 22px;height:60px;background:var(--surf);border-bottom:1px solid var(--rule)}
+.seal{font-family:'Scheherazade New',serif;font-size:20px;line-height:1;color:var(--ink);padding-bottom:5px;text-decoration:none}
+.nav{display:flex;gap:2px;margin-left:12px}
+.nav a{font-size:13.5px;color:var(--ink-2);text-decoration:none;padding:7px 12px;border-radius:7px;transition:background .13s}
+.nav a:hover{background:#EFEBE3;color:var(--ink)}
+.nav a.on{color:var(--ink);font-weight:500;box-shadow:inset 0 -2px 0 var(--argan)}
+.search{margin-left:auto;position:relative;width:230px}
+.search .inp{width:100%;height:38px;padding-left:34px;font-size:13px}
+.search svg{position:absolute;left:11px;top:11px;width:15px;height:15px;stroke-width:1.7;color:var(--muted)}
+.hdr-r{display:flex;gap:8px;align-items:center}
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--argan);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;cursor:pointer}
+
+.subbar{display:flex;align-items:center;gap:8px;padding:13px 22px;background:var(--plat);border-bottom:1px solid var(--rule);flex-wrap:wrap;position:sticky;top:0}
+.subbar .sep{width:1px;height:22px;background:var(--rule-2);margin:0 4px}
+.main{padding:22px;display:flex;flex-direction:column;gap:14px}
+.wrap{max-width:900px;margin:0 auto;width:100%}
+.crumb{font-size:12px;color:var(--muted);padding:14px 22px 0}
+.crumb a{color:var(--ink-2);text-decoration:none}
+.crumb a:hover{text-decoration:underline}
+.h2{font-size:19px;font-weight:600;letter-spacing:-.02em}
+.h3{font-size:15px;font-weight:600;letter-spacing:-.012em}
+.sub{font-size:13px;color:var(--ink-2)}
+
+/* ════════ CARTE ════════ */
+.card{display:flex;gap:16px;padding:16px;background:var(--surf);border:1px solid var(--rule);border-radius:11px;box-shadow:0 1px 2px rgba(26,24,21,.05);cursor:pointer;transition:border-color .14s,box-shadow .14s,transform .14s}
+.card:hover{border-color:var(--rule-2);box-shadow:0 4px 14px rgba(26,24,21,.09);transform:translateY(-1px)}
+.card:hover .title{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1.5px}
+.card.hot{border-left:3px solid var(--braise)}
+.card.dead{opacity:.62}
+.thumb{width:104px;height:104px;flex-shrink:0;border-radius:8px;background:#fff;border:1px solid var(--rule);position:relative;overflow:hidden}
+.thumb::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.t-oil::after{width:30px;height:64px;border-radius:5px 5px 7px 7px;background:linear-gradient(#5c7a2e,#3d5320)}
+.t-ac::after{width:64px;height:50px;border-radius:5px;background:linear-gradient(#e9edf1,#cfd7de);border:1px solid #b9c3cc}
+.t-shoe::after{width:70px;height:38px;border-radius:6px 16px 4px 4px;background:linear-gradient(#2f3a4a,#1d2531)}
+.t-tv::after{width:74px;height:44px;border-radius:3px;background:linear-gradient(#20262e,#0d1115);box-shadow:0 6px 0 -3px #b9c3cc}
+.t-cof::after{width:46px;height:56px;border-radius:6px;background:linear-gradient(#7a4a24,#4d2c12)}
+.body{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.when{font-size:11.5px;color:var(--muted);margin-left:auto}
+.title{font-size:15.5px;font-weight:500;color:var(--ink);line-height:1.32;letter-spacing:-.012em}
+.prices{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.now{font-size:25px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.035em}
+.now s{font-size:14px;font-weight:400;letter-spacing:0;text-decoration:none;color:var(--muted);margin-left:3px}
+.was{font-size:13px;color:var(--muted);text-decoration:line-through;font-variant-numeric:tabular-nums}
+.off{font-size:11.5px;font-weight:500;color:var(--argan);background:var(--argan-soft);padding:2px 8px;border-radius:4px;font-variant-numeric:tabular-nums}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:3px 13px;font-size:12px;color:var(--ink-2)}
+.meta svg{width:12px;height:12px;vertical-align:-1.5px;margin-right:4px;stroke-width:1.6;color:var(--muted)}
+.meta em{font-style:normal;color:var(--ink);font-weight:500}
+.desc{font-size:12.5px;color:var(--muted);line-height:1.5}
+.foot{display:flex;align-items:center;gap:8px;margin-top:4px}
+.by{font-size:11.5px;color:var(--muted)}
+.by em{font-style:normal;color:var(--ink);font-weight:500}
+.foot .btn-1{margin-left:auto}
+
+.panel{background:var(--surf);border:1px solid var(--rule);border-radius:11px;padding:20px}
+.panel-t{padding:15px 20px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:10px}
+.panel-b{padding:20px}
+.flush{padding:0}
+.divide{height:1px;background:var(--rule);margin:16px 0}
+
+/* pagination */
+.pager{display:flex;gap:6px;justify-content:center;padding:8px 0 4px}
+.pg{min-width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:1px solid var(--rule-2);background:var(--surf);border-radius:8px;font-size:13px;color:var(--ink-2);cursor:pointer}
+.pg.on{background:var(--ink);color:var(--plat);border-color:var(--ink);font-weight:500}
+.pg:hover:not(.on){background:var(--surf-2)}
+
+/* footer */
+.ftr{background:var(--surf);border-top:1px solid var(--rule);padding:34px 22px 26px;margin-top:10px}
+.ftr-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:28px;max-width:980px;margin:0 auto}
+.ftr h4{font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:11px}
+.ftr a{display:block;font-size:13px;color:var(--ink-2);text-decoration:none;padding:3px 0}
+.ftr a:hover{color:var(--ink);text-decoration:underline}
+.ftr-brand p{font-size:12.5px;color:var(--muted);line-height:1.55;margin-top:9px;max-width:230px}
+.ftr-btm{max-width:980px;margin:24px auto 0;padding-top:16px;border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:10px;font-size:11.5px;color:var(--muted)}
+
+/* deal detail */
+.dgrid{display:grid;grid-template-columns:400px 1fr;gap:26px}
+.gal{background:var(--surf);border:1px solid var(--rule);border-radius:11px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.gal-main{height:280px;border-radius:8px;background:#fff;border:1px solid var(--rule);position:relative}
+.gal-main::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78px;height:168px;border-radius:10px 10px 16px 16px;background:linear-gradient(#5c7a2e,#3d5320)}
+.gal-strip{display:flex;gap:8px}
+.gal-strip i{width:56px;height:56px;border-radius:6px;background:var(--surf-2);border:1px solid var(--rule);display:block}
+.gal-strip i:first-child{border-color:var(--argan);box-shadow:0 0 0 2px rgba(44,85,69,.15)}
+.dtitle{font-size:23px;font-weight:600;letter-spacing:-.025em;line-height:1.24}
+.dprice{font-size:38px;font-weight:600;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.dprice s{font-size:18px;font-weight:400;letter-spacing:0;text-decoration:none;color:var(--muted);margin-left:4px}
+.kv{display:flex;gap:10px;font-size:13px;padding:7px 0;border-bottom:1px solid var(--rule)}
+.kv span:first-child{color:var(--muted);width:120px;flex-shrink:0}
+.kv span:last-child{color:var(--ink)}
+.cmt{display:flex;gap:12px;padding:14px 0;border-top:1px solid var(--rule)}
+.cmt-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600}
+.cmt-h{display:flex;gap:8px;align-items:baseline;margin-bottom:3px}
+.cmt-h b{font-size:13px;font-weight:600}
+.cmt-h span{font-size:11.5px;color:var(--muted)}
+.cmt p{font-size:13.5px;color:var(--ink-2);line-height:1.55}
+
+.alert{display:flex;gap:12px;padding:14px 16px;border-radius:10px;font-size:13.5px;line-height:1.5}
+.a-dead{background:var(--glace-soft);color:#2F4652;border:1px solid #CBD8DE}
+.a-warn{background:#F5EEDD;color:#6B5312;border:1px solid #E5D6AC}
+.alert svg{width:17px;height:17px;stroke-width:1.8;flex-shrink:0;margin-top:2px}
+
+/* enseigne */
+.shop-h{display:flex;gap:20px;align-items:center;background:var(--surf);border:1px solid var(--rule);border-radius:11px;padding:22px}
+.shop-logo{width:74px;height:74px;border-radius:12px;background:var(--surf-2);border:1px solid var(--rule);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:var(--argan);flex-shrink:0}
+.stats{display:flex;gap:26px;margin-left:auto;flex-shrink:0}
+.stat b{display:block;font-size:21px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+
+/* compte */
+.acct{display:grid;grid-template-columns:210px 1fr;gap:22px}
+.side a{display:block;font-size:13.5px;color:var(--ink-2);text-decoration:none;padding:9px 12px;border-radius:8px}
+.side a:hover{background:#EFEBE3;color:var(--ink)}
+.side a.on{background:var(--surf);color:var(--ink);font-weight:500;border:1px solid var(--rule);box-shadow:0 1px 2px rgba(26,24,21,.05)}
+.swatch{display:flex;gap:8px;flex-wrap:wrap}
+.swatch i{width:30px;height:30px;border-radius:50%;cursor:pointer;display:block;border:2px solid transparent}
+.swatch i.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--surf) inset}
+.avatar-lg{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:23px;font-weight:600;flex-shrink:0}
+
+/* admin */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:10.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--rule)}
+.tbl td{padding:12px 14px;border-bottom:1px solid var(--rule);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--surf-2)}
+.tmini{width:40px;height:40px;border-radius:6px;background:#fff;border:1px solid var(--rule);position:relative;overflow:hidden}
+.tmini::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.src{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--muted)}
+
+/* tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--rule);padding:0 20px}
+.tab{padding:12px 14px;font-size:13.5px;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink);font-weight:500;border-bottom-color:var(--argan)}
+
+/* auth */
+.auth{max-width:380px;margin:0 auto;padding:44px 0}
+.orline{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:11.5px;margin:18px 0}
+.orline::before,.orline::after{content:"";flex:1;height:1px;background:var(--rule)}
+
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+@media(max-width:820px){
+  .dgrid,.acct,.ftr-grid{grid-template-columns:1fr}
+  .nav,.search{display:none}
+}
+@media(max-width:640px){body{padding:24px 14px 60px}.card{flex-direction:column}.thumb{width:100%;height:130px}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1 class="doc-h1">Fidwastafid — direction Tadelakt appliquée à l'ensemble du site</h1>
+<p class="doc-intro">Périmètre <strong>purement cosmétique</strong> : le vote reste en ligne dans le corps de la carte, aucune structure ne bouge. Ce qui change partout : les tokens, la hiérarchie d'action (une seule action pleine par écran), les états de survol/focus, et les trois rôles chromatiques — <strong>argan</strong> pour l'interactif, <strong>braise</strong> et <strong>glacé</strong> réservés à la seule température.</p>
+
+<!-- ══════════ 1 · FEED ══════════ -->
+<section class="screen">
+  <div class="screen-head"><span class="screen-tag">01</span><span class="screen-name">Feed</span><span class="screen-url">/</span></div>
+  <p class="screen-why">La barre de filtres est collante et posée sur le fond plâtre, pas sur blanc : elle se distingue des cartes sans avoir besoin d'ombre. Le liseré braise ne marque que les deals réellement chauds.</p>
+  <div class="frame"><div class="app">
+    <header class="hdr">
+      <a href="#" class="seal">فيد و ستافيد</a>
+      <nav class="nav"><a href="#" class="on">Deals</a><a href="#">Enseignes</a><a href="#">Villes</a><a href="#">Soumettre</a></nav>
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="inp" placeholder="Rechercher un deal, une enseigne…"></div>
+      <div class="hdr-r"><button class="btn btn-2 btn-sm">Connexion</button><button class="btn btn-1 btn-sm">Soumettre un deal</button></div>
+    </header>
+    <div class="subbar">
+      <span class="chip on">Tendance</span><span class="chip">Récents</span><span class="chip">Meilleure remise</span>
+      <span class="sep"></span>
+      <span class="chip chip-sm">Alimentaire</span><span class="chip chip-sm">Électroménager</span><span class="chip chip-sm">Mode</span><span class="chip chip-sm">Téléphonie</span>
+      <span class="sep"></span>
+      <span class="chip chip-sm">Casablanca <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:12px;height:12px;stroke-width:2"><path d="m6 9 6 6 6-6"/></svg></span>
+    </div>
+    <div class="main">
+      <div style="display:flex;align-items:baseline;gap:10px"><h2 class="h2">Deals du moment</h2><span class="sub">184 deals actifs</span></div>
+
+      <article class="card hot">
+        <div class="thumb t-oil"></div>
+        <div class="body">
+          <div class="top">
+            <span class="vote t-hot"><button class="vbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/></svg></button><span class="tnum">47°<span class="gauge"><i style="width:78%"></i></span></span><button class="vbtn dn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg></button></span>
+            <span class="badge b-hot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/><path d="M4 20h16"/></svg>Tendance</span>
+            <span class="when">il y a 3h</span>
+          </div>
+          <h3 class="title">Pack 6 × huile d'olive vierge extra Mabrouka 1L</h3>
+          <div class="prices"><span class="now">289<s> MAD</s></span><span class="was">420 MAD</span><span class="off">−31%</span></div>
+          <div class="meta"><span>Dispo. chez <em>Bringo</em></span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>Casablanca</span></div>
+          <p class="desc">Récolte 2025, acidité &lt; 0,5 %. Livraison sous 2h sur Casablanca et Mohammedia.</p>
+          <div class="foot"><button class="btn btn-3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z"/></svg>12</button><span class="by">par <em>Yassine_K</em></span><button class="btn btn-1 btn-ar">شوف الدييل ↗</button></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="thumb t-shoe"></div>
+        <div class="body">
+          <div class="top">
+            <span class="vote t-mid"><button class="vbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/></svg></button><span class="tnum">12°<span class="gauge"><i style="width:24%"></i></span></span><button class="vbtn dn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg></button></span>
+            <span class="badge b-end"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Fin dans 2 jours</span>
+            <span class="when">il y a 9h</span>
+          </div>
+          <h3 class="title">Sneakers New Balance 574 — tailles 40 à 45</h3>
+          <div class="prices"><span class="now">649<s> MAD</s></span><span class="was">1 099 MAD</span><span class="off">−41%</span></div>
+          <div class="meta"><span>Dispo. chez <em>Marwa Sport</em></span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>Casablanca, Maârif</span></div>
+          <p class="desc">Stock limité en boutique. Commande par WhatsApp acceptée, retrait sur place.</p>
+          <div class="foot"><button class="btn btn-3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z"/></svg>4</button><span class="by">par <em>Nadia_Bnk</em></span><button class="btn btn-1 btn-ar">شوف الدييل ↗</button></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="thumb t-ac"></div>
+        <div class="body">
+          <div class="top">
+            <span class="vote t-cold"><button class="vbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/></svg></button><span class="tnum">−3°<span class="gauge"><i style="width:6%"></i></span></span><button class="vbtn dn on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg></button></span>
+            <span class="when">il y a 1j</span>
+          </div>
+          <h3 class="title">Climatiseur mobile Astech 9000 BTU classe A</h3>
+          <div class="prices"><span class="now">2 490<s> MAD</s></span><span class="was">3 290 MAD</span><span class="off">−24%</span></div>
+          <div class="meta"><span>Dispo. chez <em>Electroplanet</em></span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>Rabat</span></div>
+          <p class="desc">Prix constaté plus bas en juin chez le même vendeur — signalé par la communauté.</p>
+          <div class="foot"><button class="btn btn-3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z"/></svg>3</button><span class="by">par <em>Salma.R</em></span><button class="btn btn-1 btn-ar">شوف الدييل ↗</button></div>
+        </div>
+      </article>
+
+      <div class="pager"><span class="pg">←</span><span class="pg on">1</span><span class="pg">2</span><span class="pg">3</span><span class="pg">…</span><span class="pg">19</span><span class="pg">→</span></div>
+    </div>
+
+    <footer class="ftr">
+      <div class="ftr-grid">
+        <div class="ftr-brand">
+          <span class="seal">فيد و ستافيد</span>
+          <p>Les bons plans du Maroc, partagés par ceux qui les trouvent. Fid w stafid — partage, et fais-en profiter.</p>
+        </div>
+        <div><h4>Explorer</h4><a href="#">Tous les deals</a><a href="#">Enseignes</a><a href="#">Villes</a><a href="#">Catégories</a></div>
+        <div><h4>Communauté</h4><a href="#">Soumettre un deal</a><a href="#">Règles de publication</a><a href="#">Signaler un prix erroné</a><a href="#">Contact</a></div>
+        <div><h4>Légal</h4><a href="#">Conditions d'utilisation</a><a href="#">Confidentialité</a><a href="#">Vos droits — loi 09-08</a><a href="#">Cookies</a></div>
+      </div>
+      <div class="ftr-btm"><span>© 2026 Fidwastafid</span><span>·</span><span>Déclaré auprès de la CNDP</span><span>·</span><span>Fait au Maroc</span></div>
+    </footer>
+  </div></div>
+</section>
+
+<!-- ══════════ 2 · FICHE DEAL ══════════ -->
+<section class="screen">
+  <div class="screen-head"><span class="screen-tag">02</span><span class="screen-name">Fiche deal</span><span class="screen-url">/deal/[slug]-[public_id]</span></div>
+  <p class="screen-why">Le prix atteint 38 px et reste en encre : c'est sa taille qui le hiérarchise. Une seule action pleine sur la page — le lien vers l'enseigne. Enregistrer et partager sont secondaires, le vote garde son propre registre chromatique.</p>
+  <div class="frame"><div class="app">
+    <header class="hdr">
+      <a href="#" class="seal">فيد و ستافيد</a>
+      <nav class="nav"><a href="#" class="on">Deals</a><a href="#">Enseignes</a><a href="#">Villes</a><a href="#">Soumettre</a></nav>
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="inp" placeholder="Rechercher…"></div>
+      <div class="hdr-r"><div class="avatar">K</div></div>
+    </header>
+    <div class="crumb"><a href="#">Deals</a> › <a href="#">Alimentaire</a> › Huile d'olive Mabrouka</div>
+    <div class="main"><div class="wrap">
+      <div class="dgrid">
+        <div class="gal"><div class="gal-main"></div><div class="gal-strip"><i></i><i></i><i></i></div></div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="top" style="gap:9px">
+            <span class="badge b-hot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/><path d="M4 20h16"/></svg>Tendance</span>
+            <span class="badge b-end"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Fin le 4 août</span>
+          </div>
+          <h1 class="dtitle">Pack 6 × huile d'olive vierge extra Mabrouka 1L</h1>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <span class="vote t-hot" style="padding:4px 7px"><button class="vbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/></svg></button><span class="tnum" style="font-size:16px">47°<span class="gauge"><i style="width:78%"></i></span></span><button class="vbtn dn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg></button></span>
+            <span class="sub">184 membres ont voté</span>
+          </div>
+          <div class="prices" style="align-items:flex-end;gap:12px">
+            <span class="dprice">289<s> MAD</s></span><span class="was" style="font-size:15px">420 MAD</span><span class="off" style="font-size:13px;padding:3px 10px">−31%</span>
+          </div>
+          <div style="display:flex;gap:9px;flex-wrap:wrap">
+            <button class="btn btn-1 btn-ar" style="min-height:46px;padding:0 26px;font-size:17px">شوف الدييل عند Bringo ↗</button>
+            <button class="btn btn-2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 21 12 16 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg>Enregistrer</button>
+            <button class="btn btn-2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M12 3v13"/><path d="m8 7 4-4 4 4"/></svg>Partager</button>
+          </div>
+          <div>
+            <div class="kv"><span>Enseigne</span><span><a href="#" style="color:var(--argan);font-weight:500">Bringo</a> · Carrefour Market</span></div>
+            <div class="kv"><span>Ville</span><span>Casablanca, Mohammedia</span></div>
+            <div class="kv"><span>Catégorie</span><span>Alimentaire › Épicerie</span></div>
+            <div class="kv"><span>Publié par</span><span>Yassine_K, il y a 3h</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divide"></div>
+      <h2 class="h3" style="margin-bottom:8px">Description</h2>
+      <p style="font-size:14px;color:var(--ink-2);line-height:1.65;max-width:680px">Récolte 2025, acidité inférieure à 0,5 %. Bouteilles en verre teinté de 1 litre, vendues par pack de six. Livraison Bringo sous 2 heures sur Casablanca et Mohammedia, retrait gratuit en magasin. Prix relevé le 24 juillet — signalez-le s'il a changé.</p>
+
+      <div class="alert a-warn" style="margin-top:16px;max-width:680px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 9v5"/><path d="M12 17.5h.01"/><path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+        <span>Les prix évoluent vite. Vérifiez toujours le montant final chez le vendeur avant de commander — Fidwastafid ne vend rien et ne garantit aucune disponibilité.</span>
+      </div>
+
+      <div class="divide"></div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px"><h2 class="h3">Commentaires</h2><span class="sub">12</span></div>
+      <div style="display:flex;gap:10px;margin:12px 0 4px"><input class="inp" style="flex:1" placeholder="Ajouter un commentaire…"><button class="btn btn-2">Publier</button></div>
+      <div class="cmt"><div class="cmt-av" style="background:#2C5545">S</div><div><div class="cmt-h"><b>Salma.R</b><span>il y a 1h</span></div><p>Confirmé ce matin au Carrefour Market Maârif, il reste du stock. Les bouteilles sont bien de la récolte 2025.</p></div></div>
+      <div class="cmt"><div class="cmt-av" style="background:#AD4527">M</div><div><div class="cmt-h"><b>Mehdi_Cbl</b><span>il y a 2h</span></div><p>Attention, la livraison n'est gratuite qu'à partir de 300 MAD de panier. Ça change un peu le calcul.</p></div></div>
+
+      <div class="divide"></div>
+      <h2 class="h3" style="margin-bottom:12px">Deals similaires</h2>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <article class="card"><div class="thumb t-cof"></div><div class="body">
+          <div class="top"><span class="vote t-mid" style="padding:1px 4px"><button class="vbtn" style="width:26px;height:23px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/></svg></button><span class="tnum" style="font-size:13px">21°</span><button class="vbtn dn" style="width:26px;height:23px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg></button></span><span class="when">il y a 6h</span></div>
+          <h3 class="title">Café moulu Dubois Arabica 500 g — lot de 2</h3>
+          <div class="prices"><span class="now">89<s> MAD</s></span><span class="was">134 MAD</span><span class="off">−34%</span></div>
+          <div class="meta"><span>Dispo. chez <em>Bringo</em></span></div>
+        </div></article>
+      </div>
+    </div></div>
+  </div></div>
+</section>
+
+<!-- ══════════ 3 · DEAL EXPIRÉ ══════════ -->
+<section class="screen">
+  <div class="screen-head"><span class="screen-tag">03</span><span class="screen-name">Deal expiré</span><span class="screen-url">même URL, HTTP 200</span></div>
+  <p class="screen-why">L'URL reste vivante — c'est un actif SEO. L'état expiré passe par le glacé, la désaturation de la carte et le prix barré : on comprend en une demi-seconde sans avoir lu un mot.</p>
+  <div class="frame"><div class="app"><div class="main"><div class="wrap">
+    <div class="alert a-dead" style="margin-bottom:16px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span><b>Ce deal a expiré le 12 juillet 2026.</b> Il reste consultable pour référence. Les prix indiqués ne sont plus valables — voici des offres actives sur des produits proches.</span>
+    </div>
+    <article class="card dead" style="cursor:default">
+      <div class="thumb t-tv"></div>
+      <div class="body">
+        <div class="top"><span class="badge" style="background:var(--glace-soft);color:var(--glace)">Expiré</span><span class="when">publié le 2 juillet</span></div>
+        <h3 class="title" style="color:var(--ink-2)">TV LED Samsung 55" 4K UHD série 7</h3>
+        <div class="prices"><span class="now" style="color:var(--muted);text-decoration:line-through">4 990<s> MAD</s></span></div>
+        <div class="meta"><span>Dispo. chez <em>Electroplanet</em></span></div>
+      </div>
+    </article>
+    <div style="height:12px"></div>
+    <h2 class="h3" style="margin-bottom:10px">Toujours disponibles</h2>
+    <article class="card"><div class="thumb t-ac"></div><div class="body">
+      <div class="top"><span class="vote t-mid" style="padding:1px 4px"><button class="vbtn" style="width:26px;height:23px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/></svg></button><span class="tnum" style="font-size:13px">18°</span><button class="vbtn dn" style="width:26px;height:23px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg></button></span><span class="when">il y a 5h</span></div>
+      <h3 class="title">TV LED TCL 55" 4K QLED — garantie 2 ans</h3>
+      <div class="prices"><span class="now">4 190<s> MAD</s></span><span class="was">5 490 MAD</span><span class="off">−24%</span></div>
+      <div class="meta"><span>Dispo. chez <em>Marjane</em></span></div>
+    </div></article>
+  </div></div></div></div>
+</section>
+
+<!-- ══════════ 4 · ENSEIGNE ══════════ -->
+<section class="screen">
+  <div class="screen-head"><span class="screen-tag">04</span><span class="screen-name">Page enseigne</span><span class="screen-url">/enseigne/[slug]</span></div>
+  <p class="screen-why">Les chiffres clés sont en encre, gros et tabulaires — aucun besoin de les colorer. Le bloc de texte SEO en bas de page est traité comme du contenu de lecture, pas comme du remplissage.</p>
+  <div class="frame"><div class="app">
+    <header class="hdr">
+      <a href="#" class="seal">فيد و ستافيد</a>
+      <nav class="nav"><a href="#">Deals</a><a href="#" class="on">Enseignes</a><a href="#">Villes</a><a href="#">Soumettre</a></nav>
+      <div class="hdr-r" style="margin-left:auto"><div class="avatar">K</div></div>
+    </header>
+    <div class="crumb"><a href="#">Enseignes</a> › Bringo</div>
+    <div class="main"><div class="wrap">
+      <div class="shop-h">
+        <div class="shop-logo">B</div>
+        <div>
+          <h1 class="h2" style="font-size:22px">Bringo</h1>
+          <p class="sub" style="margin-top:3px;max-width:420px">Service de courses en ligne de Carrefour Market Maroc. Livraison en 2h à Casablanca, Rabat, Marrakech et Tanger.</p>
+          <div style="display:flex;gap:7px;margin-top:10px"><span class="chip chip-sm">Alimentaire</span><span class="chip chip-sm">Livraison</span><span class="chip chip-sm">Casablanca</span></div>
+        </div>
+        <div class="stats">
+          <div class="stat"><b>42</b><span>Deals actifs</span></div>
+          <div class="stat"><b>−27%</b><span>Remise moy.</span></div>
+          <div class="stat"><b>31°</b><span>Note comm.</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin:16px 0 4px"><span class="chip on">Tous</span><span class="chip">Alimentaire</span><span class="chip">Hygiène</span><span class="chip">Maison</span></div>
+
+      <div style="display:flex;flex-direction:column;gap:11px;margin-top:10px">
+        <article class="card hot"><div class="thumb t-oil"></div><div class="body">
+          <div class="top"><span class="vote t-hot" style="padding:1px 4px"><button class="vbtn" style="width:26px;height:23px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/></svg></button><span class="tnum" style="font-size:13px">47°</span><button class="vbtn dn" style="width:26px;height:23px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg></button></span><span class="when">il y a 3h</span></div>
+          <h3 class="title">Pack 6 × huile d'olive vierge extra Mabrouka 1L</h3>
+          <div class="prices"><span class="now">289<s> MAD</s></span><span class="was">420 MAD</span><span class="off">−31%</span></div>
+          <div class="foot"><span class="by">par <em>Yassine_K</em></span><button class="btn btn-1 btn-ar">شوف الدييل ↗</button></div>
+        </div></article>
+        <article class="card"><div class="thumb t-cof"></div><div class="body">
+          <div class="top"><span class="vote t-mid" style="padding:1px 4px"><button class="vbtn" style="width:26px;height:23px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/></svg></button><span class="tnum" style="font-size:13px">21°</span><button class="vbtn dn" style="width:26px;height:23px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg></button></span><span class="when">il y a 6h</span></div>
+          <h3 class="title">Café moulu Dubois Arabica 500 g — lot de 2</h3>
+          <div class="prices"><span class="now">89<s> MAD</s></span><span class="was">134 MAD</span><span class="off">−34%</span></div>
+          <div class="foot"><span class="by">par <em>Amine.T</em></span><button class="btn btn-1 btn-ar">شوف الدييل ↗</button></div>
+        </div></article>
+      </div>
+
+      <div class="divide"></div>
+      <h2 class="h3" style="margin-bottom:8px">Les promotions Bringo au Maroc</h2>
+      <p style="font-size:13.5px;color:var(--ink-2);line-height:1.7;max-width:700px">Bringo est le service de livraison de courses de Carrefour Market au Maroc. La communauté Fidwastafid y relève en moyenne une quarantaine d'offres actives, principalement en épicerie et en produits d'entretien. Les remises les plus profondes tombent en général en début de mois et pendant les périodes de fêtes. Chaque prix publié ici est relevé par un membre ou par notre robot, puis validé à la main avant publication.</p>
+    </div></div>
+  </div></div>
+</section>
+
+<!-- ══════════ 5 · SOUMETTRE ══════════ -->
+<section class="screen">
+  <div class="screen-head"><span class="screen-tag">05</span><span class="screen-name">Soumettre — terrain</span><span class="screen-url">/soumettre</span></div>
+  <p class="screen-why">Le formulaire est la page la plus sensible du site : un seul bouton plein, en bas, et l'aide contextuelle en colonne plutôt qu'en encarts colorés. Le consentement WhatsApp est une case explicite, jamais pré-cochée.</p>
+  <div class="frame"><div class="app">
+    <header class="hdr">
+      <a href="#" class="seal">فيد و ستافيد</a>
+      <nav class="nav"><a href="#">Deals</a><a href="#">Enseignes</a><a href="#">Villes</a><a href="#" class="on">Soumettre</a></nav>
+      <div class="hdr-r" style="margin-left:auto"><div class="avatar">K</div></div>
+    </header>
+    <div class="main"><div class="wrap" style="max-width:820px">
+      <h1 class="h2" style="margin-bottom:4px">Partager un bon plan</h1>
+      <p class="sub" style="margin-bottom:16px">Un prix vérifié vaut mieux que dix approximatifs. Ne devinez jamais un montant.</p>
+
+      <div class="panel flush">
+        <div class="tabs"><span class="tab">Lien web</span><span class="tab on">Commerce de proximité</span></div>
+        <div class="panel-b" style="display:grid;grid-template-columns:1fr 250px;gap:26px">
+          <div style="display:flex;flex-direction:column;gap:15px">
+            <div class="field"><label class="lab">Nom du commerce</label><input class="inp" placeholder="Hanout Chez Rachid, Souk El Had…"></div>
+            <div class="field"><label class="lab">Adresse</label><input class="inp" placeholder="Rue, quartier, ville"></div>
+            <div class="field"><label class="lab">Lien Google Maps <s>— facultatif</s></label><input class="inp" placeholder="https://maps.app.goo.gl/…"><span class="hint">Aide les autres membres à trouver le commerce du premier coup.</span></div>
+            <div class="field"><label class="lab">Ce que vous avez trouvé</label><input class="inp" placeholder="Ex. Sardines Titus 125 g, lot de 4"></div>
+            <div style="display:flex;gap:12px">
+              <div class="field" style="flex:1"><label class="lab">Prix constaté</label><input class="inp" placeholder="0,00 MAD"></div>
+              <div class="field" style="flex:1"><label class="lab">Prix habituel <s>— facultatif</s></label><input class="inp" placeholder="0,00 MAD"></div>
+            </div>
+            <div class="field"><label class="lab">Détails</label><textarea class="inp" rows="3" placeholder="Conditions, stock, durée de l'offre…"></textarea></div>
+            <div class="field"><label class="lab">Photo du produit ou de l'étiquette</label>
+              <div style="border:1px dashed var(--rule-2);border-radius:10px;padding:20px;text-align:center;background:var(--surf-2);cursor:pointer">
+                <span class="sub">Déposez une image ici, ou <span style="color:var(--argan);font-weight:500">parcourez vos fichiers</span></span>
+              </div>
+            </div>
+            <div class="divide" style="margin:2px 0"></div>
+            <div class="field"><label class="lab">Contact WhatsApp du commerçant <s>— facultatif</s></label><input class="inp" placeholder="+212 …"></div>
+            <label class="check on"><i></i><span>Le commerçant m'a autorisé à publier son numéro WhatsApp sur Fidwastafid. Je comprends qu'il sera visible publiquement et qu'il pourra demander son retrait à tout moment.</span></label>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
+              <div style="width:150px;height:60px;border:1px solid var(--rule-2);border-radius:8px;background:var(--surf-2);display:flex;align-items:center;justify-content:center"><span class="hint">Turnstile</span></div>
+              <button class="btn btn-1" style="margin-left:auto;min-height:44px;padding:0 24px">Envoyer pour validation</button>
+            </div>
+          </div>
+          <aside style="display:flex;flex-direction:column;gap:16px;border-left:1px solid var(--rule);padding-left:22px">
+            <div><h4 style="font-size:11px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Avant d'envoyer</h4>
+              <p class="hint">Le prix doit avoir été vu de vos yeux, aujourd'hui ou hier. En cas de doute sur un montant, ne le publiez pas : un deal rejeté vaut mieux qu'un prix inventé.</p></div>
+            <div><h4 style="font-size:11px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Ce qui se passe ensuite</h4>
+              <p class="hint">Votre soumission part en file de validation. Un modérateur la relit — comptez quelques heures. Vous recevez un e-mail dans les deux cas.</p></div>
+            <div><h4 style="font-size:11px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Vos données</h4>
+              <p class="hint">Traitement déclaré auprès de la CNDP. Vous pouvez consulter, corriger ou supprimer vos données depuis votre compte.</p></div>
+          </aside>
+        </div>
+      </div>
+    </div></div>
+  </div></div>
+</section>
+
+<!-- ══════════ 6 · CONNEXION ══════════ -->
+<section class="screen">
+  <div class="screen-head"><span class="screen-tag">06</span><span class="screen-name">Connexion</span><span class="screen-url">/connexion</span></div>
+  <p class="screen-why">Le sceau porte l'identité, pas la couleur. Une action pleine, une seule — et le lien vers l'inscription reste un lien, pas un second bouton concurrent.</p>
+  <div class="frame"><div class="app">
+    <header class="hdr"><a href="#" class="seal">فيد و ستافيد</a><div class="hdr-r" style="margin-left:auto"><button class="btn btn-3">Retour au feed</button></div></header>
+    <div class="main"><div class="auth">
+      <div style="text-align:center;margin-bottom:22px">
+        <h1 class="h2" style="font-size:21px">Content de vous revoir</h1>
+        <p class="sub" style="margin-top:4px">Connectez-vous pour voter et partager vos trouvailles.</p>
+      </div>
+      <div class="panel" style="display:flex;flex-direction:column;gap:14px">
+        <div class="field"><label class="lab">Adresse e-mail</label><input class="inp" placeholder="vous@exemple.ma"></div>
+        <div class="field">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><label class="lab">Mot de passe</label><a href="#" style="font-size:11.5px;color:var(--argan);text-decoration:none">Oublié ?</a></div>
+          <input class="inp" type="password" placeholder="••••••••">
+        </div>
+        <button class="btn btn-1" style="min-height:44px">Se connecter</button>
+        <div class="orline">ou</div>
+        <button class="btn btn-2">Continuer avec Google</button>
+      </div>
+      <p class="sub" style="text-align:center;margin-top:16px;font-size:12.5px">Pas encore de compte ? <a href="#" style="color:var(--argan);font-weight:500;text-decoration:none">Créer un compte</a></p>
+      <p class="hint" style="text-align:center;margin-top:14px">En vous connectant, vous acceptez nos conditions d'utilisation. Vos données sont traitées conformément à la loi 09-08.</p>
+    </div></div>
+  </div></div>
+</section>
+
+<!-- ══════════ 7 · COMPTE ══════════ -->
+<section class="screen">
+  <div class="screen-head"><span class="screen-tag">07</span><span class="screen-name">Mon compte</span><span class="screen-url">/compte</span></div>
+  <p class="screen-why">Les couleurs d'avatar sont le seul endroit du site où la palette s'ouvre — c'est de l'expression personnelle, pas du chrome. La suppression de compte utilise le braise en contour : visible, jamais alarmiste tant qu'on ne l'a pas cliquée.</p>
+  <div class="frame"><div class="app">
+    <header class="hdr">
+      <a href="#" class="seal">فيد و ستافيد</a>
+      <nav class="nav"><a href="#">Deals</a><a href="#">Enseignes</a><a href="#">Villes</a><a href="#">Soumettre</a></nav>
+      <div class="hdr-r" style="margin-left:auto"><div class="avatar">K</div></div>
+    </header>
+    <div class="main"><div class="wrap"><div class="acct">
+      <nav class="side"><a href="#" class="on">Profil</a><a href="#">Mes deals</a><a href="#">Deals enregistrés</a><a href="#">Notifications</a><a href="#">Confidentialité</a></nav>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="panel" style="display:flex;gap:20px;align-items:center">
+          <div class="avatar-lg" style="background:#2C5545">K</div>
+          <div style="flex:1">
+            <h1 class="h2" style="font-size:19px">Kamel</h1>
+            <p class="sub" style="font-size:12.5px">kamel@exemple.ma · membre depuis mars 2026</p>
+            <div class="swatch" style="margin-top:11px"><i class="on" style="background:#2C5545"></i><i style="background:#AD4527"></i><i style="background:#54707F"></i><i style="background:#7C6015"></i><i style="background:#5A4A6B"></i><i style="background:#1A1815"></i></div>
+          </div>
+          <div class="stats"><div class="stat"><b>31</b><span>Soumis</span></div><div class="stat"><b>27</b><span>Validés</span></div><div class="stat"><b>412</b><span>Réputation</span></div></div>
+        </div>
+
+        <div class="panel flush">
+          <div class="panel-t"><h2 class="h3">Profil consommateur</h2><span class="sub" style="margin-left:auto;font-size:12px">Facultatif — sert à mieux vous proposer des deals</span></div>
+          <div class="panel-b" style="display:flex;flex-direction:column;gap:16px">
+            <div><div class="lab" style="margin-bottom:8px">Ville</div><div style="display:flex;gap:7px;flex-wrap:wrap"><span class="chip chip-sm on">Casablanca</span><span class="chip chip-sm">Rabat</span><span class="chip chip-sm">Marrakech</span><span class="chip chip-sm">Tanger</span><span class="chip chip-sm">Fès</span><span class="chip chip-sm">Agadir</span></div></div>
+            <div><div class="lab" style="margin-bottom:8px">Tranche d'âge</div><div style="display:flex;gap:7px;flex-wrap:wrap"><span class="chip chip-sm">18–24</span><span class="chip chip-sm on">25–34</span><span class="chip chip-sm">35–44</span><span class="chip chip-sm">45–54</span><span class="chip chip-sm">55+</span></div></div>
+            <div><div class="lab" style="margin-bottom:8px">Centres d'intérêt</div><div style="display:flex;gap:7px;flex-wrap:wrap"><span class="chip chip-sm on">Alimentaire</span><span class="chip chip-sm on">Électroménager</span><span class="chip chip-sm">Mode</span><span class="chip chip-sm">Téléphonie</span><span class="chip chip-sm">Voyage</span></div></div>
+            <div style="display:flex"><button class="btn btn-1" style="margin-left:auto">Enregistrer les modifications</button></div>
+          </div>
+        </div>
+
+        <div class="panel flush">
+          <div class="panel-t"><h2 class="h3">Vos données</h2></div>
+          <div class="panel-b" style="display:flex;flex-direction:column;gap:12px">
+            <p class="hint" style="max-width:560px">La loi 09-08 vous donne un droit d'accès, de rectification, d'opposition et de suppression sur vos données personnelles. Vous pouvez l'exercer ici directement, sans passer par le support.</p>
+            <div style="display:flex;gap:9px;flex-wrap:wrap">
+              <button class="btn btn-2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v13"/><path d="m8 12 4 4 4-4"/><path d="M4 21h16"/></svg>Exporter mes données</button>
+              <button class="btn btn-2">Corriger une information</button>
+              <button class="btn btn-danger">Supprimer mon compte</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div></div>
+  </div></div>
+</section>
+
+<!-- ══════════ 8 · ADMIN ══════════ -->
+<section class="screen">
+  <div class="screen-head"><span class="screen-tag">08</span><span class="screen-name">Back-office — file de validation</span><span class="screen-url">/admin/validation</span></div>
+  <p class="screen-why">Densité assumée : lignes de tableau, pas de cartes. Valider est l'action pleine, rejeter reste un contour braise — parce qu'un rejet est réversible et ne mérite pas un bouton rouge plein.</p>
+  <div class="frame"><div class="app">
+    <header class="hdr" style="background:var(--ink)">
+      <a href="#" class="seal" style="color:var(--plat)">فيد و ستافيد</a>
+      <span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(244,241,236,.5);border:1px solid rgba(244,241,236,.22);padding:3px 9px;border-radius:3px;margin-left:6px">Admin</span>
+      <nav class="nav" style="margin-left:8px"><a href="#" class="on" style="color:var(--plat);box-shadow:inset 0 -2px 0 var(--plat)">Validation</a><a href="#" style="color:rgba(244,241,236,.6)">Deals</a><a href="#" style="color:rgba(244,241,236,.6)">Membres</a><a href="#" style="color:rgba(244,241,236,.6)">Journal d'audit</a></nav>
+      <div class="hdr-r" style="margin-left:auto"><div class="avatar" style="background:var(--plat);color:var(--ink)">K</div></div>
+    </header>
+    <div class="main"><div class="wrap">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
+        <h1 class="h2">File de validation</h1><span class="badge b-wait">23 en attente</span>
+        <div style="margin-left:auto;display:flex;gap:8px"><span class="chip chip-sm on">Robot</span><span class="chip chip-sm">Communauté</span><span class="chip chip-sm">Terrain</span></div>
+      </div>
+      <div class="panel flush">
+        <table class="tbl">
+          <thead><tr><th style="width:56px"></th><th>Titre</th><th>Source</th><th style="text-align:right">Prix</th><th style="width:60px">Confiance</th><th style="width:190px"></th></tr></thead>
+          <tbody>
+            <tr>
+              <td><div class="tmini t-oil" style="--x:0"></div></td>
+              <td><b style="font-weight:500">Pack 6 × huile d'olive Mabrouka 1L</b><div class="src">bringo.ma · auto_draft · il y a 12 min</div></td>
+              <td><span class="chip chip-sm" style="cursor:default">Bringo</span></td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums"><b style="font-weight:600">289</b> <span style="color:var(--muted)">/ 420</span></td>
+              <td><span class="badge b-new">98%</span></td>
+              <td style="text-align:right"><button class="btn btn-3 btn-sm">Voir</button> <button class="btn btn-danger btn-sm">Rejeter</button> <button class="btn btn-1 btn-sm">Valider</button></td>
+            </tr>
+            <tr>
+              <td><div class="tmini t-shoe"></div></td>
+              <td><b style="font-weight:500">Sneakers New Balance 574 — tailles 40 à 45</b><div class="src">soumission terrain · Nadia_Bnk · il y a 40 min</div></td>
+              <td><span class="chip chip-sm" style="cursor:default">Marwa Sport</span></td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums"><b style="font-weight:600">649</b> <span style="color:var(--muted)">/ 1 099</span></td>
+              <td><span class="badge b-wait">à voir</span></td>
+              <td style="text-align:right"><button class="btn btn-3 btn-sm">Voir</button> <button class="btn btn-danger btn-sm">Rejeter</button> <button class="btn btn-1 btn-sm">Valider</button></td>
+            </tr>
+            <tr>
+              <td><div class="tmini t-tv"></div></td>
+              <td><b style="font-weight:500">TV LED TCL 55" 4K QLED</b><div class="src">electroplanet.ma · auto_draft · il y a 2h</div></td>
+              <td><span class="chip chip-sm" style="cursor:default">Electroplanet</span></td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums"><b style="font-weight:600">4 190</b> <span style="color:var(--muted)">/ 5 490</span></td>
+              <td><span class="badge b-new">94%</span></td>
+              <td style="text-align:right"><button class="btn btn-3 btn-sm">Voir</button> <button class="btn btn-danger btn-sm">Rejeter</button> <button class="btn btn-1 btn-sm">Valider</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint" style="margin-top:12px">Chaque validation et chaque rejet sont écrits dans le journal d'audit avec l'identifiant du modérateur et l'horodatage.</p>
+    </div></div>
+  </div></div>
+</section>
+
+<div class="verdict">
+  <h2>Périmètre du lot</h2>
+  <p>Rien ici ne déplace un élément : mêmes gabarits, mêmes composants, même arborescence. Le lot se limite aux tokens Tailwind, aux primitives (<code>Button</code>, <code>Chip</code>, <code>Input</code>, <code>Badge</code>), au <code>DealCard</code> et au chrome (header, subbar, footer).</p>
+  <p>Trois règles à graver, parce que ce sont elles qui empêchent la dérive de revenir : une seule action pleine par écran ; le gris pâle interdit sur tout ce qui est cliquable ; braise et glacé réservés à la température, jamais réutilisés pour autre chose.</p>
+  <p>Le back-office inverse volontairement son chrome en encre : il est ainsi impossible de confondre l'admin et le site public d'un coup d'œil, ce qui a une vraie valeur opérationnelle. C'est le seul écart au système.</p>
+</div>
+
+</div>
+</body>
+</html>
