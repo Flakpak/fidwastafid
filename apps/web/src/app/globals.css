@@ -31,22 +31,10 @@
   --color-warn: #7c6015;           /* file d'attente, alertes de prix */
   --color-warn-soft: #f5eedd;      /* fond associé */
 
-  /* ─── Anciens tokens v1 — EN COURS DE RETRAIT ────────────────────────────
-     rouge / orange / vert / bleu supprimés au lot 1 ; `or` supprimé ici au
-     lot 2a — ses seuls usages restants (admin/, soumettre/) sont hors
-     périmètre assumé. `creme` est CONSERVÉ à dessein : contrairement à
-     l'hypothèse du lot 2a, il n'est pas propre au chrome — c'est le fond de
-     page (`bg-creme`) d'une quinzaine de vues encore non migrées (connexion,
-     inscription, enseigne, admin, compte, deal…). Le supprimer viderait leur
-     fond en silence ; retrait reporté au lot qui migre ces vues en
-     surface-base. rouge-clair / texte / muted / bordure / sombre : idem,
-     migrés vue par vue. */
-  --color-rouge-clair: #ff6b6b; /* --rouge2 */
-  --color-creme: #f8f6f2; /* --bg — fond de page legacy, retrait différé (voir ci-dessus) */
-  --color-texte: #1a1a1a; /* --text */
-  --color-muted: #888888; /* --muted */
-  --color-bordure: #e8e4de; /* --border */
-  --color-sombre: #1e1e1e; /* --dark */
+  /* Anciens tokens v1 (rouge / orange / vert / bleu / or / creme / rouge-clair /
+     texte / muted / bordure / sombre) : ENTIÈREMENT RETIRÉS — migration UI
+     Tadelakt terminée (lots 1 → 2b). Ne subsistent que la palette Tadelakt
+     ci-dessus et les teintes d'avatar ci-dessous. */
 
   /* Couleurs d'avatar — espace membre (CONTRAT-V1 §4, amendement
      16/07/2026). Seul endroit où la palette s'ouvre (rôle « avatars » de la

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const TAGLINE_AR = "فيد و ستافيد — شارك لهميزات ديالك و خلي غيرك يستافد 🔥";
+const TAGLINE_AR = "فيد و ستافيد — شارك لهميزات ديالك و خلي غيرك يستافد";
 
 /**
  * Effet machine à écrire, porté tel quel depuis HeroBand (index.html
@@ -33,7 +33,7 @@ export function HeroArabicTypewriter() {
   }, []);
 
   return (
-    <div className="font-arabic text-muted text-xl leading-relaxed" dir="rtl">
+    <div className="font-arabic text-ink-muted text-xl leading-relaxed" dir="rtl">
       {displayed}
       {!done && <span aria-hidden="true" className="hero-cursor" />}
     </div>
