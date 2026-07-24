@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { connexionAction } from "../../lib/authActions.js";
 import { safeNextPath } from "../../lib/nextPath.js";
 import { SubmitButton } from "../../components/SubmitButton.js";
+import { Input } from "../../components/Input.js";
+import { buttonClasses } from "../../components/Button.js";
 
 /** noindex — CONTRAT-V1 §2. */
 export const metadata: Metadata = {
@@ -18,38 +20,36 @@ export default async function ConnexionPage({
   const next = safeNextPath(rawNext);
 
   return (
-    <main className="min-h-screen bg-creme text-texte flex items-center justify-center p-6">
+    <main className="min-h-screen bg-surface-base text-ink flex items-center justify-center p-6">
       <form
         action={connexionAction}
-        className="w-full max-w-sm flex flex-col gap-4 bg-white border border-bordure rounded-lg p-6"
+        className="w-full max-w-sm flex flex-col gap-4 bg-surface border border-border rounded-lg p-6"
       >
-        <h1 className="font-arabic text-2xl text-rouge">تسجيل الدخول</h1>
-        <p className="text-sm text-muted">Connexion</p>
+        <h1 className="font-arabic text-2xl text-ink">تسجيل الدخول</h1>
+        <p className="text-sm text-ink-muted">Connexion</p>
         {erreur === "confirmation" && (
-          <p className="text-sm text-rouge">
-            Lien de confirmation invalide ou expiré. Réessaie de t&apos;inscrire.
-          </p>
+          <p className="text-sm text-warn">Lien de confirmation invalide ou expiré. Réessaie de t&apos;inscrire.</p>
         )}
-        {erreur && erreur !== "confirmation" && <p className="text-sm text-rouge">Identifiants invalides.</p>}
+        {erreur && erreur !== "confirmation" && <p className="text-sm text-warn">Identifiants invalides.</p>}
         <input type="hidden" name="next" value={next} />
         <label className="flex flex-col gap-1 text-sm">
           Email
-          <input type="email" name="email" required className="border border-bordure rounded px-3 py-2" />
+          <Input type="email" name="email" required />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           Mot de passe
-          <input type="password" name="password" required minLength={8} className="border border-bordure rounded px-3 py-2" />
+          <Input type="password" name="password" required minLength={8} />
         </label>
-        <SubmitButton pendingLabel="Connexion..." className="bg-rouge text-white rounded px-4 py-2 font-bold">
+        <SubmitButton pendingLabel="Connexion..." className={buttonClasses({ variant: "primary" })}>
           Se connecter
         </SubmitButton>
         <a
           href={next === "/" ? "/inscription" : `/inscription?next=${encodeURIComponent(next)}`}
-          className="text-sm text-center text-muted underline"
+          className="text-sm text-center text-accent hover:underline"
         >
           Pas de compte ? Inscris-toi
         </a>
-        <a href="/mot-de-passe-oublie" className="text-xs text-center text-muted hover:underline">
+        <a href="/mot-de-passe-oublie" className="text-xs text-center text-accent hover:underline">
           Mot de passe oublié ?
         </a>
       </form>

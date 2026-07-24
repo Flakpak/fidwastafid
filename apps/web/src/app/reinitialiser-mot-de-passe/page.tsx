@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { resolveCurrentUser } from "../../lib/currentUser.js";
 import { reinitialiserMotDePasseAction } from "../../lib/authActions.js";
 import { SubmitButton } from "../../components/SubmitButton.js";
+import { Input } from "../../components/Input.js";
+import { buttonClasses } from "../../components/Button.js";
 
 /** noindex — CONTRAT-V1 §2, même famille que /connexion. */
 export const metadata: Metadata = {
@@ -19,28 +21,20 @@ function NouveauMotDePasseForm({ erreur }: { erreur?: string }) {
   return (
     <form
       action={reinitialiserMotDePasseAction}
-      className="w-full max-w-sm flex flex-col gap-4 bg-white border border-bordure rounded-lg p-6"
+      className="w-full max-w-sm flex flex-col gap-4 bg-surface border border-border rounded-lg p-6"
     >
-      <h1 className="text-2xl font-bold text-rouge">Nouveau mot de passe</h1>
-      {erreur === "confirmation" && (
-        <p className="text-sm text-rouge">Les deux mots de passe ne correspondent pas.</p>
-      )}
-      {erreur === "echec" && <p className="text-sm text-rouge">Réinitialisation impossible, réessaie.</p>}
+      <h1 className="text-2xl font-bold text-ink">Nouveau mot de passe</h1>
+      {erreur === "confirmation" && <p className="text-sm text-warn">Les deux mots de passe ne correspondent pas.</p>}
+      {erreur === "echec" && <p className="text-sm text-warn">Réinitialisation impossible, réessaie.</p>}
       <label className="flex flex-col gap-1 text-sm">
         Nouveau mot de passe
-        <input type="password" name="password" required minLength={8} className="border border-bordure rounded px-3 py-2" />
+        <Input type="password" name="password" required minLength={8} />
       </label>
       <label className="flex flex-col gap-1 text-sm">
         Confirme le mot de passe
-        <input
-          type="password"
-          name="passwordConfirmation"
-          required
-          minLength={8}
-          className="border border-bordure rounded px-3 py-2"
-        />
+        <Input type="password" name="passwordConfirmation" required minLength={8} />
       </label>
-      <SubmitButton pendingLabel="Enregistrement..." className="bg-rouge text-white rounded px-4 py-2 font-bold">
+      <SubmitButton pendingLabel="Enregistrement..." className={buttonClasses({ variant: "primary" })}>
         Enregistrer
       </SubmitButton>
     </form>
@@ -49,13 +43,13 @@ function NouveauMotDePasseForm({ erreur }: { erreur?: string }) {
 
 function LienInvalide() {
   return (
-    <div className="max-w-sm text-center bg-white border border-bordure rounded-lg p-6 flex flex-col gap-3">
+    <div className="max-w-sm text-center bg-surface border border-border rounded-lg p-6 flex flex-col gap-3">
       <h1 className="text-xl font-bold">Lien invalide ou expiré</h1>
-      <p className="text-muted">
+      <p className="text-ink-muted">
         Ce lien de réinitialisation n&apos;est plus valable — il n&apos;est utilisable qu&apos;une fois et expire
         après un certain délai.
       </p>
-      <Link href="/mot-de-passe-oublie" className="text-sm text-bleu font-bold hover:underline">
+      <Link href="/mot-de-passe-oublie" className="text-sm text-accent font-bold hover:underline">
         Demander un nouveau lien
       </Link>
     </div>
@@ -88,7 +82,7 @@ export default async function ReinitialiserMotDePassePage({ searchParams }: Page
 
   if (erreur === "invalide") {
     return (
-      <main className="min-h-screen bg-creme text-texte flex items-center justify-center p-6">
+      <main className="min-h-screen bg-surface-base text-ink flex items-center justify-center p-6">
         <LienInvalide />
       </main>
     );
@@ -98,7 +92,7 @@ export default async function ReinitialiserMotDePassePage({ searchParams }: Page
   if (!user) redirect("/mot-de-passe-oublie");
 
   return (
-    <main className="min-h-screen bg-creme text-texte flex items-center justify-center p-6">
+    <main className="min-h-screen bg-surface-base text-ink flex items-center justify-center p-6">
       <NouveauMotDePasseForm erreur={erreur === "confirmation" || erreur === "echec" ? erreur : undefined} />
     </main>
   );

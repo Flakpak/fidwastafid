@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "r
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { VILLES, CATEGORIES, type Enseigne } from "@fidwastafid/schemas";
+import { Input, Textarea } from "../../components/Input.js";
+import { Button } from "../../components/Button.js";
 
 interface ApiErrorBody {
   error?: { code?: string; message?: string; fields?: Record<string, string> };
@@ -39,13 +41,17 @@ function safeResetTurnstile() {
   }
 }
 
+/** Style des <select> et de l'input fichier (les <input>/<textarea> texte
+ *  passent par les primitives Input/Textarea). Même registre visuel Tadelakt. */
 function fieldClass(hasError: boolean): string {
-  return `border rounded px-3 py-2 font-normal ${hasError ? "border-rouge" : "border-bordure"}`;
+  return `w-full rounded-[9px] border bg-surface px-3 py-2 font-normal text-sm text-ink focus:border-accent focus:outline-none max-sm:min-h-11 ${
+    hasError ? "border-warn" : "border-border-strong"
+  }`;
 }
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p className="text-rouge text-xs font-semibold mt-0.5">{message}</p>;
+  return <p className="text-warn text-xs font-semibold mt-0.5">{message}</p>;
 }
 
 /** Sentinel du <select> enseigne — jamais un vrai slug (CONTRAT-V1 §3,
@@ -336,7 +342,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
 
   if (done) {
     return (
-      <p className="bg-white border border-bordure rounded-xl p-5 text-center font-bold">
+      <p className="bg-surface border border-border rounded-xl p-5 text-center font-bold">
         Merci ! Ton bon plan est envoyé, il sera visible après validation.
       </p>
     );
@@ -347,15 +353,15 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       ref={formRef}
       onSubmit={submit}
       onChange={saveDraft}
-      className="bg-white border border-bordure rounded-xl p-5 flex flex-col gap-3"
+      className="bg-surface border border-border rounded-xl p-5 flex flex-col gap-3"
     >
       {/* Charte de publication — encart court, en tête du formulaire. */}
-      <div className="bg-creme border border-bordure rounded-lg p-3 text-xs text-muted leading-relaxed">
+      <div className="bg-surface-subtle border border-border rounded-lg p-3 text-xs text-ink-muted leading-relaxed">
         <p>
-          <strong className="text-texte">Charte de publication :</strong> un bon plan = une offre d&apos;un
+          <strong className="text-ink">Charte de publication :</strong> un bon plan = une offre d&apos;un
           commerce, accessible à tous au même prix. Pas de vente entre particuliers, pas d&apos;annonces
           personnelles. Les deals sont validés par la modération avant publication.{" "}
-          <Link href="/charte" className="text-bleu font-bold hover:underline">
+          <Link href="/charte" className="text-accent font-bold hover:underline">
             Lire la charte complète
           </Link>
           .
@@ -363,14 +369,14 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       </div>
 
       {error && (
-        <div role="alert" className="bg-white border border-rouge/40 rounded-lg p-3 flex flex-col gap-2 text-sm">
-          <p className="text-rouge font-bold">{error.message}</p>
+        <div role="alert" className="bg-surface border border-warn/40 rounded-lg p-3 flex flex-col gap-2 text-sm">
+          <p className="text-warn font-bold">{error.message}</p>
           {error.unauthenticated && (
             <div className="flex gap-4 font-bold">
-              <Link href="/connexion?next=/soumettre" className="text-bleu hover:underline">
+              <Link href="/connexion?next=/soumettre" className="text-accent hover:underline">
                 Se connecter
               </Link>
-              <Link href="/inscription?next=/soumettre" className="text-bleu hover:underline">
+              <Link href="/inscription?next=/soumettre" className="text-accent hover:underline">
                 Créer un compte
               </Link>
             </div>
@@ -380,7 +386,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
 
       <label className="flex flex-col gap-1 text-sm font-bold">
         Titre
-        <input name="titre" required minLength={3} maxLength={200} className={fieldClass(Boolean(error?.fields?.titre))} />
+        <Input name="titre" required minLength={3} maxLength={200} invalid={Boolean(error?.fields?.titre)} />
         <FieldError message={error?.fields?.titre} />
       </label>
 
@@ -393,7 +399,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
           onChange={handlePhotoChange}
           className={fieldClass(Boolean(photoError ?? error?.fields?.image))}
         />
-        <span className="text-xs text-muted font-normal">
+        <span className="text-xs text-ink-subtle font-normal">
           Photographie l&apos;étiquette ou le produit — utile pour un hanout sans lien, ou si le lien ne fournit pas
           d&apos;image (jpeg/png/webp, 5 Mo max).
         </span>
@@ -407,9 +413,9 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
           <img
             src={photoPreviewUrl}
             alt="Aperçu de la photo sélectionnée"
-            className="max-h-32 w-auto object-contain border border-bordure rounded"
+            className="max-h-32 w-auto object-contain border border-border rounded"
           />
-          <button type="button" onClick={handleRemovePhoto} className="text-xs font-bold text-rouge hover:underline">
+          <button type="button" onClick={handleRemovePhoto} className="text-xs font-bold text-ink-muted hover:text-ink hover:underline">
             Retirer la photo
           </button>
         </div>
@@ -421,7 +427,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
           name="enseigneSlug"
           value={enseigneSlug}
           onChange={(e) => setEnseigneSlug(e.target.value)}
-          className="border border-bordure rounded px-3 py-2 font-normal"
+          className={fieldClass(false)}
         >
           <option value="">— Aucune enseigne —</option>
           <option value={AUTRE_COMMERCE}>Autre commerce (hanout, marché, boutique...)</option>
@@ -436,11 +442,11 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       {enseigneSlug === AUTRE_COMMERCE && (
         <label className="flex flex-col gap-1 text-sm font-bold">
           Nom du commerce
-          <input
+          <Input
             name="nomVendeur"
             maxLength={80}
             placeholder="ex. : Hanout Si Mohamed"
-            className={fieldClass(Boolean(error?.fields?.nomVendeur))}
+            invalid={Boolean(error?.fields?.nomVendeur)}
           />
           <FieldError message={error?.fields?.nomVendeur} />
         </label>
@@ -452,7 +458,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
           name="type"
           value={type}
           onChange={(e) => setType(e.target.value as typeof type)}
-          className="border border-bordure rounded px-3 py-2 font-normal"
+          className={fieldClass(false)}
         >
           <option value="physique">En magasin</option>
           <option value="en_ligne">En ligne</option>
@@ -476,27 +482,27 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       )}
 
       {type !== "en_ligne" && (
-        <div className="border border-bordure rounded-lg p-3 flex flex-col gap-3">
+        <div className="border border-border rounded-lg p-3 flex flex-col gap-3">
           <p className="text-sm font-black">Où trouver ce bon plan ?</p>
           <label className="flex flex-col gap-1 text-sm font-bold">
             Adresse ou repère (facultatif)
-            <input
+            <Input
               name="adresse"
               maxLength={200}
               placeholder="ex. : marché Derb Ghallef, allée 3"
-              className={fieldClass(Boolean(error?.fields?.adresse))}
+              invalid={Boolean(error?.fields?.adresse)}
             />
             <FieldError message={error?.fields?.adresse} />
           </label>
           <label className="flex flex-col gap-1 text-sm font-bold">
             Lien Google Maps (facultatif)
-            <input
+            <Input
               name="lienMaps"
               type="url"
               placeholder="https://maps.app.goo.gl/..."
-              className={fieldClass(Boolean(error?.fields?.lienMaps))}
+              invalid={Boolean(error?.fields?.lienMaps)}
             />
-            <span className="text-xs text-muted font-normal">Depuis Maps : Partager → Copier le lien.</span>
+            <span className="text-xs text-ink-subtle font-normal">Depuis Maps : Partager → Copier le lien.</span>
             <FieldError message={error?.fields?.lienMaps} />
           </label>
         </div>
@@ -505,7 +511,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       {type !== "physique" && (
         <label className="flex flex-col gap-1 text-sm font-bold">
           Lien de l&apos;offre
-          <input name="lien" type="url" required className={fieldClass(Boolean(error?.fields?.lien))} />
+          <Input name="lien" type="url" required invalid={Boolean(error?.fields?.lien)} />
           <FieldError message={error?.fields?.lien} />
         </label>
       )}
@@ -525,24 +531,26 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       <div className="flex gap-3">
         <label className="flex-1 min-w-0 flex flex-col gap-1 text-sm font-bold">
           Prix promo (DH)
-          <input
+          <Input
             name="prixPromo"
             type="number"
             step="0.01"
             min="0.01"
             required
-            className={`w-full min-w-0 ${fieldClass(Boolean(error?.fields?.prixPromo))}`}
+            className="min-w-0"
+            invalid={Boolean(error?.fields?.prixPromo)}
           />
           <FieldError message={error?.fields?.prixPromo} />
         </label>
         <label className="flex-1 min-w-0 flex flex-col gap-1 text-sm font-bold">
           Prix normal (DH)
-          <input
+          <Input
             name="prixNormal"
             type="number"
             step="0.01"
             min="0.01"
-            className={`w-full min-w-0 ${fieldClass(Boolean(error?.fields?.prixNormal))}`}
+            className="min-w-0"
+            invalid={Boolean(error?.fields?.prixNormal)}
           />
           <FieldError message={error?.fields?.prixNormal} />
         </label>
@@ -550,35 +558,35 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
 
       <label className="flex flex-col gap-1 text-sm font-bold">
         Fin de l&apos;offre
-        <input name="dateFin" type="date" className={fieldClass(Boolean(error?.fields?.dateFin))} />
+        <Input name="dateFin" type="date" invalid={Boolean(error?.fields?.dateFin)} />
         <FieldError message={error?.fields?.dateFin} />
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-bold">
         Description
-        <textarea
+        <Textarea
           name="description"
           maxLength={2000}
           rows={3}
-          className={fieldClass(Boolean(error?.fields?.description))}
+          invalid={Boolean(error?.fields?.description)}
         />
         <FieldError message={error?.fields?.description} />
       </label>
 
-      <div className="border border-bordure rounded-lg p-3 flex flex-col gap-3">
+      <div className="border border-border rounded-lg p-3 flex flex-col gap-3">
         <p className="text-sm font-black">Contact vendeur (facultatif)</p>
         <label className="flex flex-col gap-1 text-sm font-bold">
           Numéro WhatsApp du vendeur
-          <input
+          <Input
             name="whatsappContact"
             type="tel"
             placeholder="0612345678 ou +212612345678"
-            className={fieldClass(Boolean(error?.fields?.whatsappContact))}
+            invalid={Boolean(error?.fields?.whatsappContact)}
           />
           <FieldError message={error?.fields?.whatsappContact} />
         </label>
         <label className="flex items-start gap-2 text-sm font-normal">
-          <input type="checkbox" name="whatsappPublic" className="mt-0.5" />
+          <input type="checkbox" name="whatsappPublic" className="mt-0.5 accent-accent" />
           <span>
             J&apos;autorise l&apos;affichage public de ce numéro sur le deal (sinon il reste visible uniquement
             par la modération).
@@ -588,13 +596,9 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
 
       <div className="cf-turnstile" data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} />
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="self-start bg-rouge text-white rounded-lg px-5 py-2 font-bold disabled:opacity-50"
-      >
-        {pending ? "Publication..." : "Envoyer"}
-      </button>
+      <Button variant="primary" type="submit" disabled={pending} className="self-start">
+        {pending ? "Publication..." : "Envoyer pour validation"}
+      </Button>
     </form>
   );
 }
