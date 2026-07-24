@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Textarea } from "../../../components/Input.js";
+import { Button } from "../../../components/Button.js";
 
 interface ApiErrorBody {
   error?: { code?: string };
@@ -50,7 +52,7 @@ export function CommentForm({ publicId }: { publicId: string }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-2">
-      <textarea
+      <Textarea
         value={contenu}
         onChange={(e) => setContenu(e.target.value)}
         required
@@ -58,16 +60,11 @@ export function CommentForm({ publicId }: { publicId: string }) {
         maxLength={2000}
         rows={3}
         placeholder="Un avis sur ce bon plan ?"
-        className="border border-bordure rounded px-3 py-2 text-sm"
       />
-      <button
-        type="submit"
-        disabled={pending}
-        className="self-start bg-rouge text-white rounded px-4 py-2 font-bold text-sm disabled:opacity-50"
-      >
-        {pending ? "Envoi..." : "Commenter"}
-      </button>
-      {error && <p className="text-sm text-rouge">{error}</p>}
+      <Button variant="secondary" type="submit" disabled={pending} className="self-start">
+        {pending ? "Envoi..." : "Publier"}
+      </Button>
+      {error && <p className="text-sm text-warn">{error}</p>}
     </form>
   );
 }

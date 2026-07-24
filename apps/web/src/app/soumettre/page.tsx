@@ -30,7 +30,7 @@ export default async function SoumettrePage() {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
-    <div className="min-h-screen bg-creme text-texte">
+    <div className="min-h-screen bg-surface-base text-ink">
       <SiteHeader />
       <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" nonce={nonce} />
 
@@ -45,13 +45,13 @@ export default async function SoumettrePage() {
          * l'envoi, pour le cas où la session expire entre-temps).
          */}
         {!user && (
-          <div className="bg-creme border-2 border-or/70 rounded-xl p-4 flex flex-col gap-2 shadow-sm">
+          <div className="bg-warn-soft border border-warn/40 rounded-xl p-4 flex flex-col gap-2">
             <p className="text-sm font-bold">Tu dois être connecté pour publier ton bon plan.</p>
             <div className="flex gap-4 text-sm font-bold">
-              <Link href="/connexion?next=/soumettre" className="text-bleu hover:underline">
+              <Link href="/connexion?next=/soumettre" className="text-accent hover:underline">
                 Se connecter
               </Link>
-              <Link href="/inscription?next=/soumettre" className="text-bleu hover:underline">
+              <Link href="/inscription?next=/soumettre" className="text-accent hover:underline">
                 Créer un compte
               </Link>
             </div>
