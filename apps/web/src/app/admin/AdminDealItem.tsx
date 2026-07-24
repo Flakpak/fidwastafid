@@ -76,9 +76,9 @@ interface Action {
 }
 
 const ACTION_CLASSES: Record<Action["variant"], string> = {
-  primaire: "bg-vert text-white",
-  danger: "border border-rouge text-rouge",
-  neutre: "border border-bordure text-muted",
+  primaire: "bg-ink text-surface-base hover:bg-[#332e28]",
+  danger: "bg-surface border border-[#e4c3b7] text-hot hover:bg-hot-soft",
+  neutre: "bg-surface border border-border-strong text-ink hover:bg-surface-subtle",
 };
 
 function remise(deal: DealAdmin): number {
@@ -91,12 +91,14 @@ function remise(deal: DealAdmin): number {
  *  publique) qui ne doivent pas dépendre l'un de l'autre pour un helper de
  *  deux lignes. */
 function fieldClass(hasError: boolean): string {
-  return `border rounded px-2 py-1 font-normal text-sm ${hasError ? "border-rouge" : "border-bordure"}`;
+  return `border rounded-[7px] bg-surface text-ink px-2 py-1 font-normal text-sm focus:border-accent focus:outline-none ${
+    hasError ? "border-warn" : "border-border-strong"
+  }`;
 }
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p className="text-rouge text-xs font-semibold">{message}</p>;
+  return <p className="text-warn text-xs font-semibold">{message}</p>;
 }
 
 /**
@@ -220,9 +222,9 @@ export function AdminDealItem({
   }
 
   return (
-    <li className="bg-white border border-bordure rounded-xl p-4 flex flex-col gap-2">
+    <li className="bg-surface border border-border rounded-xl p-4 flex flex-col gap-2">
       <div className="flex items-start gap-3">
-        {showCheckbox && <input type="checkbox" checked={checked} onChange={onToggle} className="mt-1" />}
+        {showCheckbox && <input type="checkbox" checked={checked} onChange={onToggle} className="mt-1 accent-accent" />}
         {/* Photo visible directement dans la ligne du pipeline (pas
             seulement dans le panneau "Éditer le deal" replié) : l'admin doit
             pouvoir juger la photo soumise avant de Valider/Rejeter, sans
@@ -231,17 +233,17 @@ export function AdminDealItem({
           <img
             src={`/img/deals/${deal.publicId}`}
             alt={deal.titre}
-            className="w-14 h-14 object-cover rounded-lg border border-bordure flex-shrink-0"
+            className="w-14 h-14 object-cover rounded-lg border border-border flex-shrink-0"
           />
         )}
         <div className="flex-1 flex flex-col gap-1">
           <span className="font-bold">{deal.titre}</span>
-          <div className="text-xs text-muted">{joinMeta(deal.enseigneSlug ?? deal.nomVendeur, deal.ville, deal.categorie)}</div>
+          <div className="text-xs text-ink-muted">{joinMeta(deal.enseigneSlug ?? deal.nomVendeur, deal.ville, deal.categorie)}</div>
           <div className="flex items-baseline gap-2">
-            <span className="font-black text-rouge">{deal.prixPromo} DH</span>
-            {deal.prixNormal && <span className="text-sm text-muted line-through">{deal.prixNormal} DH</span>}
+            <span className="font-black text-ink tabular-nums">{deal.prixPromo} DH</span>
+            {deal.prixNormal && <span className="text-sm text-ink-subtle line-through tabular-nums">{deal.prixNormal} DH</span>}
             {remise(deal) > 0 && (
-              <span className="text-xs font-bold bg-rouge text-white rounded px-2 py-0.5">-{remise(deal)}%</span>
+              <span className="text-xs font-bold bg-accent-soft text-accent rounded px-2 py-0.5 tabular-nums">-{remise(deal)}%</span>
             )}
           </div>
           {/* Badge doublon produit — INFORMATIF, aucune action automatique
@@ -249,15 +251,20 @@ export function AdminDealItem({
               (même lien+enseigne, ou repli titre+enseigne si lien null).
               L'admin décide seul (valider, rejeter, ou éditer l'existant). */}
           {doublon && (
-            <div className="text-xs bg-[#fff8e6] border border-or rounded-lg px-2.5 py-1.5 text-texte flex flex-col gap-0.5">
-              <span className="font-bold">
-                ⚠️ Produit déjà existant ({STATUT_LABEL[doublon.statut as DealStatut] ?? doublon.statut})
+            <div className="text-xs bg-warn-soft border border-warn/40 rounded-lg px-2.5 py-1.5 text-ink flex flex-col gap-0.5">
+              <span className="font-bold flex items-center gap-1">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true" className="h-3.5 w-3.5 text-warn shrink-0">
+                  <path d="M12 9v4" />
+                  <path d="M12 17h.01" />
+                  <path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+                </svg>
+                Produit déjà existant ({STATUT_LABEL[doublon.statut as DealStatut] ?? doublon.statut})
                 {doublon.nb > 1 && ` — +${doublon.nb - 1} autre${doublon.nb - 1 > 1 ? "s" : ""}`}
               </span>
-              <span className="text-muted">
-                son prix : <strong className="text-texte">{doublon.prixPromo} DH</strong>
+              <span className="text-ink-muted">
+                son prix : <strong className="text-ink">{doublon.prixPromo} DH</strong>
                 {doublon.prixPromo !== deal.prixPromo && (
-                  <> — ce deal : <strong className="text-texte">{deal.prixPromo} DH</strong></>
+                  <> — ce deal : <strong className="text-ink">{deal.prixPromo} DH</strong></>
                 )}
                 {!doublon.parLien && <> · rapproché par titre (lien absent)</>}
               </span>
@@ -266,19 +273,19 @@ export function AdminDealItem({
                   href={`/deal/${dealUrlSlug(doublon.titre, doublon.publicId)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-rouge font-semibold hover:underline w-fit"
+                  className="text-accent font-semibold hover:underline w-fit"
                 >
                   Voir sa fiche ↗
                 </a>
               ) : (
-                <span className="text-muted">
+                <span className="text-ink-muted">
                   réf. <code className="font-mono">{doublon.publicId}</code> — onglet «{" "}
                   {STATUT_LABEL[doublon.statut as DealStatut] ?? doublon.statut} »
                 </span>
               )}
             </div>
           )}
-          <div className="text-xs text-muted">Soumis par {deal.submitterPublicId ?? "collecte automatique"}</div>
+          <div className="text-xs text-ink-subtle">Soumis par {deal.submitterPublicId ?? "collecte automatique"}</div>
         </div>
         <div className="flex flex-col gap-1 flex-shrink-0">
           {actions.map((action) => (
@@ -287,7 +294,7 @@ export function AdminDealItem({
               type="button"
               onClick={() => void onAction(action.statut, action.statut === "rejete" ? motifRejet || undefined : undefined)}
               disabled={pending}
-              className={`rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${ACTION_CLASSES[action.variant]}`}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold cursor-pointer transition-colors duration-[130ms] disabled:opacity-50 motion-reduce:transition-none ${ACTION_CLASSES[action.variant]}`}
             >
               {action.label}
             </button>
@@ -295,10 +302,10 @@ export function AdminDealItem({
         </div>
       </div>
 
-      <details className="border-t border-bordure pt-2">
-        <summary className="text-xs font-bold text-muted cursor-pointer select-none">Éditer le deal</summary>
+      <details className="border-t border-border pt-2">
+        <summary className="text-xs font-bold text-ink-muted hover:text-ink cursor-pointer select-none">Éditer le deal</summary>
         <div className="mt-2 flex flex-col gap-2">
-          {saveError && <p className="text-rouge text-xs font-bold">{saveError}</p>}
+          {saveError && <p className="text-warn text-xs font-bold">{saveError}</p>}
 
           <label className="flex flex-col gap-1 text-xs font-bold">
             Titre
@@ -308,7 +315,7 @@ export function AdminDealItem({
               maxLength={200}
               className={fieldClass(Boolean(fieldErrors.titre))}
             />
-            <span className="text-xs text-muted font-normal">
+            <span className="text-xs text-ink-subtle font-normal">
               Modifier le titre change l&apos;URL — l&apos;ancienne redirige automatiquement.
             </span>
             <FieldError message={fieldErrors.titre} />
@@ -484,6 +491,7 @@ export function AdminDealItem({
               type="checkbox"
               checked={fields.whatsappPublic}
               onChange={(e) => set("whatsappPublic", e.target.checked)}
+              className="accent-accent"
             />
             Numéro affiché publiquement {fields.whatsappPublic ? "(consenti)" : "(admin uniquement)"}
           </label>
@@ -492,23 +500,23 @@ export function AdminDealItem({
             type="button"
             onClick={() => void handleSaveFields()}
             disabled={savingFields || pending}
-            className="self-start bg-bleu text-white rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+            className="self-start bg-ink text-surface-base rounded-lg px-3 py-1.5 text-xs font-bold hover:bg-[#332e28] disabled:opacity-50 transition-colors duration-[130ms] motion-reduce:transition-none"
           >
             {savingFields ? "Enregistrement..." : "Enregistrer"}
           </button>
 
-          <div className="border-t border-bordure pt-2 mt-1 flex flex-col gap-2">
+          <div className="border-t border-border pt-2 mt-1 flex flex-col gap-2">
             {deal.lien && !isGoogleMapsUrl(deal.lien) && (
               <button
                 type="button"
                 onClick={() => void handleFetchImage()}
                 disabled={imgState === "pending" || pending}
-                className="self-start bg-or text-texte rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+                className="self-start bg-surface border border-border-strong text-ink rounded-lg px-3 py-1.5 text-xs font-bold hover:bg-surface-subtle disabled:opacity-50 transition-colors duration-[130ms] motion-reduce:transition-none"
               >
-                {imgState === "pending" ? "Récupération..." : "🖼️ Récupérer l'image du lien"}
+                {imgState === "pending" ? "Récupération..." : "Récupérer l'image du lien"}
               </button>
             )}
-            {imgState === "error" && imgError && <p className="text-rouge text-xs font-bold">{imgError}</p>}
+            {imgState === "error" && imgError && <p className="text-warn text-xs font-bold">{imgError}</p>}
 
             <div className="flex items-center gap-2">
               <input
@@ -521,18 +529,18 @@ export function AdminDealItem({
                 type="button"
                 onClick={() => void handleUploadImage()}
                 disabled={!uploadFile || uploadState === "pending" || pending}
-                className="self-start bg-or text-texte rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50 flex-shrink-0"
+                className="self-start bg-surface border border-border-strong text-ink rounded-lg px-3 py-1.5 text-xs font-bold hover:bg-surface-subtle disabled:opacity-50 flex-shrink-0 transition-colors duration-[130ms] motion-reduce:transition-none"
               >
                 {uploadState === "pending" ? "Téléversement..." : "Téléverser une image"}
               </button>
             </div>
-            {uploadState === "error" && uploadError && <p className="text-rouge text-xs font-bold">{uploadError}</p>}
+            {uploadState === "error" && uploadError && <p className="text-warn text-xs font-bold">{uploadError}</p>}
 
             {deal.imageKey && (
               <img
                 src={`/img/deals/${deal.publicId}?admin_preview=${imgCacheBust}`}
                 alt="Aperçu"
-                className="max-h-32 w-auto object-contain self-start border border-bordure rounded"
+                className="max-h-32 w-auto object-contain self-start border border-border rounded"
               />
             )}
           </div>
@@ -544,7 +552,7 @@ export function AdminDealItem({
               onChange={(e) => setMotifRejet(e.target.value)}
               rows={2}
               maxLength={500}
-              className="border border-bordure rounded px-2 py-1 font-normal text-sm"
+              className="border border-border-strong bg-surface text-ink rounded-[7px] px-2 py-1 font-normal text-sm focus:border-accent focus:outline-none"
             />
           </label>
         </div>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DealAdmin, DealStatut, Enseigne } from "@fidwastafid/schemas";
 import type { DoublonInfo } from "../api/v1/_lib/deals.js";
 import { AdminDealItem, type DealEditFields, type SaveResult, type ImageFetchResult } from "./AdminDealItem.js";
+import { Button } from "../../components/Button.js";
 
 /** Deal admin enrichi de l'info de doublon produit (visibilité seule, lot du
  *  23/07/2026) — `doublon` vit hors du modèle de domaine (cf. _lib/deals.ts),
@@ -248,23 +249,23 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   }
 
   if (error) {
-    return <p className="bg-white border border-bordure rounded-xl p-5 text-center text-rouge font-bold">{error}</p>;
+    return <p className="bg-surface border border-border rounded-xl p-5 text-center text-warn font-bold">{error}</p>;
   }
 
   if (!deals) {
-    return <p className="text-center text-muted py-16">Chargement…</p>;
+    return <p className="text-center text-ink-muted py-16">Chargement…</p>;
   }
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex border-b border-bordure overflow-x-auto">
+      <div className="flex border-b border-border overflow-x-auto">
         {ONGLETS.map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => changerOnglet(t)}
             className={`px-4 py-2 text-sm font-bold whitespace-nowrap border-b-2 -mb-px ${
-              onglet === t ? "border-rouge text-rouge" : "border-transparent text-muted"
+              onglet === t ? "border-accent text-accent" : "border-transparent text-ink-muted"
             }`}
           >
             {ONGLET_LABELS[t]} ({comptes[t]})
@@ -273,7 +274,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       </div>
 
       {deals.length < total && (
-        <p className="text-xs text-muted">
+        <p className="text-xs text-ink-subtle">
           {deals.length} deals chargés sur {total} au total (tous statuts) — la limite serveur a tronqué le
           résultat, augmente LIMIT côté API si ça se reproduit.
         </p>
@@ -281,26 +282,16 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
 
       {BULK_ONGLETS.has(onglet) && parOnglet.length > 0 && (
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void bulk("publie")}
-            disabled={pending || selected.size === 0}
-            className="bg-rouge text-white rounded-lg px-4 py-2 font-bold text-sm disabled:opacity-50"
-          >
+          <Button variant="primary" size="sm" onClick={() => void bulk("publie")} disabled={pending || selected.size === 0}>
             Valider la sélection ({selected.size})
-          </button>
-          <button
-            type="button"
-            onClick={() => void bulk("rejete")}
-            disabled={pending || selected.size === 0}
-            className="bg-white border border-bordure rounded-lg px-4 py-2 font-bold text-sm disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="danger" size="sm" onClick={() => void bulk("rejete")} disabled={pending || selected.size === 0}>
             Rejeter la sélection
-          </button>
+          </Button>
         </div>
       )}
 
-      {parOnglet.length === 0 && <p className="text-center text-muted py-16">Rien dans cet onglet.</p>}
+      {parOnglet.length === 0 && <p className="text-center text-ink-muted py-16">Rien dans cet onglet.</p>}
 
       <ul className="flex flex-col gap-2">
         {parOnglet.map((deal) => (
