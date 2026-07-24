@@ -49,20 +49,20 @@
   --color-sombre: #1e1e1e; /* --dark */
 
   /* Couleurs d'avatar — espace membre (CONTRAT-V1 §4, amendement
-     16/07/2026). Distinctes des accents ci-dessus : un avatar porte un
-     fond plein + initiale blanche, donc chaque teinte est calibrée assez
-     sombre/saturée pour un contraste correct avec du texte blanc (ex. "or"
-     ici est un doré profond, pas le jaune vif de --color-or, illisible en
-     fond plein sous du blanc). Mêmes 8 valeurs que la contrainte CHECK de
-     users.couleur_avatar (packages/db, migration 0006). */
-  --color-avatar-rouge: #f03e3e;
-  --color-avatar-terracotta: #c2542e;
-  --color-avatar-or: #b8860b;
-  --color-avatar-olive: #74812f;
-  --color-avatar-bleu: #2c5f8a;
-  --color-avatar-indigo: #4b3f8f;
-  --color-avatar-prune: #7a3b56;
-  --color-avatar-ardoise: #5b6470;
+     16/07/2026). Seul endroit où la palette s'ouvre (rôle « avatars » de la
+     charte Tadelakt) : 8 teintes ré-harmonisées sur l'esprit Tadelakt
+     (terreuses, désaturées, maquette écran 07), chacune ≥ 4,5:1 sous une
+     initiale blanche. Les NOMS restent la donnée (contrainte CHECK de
+     users.couleur_avatar, packages/db migration 0006) — seules les teintes
+     bougent, jamais les clés. */
+  --color-avatar-rouge: #ad4527;
+  --color-avatar-terracotta: #a85a32;
+  --color-avatar-or: #7c6015;
+  --color-avatar-olive: #5e6b2e;
+  --color-avatar-bleu: #4c6674;
+  --color-avatar-indigo: #514a78;
+  --color-avatar-prune: #6e3a50;
+  --color-avatar-ardoise: #515c68;
 }
 
 /** Variable posée par next/font/google sur <html> — voir layout.tsx. */
