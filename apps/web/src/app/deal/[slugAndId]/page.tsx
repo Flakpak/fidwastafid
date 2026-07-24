@@ -12,7 +12,7 @@ import { UrgenceCountdown } from "../../../components/UrgenceCountdown.js";
 import { Avatar } from "../../../components/Avatar.js";
 import { CommentForm } from "./CommentForm.js";
 import { dealDescription, dealJsonLd, dealOgDescription, truncateOgTitle } from "./seo.js";
-import { categorieIcon, dealTypeLabel, relativeDate, shortDate } from "../../../lib/format.js";
+import { dealTypeLabel, relativeDate, shortDate } from "../../../lib/format.js";
 import { urgence } from "../../../lib/urgence.js";
 import { SITE_URL } from "../../../lib/siteUrl.js";
 import { fetchDealImageBytes } from "../../../lib/dealImageStorage.js";
@@ -152,21 +152,21 @@ export default async function DealPage({ params }: PageParams) {
   const jsonLd = JSON.stringify(dealJsonLd(deal, dealHref)).replace(/</g, "\\u003c");
 
   return (
-    <div className="min-h-screen bg-creme text-texte">
+    <div className="min-h-screen bg-surface-base text-ink">
       <SiteHeader />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <main className="max-w-6xl mx-auto p-4 flex flex-col gap-4">
-        <Link href="/" className="self-start text-sm font-bold text-muted hover:text-rouge">
+        <Link href="/" className="self-start text-sm font-bold text-ink-muted hover:text-ink">
           ← Retour au feed
         </Link>
 
         {/* CARTE 1 — hero du deal, référence structure Dealabs (2 colonnes,
             jamais ses couleurs — charte fidwastafid). */}
-        <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+        <div className="bg-surface rounded-2xl border border-border shadow-[0_1px_2px_rgba(26,24,21,0.05)] overflow-hidden">
           {expire && (
             // Bandeau d'état neutre, pas funèbre — l'URL vit à vie (CONTRAT-V1 §1),
             // l'état doit juste être évident.
-            <div className="bg-creme text-muted text-center py-2 text-sm font-bold border-b border-bordure">
+            <div className="bg-cold-soft text-cold text-center py-2 text-sm font-bold border-b border-border">
               Ce bon plan est expiré
             </div>
           )}
@@ -178,7 +178,7 @@ export default async function DealPage({ params }: PageParams) {
                 empilé mobile, border-r en 2 colonnes desktop) sépare la
                 zone image du contenu ; l'ombre de la carte la sépare du
                 fond crème de la page. */}
-            <div className="bg-white border-b md:border-b-0 md:border-r border-bordure flex items-center justify-center p-8 md:p-10 min-h-[220px] md:min-h-[380px]">
+            <div className="bg-white border-b md:border-b-0 md:border-r border-border flex items-center justify-center p-8 md:p-10 min-h-[220px] md:min-h-[380px]">
               {deal.imageKey ? (
                 // Jamais d'URL Supabase construite ici — uniquement la route
                 // proxy /img/deals/[publicId] (CONTRAT-V1 §6). max-h + w-auto
@@ -191,9 +191,18 @@ export default async function DealPage({ params }: PageParams) {
                   className="max-w-full max-h-[380px] w-auto h-auto object-contain"
                 />
               ) : (
-                <span aria-hidden="true" className="text-8xl opacity-15">
-                  {categorieIcon(deal.categorie)}
-                </span>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.4}
+                  className="w-20 h-20 text-ink-subtle/50"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="9" cy="9" r="2" />
+                  <path d="m21 15-3.5-3.5-4.5 4.5-2-2L3 19" />
+                </svg>
               )}
             </div>
 
@@ -202,8 +211,11 @@ export default async function DealPage({ params }: PageParams) {
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <CardVote publicId={deal.publicId} initialScore={deal.score} />
                 <div className="flex items-center gap-3 text-sm font-bold">
-                  <Link href={`${dealHref}#commentaires`} className="text-muted hover:text-rouge">
-                    💬 {deal.commentairesCount}
+                  <Link href={`${dealHref}#commentaires`} className="flex items-center gap-1 text-ink-muted hover:text-ink">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true" className="h-4 w-4">
+                      <path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z" />
+                    </svg>
+                    {deal.commentairesCount}
                   </Link>
                   <ShareButton
                     titre={deal.titre}
@@ -213,17 +225,17 @@ export default async function DealPage({ params }: PageParams) {
                   />
                 </div>
               </div>
-              <p className="text-xs text-muted font-semibold">
+              <p className="text-xs text-ink-subtle font-semibold">
                 Vos votes mettent en avant les meilleures لهميزات — c&apos;est un bon deal ?
               </p>
 
               {/* b. Publié + badges catégorie/type. */}
-              <div className="flex items-center gap-1.5 flex-wrap text-xs font-bold text-muted">
+              <div className="flex items-center gap-1.5 flex-wrap text-xs font-bold text-ink-muted">
                 <span>Publié {relativeDate(deal.createdAt)}</span>
-                <span className="bg-creme border border-bordure rounded-full px-3 py-1">
-                  {categorieIcon(deal.categorie)} {deal.categorie}
+                <span className="bg-surface-subtle border border-border rounded-full px-3 py-1">
+                  {deal.categorie}
                 </span>
-                <span className="bg-creme border border-bordure rounded-full px-3 py-1">
+                <span className="bg-surface-subtle border border-border rounded-full px-3 py-1">
                   {dealTypeLabel(deal.type)}
                 </span>
               </div>
@@ -231,38 +243,54 @@ export default async function DealPage({ params }: PageParams) {
               {/* c. Titre — pièce centrale. */}
               <h1 className="text-3xl md:text-4xl font-black leading-tight">{deal.titre}</h1>
 
-              {/* d. Prix. */}
+              {/* d. Prix — en encre, sa taille le hiérarchise (charte Tadelakt). */}
               <div className="flex items-baseline gap-3 flex-wrap">
-                <span className="text-4xl md:text-5xl font-black text-rouge">{deal.prixPromo} DH</span>
+                <span className={`text-[38px] font-black tabular-nums leading-none ${expire ? "text-ink-subtle line-through" : "text-ink"}`}>
+                  {deal.prixPromo} DH
+                </span>
                 {deal.prixNormal && (
-                  <span className="text-lg text-muted line-through font-bold">{deal.prixNormal} DH</span>
+                  <span className="text-lg text-ink-subtle line-through font-bold tabular-nums">{deal.prixNormal} DH</span>
                 )}
                 {pct !== null && (
-                  <span className="text-sm font-bold bg-vert/10 text-vert rounded-full px-3 py-1">-{pct}%</span>
+                  <span className="text-sm font-bold bg-accent-soft text-accent rounded-full px-3 py-1 tabular-nums">-{pct}%</span>
                 )}
               </div>
 
               {/* e. Méta : enseigne/vendeur/ville/urgence. */}
               {aMeta && (
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-bold text-muted">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-bold text-ink-muted">
                   {deal.enseigneNom ? (
                     <span>
-                      Dispo. chez <strong className="text-texte">{deal.enseigneNom}</strong>
+                      Dispo. chez <strong className="text-ink">{deal.enseigneNom}</strong>
                     </span>
                   ) : (
                     deal.nomVendeur && (
                       <span>
-                        Chez <strong className="text-texte">{deal.nomVendeur}</strong>
+                        Chez <strong className="text-ink">{deal.nomVendeur}</strong>
                       </span>
                     )
                   )}
-                  {deal.ville && <span>📍 {deal.ville}</span>}
+                  {deal.ville && (
+                    <span className="flex items-center gap-1">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true" className="h-3.5 w-3.5 text-ink-subtle">
+                        <path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z" />
+                        <circle cx="12" cy="10" r="2.5" />
+                      </svg>
+                      {deal.ville}
+                    </span>
+                  )}
                   {urg?.mode === "expiree" && (
-                    <span className="text-xs font-bold bg-creme text-muted rounded-full px-2.5 py-1">Expiré</span>
+                    <span className="text-xs font-bold bg-cold-soft text-cold rounded-full px-2.5 py-1">Expiré</span>
                   )}
                   {urg?.mode === "compte-a-rebours" && <UrgenceCountdown dateFin={deal.dateFin!} />}
                   {urg?.mode === "lointaine" && (
-                    <span className="text-xs text-muted">⏰ jusqu&apos;au {shortDate(deal.dateFin!)}</span>
+                    <span className="flex items-center gap-1 text-xs text-ink-subtle">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true" className="h-3 w-3">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v5l3 2" />
+                      </svg>
+                      jusqu&apos;au {shortDate(deal.dateFin!)}
+                    </span>
                   )}
                 </div>
               )}
@@ -270,14 +298,22 @@ export default async function DealPage({ params }: PageParams) {
               {/* e-bis. Adresse/repère + lien Maps — commerces informels sans
                   enseigne curée (CONTRAT-V1 §3, amendement du 18/07/2026). */}
               {(deal.adresse || deal.lienMaps) && (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted">
-                  {deal.adresse && <span>📍 {deal.adresse}</span>}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-ink-muted">
+                  {deal.adresse && (
+                    <span className="flex items-center gap-1">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true" className="h-3.5 w-3.5 text-ink-subtle">
+                        <path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z" />
+                        <circle cx="12" cy="10" r="2.5" />
+                      </svg>
+                      {deal.adresse}
+                    </span>
+                  )}
                   {deal.lienMaps && (
                     <a
                       href={deal.lienMaps}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-bleu font-bold hover:underline"
+                      className="text-accent font-bold hover:underline"
                     >
                       Voir sur la carte ↗
                     </a>
@@ -294,7 +330,7 @@ export default async function DealPage({ params }: PageParams) {
                     href={deal.lien}
                     target="_blank"
                     rel="noopener noreferrer nofollow"
-                    className="font-arabic flex-1 text-center bg-rouge text-white rounded-2xl px-8 py-4 text-xl font-bold"
+                    className="font-arabic flex-1 text-center bg-ink text-surface-base rounded-2xl px-8 py-4 text-xl font-bold shadow-sm hover:bg-[#332e28] transition-colors duration-[130ms] active:translate-y-px motion-reduce:transition-none"
                   >
                     شوف الدييل ↗
                   </a>
@@ -304,9 +340,12 @@ export default async function DealPage({ params }: PageParams) {
                     href={whatsappHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 text-center bg-white border border-bordure text-texte rounded-2xl px-8 py-4 text-base font-bold"
+                    className="flex items-center justify-center gap-2 flex-1 text-center bg-surface border border-border-strong text-ink rounded-2xl px-8 py-4 text-base font-bold hover:bg-surface-subtle transition-colors duration-[130ms] motion-reduce:transition-none"
                   >
-                    💬 Contacter sur WhatsApp
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true" className="h-4 w-4">
+                      <path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z" />
+                    </svg>
+                    Contacter sur WhatsApp
                   </a>
                 )}
               </div>
@@ -316,14 +355,14 @@ export default async function DealPage({ params }: PageParams) {
 
         {/* CARTE 2 — à propos (auteur + description), omise si ni l'un ni l'autre. */}
         {aPropos && (
-          <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 flex flex-col gap-4">
+          <div className="bg-surface rounded-2xl border border-border shadow-[0_1px_2px_rgba(26,24,21,0.05)] p-6 md:p-8 flex flex-col gap-4">
             <h2 className="text-lg font-black">À propos de ce deal</h2>
 
             {deal.submitterPseudo && (
               <div className="flex items-center gap-3">
                 <Avatar pseudo={deal.submitterPseudo} couleurAvatar={deal.submitterCouleurAvatar} size="lg" />
-                <p className="text-sm font-semibold text-muted">
-                  Partagé par <strong className="text-texte">{deal.submitterPseudo}</strong>
+                <p className="text-sm font-semibold text-ink-muted">
+                  Partagé par <strong className="text-ink">{deal.submitterPseudo}</strong>
                 </p>
               </div>
             )}
@@ -332,7 +371,7 @@ export default async function DealPage({ params }: PageParams) {
               // whitespace-pre-line : les descriptions du pipeline contiennent
               // des \n structurés (champs "Marque:", "Numéro..." etc.), ils
               // doivent rester visibles tels quels.
-              <p className="text-[15px] text-texte leading-relaxed whitespace-pre-line">{deal.description}</p>
+              <p className="text-[15px] text-ink leading-relaxed whitespace-pre-line">{deal.description}</p>
             )}
 
             {deal.lien && (
@@ -340,7 +379,7 @@ export default async function DealPage({ params }: PageParams) {
                 href={deal.lien}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
-                className="self-start text-bleu font-bold hover:underline"
+                className="self-start text-accent font-bold hover:underline"
               >
                 Plus de détails{deal.enseigneNom ? ` sur ${deal.enseigneNom}` : ""} ↗
               </a>
@@ -349,16 +388,16 @@ export default async function DealPage({ params }: PageParams) {
         )}
 
         {/* CARTE 3 — commentaires. */}
-        <section id="commentaires" className="bg-white rounded-2xl shadow-md p-6 md:p-8 flex flex-col gap-4">
+        <section id="commentaires" className="bg-surface rounded-2xl border border-border shadow-[0_1px_2px_rgba(26,24,21,0.05)] p-6 md:p-8 flex flex-col gap-4">
           <h2 className="text-lg font-black">Commentaires ({commentaires.length})</h2>
           <CommentForm publicId={deal.publicId} />
           <ul className="flex flex-col gap-3">
             {commentaires.map((c) => (
-              <li key={c.createdAt} className="flex gap-2.5 border-t border-bordure pt-3 text-sm">
+              <li key={c.createdAt} className="flex gap-2.5 border-t border-border pt-3 text-sm">
                 <Avatar pseudo={c.pseudo} couleurAvatar={c.couleurAvatar} size="md" />
                 <div>
-                  <p className="font-black text-rouge text-xs mb-0.5">{c.pseudo}</p>
-                  <p className="text-muted">{c.contenu}</p>
+                  <p className="font-black text-ink text-xs mb-0.5">{c.pseudo}</p>
+                  <p className="text-ink-muted">{c.contenu}</p>
                 </div>
               </li>
             ))}

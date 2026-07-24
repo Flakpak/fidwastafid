@@ -20,20 +20,20 @@ const MAILTO_HREF = `mailto:contact@fidwastafid.com?subject=${encodeURIComponent
 
 export default function ContactPage() {
   return (
-    <div className="min-h-screen bg-creme text-texte">
+    <div className="min-h-screen bg-surface-base text-ink">
       <SiteHeader />
       <main className="max-w-3xl mx-auto p-4">
-        <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 flex flex-col gap-6">
+        <div className="bg-surface rounded-2xl border border-border shadow-[0_1px_2px_rgba(26,24,21,0.05)] p-6 md:p-8 flex flex-col gap-6">
           <div>
             <h1 className="text-2xl font-black mb-1">Contact</h1>
-            <p className="text-sm text-muted leading-relaxed">
+            <p className="text-sm text-ink-muted leading-relaxed">
               Un problème sur un deal, une question sur le site, une donnée à faire retirer, une idée de
               partenariat — écris-nous, on te répond.
             </p>
             {/* Touche darija, même esprit que le footer (فيد و ستافيد) — pas
                 de traduction juxtaposée ici, juste un signe de proximité,
                 cohérent avec le ton court et chaleureux voulu pour cette page. */}
-            <p dir="rtl" className="font-arabic text-rouge text-lg mt-2">
+            <p dir="rtl" className="font-arabic text-accent text-lg mt-2">
               على راحتك، حنا هنا
             </p>
           </div>
@@ -41,17 +41,21 @@ export default function ContactPage() {
           <div className="flex flex-col gap-3">
             <a
               href={MAILTO_HREF}
-              className="self-start bg-rouge text-white rounded-xl px-6 py-3 text-sm font-black"
+              className="self-start inline-flex items-center gap-2 bg-ink text-surface-base rounded-xl px-6 py-3 text-sm font-black shadow-sm hover:bg-[#332e28] transition-colors duration-[130ms] active:translate-y-px motion-reduce:transition-none"
             >
-              ✉️ Écris-nous : contact@fidwastafid.com
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true" className="h-4 w-4">
+                <rect x="3" y="5" width="18" height="14" rx="2" />
+                <path d="m3 7 9 6 9-6" />
+              </svg>
+              Écris-nous : contact@fidwastafid.com
             </a>
-            <p className="text-xs text-muted">
+            <p className="text-xs text-ink-muted">
               On répond dans un délai raisonnable, généralement quelques jours ouvrés — pas d&apos;équipe support
               24/7, on est une petite communauté.
             </p>
           </div>
 
-          <div className="text-sm text-muted leading-relaxed flex flex-col gap-2">
+          <div className="text-sm text-ink-muted leading-relaxed flex flex-col gap-2">
             <p>Quelques exemples de bonnes raisons de nous écrire :</p>
             <ul className="list-disc pl-5 flex flex-col gap-1">
               <li>signaler un problème sur un deal (prix faux, offre expirée, lien mort...) ;</li>

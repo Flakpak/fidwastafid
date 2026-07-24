@@ -17,20 +17,20 @@ function Section({ titre, children }: { titre: string; children: React.ReactNode
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-base font-black">{titre}</h2>
-      <div className="text-sm text-muted leading-relaxed flex flex-col gap-2">{children}</div>
+      <div className="text-sm text-ink-muted leading-relaxed flex flex-col gap-2">{children}</div>
     </section>
   );
 }
 
 export default function ChartePage() {
   return (
-    <div className="min-h-screen bg-creme text-texte">
+    <div className="min-h-screen bg-surface-base text-ink">
       <SiteHeader />
       <main className="max-w-3xl mx-auto p-4">
-        <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 flex flex-col gap-6">
+        <div className="bg-surface rounded-2xl border border-border shadow-[0_1px_2px_rgba(26,24,21,0.05)] p-6 md:p-8 flex flex-col gap-6">
           <div>
             <h1 className="text-2xl font-black mb-1">Charte de publication</h1>
-            <p className="text-sm text-muted">
+            <p className="text-sm text-ink-muted">
               Un bon plan Fidwastafid, c&apos;est une offre d&apos;un commerce, accessible à tous au même prix.
               Cette page explique simplement ce qui est accepté, ce qui ne l&apos;est pas, et comment la
               modération valide chaque soumission.
@@ -40,7 +40,7 @@ export default function ChartePage() {
           <Section titre="Le critère">
             <p>
               Avant de publier, on se pose une seule question :{" "}
-              <strong className="text-texte">
+              <strong className="text-ink">
                 n&apos;importe qui peut-il obtenir la même offre au même prix ?
               </strong>{" "}
               Si oui, c&apos;est un bon plan. Si l&apos;offre dépend de qui tu es, de ce que tu possèdes, ou
@@ -85,7 +85,7 @@ export default function ChartePage() {
               Chaque soumission est vérifiée par la modération avant publication — jamais automatique. Un deal
               peut être rejeté (offre invérifiable, hors charte, doublon...) ; dans ce cas, un motif est
               enregistré et reste visible par le soumetteur dans{" "}
-              <Link href="/compte" className="text-bleu font-bold hover:underline">
+              <Link href="/compte" className="text-accent font-bold hover:underline">
                 son compte
               </Link>
               , sous « Mes contributions ».
@@ -97,23 +97,26 @@ export default function ChartePage() {
               Un soumetteur peut ajouter le numéro WhatsApp du vendeur pour faciliter le contact — il reste
               visible uniquement par la modération, sauf consentement explicite à son affichage public au
               moment de la soumission. Détails :{" "}
-              <Link href="/confidentialite" className="text-bleu font-bold hover:underline">
+              <Link href="/confidentialite" className="text-accent font-bold hover:underline">
                 politique de confidentialité
               </Link>
               .
             </p>
           </Section>
 
-          <p className="text-sm text-muted">
+          <p className="text-sm text-ink-muted">
             Une question sur une modération, ou un deal qui ne respecte pas cette charte ?{" "}
-            <Link href="/contact" className="text-bleu font-bold hover:underline">
+            <Link href="/contact" className="text-accent font-bold hover:underline">
               Contacte-nous
             </Link>
             .
           </p>
 
           <div className="pt-2">
-            <Link href="/soumettre" className="inline-block bg-rouge text-white rounded-xl px-6 py-3 text-sm font-black">
+            <Link
+              href="/soumettre"
+              className="inline-block bg-ink text-surface-base rounded-xl px-6 py-3 text-sm font-black shadow-sm hover:bg-[#332e28] transition-colors duration-[130ms] motion-reduce:transition-none"
+            >
               Proposer un bon plan →
             </Link>
           </div>

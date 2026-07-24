@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from "react";
 import type { CouleurAvatar } from "@fidwastafid/schemas";
 import { Avatar, AVATAR_BG_CLASS } from "../../components/Avatar.js";
+import { Input } from "../../components/Input.js";
+import { Button } from "../../components/Button.js";
 
 const COULEURS: CouleurAvatar[] = ["rouge", "terracotta", "or", "olive", "bleu", "indigo", "prune", "ardoise"];
 
@@ -80,39 +82,36 @@ export function IdentiteForm({ pseudoInitial, couleurInitiale }: IdentiteFormPro
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-4">
         <Avatar pseudo={pseudo} couleurAvatar={couleur} size="xl" />
-        <p className="font-black text-xl text-texte">{pseudo}</p>
+        <p className="font-black text-xl text-ink">{pseudo}</p>
       </div>
 
       <form onSubmit={(e) => void enregistrerPseudo(e)} className="flex flex-col gap-2">
-        <label htmlFor="pseudo" className="text-sm font-bold text-muted">
+        <label htmlFor="pseudo" className="text-sm font-bold text-ink-muted">
           Pseudo
         </label>
         <div className="flex gap-2">
-          <input
-            id="pseudo"
-            value={pseudo}
-            onChange={(e) => {
-              setPseudo(e.target.value);
-              setSuccesPseudo(false);
-            }}
-            required
-            maxLength={40}
-            className="flex-1 border border-bordure rounded-lg px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={pendingPseudo}
-            className="bg-rouge text-white rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50"
-          >
+          <div className="flex-1 min-w-0">
+            <Input
+              id="pseudo"
+              value={pseudo}
+              onChange={(e) => {
+                setPseudo(e.target.value);
+                setSuccesPseudo(false);
+              }}
+              required
+              maxLength={40}
+            />
+          </div>
+          <Button variant="primary" type="submit" disabled={pendingPseudo}>
             {pendingPseudo ? "Enregistrement..." : "Enregistrer"}
-          </button>
+          </Button>
         </div>
-        {erreurPseudo && <p className="text-sm text-rouge">{erreurPseudo}</p>}
-        {succesPseudo && <p className="text-sm text-vert font-semibold">Pseudo mis à jour.</p>}
+        {erreurPseudo && <p className="text-sm text-warn">{erreurPseudo}</p>}
+        {succesPseudo && <p className="text-sm text-accent font-semibold">Pseudo mis à jour.</p>}
       </form>
 
       <div className="flex flex-col gap-2">
-        <p className="text-sm font-bold text-muted">Couleur d&apos;avatar</p>
+        <p className="text-sm font-bold text-ink-muted">Couleur d&apos;avatar</p>
         <div className="flex gap-2 flex-wrap">
           {COULEURS.map((c) => (
             <button
@@ -122,13 +121,13 @@ export function IdentiteForm({ pseudoInitial, couleurInitiale }: IdentiteFormPro
               disabled={pendingCouleur !== null}
               aria-label={c}
               aria-pressed={c === couleur}
-              className={`w-8 h-8 rounded-full ${AVATAR_BG_CLASS[c]} disabled:opacity-50 ${
-                c === couleur ? "ring-2 ring-offset-2 ring-texte" : ""
+              className={`w-8 h-8 max-sm:w-11 max-sm:h-11 rounded-full cursor-pointer ${AVATAR_BG_CLASS[c]} disabled:opacity-50 ${
+                c === couleur ? "ring-2 ring-offset-2 ring-ink" : ""
               }`}
             />
           ))}
         </div>
-        {erreurCouleur && <p className="text-sm text-rouge">{erreurCouleur}</p>}
+        {erreurCouleur && <p className="text-sm text-warn">{erreurCouleur}</p>}
       </div>
     </div>
   );

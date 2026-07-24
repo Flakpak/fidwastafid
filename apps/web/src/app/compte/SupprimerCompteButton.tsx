@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { deconnexionApresSuppressionAction } from "./actions.js";
+import { Button } from "../../components/Button.js";
 
 type Etape = "repos" | "confirmation" | "pending";
 
@@ -10,6 +11,9 @@ type Etape = "repos" | "confirmation" | "pending";
  * conséquences EXACTES avant tout appel réseau — jamais de suppression sur
  * un simple clic. Après un DELETE réussi, la déconnexion (cookie httpOnly,
  * illisible en JS client) passe par une Server Action dédiée (./actions.ts).
+ *
+ * Charte Tadelakt (CONTRAT-V1 §8) : action destructive = variante `danger`
+ * (contour braise, jamais un aplat alarmiste).
  */
 export function SupprimerCompteButton() {
   const [etape, setEtape] = useState<Etape>("repos");
@@ -34,44 +38,40 @@ export function SupprimerCompteButton() {
 
   if (etape === "repos") {
     return (
-      <button
-        type="button"
-        onClick={() => setEtape("confirmation")}
-        className="bg-white border-2 border-rouge text-rouge rounded-lg px-4 py-2 text-sm font-bold hover:bg-rouge hover:text-white transition-colors"
-      >
+      <Button variant="danger" onClick={() => setEtape("confirmation")} className="self-start">
         Supprimer mon compte
-      </button>
+      </Button>
     );
   }
 
   const pending = etape === "pending";
 
   return (
-    <div className="bg-creme border border-rouge/30 rounded-xl p-4 flex flex-col gap-3">
-      <p className="text-sm font-bold text-texte">Cette action est définitive :</p>
-      <ul className="text-sm text-muted list-disc pl-5 flex flex-col gap-1">
+    <div className="bg-hot-soft border border-hot/30 rounded-xl p-4 flex flex-col gap-3">
+      <p className="text-sm font-bold text-ink">Cette action est définitive :</p>
+      <ul className="text-sm text-ink-muted list-disc pl-5 flex flex-col gap-1">
         <li>Tes commentaires resteront visibles mais deviendront anonymes (&laquo;&nbsp;Membre supprimé&nbsp;&raquo;).</li>
         <li>Tes deals déjà publiés resteront en ligne, mais sans attribution à ton compte.</li>
         <li>Tu perdras définitivement l&apos;accès à ce compte — impossible à annuler.</li>
       </ul>
-      {erreur && <p className="text-sm text-rouge font-bold">{erreur}</p>}
+      {erreur && <p className="text-sm text-warn font-bold">{erreur}</p>}
       <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={() => setEtape("repos")}
           disabled={pending}
-          className="text-sm font-bold text-muted underline disabled:opacity-50"
+          className="text-sm font-bold text-ink-muted hover:text-ink underline disabled:opacity-50"
         >
           Annuler
         </button>
-        <button
-          type="button"
+        <Button
+          variant="danger"
           onClick={() => void confirmerSuppression()}
           disabled={pending}
-          className="ml-auto bg-rouge text-white rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50"
+          className="ml-auto"
         >
           {pending ? "Suppression..." : "Confirmer la suppression définitive"}
-        </button>
+        </Button>
       </div>
     </div>
   );
