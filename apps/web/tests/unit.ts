@@ -4,6 +4,12 @@ import { sniffImageMime } from "../src/app/api/v1/_lib/dealImage.js";
 import { POST as postRevalidate } from "../src/app/api/revalidate/route.js";
 import { dealOgDescription, truncateOgTitle, dealJsonLd } from "../src/app/deal/[slugAndId]/seo.js";
 import { buildShareText } from "../src/components/shareText.js";
+import {
+  fetchAuthUserEmail,
+  SupabaseAdminUnavailableError,
+  SupabaseAdminConfigError,
+} from "../src/app/api/v1/_lib/supabaseAdmin.js";
+import { resolveMeEmail } from "../src/app/api/v1/_lib/me.js";
 import type { Deal } from "@fidwastafid/schemas";
 
 // Jeton de test purement local (Phase 7B) — jamais le vrai REVALIDATE_TOKEN,
@@ -106,8 +112,112 @@ async function runAsyncChecks() {
   );
   check("mauvais jeton -> 401", mauvaisJetonRes.status === 401);
 
+  await checkWrapperAdminSupabase();
+
   console.log(`\n${pass} passés, ${fail} échoués`);
   if (fail > 0) process.exit(1);
+}
+
+/**
+ * Wrapper admin Supabase (supabaseAdmin.ts) — cœur du correctif de l'incident
+ * du 24/07/2026 (docs/INCIDENTS.md). Ces tests existent pour qu'on ne
+ * retombe JAMAIS dans le `return null` fourre-tout : chaque classe d'échec
+ * doit rester distinguable des deux autres.
+ *
+ * `fetch` global est remplacé par un bouchon (aucun réseau — ce harnais est
+ * hors ligne, cf. en-tête de ce fichier), puis restauré.
+ */
+async function checkWrapperAdminSupabase() {
+  console.log("\nAPI admin Supabase — wrapper : 404 / transitoire / configuration");
+
+  process.env.SUPABASE_URL = "https://projet-fixture.supabase.co";
+  process.env.SUPABASE_SECRET_KEY = "sb_secret_fixture_jamais_reelle";
+
+  const fetchOriginal = globalThis.fetch;
+  let appels = 0;
+
+  /** Bouchon : renvoie successivement les réponses fournies (la dernière est
+   *  répétée si le wrapper retente au-delà de la liste). */
+  function stubFetch(reponses: { status: number; body?: string }[]) {
+    appels = 0;
+    globalThis.fetch = (async () => {
+      const r = reponses[Math.min(appels, reponses.length - 1)]!;
+      appels++;
+      return new Response(r.body ?? "", { status: r.status });
+    }) as typeof globalThis.fetch;
+  }
+
+  const UID = "11111111-2222-3333-4444-555555555555";
+
+  try {
+    // 1. 404 -> null, aucun retry (absence légitime, pas une panne).
+    stubFetch([{ status: 404, body: '{"msg":"User not found"}' }]);
+    const email404 = await fetchAuthUserEmail(UID);
+    check("404 -> null (utilisateur inexistant, pas une panne)", email404 === null);
+    check("404 -> aucun retry (1 seul appel)", appels === 1);
+
+    // 2. 500 puis 200 -> succès après un retry.
+    stubFetch([{ status: 500, body: "boom" }, { status: 200, body: '{"email":"membre@exemple.ma"}' }]);
+    const emailRetry = await fetchAuthUserEmail(UID);
+    check("500 puis 200 -> succès après retry", emailRetry === "membre@exemple.ma");
+    check("500 puis 200 -> exactement 2 appels (1 retry)", appels === 2);
+
+    // 3. 500 persistant -> erreur typée transitoire, JAMAIS null.
+    stubFetch([{ status: 503, body: "indisponible" }]);
+    let transitoire: unknown = null;
+    try {
+      await fetchAuthUserEmail(UID);
+    } catch (err) {
+      transitoire = err;
+    }
+    check(
+      "5xx persistant -> SupabaseAdminUnavailableError (jamais null)",
+      transitoire instanceof SupabaseAdminUnavailableError
+    );
+    check(
+      "5xx persistant -> statut réel porté par l'erreur",
+      transitoire instanceof SupabaseAdminUnavailableError && transitoire.status === 503
+    );
+    check("5xx persistant -> tentatives bornées (3 appels max)", appels === 3);
+
+    // 4. 401 -> erreur de configuration, aucun retry (clé révoquée : incident
+    //    du 19/07/2026 — la retenter ne ferait que retarder le diagnostic).
+    stubFetch([{ status: 401, body: '{"msg":"Invalid API key"}' }]);
+    let config: unknown = null;
+    try {
+      await fetchAuthUserEmail(UID);
+    } catch (err) {
+      config = err;
+    }
+    check("401 -> SupabaseAdminConfigError", config instanceof SupabaseAdminConfigError);
+    check("401 -> aucun retry (1 seul appel)", appels === 1);
+
+    // 5. Dégradation gracieuse de /me : e-mail transitoirement indisponible ->
+    //    profil rendu quand même, aucune exception. (buildMe() complet exige
+    //    une base ; sa branche e-mail est isolée dans resolveMeEmail.)
+    stubFetch([{ status: 429, body: "rate limited" }]);
+    let degrade: { email?: string; emailIndisponible: boolean } | null = null;
+    try {
+      degrade = await resolveMeEmail(UID);
+    } catch {
+      degrade = null;
+    }
+    check("e-mail transitoirement indisponible -> /me ne jette pas", degrade !== null);
+    check("e-mail transitoirement indisponible -> emailIndisponible = true", degrade?.emailIndisponible === true);
+    check("e-mail transitoirement indisponible -> aucun e-mail inventé", degrade?.email === undefined);
+
+    // 6. 404 sur /me -> incohérence réelle, on jette (pas de dégradation).
+    stubFetch([{ status: 404, body: '{"msg":"User not found"}' }]);
+    let jete = false;
+    try {
+      await resolveMeEmail(UID);
+    } catch {
+      jete = true;
+    }
+    check("compte auth introuvable (404) -> /me échoue franchement", jete);
+  } finally {
+    globalThis.fetch = fetchOriginal;
+  }
 }
 
 console.log("\nog:image — extraction depuis HTML");

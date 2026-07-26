@@ -44,6 +44,39 @@ function readEnv(name: string): string {
   return value;
 }
 
+/**
+ * Suffixe de diagnostic pour les assertions sur l'e-mail de /me.
+ *
+ * Avant le correctif du 24/07/2026 (docs/INCIDENTS.md), une indisponibilité de
+ * l'API admin Supabase faisait planter TOUT le script sur un opaque « Email
+ * introuvable via l'API admin Supabase. » — sans statut HTTP, sans savoir
+ * combien de fois on avait réessayé, ni à quelle étape du scénario.
+ *
+ * Désormais /me se dégrade (200 + `emailIndisponible`), la suite du scénario
+ * s'exécute, et l'échec dit : l'étape, le statut HTTP de la réponse /me, et où
+ * lire le statut amont réel + le nombre de tentatives (lignes `[supabase-admin]`
+ * du wrapper, juste au-dessus dans ce même log).
+ *
+ * On ne masque PAS l'échec pour autant : l'assertion reste rouge. Masquer un
+ * flake est la version CI du fallback silencieux qu'on vient de supprimer.
+ */
+function diagnosticEmail(
+  etape: string,
+  statutHttp: number,
+  body: { email?: string; emailIndisponible?: boolean }
+): string {
+  if (typeof body.email === "string" && body.email.length > 0) return "";
+  if (body.emailIndisponible) {
+    return (
+      ` [ÉCHEC AMONT — étape « ${etape} » : /me a répondu ${statutHttp} avec emailIndisponible=true.` +
+      ` L'API admin Supabase était indisponible ; statut amont réel + nombre de tentatives dans les lignes` +
+      ` "[supabase-admin]" ci-dessus. Le profil a bien été rendu sans l'e-mail (dégradation voulue).]`
+    );
+  }
+  return ` [ÉCHEC — étape « ${etape} » : /me a répondu ${statutHttp}, e-mail absent SANS emailIndisponible —` +
+    ` ce n'est donc pas une panne amont, mais une régression du contrat /me.]`;
+}
+
 async function getRealAccessToken(): Promise<{ token: string; userId: string }> {
   const supabaseUrl = readEnv("SUPABASE_URL");
   // Migration clés API Supabase terminée (19/07/2026,
@@ -801,6 +834,7 @@ async function main() {
     publicId?: string;
     pseudo?: string;
     email?: string;
+    emailIndisponible?: boolean;
     couleurAvatar?: string;
     dealsCount?: number;
     votesCount?: number;
@@ -808,8 +842,16 @@ async function main() {
   };
   check("GET /me -> 200", meRes.status === 200);
   check("GET /me -> pseudo = IntegrationTest", meBody.pseudo === "IntegrationTest");
-  check("GET /me -> email présent", typeof meBody.email === "string" && meBody.email.length > 0);
+  check(`GET /me -> email présent${diagnosticEmail("GET /me", meRes.status, meBody)}`,
+    typeof meBody.email === "string" && meBody.email.length > 0);
   check("GET /me -> couleurAvatar présente", typeof meBody.couleurAvatar === "string");
+  // Le contrat rend l'absence d'e-mail EXPLICITE : plus besoin de deviner
+  // entre « pas d'e-mail » et « e-mail pas récupéré » (correctif 24/07/2026).
+  check("GET /me -> emailIndisponible explicite (booléen toujours présent)", typeof meBody.emailIndisponible === "boolean");
+  check(
+    "GET /me -> profil utilisable même si l'e-mail manque (dégradation gracieuse, jamais un 500)",
+    meRes.status === 200 && typeof meBody.pseudo === "string"
+  );
   check(
     "GET /me -> compteurs numériques",
     typeof meBody.dealsCount === "number" &&
