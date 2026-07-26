@@ -350,17 +350,31 @@ scrapé, non maîtrisé) : l'UI est un cadre plâtre + encre à ~90 %, jamais un
 | `surface-subtle` | `#FAF8F4` | survol de surface, zones inertes |
 | `border` | `#E3DED4` | filets par défaut |
 | `border-strong` | `#D2CABB` | contour de tout élément **cliquable** |
-| `ink` | `#1A1815` | texte principal, bouton primaire |
+| `ink` | `#1A1815` | texte principal, disque du sceau |
 | `ink-muted` | `#5C554B` | texte secondaire, icônes de méta |
 | `ink-subtle` | `#736B61` | aides, horodatages, placeholders |
-| `accent` | `#2C5545` | interactif, marque, focus (argan) |
-| `accent-soft` | `#E7EFE9` | fond du badge de remise |
+| `accent` | `#2F6B57` | interactif, marque, focus (argan) |
+| `accent-hi` | `#24564A` | survol du bouton primaire |
+| `accent-soft` | `#EAF1ED` | champ du hero, badge de remise, filtre actif |
+| `accent-line` | `#B6CFC4` | contour des éléments accent doux |
+| `safran` | `#B07C2A` | **ornement de marque uniquement** — voir règle 4 |
+| `safran-line` | `#E0C793` | filet intérieur du sceau |
 | `hot` | `#AD4527` | score chaud (≥ seuil) — **rien d'autre** |
-| `hot-soft` | `#F7E9E2` | fond du badge « Tendance » |
+| `hot-soft` | `#F9E9E2` | fond du vote haut et du badge « Tendance » |
+| `hot-line` | `#E6C5B6` | contour du vote chaud et du badge |
 | `cold` | `#4C6674` | froideur d'un deal : score négatif **ou** expiré |
-| `cold-soft` | `#E9EEF1` | fond des états expirés |
+| `cold-soft` | `#EAF0F3` | fond du vote bas et des états expirés |
+| `cold-line` | `#C2D2DA` | contour du vote froid |
 | `warn` | `#7C6015` | file d'attente, alertes de prix |
 | `warn-soft` | `#F5EEDD` | fond associé |
+
+**Ajustement du 26/07/2026 (lot 4)** — référence chromatique :
+`docs/maquettes/tadelakt-couleur-subtile.html`, qui remplace `tadelakt-site-complet.html` sur les
+couleurs (celle-ci reste la référence de structure et des écrans 02-08). Fait générateur : après revue
+visuelle de la préversion, le site paraissait **terne**. L'accent précédent (`#2C5545`) était trop
+sombre et trop désaturé pour se lire comme une couleur, et les boutons primaires en `ink` avaient
+supprimé le dernier porteur d'identité. `#2F6B57` conserve la même luminance utile (6,25:1 sur blanc)
+avec plus de chroma : présence gagnée, lisibilité inchangée. Le bouton primaire passe en `accent`.
 
 Deux valeurs divergent **volontairement** de la maquette HTML validée, pour passer le contraste AA :
 `ink-subtle` vaut `#736B61` (et non `#8B8378` : 3,74:1 → 5,24:1 sur blanc) et `cold` vaut `#4C6674`
@@ -383,6 +397,11 @@ mesurés ≥ 4,5:1.
    primitives peut employer la teinte `hot` en contour et en texte uniquement, jamais en aplat au
    repos. `cold` couvre la froideur d'un deal au sens large : score négatif et état expiré.** Toute
    autre utilisation est un bug.
+4. **`safran` est un ornement de marque** : sceau, motif du hero. Il n'apparaît jamais sur un bouton,
+   un badge, un état ou un texte courant. Toute apparition de `safran` dans un composant d'interface
+   est un bug — c'est par cette accumulation que la charte rouge/or abandonnée se reconstituerait.
+   Corollaire technique : à 3,6:1 sur blanc, `safran` ne passe pas l'AA en texte courant ; il est
+   réservé aux tracés et au grand corps.
 
 Référence directe pour la config Tailwind (`@theme`, `apps/web/src/app/globals.css`) et les primitives
 UI (`apps/web/src/components`). La refonte est portée en trois lots : lot 1 = ce contrat + tokens +
