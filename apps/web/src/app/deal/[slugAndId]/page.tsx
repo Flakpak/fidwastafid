@@ -330,7 +330,7 @@ export default async function DealPage({ params }: PageParams) {
                     href={deal.lien}
                     target="_blank"
                     rel="noopener noreferrer nofollow"
-                    className="font-arabic flex-1 text-center bg-ink text-surface-base rounded-2xl px-8 py-4 text-xl font-bold shadow-sm hover:bg-[#332e28] transition-colors duration-[130ms] active:translate-y-px motion-reduce:transition-none"
+                    className="font-arabic flex-1 text-center bg-accent text-white rounded-2xl px-8 py-4 text-xl font-bold shadow-sm hover:bg-accent-hi transition-colors duration-[130ms] active:translate-y-px motion-reduce:transition-none"
                   >
                     شوف الدييل ↗
                   </a>

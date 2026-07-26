@@ -242,7 +242,7 @@ export function Feed({
 
           <Link
             href="/concept"
-            className="mx-3 mb-1 rounded-[10px] border border-border-strong bg-surface text-left text-xs font-extrabold px-3.5 py-2.5 text-ink hover:bg-surface-subtle transition-colors duration-[130ms] motion-reduce:transition-none"
+            className="mx-3 mb-1 rounded-[10px] border border-accent-line bg-surface text-left text-xs font-extrabold px-3.5 py-2.5 text-accent hover:bg-accent-soft hover:border-accent transition-colors duration-[130ms] motion-reduce:transition-none"
           >
             Le concept Fidwastafid
           </Link>
