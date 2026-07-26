@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { temperature, jaugeRemplissage } from "../lib/score.js";
+import { temperature } from "../lib/score.js";
 
 interface ApiErrorBody {
   error?: { code?: string; message?: string };
@@ -13,16 +13,16 @@ const CHEVRON_UP = "M6 15l6-6 6 6";
 const CHEVRON_DOWN = "M6 9l6 6 6-6";
 
 /**
- * Pilule de vote — capsule bordée unique [خسارة | score | ربح], en ligne dans
- * le corps de la carte (aucun rail, aucun déplacement). Îlot client minimal
- * (boutons + score), réutilisé tel quel sur la carte du feed ET la page deal.
+ * Groupe de vote — [خسارة | score | ربح] en ligne dans le corps de la carte
+ * (aucun rail, aucun déplacement). Îlot client minimal (boutons + score),
+ * réutilisé tel quel sur la carte du feed ET la page deal.
  *
- * Charte Tadelakt (CONTRAT-V1 §8) : filet `border-strong`, fond `surface`,
- * rayon 20px. Depuis le lot 4, chaque flèche porte sa température AU REPOS
- * (fond doux + contour + icône teintée) ; survol et vote passent au fond
- * plein. Le score est teinté par sa zone (hot ≥ seuil, cold < 0, ink neutre)
- * et suivi d'une jauge proportionnelle — la température reste lisible sans
- * lire le chiffre, et n'est jamais portée par la seule couleur.
+ * Charte Tadelakt (CONTRAT-V1 §8). Depuis le lot 4, chaque flèche porte sa
+ * température AU REPOS (fond doux + icône teintée) ; survol et vote passent au
+ * fond plein. Lot 6 : ni conteneur bordé ni contour de pastille — deux
+ * surfaces pleines n'ont pas besoin d'être enfermées — et plus de jauge, le
+ * score en graisse 700 portant seul le niveau. Le chiffre reste lu : la
+ * couleur n'est jamais la seule information.
  *
  * Les libellés `ربح`/`خسارة` sont conservés (non négociables, CONTRAT-V1 §8) :
  * la maquette montre des boutons chevron seuls, mais le contrat prime. Les
@@ -68,33 +68,42 @@ export function CardVote({ publicId, initialScore }: { publicId: string; initial
   }
 
   const temp = temperature(score);
+  /**
+   * Lot 6 — la jauge est retirée. Le chiffre porte seul le niveau, compensé
+   * par la graisse 700 et 15px : il devient l'objet lisible du groupe, et les
+   * trois teintes (hot / ink / cold) restent distinguables sans le lire.
+   */
   const scoreColor = temp === "chaud" ? "text-hot" : temp === "froid" ? "text-cold" : "text-ink";
-  const gaugeColor = temp === "chaud" ? "bg-hot" : temp === "froid" ? "bg-cold" : "bg-ink-muted";
-  const remplissage = jaugeRemplissage(score);
 
   /**
    * Lot 4 — CORRECTION D'AFFORDANCE, pas un choix esthétique. Les flèches
    * n'étaient teintées qu'au survol : sur mobile, où le survol n'existe pas,
    * rien n'indiquait jamais que le haut est chaud et le bas froid. Chaque
-   * flèche porte donc sa teinte EN PERMANENCE (fond doux + contour + icône),
-   * le survol et l'état voté passant au fond plein.
+   * flèche porte donc sa teinte EN PERMANENCE (fond doux + icône), le survol
+   * et l'état voté passant au fond plein.
    *
-   * Trois états distinguables sans survol : repos (doux + contour), pressé/
-   * voté (plein, icône blanche), désactivé (opacité). Cible ≥ 44px conservée
-   * en mobile via `max-sm:min-h-11`.
+   * Lot 6 — les contours des pastilles et le conteneur bordé sont retirés :
+   * deux surfaces déjà pleines n'ont pas besoin d'être enfermées dans une
+   * boîte. Les pastilles restent collées, séparées de 1px.
+   *
+   * Trois états distinguables sans survol : repos (fond doux), pressé/voté
+   * (plein, icône blanche), désactivé (opacité). Cible ≥ 44px conservée en
+   * mobile via `max-sm:min-h-11`.
    */
   const froidCls =
     voted === "froid"
-      ? "bg-cold border-cold text-white"
-      : "bg-cold-soft border-cold-line text-cold hover:bg-cold hover:border-cold hover:text-white";
+      ? "bg-cold text-white"
+      : "bg-cold-soft text-cold hover:bg-cold hover:text-white";
   const chaudCls =
     voted === "chaud"
-      ? "bg-hot border-hot text-white"
-      : "bg-hot-soft border-hot-line text-hot hover:bg-hot hover:border-hot hover:text-white";
+      ? "bg-hot text-white"
+      : "bg-hot-soft text-hot hover:bg-hot hover:text-white";
 
   return (
     <div className="inline-flex flex-col gap-0.5">
-      <div className="inline-flex items-stretch gap-1 rounded-[20px] border border-border-strong bg-surface p-[3px] text-sm">
+      {/* Plus de conteneur bordé (lot 6) : les pastilles sont collées, séparées
+          de 1px, et se suffisent comme surfaces pleines. */}
+      <div className="inline-flex items-stretch gap-px text-sm">
         {/* Vote froid — خسارة (bas). */}
         <button
           type="button"
@@ -104,7 +113,7 @@ export function CardVote({ publicId, initialScore }: { publicId: string; initial
           }}
           disabled={pending}
           aria-label="Voter خسارة (froid)"
-          className={`font-arabic flex min-h-[28px] items-center gap-1 rounded-[7px] border px-2.5 font-bold transition-colors duration-[130ms] motion-reduce:transition-none disabled:opacity-50 max-sm:min-h-11 ${froidCls}`}
+          className={`font-arabic flex min-h-[29px] items-center gap-1 rounded-[8px] px-2.5 font-bold transition-colors duration-[130ms] motion-reduce:transition-none disabled:opacity-50 max-sm:min-h-11 ${froidCls}`}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} aria-hidden="true" className="h-4 w-4">
             <path d={CHEVRON_DOWN} />
@@ -112,13 +121,13 @@ export function CardVote({ publicId, initialScore }: { publicId: string; initial
           خسارة
         </button>
 
-        {/* Score + jauge — teinté par température, jamais une couleur seule (le
-            chiffre porte l'info, la jauge la rend lisible d'un coup d'œil). */}
-        <span className={`flex flex-col items-center justify-center px-1.5 ${scoreColor}`}>
-          <span className="text-[14.5px] font-semibold leading-none tabular-nums">{score}°</span>
-          <span aria-hidden="true" className="mt-0.5 h-[3px] w-[30px] overflow-hidden rounded-full bg-border">
-            <span className={`block h-full rounded-full ${gaugeColor}`} style={{ width: `${remplissage}%` }} />
-          </span>
+        {/* Score — seul porteur du niveau depuis le retrait de la jauge : 15px
+            graisse 700, teinté par température. Le chiffre reste lu, la couleur
+            n'est jamais la seule information. */}
+        <span
+          className={`flex min-w-[42px] items-center justify-center px-1.5 text-[15px] font-bold leading-none tracking-[-0.03em] tabular-nums ${scoreColor}`}
+        >
+          {score}°
         </span>
 
         {/* Vote chaud — ربح (haut). */}
@@ -130,7 +139,7 @@ export function CardVote({ publicId, initialScore }: { publicId: string; initial
           }}
           disabled={pending}
           aria-label="Voter ربح (chaud)"
-          className={`font-arabic flex min-h-[28px] items-center gap-1 rounded-[7px] border px-2.5 font-bold transition-colors duration-[130ms] motion-reduce:transition-none disabled:opacity-50 max-sm:min-h-11 ${chaudCls}`}
+          className={`font-arabic flex min-h-[29px] items-center gap-1 rounded-[8px] px-2.5 font-bold transition-colors duration-[130ms] motion-reduce:transition-none disabled:opacity-50 max-sm:min-h-11 ${chaudCls}`}
         >
           ربح
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} aria-hidden="true" className="h-4 w-4">
