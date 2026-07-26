@@ -350,7 +350,7 @@ scrapé, non maîtrisé) : l'UI est un cadre plâtre + encre à ~90 %, jamais un
 | `surface-subtle` | `#FAF8F4` | survol de surface, zones inertes |
 | `border` | `#E3DED4` | filets par défaut |
 | `border-strong` | `#D2CABB` | contour de tout élément **cliquable** |
-| `ink` | `#1A1815` | texte principal, disque du sceau |
+| `ink` | `#1A1815` | texte principal, fond du monogramme sur variante encre |
 | `ink-muted` | `#5C554B` | texte secondaire, icônes de méta |
 | `ink-subtle` | `#736B61` | aides, horodatages, placeholders |
 | `accent` | `#2F6B57` | interactif, marque, focus (argan) |
@@ -358,7 +358,7 @@ scrapé, non maîtrisé) : l'UI est un cadre plâtre + encre à ~90 %, jamais un
 | `accent-soft` | `#EAF1ED` | champ du hero, badge de remise, filtre actif |
 | `accent-line` | `#B6CFC4` | contour des éléments accent doux |
 | `safran` | `#B07C2A` | **ornement de marque uniquement** — voir règle 4 |
-| `safran-line` | `#E0C793` | filet intérieur du sceau |
+| `safran-line` | `#E0C793` | `w` du monogramme, filet de la baseline |
 | `hot` | `#AD4527` | score chaud (≥ seuil) — **rien d'autre** |
 | `hot-soft` | `#F9E9E2` | fond du vote haut et du badge « Tendance » |
 | `hot-line` | `#E6C5B6` | contour du vote chaud et du badge |
@@ -383,7 +383,16 @@ mesurés ≥ 4,5:1.
 
 ### Non-négociables (inchangés par cet amendement)
 
-- **Sceau calligraphique `فيد و ستافيد`** — médaillon SVG autonome (`Seal.tsx`), jamais un asset externe.
+- **Marque** (amendement du 26/07/2026, lot 5). L'identité de Fidwastafid repose sur un logotype latin
+  **FIDWASTAFID** — `FID` et `STAFID` en `accent`, `WA` en `safran` — accompagné de la baseline
+  « Les bons plans du Maroc » en `ink-2`, flanquée de deux filets, l'un `accent`, l'autre `safran`.
+  Sa forme carrée est le monogramme **FwS**, le `w` minuscule reprenant la conjonction *و* du nom.
+  Les fichiers de référence vivent dans `apps/web/public/brand/` : ce sont des tracés vectoriels,
+  jamais du texte composé, et ils ne doivent pas être redessinés.
+
+  La calligraphie arabe `فيد و ستافيد` est **conservée en signature secondaire** au pied de page.
+  Elle reste non négociable à ce titre. Le médaillon circulaire à anneau safran est abandonné, ainsi
+  que les pistes khatim et flèches d'échange.
 - **Typographie Scheherazade New** pour tout rendu arabe.
 - **Libellés de vote `ربح`** (vote chaud) **/ `خسارة`** (vote froid).
 - **CTA en darija.**
@@ -397,7 +406,8 @@ mesurés ≥ 4,5:1.
    primitives peut employer la teinte `hot` en contour et en texte uniquement, jamais en aplat au
    repos. `cold` couvre la froideur d'un deal au sens large : score négatif et état expiré.** Toute
    autre utilisation est un bug.
-4. **`safran` est un ornement de marque** : sceau, motif du hero. Il n'apparaît jamais sur un bouton,
+4. **`safran` est un ornement de marque** : logotype (le `WA`, le `w` du monogramme, le filet de la
+   baseline) et motif du hero. Il n'apparaît jamais sur un bouton,
    un badge, un état ou un texte courant. Toute apparition de `safran` dans un composant d'interface
    est un bug — c'est par cette accumulation que la charte rouge/or abandonnée se reconstituerait.
    Corollaire technique : à 3,6:1 sur blanc, `safran` ne passe pas l'AA en texte courant ; il est
