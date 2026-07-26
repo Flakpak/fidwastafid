@@ -16,6 +16,22 @@ function reduction(deal: Deal): number | null {
 }
 
 /**
+ * Économie en dirhams, calculée depuis les données — jamais une valeur écrite
+ * en dur.
+ *
+ * Renvoie `null` dès que le prix de référence est absent, nul ou incohérent
+ * (inférieur ou égal au prix courant). Dans ce cas l'appelant n'affiche RIEN :
+ * ni zéro, ni tiret. Annoncer une fausse économie serait pire que de ne rien
+ * annoncer — c'est la promesse de fiabilité des prix qui se joue là.
+ */
+function economie(deal: Deal): number | null {
+  if (deal.prixNormal === undefined || deal.prixNormal === null) return null;
+  if (!Number.isFinite(deal.prixNormal) || !Number.isFinite(deal.prixPromo)) return null;
+  if (deal.prixNormal <= deal.prixPromo) return null;
+  return Math.round((deal.prixNormal - deal.prixPromo) * 100) / 100;
+}
+
+/**
  * Carte deal — structure Dealabs (2 colonnes fixes, pilule de vote, CTA
  * proéminent) restylée charte Tadelakt (CONTRAT-V1 §8). Reste un composant
  * serveur (feed SSR, Phase 4) : les boutons de vote (CardVote), le compte à
@@ -34,6 +50,7 @@ function reduction(deal: Deal): number | null {
  */
 export function DealCard({ deal }: { deal: Deal }) {
   const pct = reduction(deal);
+  const gain = economie(deal);
   const dealHref = `/deal/${dealUrlSlug(deal.titre, deal.publicId)}`;
   const isHot = deal.score >= SEUIL_CHAUD;
   const urg = urgence(deal);
@@ -130,15 +147,26 @@ export function DealCard({ deal }: { deal: Deal }) {
             {deal.titre}
           </h2>
 
-          {/* c. Prix + confiance. Le prix n'est plus coloré : sa taille (25px)
-              le hiérarchise (charte Tadelakt). */}
+          {/* c. Prix + confiance. Le prix reste en ENCRE : dans ce système
+              `accent` dit « cliquable » et `hot` dit « deal chaud » — un prix
+              vert passerait pour un lien, un prix braise pour une température.
+              La hiérarchie passe donc par la masse (30px, graisse 700), pas par
+              la teinte. La pastille de remise, elle, est l'ancre colorée. */}
           <div className="flex items-center gap-2 flex-wrap text-xs">
-            <span className="text-[25px] font-semibold text-ink tabular-nums leading-none">
+            <span className="text-[30px] font-bold text-ink tabular-nums leading-none tracking-[-0.035em]">
               {deal.prixPromo}
-              <span className="text-sm font-normal text-ink-subtle"> DH</span>
+              <span className="text-[15px] font-medium tracking-normal text-ink-subtle"> DH</span>
             </span>
-            {deal.prixNormal && <span className="text-ink-subtle line-through tabular-nums">{deal.prixNormal} DH</span>}
-            {pct !== null && <Badge variant="accent">-{pct}%</Badge>}
+            {deal.prixNormal && (
+              <span className="text-[15px] font-medium text-ink-subtle line-through tabular-nums">
+                {deal.prixNormal} DH
+              </span>
+            )}
+            {pct !== null && (
+              <span className="rounded-[4px] bg-accent px-2 py-[3px] text-xs font-semibold text-white tabular-nums">
+                -{pct}%
+              </span>
+            )}
             {(deal.enseigneNom || deal.nomVendeur || deal.ville) && (
               <span aria-hidden="true" className="w-px h-3 bg-border" />
             )}
@@ -169,6 +197,15 @@ export function DealCard({ deal }: { deal: Deal }) {
               </span>
             )}
           </div>
+
+          {/* c-bis. Économie en dirhams — un pourcentage demande un calcul
+              mental, un montant est directement comparable à ce qu'on a en
+              poche. Affichée UNIQUEMENT si le prix de référence existe et
+              dépasse le prix courant (cf. `economie`) : jamais de zéro, jamais
+              de tiret, rien du tout. */}
+          {gain !== null && (
+            <p className="text-[11.5px] font-medium text-accent">Tu économises {gain} DH</p>
+          )}
 
           {/* d. Description. */}
           {deal.description && <p className="text-[12.5px] text-ink-subtle leading-snug line-clamp-2">{deal.description}</p>}
