@@ -9,14 +9,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * (sharp/etc.) n'existe dans ce monorepo, et en installer une juste pour un
  * favicon serait disproportionné. Le format ICO est simple (en-tête +
  * bitmap 32bpp) : on dessine directement les pixels d'un motif "sceau"
- * simplifié (anneau or sur fond sombre — CONTRAT-V1 §8), illisible en
- * détail à 16/32px de toute façon, cohérent avec le sceau complet
- * (Seal.tsx) utilisé ailleurs (icon.tsx/apple-icon.tsx, qui eux peuvent se
- * permettre plus de détail via next/og).
+ * simplifié (anneau plâtre sur fond encre — charte Tadelakt, CONTRAT-V1 §8),
+ * illisible en détail à 16/32px de toute façon, cohérent avec le sceau
+ * complet (Seal.tsx) utilisé ailleurs (icon.tsx/apple-icon.tsx, qui eux
+ * peuvent se permettre plus de détail via next/og).
+ *
+ * Pas d'argan (`accent`) dans le favicon : à 16 px, un vert sombre sur encre
+ * ne se distingue plus. Seul le contraste encre/plâtre survit à la réduction.
  */
 
-const DARK: [number, number, number] = [0x1a, 0x0e, 0x06]; // seal-bg (le plus sombre du dégradé)
-const GOLD: [number, number, number] = [0xff, 0xd4, 0x3b]; // --or
+const INK: [number, number, number] = [0x1a, 0x18, 0x15]; // ink — fond
+const PLASTER: [number, number, number] = [0xf4, 0xf1, 0xec]; // surface-base — anneau et pastille
 
 function drawSeal(size: number): Buffer {
   // BGRA, 32bpp, une ligne par ligne du bas vers le haut (convention BMP/ICO).
@@ -37,9 +40,9 @@ function drawSeal(size: number): Buffer {
 
       let color: [number, number, number] | null = null;
       if (dist <= dotR) {
-        color = GOLD;
+        color = PLASTER;
       } else if (dist <= outerR) {
-        color = dist >= ringInner ? GOLD : DARK;
+        color = dist >= ringInner ? PLASTER : INK;
       }
 
       const offset = (row * size + col) * 4;
