@@ -1,42 +1,34 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { ImageResponse } from "next/og";
 
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
 /**
- * Icône apple-touch (180px) — assez de résolution pour reprendre le motif
- * du sceau complet (Seal.tsx : anneau safran sur fond encre + "فيد", charte
- * Tadelakt, cf. CONTRAT-V1 §8) plutôt que la version simplifiée du favicon
- * 16/32px. Couleurs seules : la forme calligraphique est non négociable.
+ * Icône apple-touch (180px) — monogramme FwS (CONTRAT-V1 §8, lot 5).
+ *
+ * Le fond `accent` occupe TOUT le canevas : une icône d'app ne flotte pas sur
+ * du vide, c'est le système qui arrondit les coins. `mark.svg` porte déjà son
+ * fond en `<rect>` plein bord à bord — il suffit donc de l'étirer au canevas,
+ * sans marge ni disque intermédiaire.
+ *
+ * Le fichier est lu sur le disque et passé en data URI : satori ne résout pas
+ * les chemins relatifs, et on ne redessine pas le tracé de référence (§8).
+ * Route `nodejs` par défaut, `readFileSync` y est disponible.
  */
+const markDataUri = `data:image/svg+xml;base64,${readFileSync(
+  path.join(process.cwd(), "public", "brand", "mark.svg")
+).toString("base64")}`;
+
 export default function AppleIcon() {
   return new ImageResponse(
     (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#1a1815", // ink
-        }}
-      >
-        <div
-          style={{
-            width: 148,
-            height: 148,
-            borderRadius: "50%",
-            border: "6px solid #b07c2a", // safran
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div style={{ fontFamily: "serif", fontSize: 56, fontWeight: 700, color: "#F0D9A8", display: "flex" }}>
-            فيد
-          </div>
-        </div>
+      // Fond accent sous le monogramme : le `rx` du fichier laisse ses coins
+      // transparents, or iOS applique DÉJÀ son propre masque — sans ce fond,
+      // les coins seraient arrondis deux fois et laisseraient voir le vide.
+      <div style={{ width: "100%", height: "100%", display: "flex", background: "#2f6b57" }}>
+        <img src={markDataUri} width={180} height={180} alt="Fidwastafid" />
       </div>
     ),
     size
