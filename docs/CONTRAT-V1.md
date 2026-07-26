@@ -379,8 +379,10 @@ mesurés ≥ 4,5:1.
 1. **Une seule action pleine (`variant="primary"`) par écran.**
 2. **Le gris pâle est interdit sur tout élément cliquable** — un cliquable porte toujours un contour
    `border-strong` et une encre lisible, jamais un gris d'inertie.
-3. **`hot` est réservé au score chaud (≥ seuil). `cold` couvre la froideur d'un deal au sens large :
-   score négatif et état expiré.** Toute autre utilisation de l'un ou l'autre est un bug.
+3. **`hot` en aplat ou en badge est réservé au score chaud (≥ seuil). La variante `danger` des
+   primitives peut employer la teinte `hot` en contour et en texte uniquement, jamais en aplat au
+   repos. `cold` couvre la froideur d'un deal au sens large : score négatif et état expiré.** Toute
+   autre utilisation est un bug.
 
 Référence directe pour la config Tailwind (`@theme`, `apps/web/src/app/globals.css`) et les primitives
 UI (`apps/web/src/components`). La refonte est portée en trois lots : lot 1 = ce contrat + tokens +
