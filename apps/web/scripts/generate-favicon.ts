@@ -14,8 +14,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * complet (Seal.tsx) utilisé ailleurs (icon.tsx/apple-icon.tsx, qui eux
  * peuvent se permettre plus de détail via next/og).
  *
- * Pas d'argan (`accent`) dans le favicon : à 16 px, un vert sombre sur encre
- * ne se distingue plus. Seul le contraste encre/plâtre survit à la réduction.
+ * EXCEPTION ASSUMÉE au lot 4 : le sceau prend l'anneau `safran` partout
+ * ailleurs (180 px, 512 px, OG), mais PAS ici. À 16/32 px, le safran sur encre
+ * (3,0:1) passe sous le seuil de lisibilité et l'anneau se referme en tache ;
+ * seul le contraste encre/plâtre survit à la réduction. Même raison pour
+ * l'argan.
  */
 
 const INK: [number, number, number] = [0x1a, 0x18, 0x15]; // ink — fond

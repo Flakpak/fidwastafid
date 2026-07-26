@@ -5,7 +5,7 @@ import { ImageResponse } from "next/og";
  * la convention spéciale `icon`/`apple-icon`, réservée à une seule taille
  * chacune) : Next.js sait servir une ImageResponse depuis n'importe quel
  * handler GET. Même motif que apple-icon.tsx, plus de résolution — donc
- * mêmes couleurs Tadelakt (encre/plâtre, CONTRAT-V1 §8).
+ * mêmes couleurs Tadelakt (anneau safran sur encre, CONTRAT-V1 §8).
  */
 export function GET() {
   return new ImageResponse(
@@ -25,13 +25,13 @@ export function GET() {
             width: 420,
             height: 420,
             borderRadius: "50%",
-            border: "16px solid #f4f1ec", // surface-base
+            border: "16px solid #b07c2a", // safran
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <div style={{ fontFamily: "serif", fontSize: 160, fontWeight: 700, color: "#f4f1ec", display: "flex" }}>
+          <div style={{ fontFamily: "serif", fontSize: 160, fontWeight: 700, color: "#F0D9A8", display: "flex" }}>
             فيد
           </div>
         </div>

@@ -11,9 +11,11 @@ export const contentType = "image/png";
  * (Seal.tsx), donc motif simplifié — via next/og (déjà utilisé par
  * opengraph-image.tsx), pas de nouvelle dépendance.
  *
- * Pas d'argan (`accent`) ici : à 16 px, un vert sombre sur encre ne se
- * distingue plus. Seul le contraste encre/plâtre (15,7:1) survit à la
- * réduction.
+ * EXCEPTION ASSUMÉE au lot 4 : les grandes tailles (180 px, 512 px, OG)
+ * prennent l'anneau `safran` du sceau, pas celui-ci. À 16/32 px, le safran sur
+ * encre (3,0:1) descend sous le seuil de lisibilité et la couronne se referme
+ * en tache ; l'anneau reste donc en plâtre, dont le contraste sur l'encre
+ * (15,7:1) est le seul qui survive à la réduction. Même raison pour l'argan.
  */
 export default function Icon() {
   return new ImageResponse(
