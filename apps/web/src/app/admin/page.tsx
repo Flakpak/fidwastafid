@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { Enseigne } from "@fidwastafid/schemas";
 import { AdminPipeline } from "./AdminPipeline.js";
+import { Seal } from "../../components/Seal.js";
 import { resolveCurrentUser } from "../../lib/currentUser.js";
 import { GET as getEnseignesHandler } from "../api/v1/enseignes/route.js";
 
@@ -53,10 +54,9 @@ export default async function AdminPage() {
           08) : impossible de confondre l'admin et le site public d'un coup
           d'œil — seul écart assumé au système clair. */}
       <header className="bg-ink flex items-center gap-3 h-[60px] px-4 sm:px-6">
-        <Link href="/" aria-label="فيد و ستافيد" className="shrink-0">
-          <span dir="rtl" className="font-arabic text-surface-base text-xl leading-none pb-[5px] inline-block">
-            فيد و ستافيد
-          </span>
+        {/* Déclinaison `clair` du sceau — le chrome admin est inversé en encre. */}
+        <Link href="/" aria-label="فيد و ستافيد — Fidwastafid" className="shrink-0">
+          <Seal className="h-9 w-9" variant="clair" withWordmark />
         </Link>
         <span className="text-[11px] font-medium tracking-[0.14em] uppercase text-surface-base/60 border border-surface-base/25 rounded px-2 py-0.5">
           Admin

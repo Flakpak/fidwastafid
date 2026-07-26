@@ -5,34 +5,71 @@
  * CSP (middleware.ts) n'autorise `style-src` que par nonce, qui ne s'applique
  * pas à l'attribut HTML `style`.
  *
- * Charte Tadelakt (CONTRAT-V1 §8) : le médaillon passe en ENCRE sur clair —
- * teintes seulement, la forme et la calligraphie sont non négociables et
- * restent intactes (arbitrage lot 2b). Plus de dégradé doré ni de fond foncé :
- * disque plâtre discret, gravure à l'encre.
+ * Lot 4 — RÉGRESSION CORRIGÉE : le lot 2b avait réduit le sceau à un simple
+ * wordmark texte, ce qui violait le §8 (le médaillon y est déclaré non
+ * négociable). Le médaillon est restauré, en encre et safran (maquette
+ * `docs/maquettes/tadelakt-couleur-subtile.html`) : anneau extérieur `safran`,
+ * anneau intérieur `safran-line`, disque `ink`, calligraphie en #F0D9A8
+ * (12,8:1 sur l'encre).
+ *
+ * Le safran vit ICI et dans le motif du hero, nulle part ailleurs (§8, règle
+ * 4) : c'est un ornement de marque, jamais un composant d'interface.
+ *
+ * Le nom latin « Fidwastafid » sous la calligraphie rend la marque
+ * identifiable par qui ne lit pas l'arabe — il ne se supprime pas.
+ *
+ * `variant="clair"` : déclinaison pour fond coloré/sombre (anneaux clairs,
+ * disque blanc, calligraphie `accent`).
  */
-export function Seal({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <circle cx="50" cy="50" r="48" fill="#faf8f4" />
-      <circle cx="50" cy="50" r="46" fill="none" stroke="#1a1815" strokeWidth="1.5" />
-      <circle cx="50" cy="50" r="40" fill="none" stroke="#1a1815" strokeWidth="0.5" strokeDasharray="2.5,4" opacity="0.3" />
-      <polygon points="50,3 52,7 50,11 48,7" fill="#1a1815" opacity="0.85" />
-      <polygon points="50,89 52,93 50,97 48,93" fill="#1a1815" opacity="0.85" />
-      <polygon points="3,50 7,48 11,50 7,52" fill="#1a1815" opacity="0.85" />
-      <polygon points="89,50 93,48 97,50 93,52" fill="#1a1815" opacity="0.85" />
-      <text x="50" y="38" fontFamily="'Scheherazade New', serif" fontSize="22" fontWeight="700" fill="#1a1815" textAnchor="middle">
+export function Seal({
+  className,
+  variant = "defaut",
+  withWordmark = false,
+}: {
+  className?: string;
+  variant?: "defaut" | "clair";
+  /** Ajoute le bloc texte à droite du médaillon (en-tête, pied de page). */
+  withWordmark?: boolean;
+}) {
+  const clair = variant === "clair";
+  const anneau = clair ? "#F0D9A8" : "#b07c2a"; // safran
+  const anneauInterne = clair ? "#FFFFFF" : "#e0c793"; // safran-line
+  const disque = clair ? "#FFFFFF" : "#1a1815"; // ink
+  const calligraphie = clair ? "#2f6b57" : "#F0D9A8"; // accent
+
+  const medaillon = (
+    <svg className={className} viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="19" cy="19" r="17.5" fill="none" stroke={anneau} strokeWidth="1.3" />
+      <circle cx="19" cy="19" r="14.4" fill="none" stroke={anneauInterne} strokeWidth="1" />
+      <circle cx="19" cy="19" r="12.6" fill={disque} />
+      <text
+        x="19"
+        y="24.4"
+        textAnchor="middle"
+        fontFamily="'Scheherazade New', serif"
+        fontSize="14.5"
+        fill={calligraphie}
+      >
         فيد
       </text>
-      <line x1="22" y1="48" x2="36" y2="48" stroke="#1a1815" strokeWidth="0.7" opacity="0.5" />
-      <circle cx="22" cy="48" r="1.5" fill="#1a1815" opacity="0.5" />
-      <text x="50" y="53" fontFamily="'Scheherazade New', serif" fontSize="11" fontWeight="400" fill="#1a1815" textAnchor="middle" opacity="0.85">
-        و
-      </text>
-      <line x1="64" y1="48" x2="78" y2="48" stroke="#1a1815" strokeWidth="0.7" opacity="0.5" />
-      <circle cx="78" cy="48" r="1.5" fill="#1a1815" opacity="0.5" />
-      <text x="50" y="70" fontFamily="'Scheherazade New', serif" fontSize="20" fontWeight="700" fill="#1a1815" textAnchor="middle">
-        ستافيد
-      </text>
     </svg>
+  );
+
+  if (!withWordmark) return medaillon;
+
+  return (
+    <span className="inline-flex items-center gap-2.5">
+      {medaillon}
+      <span className="flex flex-col leading-[1.05]">
+        <span dir="rtl" className={`font-arabic text-[19px] pb-0.5 ${clair ? "text-surface-base" : "text-ink"}`}>
+          فيد و ستافيد
+        </span>
+        <span
+          className={`text-[9.5px] tracking-[0.19em] uppercase ${clair ? "text-surface-base/70" : "text-ink-subtle"}`}
+        >
+          Fidwastafid
+        </span>
+      </span>
+    </span>
   );
 }

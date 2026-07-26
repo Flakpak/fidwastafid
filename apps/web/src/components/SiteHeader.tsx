@@ -2,6 +2,7 @@ import Link from "next/link";
 import { resolveCurrentUser } from "../lib/currentUser.js";
 import { deconnexionAction } from "../lib/authActions.js";
 import { buttonClasses } from "./Button.js";
+import { Seal } from "./Seal.js";
 
 /**
  * État connecté/pseudo/lien admin résolu CÔTÉ SERVEUR (doctrine CONTRAT-V1
@@ -12,19 +13,17 @@ import { buttonClasses } from "./Button.js";
  * à réévaluer côté client, donc rien à hydrater.
  *
  * Charte Tadelakt (CONTRAT-V1 §8) : en-tête clair (`surface` + filet `border`),
- * sceau en encre (wordmark Scheherazade, à la place du médaillon coloré de la
- * v1). Une seule action pleine ici — « Soumettre un deal » ; « Connexion »
- * reste secondaire.
+ * sceau = médaillon safran/encre + wordmark (lot 4 : le wordmark seul du lot 2b
+ * violait le §8, qui déclare le médaillon non négociable). Une seule action
+ * pleine ici — « Soumettre un deal » ; « Connexion » reste secondaire neutre.
  */
 export async function SiteHeader() {
   const user = await resolveCurrentUser();
 
   return (
     <header className="bg-surface border-b border-border sticky top-0 z-10 h-[60px] px-4 sm:px-6 flex items-center justify-between gap-3">
-      <Link href="/" aria-label="فيد و ستافيد" className="shrink-0">
-        <span dir="rtl" className="font-arabic text-ink text-xl leading-none pb-[5px] inline-block">
-          فيد و ستافيد
-        </span>
+      <Link href="/" aria-label="فيد و ستافيد — Fidwastafid" className="shrink-0">
+        <Seal className="h-9 w-9" withWordmark />
       </Link>
       <nav className="flex items-center gap-2 sm:gap-3">
         <Link href="/soumettre" className={buttonClasses({ variant: "primary", size: "sm" })}>
