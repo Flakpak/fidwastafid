@@ -10,6 +10,12 @@ import {
   SupabaseAdminConfigError,
 } from "../src/app/api/v1/_lib/supabaseAdmin.js";
 import { resolveMeEmail } from "../src/app/api/v1/_lib/me.js";
+import {
+  TAILLE_PAGE,
+  construireParamsFeed,
+  fusionnerSansDoublon,
+  messageErreurFeed,
+} from "../src/lib/feedPagination.js";
 import type { Deal } from "@fidwastafid/schemas";
 
 // Jeton de test purement local (Phase 7B) — jamais le vrai REVALIDATE_TOKEN,
@@ -394,5 +400,85 @@ check(
   "JSON-LD sérialisable et re-parsable (forme réellement injectée dans le <script>)",
   JSON.parse(JSON.stringify(publie))["@type"] === "Product" && JSON.parse(JSON.stringify(publie)).offers["@type"] === "Offer"
 );
+
+/**
+ * Pagination du feed — incident du 26/07/2026 : 57 des 81 deals publiés
+ * invisibles, `nextCursor` typé mais jamais consommé. Ces cas verrouillent les
+ * trois propriétés qui font qu'une pagination par curseur reste correcte :
+ * elle accumule, elle ne duplique pas, elle s'arrête.
+ */
+console.log("\nPagination du feed — accumulation, doublons, arrêt");
+
+function dealFictif(publicId: string): Deal {
+  return { ...dealJsonLdBase, publicId };
+}
+
+// -- Construction des paramètres : le curseur part VERBATIM.
+const paramsSansCurseur = construireParamsFeed({ tri: "tendance", type: "tous" });
+check("params : limit = taille de page", paramsSansCurseur.get("limit") === String(TAILLE_PAGE));
+check("params : type=tous n'est pas transmis (absence de filtre)", paramsSansCurseur.get("type") === null);
+check("params : pas de cursor sur la première page", paramsSansCurseur.get("cursor") === null);
+
+const curseurOpaque = "eyJ0cmkiOiJ0ZW5kYW5jZSIsImFzT2YiOiIyMDI2LTA3LTI2VDE4OjQ2OjE4LjQyMloifQ";
+const paramsAvecCurseur = construireParamsFeed({
+  tri: "tendance",
+  ville: "Casablanca",
+  categorie: "Mode",
+  type: "physique",
+  cursor: curseurOpaque,
+});
+check("params : curseur retransmis tel quel (asOf/publicId préservés)", paramsAvecCurseur.get("cursor") === curseurOpaque);
+check("params : filtres actifs transmis", paramsAvecCurseur.get("ville") === "Casablanca" && paramsAvecCurseur.get("type") === "physique");
+
+// -- Accumulation sur plusieurs pages.
+const page1 = [dealFictif("aaaaaaaaa1"), dealFictif("aaaaaaaaa2"), dealFictif("aaaaaaaaa3")];
+const page2 = [dealFictif("bbbbbbbbb1"), dealFictif("bbbbbbbbb2")];
+let accumule = fusionnerSansDoublon([], page1);
+accumule = fusionnerSansDoublon(accumule, page2);
+check("2 pages -> les deux sont accumulées", accumule.length === 5);
+check("2 pages -> l'ordre de service est conservé", accumule[0]!.publicId === "aaaaaaaaa1" && accumule[4]!.publicId === "bbbbbbbbb2");
+
+// -- Doublon entre pages (curseur mal départagé) : écarté en silence, jamais rendu deux fois.
+const page3AvecRepetition = [dealFictif("bbbbbbbbb2"), dealFictif("ccccccccc1")];
+const apresPage3 = fusionnerSansDoublon(accumule, page3AvecRepetition);
+check("doublon inter-pages écarté", apresPage3.length === 6);
+check(
+  "aucun publicId présent deux fois",
+  new Set(apresPage3.map((d) => d.publicId)).size === apresPage3.length
+);
+
+// -- Doublon INTERNE à une même page.
+const pageAvecDoublonInterne = [dealFictif("ddddddddd1"), dealFictif("ddddddddd1"), dealFictif("ddddddddd2")];
+const apresInterne = fusionnerSansDoublon([], pageAvecDoublonInterne);
+check("doublon interne à une page écarté", apresInterne.length === 2);
+
+// -- Page vide (fin de liste) : ne casse rien, ne duplique rien.
+check("page vide -> liste inchangée", fusionnerSansDoublon(apresPage3, []).length === apresPage3.length);
+
+// -- Simulation complète : 81 deals, pages de 24, arrêt quand nextCursor = null.
+{
+  const total = 81;
+  const tous = Array.from({ length: total }, (_, i) => dealFictif(`deal${String(i).padStart(6, "0")}`));
+  let charges: Deal[] = [];
+  let offset = 0;
+  let cursor: string | null = "debut";
+  let pages = 0;
+  while (cursor !== null && pages < 20) {
+    const lot = tous.slice(offset, offset + TAILLE_PAGE);
+    offset += lot.length;
+    charges = fusionnerSansDoublon(charges, lot);
+    cursor = offset < total ? `curseur-${offset}` : null; // l'API renvoie null en fin de liste
+    pages++;
+  }
+  check("parcours complet -> 81 deals chargés", charges.length === total);
+  check("parcours complet -> 4 pages (24+24+24+9)", pages === 4);
+  check("parcours complet -> arrêt sur nextCursor null", cursor === null);
+  check("parcours complet -> aucun doublon", new Set(charges.map((d) => d.publicId)).size === total);
+}
+
+// -- Messages d'erreur : jamais un silence.
+check("erreur 429 -> message spécifique", messageErreurFeed(429).includes("Trop de requêtes"));
+check("erreur 5xx -> message serveur", messageErreurFeed(503).includes("serveur"));
+check("erreur réseau -> message générique non vide", messageErreurFeed().length > 0);
 
 void runAsyncChecks();
