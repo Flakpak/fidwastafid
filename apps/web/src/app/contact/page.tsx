@@ -41,7 +41,7 @@ export default function ContactPage() {
           <div className="flex flex-col gap-3">
             <a
               href={MAILTO_HREF}
-              className="self-start inline-flex items-center gap-2 bg-ink text-surface-base rounded-xl px-6 py-3 text-sm font-black shadow-sm hover:bg-[#332e28] transition-colors duration-[130ms] active:translate-y-px motion-reduce:transition-none"
+              className="self-start inline-flex items-center gap-2 bg-accent text-white rounded-xl px-6 py-3 text-sm font-black shadow-sm hover:bg-accent-hi transition-colors duration-[130ms] active:translate-y-px motion-reduce:transition-none"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true" className="h-4 w-4">
                 <rect x="3" y="5" width="18" height="14" rx="2" />

@@ -13,7 +13,14 @@ import type { ComponentProps } from "react";
  * Modificateur `arabic` : Scheherazade New, `rtl`, +2px de corps et +3px de
  * padding bas — le rendu arabe déborde optiquement vers le bas.
  */
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+/**
+ * `secondary` = secondaire NEUTRE (actions sans charge de marque : Connexion,
+ * Enregistrer, Publier…). `brand` = secondaire DE MARQUE, à réserver aux
+ * actions qui portent l'identité à côté d'un primaire (« Le concept
+ * Fidwastafid »). Les deux existent séparément depuis le lot 4 : avant, le
+ * secondaire de marque était blanc sur blanc, donc invisible.
+ */
+export type ButtonVariant = "primary" | "secondary" | "brand" | "ghost" | "danger";
 export type ButtonSize = "md" | "sm";
 
 const base =
@@ -26,10 +33,11 @@ const base =
   "max-sm:min-h-11";
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-ink text-surface-base border-transparent shadow-sm hover:bg-[#332e28]",
+  primary: "bg-accent text-white border-transparent shadow-sm hover:bg-accent-hi",
   secondary: "bg-surface text-ink border-border-strong hover:bg-surface-subtle hover:border-[#b9b0a0]",
+  brand: "bg-surface text-accent border-accent-line hover:bg-accent-soft hover:border-accent",
   ghost: "bg-transparent text-ink-muted border-transparent hover:bg-[#eae5dc] hover:text-ink",
-  danger: "bg-surface text-hot border-[#e4c3b7] hover:bg-hot-soft",
+  danger: "bg-surface text-hot border-hot-line hover:bg-hot-soft",
 };
 
 const heights: Record<ButtonSize, string> = { md: "h-10", sm: "h-8" };

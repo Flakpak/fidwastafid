@@ -115,7 +115,7 @@ export default function ChartePage() {
           <div className="pt-2">
             <Link
               href="/soumettre"
-              className="inline-block bg-ink text-surface-base rounded-xl px-6 py-3 text-sm font-black shadow-sm hover:bg-[#332e28] transition-colors duration-[130ms] motion-reduce:transition-none"
+              className="inline-block bg-accent text-white rounded-xl px-6 py-3 text-sm font-black shadow-sm hover:bg-accent-hi transition-colors duration-[130ms] motion-reduce:transition-none"
             >
               Proposer un bon plan →
             </Link>

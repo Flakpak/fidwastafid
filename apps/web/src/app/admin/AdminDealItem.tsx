@@ -76,8 +76,8 @@ interface Action {
 }
 
 const ACTION_CLASSES: Record<Action["variant"], string> = {
-  primaire: "bg-ink text-surface-base hover:bg-[#332e28]",
-  danger: "bg-surface border border-[#e4c3b7] text-hot hover:bg-hot-soft",
+  primaire: "bg-accent text-white hover:bg-accent-hi",
+  danger: "bg-surface border border-hot-line text-hot hover:bg-hot-soft",
   neutre: "bg-surface border border-border-strong text-ink hover:bg-surface-subtle",
 };
 
@@ -500,7 +500,7 @@ export function AdminDealItem({
             type="button"
             onClick={() => void handleSaveFields()}
             disabled={savingFields || pending}
-            className="self-start bg-ink text-surface-base rounded-lg px-3 py-1.5 text-xs font-bold hover:bg-[#332e28] disabled:opacity-50 transition-colors duration-[130ms] motion-reduce:transition-none"
+            className="self-start bg-accent text-white rounded-lg px-3 py-1.5 text-xs font-bold hover:bg-accent-hi disabled:opacity-50 transition-colors duration-[130ms] motion-reduce:transition-none"
           >
             {savingFields ? "Enregistrement..." : "Enregistrer"}
           </button>
