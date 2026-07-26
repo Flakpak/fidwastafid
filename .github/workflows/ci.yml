@@ -27,6 +27,40 @@ name: CI
 on:
   push:
   pull_request:
+  # Exécution planifiée quotidienne — ajoutée le 24/07/2026 (docs/INCIDENTS.md).
+  #
+  # Pourquoi : une défaillance externe intermittente (API admin Supabase, projet
+  # de dev en pause, clé révoquée) ne se manifestait jusqu'ici qu'au prochain
+  # `push` — c'est-à-dire au milieu d'un lot de travail, où elle se confond avec
+  # une vraie régression. Trois runs rouges (#211-#213) ont ainsi été imputés à
+  # tort à une refonte purement cosmétique. Une exécution nocturne fait
+  # apparaître le problème pour ce qu'il est : un incident d'infrastructure,
+  # daté, sans code en cours de route.
+  #
+  # 04:20 UTC : entre la sauvegarde (03:00, db-backup.yml) et le pipeline
+  # quotidien (05:00, pipeline-quotidien.yml), et volontairement décalé de
+  # l'heure pile — les crons à `:00` sont massivement souscrits chez GitHub et
+  # partent avec un retard variable.
+  #
+  # `schedule` ne se déclenche QUE sur la branche par défaut (main) : ce
+  # déclencheur reste donc inerte tant que ce correctif n'est pas fusionné.
+  #
+  # Innocuité vérifiée avant ajout (aucune action destructive sur la dev) :
+  #   - `integration` tourne contre un Postgres JETABLE (service container,
+  #     DATABASE_URL=localhost) détruit à la fin du run — rien à nettoyer ;
+  #   - la seule écriture externe est l'upload d'image de test vers le bucket
+  #     `deals-images`, sur une clé DÉTERMINISTE (deals/itgd2a9qa2.webp, cf.
+  #     DEAL_PUBLIC_ID dans tests/integration.ts) et en `x-upsert` : chaque run
+  #     réécrit le même objet, aucune accumulation ;
+  #   - côté Supabase Auth, le scénario se limite à une connexion et à la
+  #     lecture de l'e-mail ; `DELETE /api/v1/me` n'est délibérément pas testé
+  #     automatiquement (cf. fin de tests/integration.ts) ;
+  #   - `migrations-check` est en lecture seule (CONTRAT-V1 §7).
+  schedule:
+    - cron: "20 4 * * *"
+  # Permet de rejouer la CI complète à la demande sans pousser un commit —
+  # nécessaire pour vérifier ce déclencheur planifié sans attendre la nuit.
+  workflow_dispatch: {}
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
