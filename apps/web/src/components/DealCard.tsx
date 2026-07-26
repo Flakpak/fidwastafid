@@ -117,9 +117,16 @@ export function DealCard({ deal }: { deal: Deal }) {
           </div>
         </div>
 
-        <Link href={dealHref} className="flex flex-col gap-1.5">
-          {/* b. Titre — souligné au survol de la carte (group). */}
-          <h2 className="font-bold text-base leading-snug line-clamp-2 text-ink group-hover:underline underline-offset-[3px] decoration-[1.5px]">
+        {/* `group/lien` : le focus clavier atterrit sur CE lien, pas sur la carte
+            (un <div> n'est pas focusable) — sans ce groupe nommé, la variante
+            focus-visible ne se déclencherait jamais. Le survol reste porté par
+            le `group` de la carte entière. */}
+        <Link href={dealHref} className="group/lien flex flex-col gap-1.5 rounded-sm focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+          {/* b. Titre — affordance de clic : le soulignement est retiré (lot 6)
+              au profit d'un passage en `accent`, au survol ET au focus clavier.
+              Sans le second, l'affordance disparaîtrait pour qui navigue au
+              clavier, où l'ombre de la carte ne dit rien. */}
+          <h2 className="font-bold text-base leading-snug line-clamp-2 text-ink transition-colors duration-[130ms] motion-reduce:transition-none group-hover:text-accent group-focus-visible/lien:text-accent">
             {deal.titre}
           </h2>
 

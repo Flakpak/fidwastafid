@@ -16,13 +16,6 @@ export function temperature(score: number): Temperature {
   return "neutre";
 }
 
-/**
- * Remplissage de la jauge de température, en pourcentage (0–100). Proportionnel
- * au score, plafonné à 3× le seuil chaud (= jauge pleine) — le plafond dérive
- * du seuil, il n'est pas choisi indépendamment. Plancher à 4 % pour qu'un score
- * nul ou négatif reste un filet visible plutôt qu'une jauge vide.
- */
-export function jaugeRemplissage(score: number): number {
-  const plein = SEUIL_CHAUD * 3;
-  return Math.max(4, Math.min(100, Math.round((score / plein) * 100)));
-}
+/* `jaugeRemplissage` a été retirée au lot 6 avec la jauge elle-même : le score
+   en graisse 700 porte désormais seul le niveau. Ne pas la réintroduire sans
+   réintroduire la jauge — une fonction sans appelant est de la dette. */
