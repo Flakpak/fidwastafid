@@ -6,6 +6,7 @@ import { SiteFooter } from "../components/SiteFooter.js";
 import { Ticker } from "../components/Ticker.js";
 import { HeroBand } from "../components/HeroBand.js";
 import { Feed } from "./Feed.js";
+import { construireParamsFeed } from "../lib/feedPagination.js";
 
 const DESCRIPTION = "Les meilleurs bons plans et promotions au Maroc, votés par la communauté : alimentaire, high-tech, mode et plus.";
 
@@ -37,17 +38,22 @@ interface DealsPage {
  * pas de base URL à deviner (dev/Docker/Vercel ont des origines
  * différentes), et ça reste la même API que le web/mobile consommeront
  * plus tard (CONTRAT-V1 : une seule porte d'entrée /api/v1).
+ *
+ * Renvoie désormais le `nextCursor` en plus des deals : il était typé ici
+ * depuis toujours mais jamais transmis, si bien que le feed s'arrêtait à la
+ * première page (57 des 81 deals publiés invisibles en production).
  */
-async function fetchFeed(): Promise<Deal[]> {
-  const response = await getDealsHandler(new Request("http://localhost/api/v1/deals?limit=24"));
+async function fetchFeed(): Promise<DealsPage> {
+  const params = construireParamsFeed({ tri: "tendance" });
+  const response = await getDealsHandler(new Request(`http://localhost/api/v1/deals?${params.toString()}`));
   const body = (await response.json()) as DealsPage;
-  return body.data;
+  return { data: body.data, nextCursor: body.nextCursor };
 }
 
 type PageParams = { searchParams: Promise<{ compte?: string; motdepasse?: string }> };
 
 export default async function Home({ searchParams }: PageParams) {
-  const [deals, { compte, motdepasse }] = await Promise.all([fetchFeed(), searchParams]);
+  const [premierePage, { compte, motdepasse }] = await Promise.all([fetchFeed(), searchParams]);
   const message =
     compte === "supprime"
       ? "Ton compte a bien été supprimé. Merci d'avoir fait partie de la communauté."
@@ -66,7 +72,7 @@ export default async function Home({ searchParams }: PageParams) {
         </div>
       )}
       <Ticker />
-      <Feed initialDeals={deals} hero={<HeroBand />} />
+      <Feed initialDeals={premierePage.data} initialCursor={premierePage.nextCursor} hero={<HeroBand />} />
       <SiteFooter />
     </div>
   );

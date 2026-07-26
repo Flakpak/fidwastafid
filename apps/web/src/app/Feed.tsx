@@ -6,6 +6,7 @@ import { VILLES, CATEGORIES, type Deal } from "@fidwastafid/schemas";
 import { DealCard } from "../components/DealCard.js";
 import { Seal } from "../components/Seal.js";
 import { categorieIcon } from "../lib/format.js";
+import { construireParamsFeed, fusionnerSansDoublon, messageErreurFeed } from "../lib/feedPagination.js";
 
 type Type = "tous" | "physique" | "en_ligne";
 type Tri = "tendance" | "score" | "recent";
@@ -100,8 +101,23 @@ function EdgeFades({ atStart, atEnd }: { atStart: boolean; atEnd: boolean }) {
   );
 }
 
-export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React.ReactNode }) {
+export function Feed({
+  initialDeals,
+  initialCursor,
+  hero,
+}: {
+  initialDeals: Deal[];
+  /** Curseur de la page suivante, tel que renvoyé par l'API — `null` si la
+   *  première page épuise déjà la liste. */
+  initialCursor: string | null;
+  hero: React.ReactNode;
+}) {
   const [deals, setDeals] = useState(initialDeals);
+  /** Curseur courant. Retransmis verbatim à l'API : il encode `asOf` (fige le
+   *  classement pendant la navigation) et `publicId` (départage les ex æquo). */
+  const [cursor, setCursor] = useState<string | null>(initialCursor);
+  const [chargement, setChargement] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
   const [ville, setVille] = useState<string>("");
   const [categorie, setCategorie] = useState<string>("");
   const [type, setType] = useState<Type>("tous");
@@ -151,21 +167,68 @@ export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React
     // naturellement à son offset collé (top-[70px]).
     filtresRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
-    const params = new URLSearchParams({ limit: "24", tri });
-    if (ville) params.set("ville", ville);
-    if (categorie) params.set("categorie", categorie);
-    if (type !== "tous") params.set("type", type);
-
     let cancelled = false;
-    fetch(`/api/v1/deals?${params.toString()}`)
-      .then((res) => res.json())
-      .then((body: { data: Deal[] }) => {
-        if (!cancelled) setDeals(body.data);
-      });
+    setChargement(true);
+    setErreur(null);
+
+    void (async () => {
+      const params = construireParamsFeed({ tri, ville, categorie, type });
+      try {
+        const res = await fetch(`/api/v1/deals?${params.toString()}`);
+        if (!res.ok) {
+          // Jamais un `catch` muet qui laisserait la liste précédente en place
+          // en faisant comme si de rien n'était (incident du 26/07/2026) : le
+          // statut part dans les logs, l'utilisateur voit un message et peut
+          // relancer.
+          console.error(`[feed] filtrage échoué — HTTP ${res.status} sur ${params.toString()}`);
+          if (!cancelled) setErreur(messageErreurFeed(res.status));
+          return;
+        }
+        const body = (await res.json()) as { data: Deal[]; nextCursor: string | null };
+        if (cancelled) return;
+        // Changement de filtre = nouvelle liste, donc nouveau curseur.
+        setDeals(body.data);
+        setCursor(body.nextCursor);
+      } catch (err) {
+        console.error("[feed] filtrage échoué — erreur réseau", err);
+        if (!cancelled) setErreur(messageErreurFeed());
+      } finally {
+        if (!cancelled) setChargement(false);
+      }
+    })();
+
     return () => {
       cancelled = true;
     };
   }, [ville, categorie, type, tri]);
+
+  /**
+   * Page suivante — le curseur est réémis tel quel, jamais reconstruit. Les
+   * résultats sont fusionnés en écartant les `publicId` déjà présents : un
+   * curseur mal départagé republierait des lignes sans lever d'erreur.
+   */
+  const chargerPlus = useCallback(async () => {
+    if (!cursor || chargement) return;
+    setChargement(true);
+    setErreur(null);
+    const params = construireParamsFeed({ tri, ville, categorie, type, cursor });
+    try {
+      const res = await fetch(`/api/v1/deals?${params.toString()}`);
+      if (!res.ok) {
+        console.error(`[feed] page suivante échouée — HTTP ${res.status}`);
+        setErreur(messageErreurFeed(res.status));
+        return;
+      }
+      const body = (await res.json()) as { data: Deal[]; nextCursor: string | null };
+      setDeals((prev) => fusionnerSansDoublon(prev, body.data));
+      setCursor(body.nextCursor);
+    } catch (err) {
+      console.error("[feed] page suivante échouée — erreur réseau", err);
+      setErreur(messageErreurFeed());
+    } finally {
+      setChargement(false);
+    }
+  }, [cursor, chargement, tri, ville, categorie, type]);
 
   const visibles = useMemo(() => {
     if (!recherche.trim()) return deals;
@@ -371,11 +434,56 @@ export function Feed({ initialDeals, hero }: { initialDeals: Deal[]; hero: React
           </div>
 
           <div className="flex flex-col gap-3">
-            {visibles.length === 0 && <p className="text-center text-muted py-16">Aucun bon plan pour l&apos;instant.</p>}
+            {visibles.length === 0 && !chargement && !erreur && (
+              <p className="text-center text-muted py-16">Aucun bon plan pour l&apos;instant.</p>
+            )}
             {visibles.map((deal) => (
               <DealCard key={deal.publicId} deal={deal} />
             ))}
           </div>
+
+          {/* Échec de chargement — message honnête + reprise. Jamais un
+              silence : avant ce lot, un rechargement en échec laissait la
+              liste précédente à l'écran sans rien signaler. */}
+          {erreur && (
+            <div
+              role="alert"
+              className="mt-4 bg-white border border-rouge/40 rounded-xl p-4 flex flex-col items-center gap-2 text-sm"
+            >
+              <p className="text-rouge font-bold text-center">{erreur}</p>
+              <button
+                type="button"
+                onClick={() => void chargerPlus()}
+                disabled={chargement}
+                className="rounded-full border border-bordure bg-white px-4 py-2 text-xs font-bold text-texte disabled:opacity-50"
+              >
+                Réessayer
+              </button>
+            </div>
+          )}
+
+          {/* « Charger plus » — bouton et non scroll infini : le pied de page
+              porte les mentions CNDP et loi 09-08, un scroll infini les rendrait
+              inatteignables. Disparaît quand l'API ne renvoie plus de curseur. */}
+          {cursor && !erreur && (
+            <div className="flex justify-center py-6">
+              <button
+                type="button"
+                onClick={() => void chargerPlus()}
+                disabled={chargement}
+                aria-busy={chargement}
+                className="min-h-11 rounded-full border border-bordure bg-white px-6 py-2 text-sm font-bold text-texte hover:bg-creme disabled:opacity-50 disabled:cursor-default"
+              >
+                {chargement ? "Chargement…" : "Charger plus de deals"}
+              </button>
+            </div>
+          )}
+
+          {/* Fin de liste explicite : sans elle, l'absence de bouton est
+              ambiguë (fin réelle ou bouton disparu ?). */}
+          {!cursor && !erreur && visibles.length > 0 && (
+            <p className="text-center text-muted text-xs py-6">Tu as vu tous les bons plans du moment.</p>
+          )}
         </main>
       </div>
     </>
