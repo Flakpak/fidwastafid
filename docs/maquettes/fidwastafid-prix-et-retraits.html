@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fidwastafid — prix et retraits</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Scheherazade+New:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --plat:#F4F1EC;--surf:#fff;--rule:#E3DED4;--rule-2:#D2CABB;
+  --ink:#1A1815;--ink-2:#5C554B;--ink-3:#736B61;
+  --accent:#2F6B57;--accent-hi:#24564A;--accent-soft:#EAF1ED;--accent-line:#B6CFC4;
+  --safran:#B07C2A;--safran-line:#E0C793;
+  --hot:#AD4527;--hot-soft:#F9E9E2;--hot-line:#E6C5B6;
+  --cold:#4C6674;--cold-soft:#EAF0F3;--cold-line:#C2D2DA;
+  --warn:#7C6015;--warn-soft:#F5EEDD;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#e6e3de;font-family:'Instrument Sans',system-ui,sans-serif;font-size:15px;line-height:1.6;padding:32px 20px 80px}
+.page{max-width:1000px;margin:0 auto}
+h1{font-size:26px;font-weight:600;letter-spacing:-.025em;margin-bottom:11px}
+.intro{max-width:670px;margin-bottom:36px;color:#9d978e;font-size:14.5px}
+.intro strong{color:#e6e3de;font-weight:600}
+.sec{margin-bottom:42px}
+.sh{display:flex;gap:11px;align-items:baseline;margin-bottom:6px;flex-wrap:wrap}
+.st{font-size:10.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:#6b655c;border:1px solid #332f2a;padding:3px 9px;border-radius:2px}
+.sn{font-size:18.5px;font-weight:600;letter-spacing:-.015em}
+.sw{color:#9d978e;font-size:14.5px;max-width:710px;margin-bottom:15px}
+.sw b{color:#e6e3de;font-weight:600}
+.pane{background:var(--plat);border:1px solid var(--rule);border-radius:12px;padding:20px;color:var(--ink)}
+.lab{font-size:10.5px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);margin-bottom:10px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.pill{font-size:9.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:3px}
+.p-ok{background:var(--accent-soft);color:var(--accent)}
+.p-ko{background:var(--hot-soft);color:var(--hot)}
+.p-mid{background:var(--warn-soft);color:var(--warn)}
+.verdict{border-left:2px solid var(--accent);padding:18px 0 18px 22px;max-width:710px;color:#c3bdb4;font-size:14.5px}
+.verdict h2{font-size:16.5px;font-weight:600;color:#e6e3de;margin-bottom:9px}
+.verdict p{margin-bottom:11px}.verdict p:last-child{margin-bottom:0}
+.verdict code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#9d978e}
+
+/* ══ CARTE ══ */
+.card{display:flex;gap:16px;padding:16px;background:var(--surf);border:1px solid var(--rule);border-radius:11px;box-shadow:0 1px 2px rgba(26,24,21,.05);cursor:pointer;transition:border-color .14s,box-shadow .14s,transform .14s;margin-bottom:11px}
+.card:hover{border-color:var(--accent-line);box-shadow:0 4px 14px rgba(26,24,21,.08);transform:translateY(-1px)}
+.card.hot{border-left:3px solid var(--hot)}
+.thumb{width:104px;height:104px;flex-shrink:0;border-radius:8px;background:#fff;border:1px solid var(--rule);position:relative;overflow:hidden}
+.thumb::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.t-oil::after{width:30px;height:64px;border-radius:5px 5px 7px 7px;background:linear-gradient(#5c7a2e,#3d5320)}
+.t-shoe::after{width:70px;height:38px;border-radius:6px 16px 4px 4px;background:linear-gradient(#2f3a4a,#1d2531)}
+.body{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.when{font-size:11.5px;color:var(--ink-3);margin-left:auto}
+.title{font-size:15.5px;font-weight:500;color:var(--ink);line-height:1.32;letter-spacing:-.012em;transition:color .13s}
+.card:hover .title{color:var(--accent)}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:3px 13px;font-size:12px;color:var(--ink-2)}
+.meta svg{width:12px;height:12px;vertical-align:-1.5px;margin-right:4px;stroke-width:1.6;color:var(--ink-3)}
+.meta em{font-style:normal;color:var(--ink);font-weight:500}
+.desc{font-size:12.5px;color:var(--ink-3);line-height:1.5}
+.foot{display:flex;align-items:center;gap:8px;margin-top:4px}
+.by{font-size:11.5px;color:var(--ink-3)}
+.by em{font-style:normal;color:var(--ink);font-weight:500}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:5px}
+.badge svg{width:12px;height:12px;stroke-width:1.9}
+.b-hot{background:var(--hot-soft);color:var(--hot);border:1px solid var(--hot-line)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:0 17px;border-radius:9px;font-family:inherit;font-size:13.5px;font-weight:500;border:1px solid transparent;cursor:pointer;transition:background .13s}
+.btn-1{background:var(--accent);color:#fff}.btn-1:hover{background:var(--accent-hi)}
+.btn-3{background:transparent;color:var(--ink-2);padding:0 10px;min-height:32px}
+.btn-3:hover{background:#EAE5DC;color:var(--ink)}
+.btn svg{width:15px;height:15px;stroke-width:1.7}
+.btn-ar{font-family:'Scheherazade New',serif;font-size:16px;direction:rtl;padding-bottom:3px}
+.foot .btn-1{margin-left:auto}
+
+/* ══ VOTE — sans contour, sans jauge ══ */
+.vote{display:inline-flex;align-items:center;gap:1px}
+.vbtn{width:32px;height:29px;display:flex;align-items:center;justify-content:center;border:none;border-radius:8px;cursor:pointer;transition:all .13s}
+.vbtn svg{width:17px;height:17px;stroke-width:2.4}
+.vbtn.up{background:var(--hot-soft);color:var(--hot)}
+.vbtn.up:hover,.vbtn.up.on{background:var(--hot);color:#fff}
+.vbtn.dn{background:var(--cold-soft);color:var(--cold)}
+.vbtn.dn:hover,.vbtn.dn.on{background:var(--cold);color:#fff}
+.tnum{font-size:15px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;min-width:42px;text-align:center}
+.t-hot .tnum{color:var(--hot)}.t-mid .tnum{color:var(--ink)}.t-cold .tnum{color:var(--cold)}
+
+/* ══ PRIX — variantes ══ */
+.prices{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.now{font-variant-numeric:tabular-nums;letter-spacing:-.035em;font-weight:600}
+.now s{font-weight:400;letter-spacing:0;text-decoration:none;color:var(--ink-3);margin-left:3px}
+.was{font-size:13px;color:var(--ink-3);text-decoration:line-through;font-variant-numeric:tabular-nums}
+.off{font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums;padding:2px 8px;border-radius:4px}
+
+/* A — actuel */
+.vA .now{font-size:25px;color:var(--ink)} .vA .now s{font-size:14px}
+.vA .off{color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-line)}
+/* B — masse */
+.vB .now{font-size:30px;font-weight:700;color:var(--ink)} .vB .now s{font-size:15px;font-weight:500}
+.vB .off{color:#fff;background:var(--accent);font-size:12px;padding:3px 9px}
+.vB .save{font-size:11.5px;color:var(--accent);font-weight:500}
+/* C — prix accent */
+.vC .now{font-size:27px;color:var(--accent)} .vC .now s{font-size:14px;color:var(--accent);opacity:.7}
+.vC .off{color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-line)}
+/* D — prix braise */
+.vD .now{font-size:27px;color:var(--hot)} .vD .now s{font-size:14px;color:var(--hot);opacity:.75}
+.vD .off{color:var(--hot);background:var(--hot-soft);border:1px solid var(--hot-line)}
+
+.demo{background:var(--surf);border:1px solid var(--rule);border-radius:10px;padding:15px 17px}
+.side{display:flex;gap:14px;flex-wrap:wrap}
+.side>div{flex:1;min-width:250px}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Retraits et traitement du prix</h1>
+<p class="intro">Les trois retraits sont appliqués partout ci-dessous. Deux d'entre eux suppriment une information ou une affordance — je propose une compensation à chaque fois, <strong>tu gardes ou tu jettes</strong>. Ensuite, quatre traitements du prix.</p>
+
+<!-- 1 -->
+<section class="sec">
+  <div class="sh"><span class="st">01</span><span class="sn">Les trois retraits</span></div>
+  <p class="sw"><b>Contour du vote</b> — retiré. Les deux pastilles teintées se suffisent : elles sont déjà des surfaces pleines, le contour les enfermait dans une boîte inutile. Rien à compenser, c'est un gain net.<br>
+  <b>Jauge sous la température</b> — retirée. On perd la lecture instantanée du niveau, mais le chiffre reste coloré : chaud, neutre, froid restent distinguables sans lire. Je l'ai compensée en passant le chiffre en graisse 700 — il devient l'objet lisible du groupe.<br>
+  <b>Soulignement du titre au survol</b> — retiré, mais <b>c'est le seul point où j'insiste</b>. Le soulignement était l'affordance qui disait « ceci est cliquable ». Sans lui, il ne reste que l'ombre de la carte, ce qui est faible et invisible au clavier. Je l'ai remplacé par un <b>changement de couleur du titre vers l'accent</b> : même fonction, beaucoup plus discret.</p>
+  <div class="pane">
+    <div class="lab">Survole la carte pour voir le titre changer <span class="pill p-ok">retraits appliqués</span></div>
+    <article class="card hot vA">
+      <div class="thumb t-oil"></div>
+      <div class="body">
+        <div class="top">
+          <span class="vote t-hot"><button class="vbtn up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/></svg></button><span class="tnum">47°</span><button class="vbtn dn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg></button></span>
+          <span class="badge b-hot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/><path d="M4 20h16"/></svg>Tendance</span>
+          <span class="when">il y a 3h</span>
+        </div>
+        <h3 class="title">Pack 6 × huile d'olive vierge extra Mabrouka 1L</h3>
+        <div class="prices"><span class="now">289<s> MAD</s></span><span class="was">420 MAD</span><span class="off">−31%</span></div>
+        <div class="meta"><span>Dispo. chez <em>Bringo</em></span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>Casablanca</span></div>
+        <p class="desc">Récolte 2025, acidité &lt; 0,5 %. Livraison sous 2h sur Casablanca et Mohammedia.</p>
+        <div class="foot"><button class="btn btn-3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z"/></svg>12</button><span class="by">par <em>Yassine_K</em></span><button class="btn btn-1 btn-ar">شوف الدييل ↗</button></div>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="sec">
+  <div class="sh"><span class="st">02</span><span class="sn">Le prix — quatre traitements</span></div>
+  <p class="sw">Ta question est la bonne, et ma position initiale méritait d'être challengée. Mais attention au piège : <b>colorer le prix crée une collision de sens</b>. Dans notre système, le vert dit « cliquable », la braise dit « deal chaud ». Un prix vert ressemble à un lien ; un prix braise se confond avec la température. C'est pour cette raison que je ne recommande pas C ni D — pas par goût.</p>
+  <div class="pane"><div class="side">
+    <div>
+      <div class="lab">A — actuel <span class="pill p-mid">trop discret</span></div>
+      <div class="demo vA"><div class="prices"><span class="now">289<s> MAD</s></span><span class="was">420 MAD</span><span class="off">−31%</span></div></div>
+    </div>
+    <div>
+      <div class="lab">B — masse et ancrage <span class="pill p-ok">recommandé</span></div>
+      <div class="demo vB"><div class="prices"><span class="now">289<s> MAD</s></span><span class="was">420 MAD</span><span class="off">−31%</span></div>
+      <div class="save" style="margin-top:5px">Tu économises 131 MAD</div></div>
+    </div>
+    <div>
+      <div class="lab">C — prix en accent <span class="pill p-ko">ressemble à un lien</span></div>
+      <div class="demo vC"><div class="prices"><span class="now">289<s> MAD</s></span><span class="was">420 MAD</span><span class="off">−31%</span></div></div>
+    </div>
+    <div>
+      <div class="lab">D — prix en braise <span class="pill p-ko">collision température</span></div>
+      <div class="demo vD"><div class="prices"><span class="now">289<s> MAD</s></span><span class="was">420 MAD</span><span class="off">−31%</span></div></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- 3 -->
+<section class="sec">
+  <div class="sh"><span class="st">03</span><span class="sn">B, en situation</span></div>
+  <p class="sw">Trois leviers cumulés, aucun nouveau coloris : le prix passe de 25 à <b>30 px en graisse 700</b> — il devient le deuxième objet le plus grand après l'image ; la pastille de remise passe en <b>aplat accent plein</b>, ce qui donne au groupe une ancre colorée juste à côté du chiffre ; et une ligne <b>« Tu économies X MAD »</b> traduit le pourcentage en dirhams, ce que le cerveau lit plus vite qu'un ratio.</p>
+  <div class="pane">
+    <article class="card hot vB">
+      <div class="thumb t-oil"></div>
+      <div class="body">
+        <div class="top">
+          <span class="vote t-hot"><button class="vbtn up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/></svg></button><span class="tnum">47°</span><button class="vbtn dn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg></button></span>
+          <span class="badge b-hot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/><path d="M4 20h16"/></svg>Tendance</span>
+          <span class="when">il y a 3h</span>
+        </div>
+        <h3 class="title">Pack 6 × huile d'olive vierge extra Mabrouka 1L</h3>
+        <div class="prices"><span class="now">289<s> MAD</s></span><span class="was">420 MAD</span><span class="off">−31%</span></div>
+        <div class="save">Tu économises 131 MAD</div>
+        <div class="meta"><span>Dispo. chez <em>Bringo</em></span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>Casablanca</span></div>
+        <div class="foot"><button class="btn btn-3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z"/></svg>12</button><span class="by">par <em>Yassine_K</em></span><button class="btn btn-1 btn-ar">شوف الدييل ↗</button></div>
+      </div>
+    </article>
+    <article class="card vB">
+      <div class="thumb t-shoe"></div>
+      <div class="body">
+        <div class="top">
+          <span class="vote t-mid"><button class="vbtn up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 15 6-6 6 6"/></svg></button><span class="tnum">12°</span><button class="vbtn dn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg></button></span>
+          <span class="when">il y a 9h</span>
+        </div>
+        <h3 class="title">Sneakers New Balance 574 — tailles 40 à 45</h3>
+        <div class="prices"><span class="now">649<s> MAD</s></span><span class="was">1 099 MAD</span><span class="off">−41%</span></div>
+        <div class="save">Tu économises 450 MAD</div>
+        <div class="meta"><span>Dispo. chez <em>Marwa Sport</em></span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>Casablanca, Maârif</span></div>
+        <div class="foot"><button class="btn btn-3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z"/></svg>4</button><span class="by">par <em>Nadia_Bnk</em></span><button class="btn btn-1 btn-ar">شوف الدييل ↗</button></div>
+      </div>
+    </article>
+  </div>
+</section>
+
+<div class="verdict">
+  <h2>Ce que je recommande</h2>
+  <p><b>B.</b> Le prix devient immédiatement visible sans qu'on ait touché à une seule couleur — donc sans créer d'ambiguïté avec le vert cliquable ni la braise de température. En design d'interface, <b>la taille est un levier de hiérarchie plus fort que la teinte</b>, et elle n'a aucun coût sémantique : un chiffre gros reste un chiffre, un chiffre coloré devient un signal qu'il faut interpréter.</p>
+  <p>La ligne « Tu économises 131 MAD » est l'ajout qui aura le plus d'effet réel. Un pourcentage demande un calcul mental ; un montant en dirhams est directement comparable à ce que la personne a en poche. <b>Attention toutefois</b> : elle n'a de sens que si le prix de référence est fiable. Si beaucoup de deals n'ont pas de prix barré, ou si ces prix barrés sont approximatifs, elle affiche une économie fausse — dans ce cas, ne l'affiche que lorsque le prix d'origine est renseigné et vérifié.</p>
+  <p>Si tu trouves B encore trop sage, le levier suivant n'est toujours pas la couleur du prix : c'est <code>font-weight: 800</code> et un prix en 34 px. On peut monter loin en restant en encre.</p>
+</div>
+
+</div>
+</body>
+</html>
