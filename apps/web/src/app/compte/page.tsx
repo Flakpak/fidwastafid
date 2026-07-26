@@ -103,7 +103,18 @@ export default async function ComptePage() {
           <h2 className="text-lg font-black">Mes données</h2>
           <div>
             <p className="text-xs font-bold text-muted mb-1">Email</p>
-            <p className="text-sm text-muted bg-creme rounded-lg px-3 py-2">{me.email}</p>
+            {/* Dégradation gracieuse (incident du 24/07/2026, docs/INCIDENTS.md) :
+                l'e-mail vit dans Supabase Auth, pas en base. Si l'API admin est
+                momentanément indisponible, le reste du profil est parfaitement
+                utilisable — on affiche l'indisponibilité plutôt que de casser
+                toute la page. */}
+            {me.email ? (
+              <p className="text-sm text-muted bg-creme rounded-lg px-3 py-2">{me.email}</p>
+            ) : (
+              <p className="text-sm text-muted bg-creme rounded-lg px-3 py-2 italic">
+                Momentanément indisponible — réessaie dans quelques instants.
+              </p>
+            )}
             <p className="text-xs text-muted mt-1">Identifiant de connexion — non modifiable ici.</p>
           </div>
           <p className="text-sm text-muted leading-relaxed">

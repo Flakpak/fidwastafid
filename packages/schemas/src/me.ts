@@ -23,7 +23,16 @@ export type MeDeal = z.infer<typeof meDealSchema>;
 export const meSchema = z.object({
   publicId: publicIdSchema,
   pseudo: z.string(),
-  email: z.string().email(),
+  /** Absent UNIQUEMENT quand l'API admin Supabase était momentanément
+   *  indisponible au moment du rendu (429/5xx/réseau) — voir
+   *  `emailIndisponible` ci-dessous. Le reste du profil reste exact et
+   *  utilisable : une panne amont passagère ne doit pas transformer /compte
+   *  en page d'erreur (incident du 24/07/2026, docs/INCIDENTS.md). */
+  email: z.string().email().optional(),
+  /** `true` quand `email` manque pour cause de panne transitoire amont, et
+   *  jamais pour une autre raison. Rend l'absence EXPLICITE côté client, au
+   *  lieu de laisser deviner entre « pas d'e-mail » et « e-mail pas récupéré ». */
+  emailIndisponible: z.boolean(),
   couleurAvatar: couleurAvatarSchema,
   dealsCount: z.number().int().nonnegative(),
   votesCount: z.number().int().nonnegative(),
