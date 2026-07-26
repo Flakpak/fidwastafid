@@ -402,6 +402,14 @@ mesurés ≥ 4,5:1.
    est un bug — c'est par cette accumulation que la charte rouge/or abandonnée se reconstituerait.
    Corollaire technique : à 3,6:1 sur blanc, `safran` ne passe pas l'AA en texte courant ; il est
    réservé aux tracés et au grand corps.
+5. **Les maquettes sont des références VISUELLES exclusivement.** Leur contenu textuel et chiffré est
+   du remplissage. Aucun texte, libellé ou nombre ne doit jamais en être repris. En cas de divergence
+   de contenu, le code existant prime sur la maquette.
+
+   *Fait générateur (26/07/2026)* : le lot 4 avait remplacé le titre et les trois étapes du hero par
+   la baseline de la maquette, et affiché « 184 deals actifs / 27 enseignes / 4 210 membres » — des
+   chiffres d'audience **inventés**, écrits en dur, sans aucune source. Une refonte annoncée comme
+   cosmétique avait ainsi modifié le discours du produit. Le contenu a été restauré à l'identique.
 
 Référence directe pour la config Tailwind (`@theme`, `apps/web/src/app/globals.css`) et les primitives
 UI (`apps/web/src/components`). La refonte est portée en trois lots : lot 1 = ce contrat + tokens +
