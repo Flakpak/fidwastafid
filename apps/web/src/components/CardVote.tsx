@@ -18,11 +18,11 @@ const CHEVRON_DOWN = "M6 9l6 6 6-6";
  * (boutons + score), réutilisé tel quel sur la carte du feed ET la page deal.
  *
  * Charte Tadelakt (CONTRAT-V1 §8) : filet `border-strong`, fond `surface`,
- * rayon 20px. Au repos les boutons sont en encre atténuée ; la température ne
- * paraît qu'au survol (`hot-soft`/`cold-soft`) et au vote (fond plein). Le
- * score est teinté par sa zone (hot ≥ seuil, cold < 0, ink neutre) et suivi
- * d'une jauge proportionnelle — la température reste lisible sans lire le
- * chiffre, et n'est jamais portée par la seule couleur.
+ * rayon 20px. Depuis le lot 4, chaque flèche porte sa température AU REPOS
+ * (fond doux + contour + icône teintée) ; survol et vote passent au fond
+ * plein. Le score est teinté par sa zone (hot ≥ seuil, cold < 0, ink neutre)
+ * et suivi d'une jauge proportionnelle — la température reste lisible sans
+ * lire le chiffre, et n'est jamais portée par la seule couleur.
  *
  * Les libellés `ربح`/`خسارة` sont conservés (non négociables, CONTRAT-V1 §8) :
  * la maquette montre des boutons chevron seuls, mais le contrat prime. Les
@@ -72,12 +72,29 @@ export function CardVote({ publicId, initialScore }: { publicId: string; initial
   const gaugeColor = temp === "chaud" ? "bg-hot" : temp === "froid" ? "bg-cold" : "bg-ink-muted";
   const remplissage = jaugeRemplissage(score);
 
-  const froidCls = voted === "froid" ? "bg-cold text-white" : "text-ink-muted hover:bg-cold-soft hover:text-cold";
-  const chaudCls = voted === "chaud" ? "bg-hot text-white" : "text-ink-muted hover:bg-hot-soft hover:text-hot";
+  /**
+   * Lot 4 — CORRECTION D'AFFORDANCE, pas un choix esthétique. Les flèches
+   * n'étaient teintées qu'au survol : sur mobile, où le survol n'existe pas,
+   * rien n'indiquait jamais que le haut est chaud et le bas froid. Chaque
+   * flèche porte donc sa teinte EN PERMANENCE (fond doux + contour + icône),
+   * le survol et l'état voté passant au fond plein.
+   *
+   * Trois états distinguables sans survol : repos (doux + contour), pressé/
+   * voté (plein, icône blanche), désactivé (opacité). Cible ≥ 44px conservée
+   * en mobile via `max-sm:min-h-11`.
+   */
+  const froidCls =
+    voted === "froid"
+      ? "bg-cold border-cold text-white"
+      : "bg-cold-soft border-cold-line text-cold hover:bg-cold hover:border-cold hover:text-white";
+  const chaudCls =
+    voted === "chaud"
+      ? "bg-hot border-hot text-white"
+      : "bg-hot-soft border-hot-line text-hot hover:bg-hot hover:border-hot hover:text-white";
 
   return (
     <div className="inline-flex flex-col gap-0.5">
-      <div className="inline-flex items-stretch overflow-hidden rounded-[20px] border border-border-strong bg-surface text-sm">
+      <div className="inline-flex items-stretch gap-1 rounded-[20px] border border-border-strong bg-surface p-[3px] text-sm">
         {/* Vote froid — خسارة (bas). */}
         <button
           type="button"
@@ -87,7 +104,7 @@ export function CardVote({ publicId, initialScore }: { publicId: string; initial
           }}
           disabled={pending}
           aria-label="Voter خسارة (froid)"
-          className={`font-arabic flex min-h-[27px] items-center gap-1 px-2.5 font-bold transition-colors duration-[130ms] motion-reduce:transition-none disabled:opacity-50 max-sm:min-h-11 ${froidCls}`}
+          className={`font-arabic flex min-h-[28px] items-center gap-1 rounded-[7px] border px-2.5 font-bold transition-colors duration-[130ms] motion-reduce:transition-none disabled:opacity-50 max-sm:min-h-11 ${froidCls}`}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} aria-hidden="true" className="h-4 w-4">
             <path d={CHEVRON_DOWN} />
@@ -97,7 +114,7 @@ export function CardVote({ publicId, initialScore }: { publicId: string; initial
 
         {/* Score + jauge — teinté par température, jamais une couleur seule (le
             chiffre porte l'info, la jauge la rend lisible d'un coup d'œil). */}
-        <span className={`flex flex-col items-center justify-center border-x border-border px-1.5 ${scoreColor}`}>
+        <span className={`flex flex-col items-center justify-center px-1.5 ${scoreColor}`}>
           <span className="text-[14.5px] font-semibold leading-none tabular-nums">{score}°</span>
           <span aria-hidden="true" className="mt-0.5 h-[3px] w-[30px] overflow-hidden rounded-full bg-border">
             <span className={`block h-full rounded-full ${gaugeColor}`} style={{ width: `${remplissage}%` }} />
@@ -113,7 +130,7 @@ export function CardVote({ publicId, initialScore }: { publicId: string; initial
           }}
           disabled={pending}
           aria-label="Voter ربح (chaud)"
-          className={`font-arabic flex min-h-[27px] items-center gap-1 px-2.5 font-bold transition-colors duration-[130ms] motion-reduce:transition-none disabled:opacity-50 max-sm:min-h-11 ${chaudCls}`}
+          className={`font-arabic flex min-h-[28px] items-center gap-1 rounded-[7px] border px-2.5 font-bold transition-colors duration-[130ms] motion-reduce:transition-none disabled:opacity-50 max-sm:min-h-11 ${chaudCls}`}
         >
           ربح
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} aria-hidden="true" className="h-4 w-4">
