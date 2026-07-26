@@ -10,6 +10,45 @@ en a appris. Une leçon gravée ici a vocation à être citée depuis le code ou
 
 ---
 
+## 2026-07-26 — `/opengraph-image` en 500 : satori refuse les nœuds `<text>`
+
+**Symptôme.** `GET /opengraph-image` répondait **500** après l'ajout du médaillon du sceau
+dans l'image Open Graph. Aucune erreur applicative lisible côté route : le message n'apparaît
+que dans les logs du serveur de développement, enveloppé dans un `failed to pipe response`.
+
+```
+[Error: failed to pipe response] {
+  [cause]: Error: <text> nodes are not currently supported, please convert them to <path>
+}
+```
+
+**Cause.** `next/og` rend via **satori**, qui ne sait pas composer un nœud SVG `<text>` : il
+n'a pas de moteur de mise en forme de texte à l'intérieur d'un SVG, et demande des tracés.
+Le médaillon avait été écrit en SVG en ligne avec la calligraphie `فيد` en `<text>` — la
+forme naturelle en HTML, refusée ici.
+
+Ce n'est pas une limite de la police ni de l'arabe : **tout** `<text>` est refusé, quel que
+soit son contenu. Les `<path>`, `<rect>` et `<circle>` du même SVG passaient sans problème,
+ce qui rendait l'échec d'autant plus déroutant — le fichier « marchait presque ».
+
+**Correctif.** Composer le médaillon en `<div>` imbriqués (cercles obtenus par
+`borderRadius: "50%"`, texte en enfant direct d'un `div`), technique déjà validée par
+`apple-icon.tsx`. Depuis le passage au logotype vectoriel (lot 5), les assets de marque sont
+des **tracés** (`<path>`/`<rect>`) lus sur disque et passés en data URI : le problème ne peut
+plus se poser pour le logo lui-même.
+
+**Leçon.**
+
+> Dans `next/og`, du texte ne se compose qu'en `div`, jamais en `<svg><text>`. Un SVG destiné
+> à satori doit être **entièrement vectorisé** — si un asset contient encore du texte
+> composé, il n'est pas prêt pour l'OG.
+
+Corollaire général, qui rejoint les deux entrées ci-dessous : **une route génératrice
+d'image doit être vérifiée par son statut HTTP, pas par relecture du code.** Ici `pnpm build`
+et `tsc` passaient tous les deux — seul un `curl` sur la route a révélé le 500.
+
+---
+
 ## 2026-07-24 — L'API admin Supabase hoquette, `/me` renvoie 500, la CI accuse la mauvaise branche
 
 **Symptôme.** Trois runs CI consécutifs (#211, #212, #213) rouges sur la branche
