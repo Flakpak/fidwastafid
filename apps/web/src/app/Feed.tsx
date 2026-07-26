@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { VILLES, CATEGORIES, type Deal } from "@fidwastafid/schemas";
 import { DealCard } from "../components/DealCard.js";
@@ -111,6 +111,25 @@ export function Feed({
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [chargement, setChargement] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  /**
+   * Le bouton « Charger plus » est rendu par le SSR mais ne répond qu'une fois
+   * React monté. Sur une connexion mobile lente — l'essentiel de l'audience —
+   * cette fenêtre est bien réelle : un clic pendant celle-ci ne fait rien, et
+   * le bouton paraît cassé. Il est donc `disabled` jusqu'au montage. Un bouton
+   * visiblement inactif est honnête ; un bouton actif qui ne répond pas ne
+   * l'est pas.
+   *
+   * `useSyncExternalStore` plutôt qu'un `setState` dans un effet : c'est la
+   * sonde d'hydratation canonique (`false` au rendu serveur, `true` côté
+   * client), sans passe de rendu supplémentaire et sans déroger à la règle
+   * `react-hooks/set-state-in-effect`. Le store ne change jamais après
+   * l'hydratation, d'où un abonnement vide.
+   */
+  const monte = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const [ville, setVille] = useState<string>("");
   const [categorie, setCategorie] = useState<string>("");
   const [type, setType] = useState<Type>("tous");
@@ -454,7 +473,7 @@ export function Feed({
               <button
                 type="button"
                 onClick={() => void chargerPlus()}
-                disabled={chargement}
+                disabled={!monte || chargement}
                 aria-busy={chargement}
                 className="min-h-11 rounded-full border border-border-strong bg-surface px-6 py-2 text-sm font-bold text-ink hover:bg-surface-subtle disabled:opacity-50 disabled:cursor-default"
               >
