@@ -3,7 +3,7 @@ import type { ComponentProps } from "react";
 /**
  * Champs primitifs — charte Tadelakt (CONTRAT-V1 §8). Contour `border-strong`,
  * placeholder `ink-subtle` (5,2:1 sur blanc). Focus : bordure `accent` + halo
- * `0 0 0 3px rgba(44,85,69,.13)` (et non l'anneau outline des boutons — un
+ * `0 0 0 3px rgba(47,107,87,.13)` (et non l'anneau outline des boutons — un
  * champ signale son focus par sa bordure, pas par un anneau détaché).
  * `invalid` bascule sur le registre d'alerte `warn` (bordure + halo).
  * Cible tactile ≥44px en mobile.
@@ -14,7 +14,7 @@ const base =
   "motion-reduce:transition-none disabled:opacity-40 disabled:pointer-events-none " +
   "max-sm:min-h-11";
 
-const normalState = "border-border-strong focus:border-accent focus:shadow-[0_0_0_3px_rgba(44,85,69,0.13)]";
+const normalState = "border-border-strong focus:border-accent focus:shadow-[0_0_0_3px_rgba(47,107,87,0.13)]";
 const invalidState = "border-warn focus:border-warn focus:shadow-[0_0_0_3px_rgba(124,96,21,0.15)]";
 
 export function Input({ className, invalid = false, ...props }: ComponentProps<"input"> & { invalid?: boolean }) {

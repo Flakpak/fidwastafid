@@ -8,28 +8,44 @@
 @theme {
   /* ─── Palette Tadelakt (CONTRAT-V1 §8) ───────────────────────────────────
      Noms sémantiques, jamais des noms de couleur : c'est ce qui empêche la
-     dérive. accent = interactif/marque ; hot = température chaude et rien
-     d'autre ; cold = température froide et rien d'autre (§8, règle 3).
-     Deux valeurs divergent volontairement de la maquette HTML pour passer
-     l'AA : ink-subtle #736B61 (au lieu de #8B8378 : 3,74:1 → 5,24:1 sur blanc)
-     et cold #4C6674 (au lieu de #54707F : 4,49:1 → 5,19:1 sur cold-soft).
-     Tous les couples texte/fond sont mesurés ≥ 4,5:1. */
+     dérive. accent = interactif/marque ; hot = score chaud ; cold = froideur
+     d'un deal ; safran = ORNEMENT DE MARQUE UNIQUEMENT (§8, règles 3 et 4).
+
+     Ajustement chromatique du lot 4 (maquette de référence :
+     docs/maquettes/tadelakt-couleur-subtile.html) : l'accent précédent
+     (#2C5545) était trop sombre et trop désaturé pour se lire comme une
+     couleur — le site paraissait terne. #2F6B57 conserve la MÊME luminance
+     utile (6,25:1 sur blanc, contre 6,3:1 avant) avec nettement plus de
+     chroma : on gagne en présence sans rien perdre en lisibilité.
+
+     Deux valeurs divergent volontairement de la maquette pour passer l'AA :
+     ink-subtle #736B61 (au lieu de #8B8378) et cold #4C6674 (au lieu de
+     #54707F). Tous les couples TEXTE/fond sont mesurés ≥ 4,5:1 ; les tokens
+     `*-line` sont des filets décoratifs, jamais porteurs d'information seuls
+     (l'affordance passe par l'icône et le fond, ≥ 4,8:1). */
   --color-surface-base: #f4f1ec;   /* fond de page (plâtre) */
   --color-surface: #ffffff;        /* cartes, panneaux, champs */
   --color-surface-subtle: #faf8f4; /* survol de surface, zones inertes */
   --color-border: #e3ded4;         /* filets par défaut */
-  --color-border-strong: #d2cabb;  /* contour de tout élément cliquable */
-  --color-ink: #1a1815;            /* texte principal, bouton primaire */
+  --color-border-strong: #d2cabb;  /* contour d'un cliquable neutre */
+  --color-ink: #1a1815;            /* texte principal */
   --color-ink-muted: #5c554b;      /* texte secondaire, icônes de méta */
   --color-ink-subtle: #736b61;     /* aides, horodatages, placeholders (AA) */
-  --color-accent: #2c5545;         /* interactif, marque, focus (argan) */
-  --color-accent-soft: #e7efe9;    /* fond du badge de remise */
-  --color-hot: #ad4527;            /* température chaude — rien d'autre */
-  --color-hot-soft: #f7e9e2;       /* fond du badge « Tendance » */
-  --color-cold: #4c6674;           /* température froide — rien d'autre (AA) */
-  --color-cold-soft: #e9eef1;      /* fond des états expirés */
+  --color-accent: #2f6b57;         /* interactif, marque, focus (argan) */
+  --color-accent-hi: #24564a;      /* survol du bouton primaire */
+  --color-accent-soft: #eaf1ed;    /* champ du hero, remise, filtre actif */
+  --color-accent-line: #b6cfc4;    /* contour des éléments accent doux */
+  --color-safran: #b07c2a;         /* ORNEMENT de marque : sceau, motif — §8 règle 4 */
+  --color-safran-line: #e0c793;    /* filet intérieur du sceau */
+  --color-hot: #ad4527;            /* score chaud — rien d'autre */
+  --color-hot-soft: #f9e9e2;       /* fond du vote haut et du badge « Tendance » */
+  --color-hot-line: #e6c5b6;       /* contour du vote chaud et du badge */
+  --color-cold: #4c6674;           /* froideur d'un deal (négatif, expiré) */
+  --color-cold-soft: #eaf0f3;      /* fond du vote bas et des états expirés */
+  --color-cold-line: #c2d2da;      /* contour du vote froid */
   --color-warn: #7c6015;           /* file d'attente, alertes de prix */
   --color-warn-soft: #f5eedd;      /* fond associé */
+  --color-warn-line: #e5d6ac;      /* contour du badge « Fin proche » */
 
   /* Anciens tokens v1 (rouge / orange / vert / bleu / or / creme / rouge-clair /
      texte / muted / bordure / sombre) : ENTIÈREMENT RETIRÉS — migration UI

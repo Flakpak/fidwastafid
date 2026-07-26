@@ -372,7 +372,7 @@ export function Feed({
                   value={recherche}
                   onChange={(e) => setRecherche(e.target.value)}
                   placeholder="Rechercher un deal, une enseigne..."
-                  className="shrink-0 w-44 md:flex-1 md:w-auto border border-border-strong bg-surface rounded-full px-4 py-1.5 text-sm text-ink placeholder:text-ink-subtle focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(44,85,69,0.13)] transition-[border-color,box-shadow] duration-[130ms] motion-reduce:transition-none"
+                  className="shrink-0 w-44 md:flex-1 md:w-auto border border-border-strong bg-surface rounded-full px-4 py-1.5 text-sm text-ink placeholder:text-ink-subtle focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(47,107,87,0.13)] transition-[border-color,box-shadow] duration-[130ms] motion-reduce:transition-none"
                 />
                 <select
                   value={ville}
