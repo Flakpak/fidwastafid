@@ -597,7 +597,7 @@ export function SoumettreForm({ enseignes }: { enseignes: Enseigne[] }) {
       <div className="cf-turnstile" data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} />
 
       <Button variant="primary" type="submit" disabled={pending} className="self-start">
-        {pending ? "Publication..." : "Envoyer pour validation"}
+        {pending ? "Publication..." : "Envoyer"}
       </Button>
     </form>
   );

@@ -1,9 +1,31 @@
 import { HeroArabicTypewriter } from "./HeroArabicTypewriter.js";
 
-const STATS = [
-  { valeur: "184", label: "Deals actifs" },
-  { valeur: "27", label: "Enseignes" },
-  { valeur: "4 210", label: "Membres" },
+/**
+ * Contenu RESTAURÉ à l'identique depuis main (correction de périmètre du
+ * 26/07/2026) : le lot 4 avait remplacé ces trois étapes par une baseline, deux
+ * boutons et des chiffres d'audience — tout cela venait du remplissage de la
+ * maquette, pas du produit. Voir CONTRAT-V1 §8, règle 5 : une maquette est une
+ * référence VISUELLE, jamais une source de contenu.
+ */
+const STEPS = [
+  {
+    num: 1,
+    titreFr: "Tu déniche une لهميزة",
+    titreAr: "لقيتي لهميزة ديالك؟",
+    desc: "En faisant tes courses en magasin ou en ligne — si ça t'a fait économiser, ça peut faire économiser tout le monde.",
+  },
+  {
+    num: 2,
+    titreFr: "Tu la partages en 30 sec",
+    titreAr: "شاركها مع الجماعة",
+    desc: "Prix, magasin, ville — c'est tout ce qu'il faut. Notre équipe vérifie et publie. Ton deal aide des centaines de personnes à faire les mêmes économies.",
+  },
+  {
+    num: 3,
+    titreFr: "La communauté vote",
+    titreAr: "الجماعة تقيّم",
+    desc: "ربح = deal intéressant, fonce. خسارة = à éviter. Les meilleures لهميزات remontent en tête — plus tu partages, plus tu construis ta réputation.",
+  },
 ];
 
 /**
@@ -38,57 +60,47 @@ function MotifZellige() {
 /**
  * Bandeau hero — porté depuis HeroBand (index.html racine, v1). Composant
  * serveur : seule la tagline arabe (typewriter) hydrate, cf.
- * HeroArabicTypewriter.
+ * HeroArabicTypewriter. Le popup mobile "bottom sheet" de v1 n'est pas
+ * repris — ce bandeau reste inline à toutes les tailles, restylé en
+ * responsive (v1 ne le masque pas non plus en mobile, seule la sidebar
+ * disparaît).
  *
- * Lot 4 (maquette `docs/maquettes/tadelakt-couleur-subtile.html`) : le hero
- * devient un CHAMP `accent-soft` — un plâtre très légèrement teinté, pas un
- * aplat vert. C'est ce qui lui donne de la chaleur sans écraser le feed juste
- * en dessous : si le hero criait, tout ce qui suit paraîtrait fade par
- * contraste. Les trois étapes explicatives de la v1 laissent la place à une
- * baseline + deux actions + les chiffres clés, comme la maquette.
+ * Charte Tadelakt (CONTRAT-V1 §8) : champ `accent-soft` — un plâtre très
+ * légèrement teinté, pas un aplat vert — motif zellige en filigrane, segment
+ * de titre en `accent`. Le CONTENU (titre, trois étapes, sous-titres arabes,
+ * descriptions) est celui d'origine : seul le traitement visuel change.
  */
 export function HeroBand() {
   return (
-    <div className="relative overflow-hidden bg-accent-soft border border-border rounded-2xl px-6 py-8 md:px-8 mb-4">
+    <div className="relative overflow-hidden bg-accent-soft border border-border rounded-2xl p-6 md:p-8 mb-4">
       <MotifZellige />
 
-      <div className="relative max-w-[620px]">
-        {/* Baseline arabe en safran — ornement de marque (§8, règle 4). */}
-        <span dir="rtl" className="font-arabic text-safran text-[22px] leading-snug block mb-1 hero-fr-anim">
-          فيد و ستافيد
-        </span>
-
-        <h1 className="text-2xl md:text-[28px] font-semibold tracking-tight leading-tight text-ink mb-2 hero-fr-anim">
-          Les bons plans du Maroc, trouvés par <span className="text-accent">ceux qui les vivent</span>.
+      <div className="relative mb-5">
+        <h1 className="text-xl md:text-[22px] font-black leading-tight mb-1.5 hero-fr-anim text-ink">
+          Les meilleurs bons plans du Maroc,
+          <br />
+          <span className="text-accent">partagés par la communauté</span>
         </h1>
+        <HeroArabicTypewriter />
+      </div>
 
-        <div className="mb-4">
-          <HeroArabicTypewriter />
-        </div>
-
-        <div className="flex flex-wrap gap-2.5 hero-steps-anim">
-          <a
-            href="#deals"
-            className="inline-flex items-center justify-center h-10 rounded-[9px] border border-transparent bg-accent px-4 text-sm font-medium text-white shadow-sm hover:bg-accent-hi transition-colors duration-[130ms] active:translate-y-px motion-reduce:transition-none"
-          >
-            Voir les deals du jour
-          </a>
-          <a
-            href="/concept"
-            className="inline-flex items-center justify-center h-10 rounded-[9px] border border-accent-line bg-surface px-4 text-sm font-medium text-accent hover:bg-accent-soft hover:border-accent transition-colors duration-[130ms] active:translate-y-px motion-reduce:transition-none"
-          >
-            Le concept Fidwastafid
-          </a>
-        </div>
-
-        <div className="mt-5 flex gap-7 border-t border-accent-line pt-4">
-          {STATS.map((s) => (
-            <div key={s.label}>
-              <b className="block text-[19px] font-semibold tracking-tight tabular-nums text-accent">{s.valeur}</b>
-              <span className="text-[10.5px] uppercase tracking-[0.09em] text-ink-subtle">{s.label}</span>
+      <div className="relative grid grid-cols-1 md:grid-cols-3 gap-2.5 hero-steps-anim">
+        {STEPS.map((step) => (
+          <div key={step.num} className="flex md:block gap-3 items-start bg-surface border border-border rounded-2xl p-3.5 md:p-4">
+            <div className="flex items-center gap-2 mb-0 md:mb-2.5">
+              <span className="bg-accent text-white w-[26px] h-[26px] rounded-lg flex items-center justify-center text-xs font-black shrink-0">
+                {step.num}
+              </span>
             </div>
-          ))}
-        </div>
+            <div>
+              <p className="text-[13px] font-black text-ink">{step.titreFr}</p>
+              <p dir="rtl" className="font-arabic text-accent text-base font-bold leading-tight">
+                {step.titreAr}
+              </p>
+              <p className="text-xs text-ink-muted font-semibold leading-relaxed mt-1">{step.desc}</p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

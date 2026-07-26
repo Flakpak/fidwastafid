@@ -62,7 +62,7 @@ export function CommentForm({ publicId }: { publicId: string }) {
         placeholder="Un avis sur ce bon plan ?"
       />
       <Button variant="secondary" type="submit" disabled={pending} className="self-start">
-        {pending ? "Envoi..." : "Publier"}
+        {pending ? "Envoi..." : "Commenter"}
       </Button>
       {error && <p className="text-sm text-warn">{error}</p>}
     </form>

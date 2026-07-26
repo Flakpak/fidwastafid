@@ -16,11 +16,13 @@ import { Seal } from "./Seal.js";
 export function SiteFooter() {
   return (
     <footer className="bg-surface border-t border-border py-8 px-4 flex flex-col items-center gap-2">
-      <Seal className="h-10 w-10" withWordmark />
+      <Seal className="h-10 w-10" />
       {/* Pas de dir="rtl" : phrase mixte ar/fr, même convention que v1 (titleFr
           de la section "Nos valeurs") — l'algorithme bidi Unicode gère le
-          segment arabe correctement dans un paragraphe de base LTR. */}
-      <p className="text-ink-muted text-sm text-center">partage et fais profiter</p>
+          segment arabe correctement dans un paragraphe de base LTR.
+          Texte restauré à l'identique depuis main (correction de périmètre du
+          26/07/2026) : seule la couleur change. */}
+      <p className="font-arabic text-ink text-lg text-center">فيد و ستافيد — partage et fais profiter</p>
       <div className="flex items-center gap-3 mt-1 text-xs text-ink-muted">
         <Link href="/confidentialite" className="hover:text-ink">
           Confidentialité
