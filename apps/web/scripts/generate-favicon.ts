@@ -1,61 +1,54 @@
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import sharp from "sharp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * Génère public/favicon.ico à la main — aucune dépendance de rasterisation
- * (sharp/etc.) n'existe dans ce monorepo, et en installer une juste pour un
- * favicon serait disproportionné. Le format ICO est simple (en-tête +
- * bitmap 32bpp) : on dessine directement les pixels d'un motif "sceau"
- * simplifié (anneau plâtre sur fond encre — charte Tadelakt, CONTRAT-V1 §8),
- * illisible en détail à 16/32px de toute façon, cohérent avec le sceau
- * complet (Seal.tsx) utilisé ailleurs (icon.tsx/apple-icon.tsx, qui eux
- * peuvent se permettre plus de détail via next/og).
+ * Génère public/favicon.ico depuis le monogramme vectoriel de référence
+ * (public/brand/mark-16.svg — CONTRAT-V1 §8, lot 5).
  *
- * EXCEPTION ASSUMÉE au lot 4 : le sceau prend l'anneau `safran` partout
- * ailleurs (180 px, 512 px, OG), mais PAS ici. À 16/32 px, le safran sur encre
- * (3,0:1) passe sous le seuil de lisibilité et l'anneau se referme en tache ;
- * seul le contraste encre/plâtre survit à la réduction. Même raison pour
- * l'argan.
+ * Le tracé n'est jamais redessiné : il est RASTÉRISÉ par sharp, déjà présent
+ * dans apps/web pour le traitement des images de deals. (Le commentaire
+ * historique de ce fichier affirmait qu'aucune dépendance de rasterisation
+ * n'existait dans le monorepo — c'était vrai avant l'arrivée de sharp ; le
+ * motif était alors dessiné pixel par pixel à la main.)
+ *
+ * `mark-16.svg` et non `mark.svg` : à 16/32 px, le rayon d'angle de 22 % de la
+ * version standard ronge les lettres. Le fichier 16 porte un rayon réduit,
+ * pensé pour cette taille — c'est le même que sert `icon.tsx`, les deux voies
+ * restent donc identiques.
+ *
+ * Le format ICO est assemblé à la main (en-tête + bitmaps 32bpp) : aucune
+ * bibliothèque du projet ne l'écrit, et le format est trivial.
  */
 
-const INK: [number, number, number] = [0x1a, 0x18, 0x15]; // ink — fond
-const PLASTER: [number, number, number] = [0xf4, 0xf1, 0xec]; // surface-base — anneau et pastille
+const SOURCE = path.join(__dirname, "..", "public", "brand", "mark-16.svg");
+const svg = readFileSync(SOURCE);
 
-function drawSeal(size: number): Buffer {
-  // BGRA, 32bpp, une ligne par ligne du bas vers le haut (convention BMP/ICO).
+/**
+ * Rastérise le SVG à `size` px et renvoie les pixels au format attendu par
+ * ICO : BGRA 32bpp, lignes du bas vers le haut (convention BMP).
+ */
+async function rasterise(size: number): Promise<Buffer> {
+  const { data } = await sharp(svg, { density: 384 })
+    .resize(size, size, { fit: "fill" })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
   const pixels = Buffer.alloc(size * size * 4);
-  const cx = size / 2;
-  const cy = size / 2;
-  const outerR = size * 0.47;
-  const ringInner = size * 0.36;
-  const dotR = size * 0.1;
-
   for (let row = 0; row < size; row++) {
-    // row 0 = bas de l'image en sortie ICO (bottom-up) — on dessine directement
-    // dans cet ordre, le motif est symétrique donc l'orientation n'a pas d'importance.
+    // Ligne 0 de la sortie ICO = bas de l'image : on lit la source à l'envers.
+    const srcRow = size - 1 - row;
     for (let col = 0; col < size; col++) {
-      const dx = col + 0.5 - cx;
-      const dy = row + 0.5 - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      let color: [number, number, number] | null = null;
-      if (dist <= dotR) {
-        color = PLASTER;
-      } else if (dist <= outerR) {
-        color = dist >= ringInner ? PLASTER : INK;
-      }
-
-      const offset = (row * size + col) * 4;
-      if (color) {
-        pixels[offset] = color[2]; // B
-        pixels[offset + 1] = color[1]; // G
-        pixels[offset + 2] = color[0]; // R
-        pixels[offset + 3] = 0xff; // A
-      }
-      // sinon transparent (buffer déjà zéro-initialisé).
+      const s = (srcRow * size + col) * 4;
+      const d = (row * size + col) * 4;
+      pixels[d] = data[s + 2]!; // B
+      pixels[d + 1] = data[s + 1]!; // G
+      pixels[d + 2] = data[s]!; // R
+      pixels[d + 3] = data[s + 3]!; // A
     }
   }
   return pixels;
@@ -79,8 +72,10 @@ function bmpInfoHeaderAndMask(size: number, colorData: Buffer): Buffer {
   return Buffer.concat([header, colorData, mask]);
 }
 
-function buildIco(sizes: number[]): Buffer {
-  const images = sizes.map((size) => bmpInfoHeaderAndMask(size, drawSeal(size)));
+async function buildIco(sizes: number[]): Promise<Buffer> {
+  const images = await Promise.all(
+    sizes.map(async (size) => bmpInfoHeaderAndMask(size, await rasterise(size)))
+  );
 
   const iconDir = Buffer.alloc(6);
   iconDir.writeUInt16LE(0, 0); // reserved
@@ -107,7 +102,7 @@ function buildIco(sizes: number[]): Buffer {
   return Buffer.concat([iconDir, ...entries, ...images]);
 }
 
-const ico = buildIco([16, 32, 48]);
+const ico = await buildIco([16, 32, 48]);
 const outPath = path.join(__dirname, "..", "public", "favicon.ico");
 writeFileSync(outPath, ico);
 console.log(`favicon.ico écrit (${ico.length} octets, tailles 16/32/48) — ${outPath}`);
