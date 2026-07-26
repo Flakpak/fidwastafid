@@ -37,12 +37,59 @@ export default function Image() {
           color: "#1a1815", // ink
         }}
       >
-        <div style={{ fontSize: 104, fontWeight: 700, letterSpacing: "-0.02em", display: "flex" }}>
+        {/* Médaillon du sceau — anneau safran sur disque encre (§8, règle 4 :
+            le safran est un ornement de marque, et le sceau en est le lieu).
+            Construit en <div> imbriqués, PAS en <svg><text> : satori (next/og)
+            ne sait pas rendre un nœud <text> ("please convert them to <path>").
+            Même approche que apple-icon.tsx. */}
+        <div
+          style={{
+            width: 132,
+            height: 132,
+            borderRadius: "50%",
+            border: "3px solid #b07c2a", // safran
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 26,
+          }}
+        >
+          <div
+            style={{
+              width: 112,
+              height: 112,
+              borderRadius: "50%",
+              border: "2px solid #e0c793", // safran-line
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              style={{
+                width: 96,
+                height: 96,
+                borderRadius: "50%",
+                background: "#1a1815", // ink
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#F0D9A8",
+                fontSize: 38,
+                fontWeight: 700,
+              }}
+            >
+              فيد
+            </div>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 92, fontWeight: 700, letterSpacing: "-0.02em", display: "flex" }}>
           فيد و ستافيد
         </div>
 
-        {/* Unique touche d'argan de l'image (accent #2C5545). */}
-        <div style={{ width: 128, height: 3, background: "#2c5545", marginTop: 28, display: "flex" }} />
+        {/* Unique touche d'argan de l'image (accent #2F6B57). */}
+        <div style={{ width: 128, height: 3, background: "#2f6b57", marginTop: 24, display: "flex" }} />
 
         <div style={{ fontSize: 44, fontWeight: 600, marginTop: 28, letterSpacing: "-0.015em", display: "flex" }}>
           Fidwastafid

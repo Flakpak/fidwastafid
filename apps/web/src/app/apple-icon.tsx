@@ -5,7 +5,7 @@ export const contentType = "image/png";
 
 /**
  * Icône apple-touch (180px) — assez de résolution pour reprendre le motif
- * du sceau complet (Seal.tsx : anneau plâtre sur fond encre + "فيد", charte
+ * du sceau complet (Seal.tsx : anneau safran sur fond encre + "فيد", charte
  * Tadelakt, cf. CONTRAT-V1 §8) plutôt que la version simplifiée du favicon
  * 16/32px. Couleurs seules : la forme calligraphique est non négociable.
  */
@@ -27,13 +27,13 @@ export default function AppleIcon() {
             width: 148,
             height: 148,
             borderRadius: "50%",
-            border: "6px solid #f4f1ec", // surface-base
+            border: "6px solid #b07c2a", // safran
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <div style={{ fontFamily: "serif", fontSize: 56, fontWeight: 700, color: "#f4f1ec", display: "flex" }}>
+          <div style={{ fontFamily: "serif", fontSize: 56, fontWeight: 700, color: "#F0D9A8", display: "flex" }}>
             فيد
           </div>
         </div>
