@@ -8,15 +8,18 @@ import type { ComponentProps } from "react";
  */
 export type BadgeVariant = "hot" | "accent" | "warn" | "outline" | "cold";
 
+/** Lot 4 : chaque variante porte un contour de sa propre famille — un badge
+ *  doux cerclé se détache du blanc sans réclamer un aplat plein (§8, règle 1 :
+ *  l'aplat reste au bouton primaire). */
 const base =
-  "inline-flex items-center rounded-[5px] px-1.5 py-0.5 text-[11.5px] font-medium leading-none";
+  "inline-flex items-center gap-1 rounded-[5px] border px-2 py-0.5 text-[11.5px] font-medium leading-none";
 
 const variants: Record<BadgeVariant, string> = {
-  hot: "bg-hot-soft text-hot",
-  accent: "bg-accent-soft text-accent",
-  warn: "bg-warn-soft text-warn",
-  cold: "bg-cold-soft text-cold",
-  outline: "bg-transparent text-ink-muted border border-border-strong",
+  hot: "bg-hot-soft text-hot border-hot-line",
+  accent: "bg-accent-soft text-accent border-accent-line",
+  warn: "bg-warn-soft text-warn border-warn-line",
+  cold: "bg-cold-soft text-cold border-cold-line",
+  outline: "bg-transparent text-ink-muted border-border-strong",
 };
 
 export function Badge({
