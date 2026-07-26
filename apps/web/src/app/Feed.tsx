@@ -5,7 +5,7 @@ import Link from "next/link";
 import { VILLES, CATEGORIES, type Deal } from "@fidwastafid/schemas";
 import { DealCard } from "../components/DealCard.js";
 import { Chip } from "../components/Chip.js";
-import { Seal } from "../components/Seal.js";
+import { Brand } from "../components/Brand.js";
 import { construireParamsFeed, fusionnerSansDoublon, messageErreurFeed } from "../lib/feedPagination.js";
 
 type Type = "tous" | "physique" | "en_ligne";
@@ -238,7 +238,7 @@ export function Feed({
             vit dans sa propre colonne de la grille, aucun chevauchement. */}
         <aside className="hidden md:flex md:flex-col md:sticky md:top-[70px] md:h-[calc(100vh-70px)] md:overflow-y-auto bg-surface border-r border-border py-5">
           <div className="text-center px-4 pb-4 mb-3 border-b border-border">
-            <Seal className="w-20 h-20 mx-auto mb-2" />
+            <Brand forme="mark" hauteur={72} className="mx-auto mb-2" alt="" />
             <p className="text-[10px] text-ink-muted font-semibold">Bons plans marocains</p>
           </div>
 

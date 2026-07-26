@@ -2,7 +2,7 @@ import Link from "next/link";
 import { resolveCurrentUser } from "../lib/currentUser.js";
 import { deconnexionAction } from "../lib/authActions.js";
 import { buttonClasses } from "./Button.js";
-import { Seal } from "./Seal.js";
+import { Brand } from "./Brand.js";
 
 /**
  * État connecté/pseudo/lien admin résolu CÔTÉ SERVEUR (doctrine CONTRAT-V1
@@ -13,17 +13,21 @@ import { Seal } from "./Seal.js";
  * à réévaluer côté client, donc rien à hydrater.
  *
  * Charte Tadelakt (CONTRAT-V1 §8) : en-tête clair (`surface` + filet `border`),
- * sceau = médaillon safran/encre + wordmark (lot 4 : le wordmark seul du lot 2b
- * violait le §8, qui déclare le médaillon non négociable). Une seule action
- * pleine ici — « Soumettre un deal » ; « Connexion » reste secondaire neutre.
+ * marque = logotype vectoriel (lot 5). Wordmark seul — la baseline y serait
+ * illisible et redondante avec le contenu de la page ; hauteur de capitale
+ * ~22px, soit 30px de fichier (les capitales occupent 70 des 94 unités du
+ * viewBox). Sous `sm`, le cadre est trop étroit pour 245px de wordmark : le
+ * monogramme prend le relais. Une seule action pleine ici — « Soumettre un
+ * deal » ; « Connexion » reste secondaire neutre.
  */
 export async function SiteHeader() {
   const user = await resolveCurrentUser();
 
   return (
     <header className="bg-surface border-b border-border sticky top-0 z-10 h-[60px] px-4 sm:px-6 flex items-center justify-between gap-3">
-      <Link href="/" aria-label="فيد و ستافيد — Fidwastafid" className="shrink-0">
-        <Seal className="h-9 w-9" withWordmark />
+      <Link href="/" className="shrink-0" aria-label="Fidwastafid — accueil">
+        <Brand forme="mark" hauteur={32} alt="" className="sm:hidden" />
+        <Brand forme="wordmark" hauteur={30} alt="" className="hidden sm:block" />
       </Link>
       <nav className="flex items-center gap-2 sm:gap-3">
         <Link href="/soumettre" className={buttonClasses({ variant: "primary", size: "sm" })}>
