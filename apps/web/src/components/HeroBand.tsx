@@ -30,7 +30,7 @@ const STEPS = [
 
 /**
  * Motif zellige — ornement de marque (CONTRAT-V1 §8, règle 4 : c'est l'un des
- * deux seuls emplacements où le `safran` est autorisé, avec le sceau).
+ * deux seuls emplacements où le `safran` est autorisé, avec le logotype).
  * Purement décoratif, donc `aria-hidden` ; masqué en mobile, où il n'y a pas
  * la place et où il concurrencerait le texte.
  *
