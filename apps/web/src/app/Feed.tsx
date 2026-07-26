@@ -24,14 +24,16 @@ const TRIS: { value: Tri; label: string }[] = [
 /** Bouton vertical de la sidebar — porté depuis .sidebar-btn (index.html racine, v1). */
 function sidebarBtnClass(active: boolean): string {
   return `flex items-center gap-2 px-4 py-2 text-xs font-bold text-left border-l-[3px] w-full ${
-    active ? "text-ink bg-surface-subtle border-l-accent" : "text-ink-muted border-l-transparent hover:bg-[#efebe3] hover:text-ink"
+    active
+      ? "text-accent bg-accent-soft border-l-accent"
+      : "text-ink-muted border-l-transparent hover:bg-accent-soft hover:text-accent"
   }`;
 }
 
 /** Bouton catégorie de la sidebar — porté depuis .cat-btn (index.html racine, v1). */
 function catBtnClass(active: boolean): string {
   return `flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-bold text-left ${
-    active ? "bg-accent-soft text-accent" : "text-ink-muted hover:bg-surface-subtle hover:text-ink"
+    active ? "bg-accent-soft text-accent border border-accent" : "border border-transparent text-ink-muted hover:bg-accent-soft hover:text-accent"
   }`;
 }
 

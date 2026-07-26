@@ -40,7 +40,7 @@ export function DealCard({ deal }: { deal: Deal }) {
 
   return (
     <div
-      className={`group flex flex-row overflow-hidden rounded-[11px] border border-border bg-surface shadow-[0_1px_2px_rgba(26,24,21,0.05)] transition-[border-color,box-shadow,transform] duration-[140ms] hover:-translate-y-px hover:border-border-strong hover:shadow-[0_4px_14px_rgba(26,24,21,0.09)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
+      className={`group flex flex-row overflow-hidden rounded-[11px] border border-border bg-surface shadow-[0_1px_2px_rgba(26,24,21,0.05)] transition-[border-color,box-shadow,transform] duration-[140ms] hover:-translate-y-px hover:border-accent-line hover:shadow-[0_4px_14px_rgba(26,24,21,0.09)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
         isHot ? "border-l-[3px] border-l-hot" : ""
       }`}
     >

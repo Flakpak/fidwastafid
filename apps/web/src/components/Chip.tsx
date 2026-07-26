@@ -14,8 +14,12 @@ const base =
   "motion-reduce:transition-none disabled:opacity-40 disabled:pointer-events-none " +
   "max-sm:min-h-11";
 
-const inactive = "bg-surface border-border-strong text-ink-muted hover:bg-surface-subtle hover:text-ink";
-const active = "bg-accent border-accent text-white";
+/** Lot 4 : le filtre actif passe du vert plein au vert DOUX cerclé — sur une
+ *  barre qui en aligne dix, dix pastilles pleines faisaient beaucoup, et
+ *  l'aplat doit rester réservé au bouton primaire (§8, règle 1). */
+const inactive =
+  "bg-surface border-border-strong text-ink-muted hover:bg-accent-soft hover:border-accent-line hover:text-accent";
+const active = "bg-accent-soft border-accent text-accent";
 
 export function Chip({
   active: isActive = false,
