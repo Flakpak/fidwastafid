@@ -5,30 +5,17 @@
   "type": "module",
   "packageManager": "pnpm@11.11.0",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.99.2",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@types/pg": "^8.11.10",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
     "pg": "^8.13.1",
-    "typescript-eslint": "^8.65.0",
-    "vite": "^8.1.5"
+    "typescript-eslint": "^8.65.0"
   }
 }

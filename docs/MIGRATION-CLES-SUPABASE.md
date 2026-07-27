@@ -96,10 +96,11 @@ soient provisionnés partout. Retiré une fois cette étape confirmée :
       "SUPABASE_ANON_KEY\|SUPABASE_SERVICE_ROLE_KEY"` sur ce repo et le
       pipeline ne renvoie plus que des mentions historiques dans les
       commentaires/cette doc, aucune lecture de `process.env` restante.
-- [ ] `index.html`/`src/App.jsx` à la racine du repo (reliquat du site v1
-      statique, hors périmètre `apps/web`) — non traité, hors scope de
-      cette migration ; déjà sur une clé publishable propre (voir le
-      fichier), à vérifier séparément si ce reliquat est encore servi.
+- [x] `index.html`/`src/App.jsx` à la racine du repo (reliquat du site v1
+      statique, hors périmètre `apps/web`) — **question close le 27/07/2026 par
+      suppression** : le scaffold entier a été décommissionné, il n'y a plus de
+      clé à vérifier là. Il n'était plus servi nulle part (projet Vercel v1
+      supprimé le 21/07 ; Vercel construit `apps/web` en Root Directory).
 
 Clés legacy (`anon`/`service_role`) désactivées côté Dashboard Supabase.
 Ce document reste la référence de la convention de clés et de la procédure
