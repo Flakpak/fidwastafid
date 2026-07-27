@@ -5,7 +5,7 @@ import { dealInputSchema, generatePublicId, type DealInput } from "@fidwastafid/
 import { apiError, withAuthErrors } from "../_lib/errors.js";
 import { parseJsonBody, parseCandidate } from "../_lib/validation.js";
 import { isRateLimited, getClientIp } from "../_lib/rateLimit.js";
-import { verifyTurnstile } from "../_lib/turnstile.js";
+import { verifierTurnstile, TurnstileIndisponibleError } from "../_lib/turnstile.js";
 import { decodeCursor, encodeCursor, type TriDeals } from "../_lib/pagination.js";
 import { DEAL_SELECT, DEAL_FROM, PUBLIC_STATUTS, toDeal, type DealRow } from "../_lib/deals.js";
 import { processAndStoreDealImage, InvalidImageError, ImageProcessingError } from "../_lib/dealImage.js";
@@ -223,9 +223,31 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
   // Turnstile sur la soumission (plan v2, Phase 3) — token dans un header
   // dédié, pas dans le body : dealInputSchema est le modèle de domaine figé
   // (CONTRAT-V1 §3), pas l'endroit pour un artefact anti-abus.
-  const turnstileOk = await verifyTurnstile(request.headers.get("x-turnstile-token"), getClientIp(request));
-  if (!turnstileOk) {
-    return apiError("VALIDATION_ERROR", "Vérification anti-robot invalide.");
+  //
+  // Trois issues distinctes (voir _lib/turnstile.ts) :
+  //   - refusé            -> rejet, message invitant à refaire la vérification ;
+  //   - panne amont       -> on ACCEPTE, en marquant la soumission non vérifiée.
+  //                          Tenable ici parce qu'elle part en `en_attente` :
+  //                          un modérateur la relit avant toute publication.
+  //                          La rejeter casserait la boucle communautaire sans
+  //                          que personne ne soit alerté ;
+  //   - clé invalide      -> notre bug : fail-closed, bruyant, jamais masqué.
+  let turnstileVerifie = true;
+  try {
+    const verdict = await verifierTurnstile(request.headers.get("x-turnstile-token"), getClientIp(request));
+    if (verdict.verdict === "refuse") {
+      console.warn(`[deals] soumission refusée par Turnstile — codes=${JSON.stringify(verdict.codes)}`);
+      return apiError("VALIDATION_ERROR", "Vérification anti-robot échouée. Refais la vérification, puis renvoie.");
+    }
+  } catch (err) {
+    if (err instanceof TurnstileIndisponibleError) {
+      turnstileVerifie = false;
+      console.error(`[deals] Turnstile injoignable — soumission acceptée SANS vérification. ${err.message}`);
+    } else {
+      // TurnstileConfigError (clé absente/révoquée) : on ne laisse rien passer
+      // et l'erreur remonte telle quelle dans les logs.
+      throw err;
+    }
   }
 
   const contentType = request.headers.get("content-type") ?? "";
@@ -297,8 +319,8 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
     `insert into deals
        (public_id, titre, enseigne_id, nom_vendeur, adresse, lien_maps, ville, categorie, type,
         prix_promo, prix_normal, date_fin, description, lien, image_key,
-        whatsapp_contact, whatsapp_public, statut, submitter_id, score)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'en_attente',$18,0)`,
+        whatsapp_contact, whatsapp_public, statut, submitter_id, score, turnstile_verifie)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'en_attente',$18,0,$19)`,
     [
       publicId,
       input.titre,
@@ -318,6 +340,7 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
       input.whatsappContact ?? null,
       input.whatsappPublic,
       user.id,
+      turnstileVerifie,
     ]
   );
 

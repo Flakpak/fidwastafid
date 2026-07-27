@@ -8,7 +8,7 @@ import { setSessionCookie } from "./sessionCookie.js";
 import { SITE_URL } from "./siteUrl.js";
 import { safeNextPath } from "./nextPath.js";
 import { getClientIp, isRateLimitedByEmail } from "../app/api/v1/_lib/rateLimit.js";
-import { verifyTurnstile } from "../app/api/v1/_lib/turnstile.js";
+import { verifierTurnstile } from "../app/api/v1/_lib/turnstile.js";
 
 export async function connexionAction(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "").trim();
@@ -88,8 +88,24 @@ export async function motDePasseOublieAction(formData: FormData): Promise<void> 
   const request = new Request("http://localhost/", { headers: await headers() });
   const ip = getClientIp(request);
 
-  const turnstileOk = await verifyTurnstile(turnstileToken ? String(turnstileToken) : null, ip);
-  if (!turnstileOk) {
+  // Contrairement à la soumission de deal, ce flux n'a AUCUN filet humain en
+  // aval : il déclenche directement un envoi d'e-mail. La dégradation
+  // « accepter en marquant non vérifié » n'a donc pas d'équivalent ici — une
+  // panne Turnstile ne peut pas ouvrir un canal d'envoi non protégé. On reste
+  // fail-closed dans les trois cas non valides, mais la panne est désormais
+  // journalisée en erreur au lieu de disparaître dans un `false`.
+  let verdictTurnstile: Awaited<ReturnType<typeof verifierTurnstile>> | null = null;
+  try {
+    verdictTurnstile = await verifierTurnstile(turnstileToken ? String(turnstileToken) : null, ip);
+  } catch (err) {
+    console.error(
+      `[auth] réinitialisation bloquée — vérification anti-robot impossible. ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+    redirect("/mot-de-passe-oublie?erreur=turnstile");
+  }
+  if (verdictTurnstile.verdict !== "valide") {
     redirect("/mot-de-passe-oublie?erreur=turnstile");
   }
 
