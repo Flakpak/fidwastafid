@@ -356,6 +356,9 @@
               "string",
               "null"
             ]
+          },
+          "turnstileVerifie": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -374,7 +377,8 @@
           "createdAt",
           "updatedAt",
           "whatsappPublic",
-          "motifRejet"
+          "motifRejet",
+          "turnstileVerifie"
         ]
       },
       "DealInput": {
@@ -696,6 +700,9 @@
             "type": "string",
             "format": "email"
           },
+          "emailIndisponible": {
+            "type": "boolean"
+          },
           "couleurAvatar": {
             "type": "string",
             "enum": [
@@ -767,7 +774,7 @@
         "required": [
           "publicId",
           "pseudo",
-          "email",
+          "emailIndisponible",
           "couleurAvatar",
           "dealsCount",
           "votesCount",
