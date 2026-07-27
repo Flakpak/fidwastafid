@@ -9,13 +9,13 @@ journalisation d'échec est désormais permanente et structurée dans
 `_lib/turnstile.ts`, avec le statut HTTP et le nombre de tentatives — elle
 n'est plus un diagnostic ponctuel mais une propriété du wrapper.)*
 
-- `apps/web/public/openapi.json` est un artefact généré
-  (`pnpm --filter @fidwastafid/web openapi:generate`) qu'AUCUN job CI ne
-  vérifie. Constaté le 27/07/2026 : `emailIndisponible`, ajouté à `/me`
-  par le correctif du 24/07, n'y était jamais arrivé — la spec publiée
-  affirmait encore `email` requis. Ajouter un job qui régénère puis
-  `git diff --exit-code` : une spec peut mentir sur l'API sans que rien
-  ne rougisse, c'est la version documentaire du fallback silencieux.
+- ~~`apps/web/public/openapi.json` est un artefact généré qu'AUCUN job CI ne
+  vérifie.~~ **Fait le 27/07/2026** — job `openapi-check` (commit 3ddfaa3) :
+  régénère puis `git diff --exit-code`. Conservé ici pour le fait générateur :
+  `emailIndisponible`, ajouté à `/me` par le correctif du 24/07, n'était jamais
+  arrivé dans la spec publiée, qui affirmait encore `email` requis pendant
+  trois jours. Une spec peut mentir sur l'API sans que rien ne rougisse —
+  version documentaire du fallback silencieux.
 
 ## Refonte Tadelakt — suites (2026-07-24)
 
@@ -39,6 +39,81 @@ rm`. Décommissionner proprement nécessite de retirer aussi
 `vite.config.js`, `src/`, les scripts et les dépendances associées du
 `package.json` racine — plus gros qu'une suppression isolée, chantier à
 part.
+
+**Argument nouveau du 27/07/2026 — ce reliquat coûte maintenant en bruit de
+sécurité.** À la réactivation des alertes Dependabot, **15 des 28 alertes
+ouvertes** ne venaient pas du monorepo mais de **`package-lock.json`**, le
+lockfile npm de ce prototype v1, toujours versionné à la racine (98 Ko, daté
+du 11/07) et référencé par rien : ni `npm ci`, ni un workflow, ni le
+Dockerfile — `pnpm` l'ignore complètement. C'est de là que sortent les seules
+alertes `ws` (dont une `high` classée « runtime » alors qu'aucun build ne lit
+ce fichier), et les alertes `vite`/`js-yaml`/`@babel/core`/`picomatch`, toutes
+absentes de `pnpm audit`. Vérification croisée nette : 12 alertes sur
+`pnpm-lock.yaml` + 1 sur `apps/web/package.json` = 13, exactement le compte de
+`pnpm audit`. Le reste est le fantôme de la v1.
+
+Conséquence pratique : tant que ce fichier reste versionné, chaque revue de
+sécurité doit trier deux surfaces dont une est fictive, et Dependabot ouvrira
+des PR contre un lockfile que personne ne construit. Le supprimer est la
+première étape du décommissionnement, et la moins risquée (aucun consommateur).
+
+## Dépendances — montées majeures parquées (2026-07-27)
+
+*Tri du jour : les correctifs de sécurité et les montées à rayon d'impact nul
+sont passés (next 15.5.21, sharp 0.35.3, lot sûr #30). Restent quatre chantiers
+majeurs, parqués ici avec ce qui a été **constaté**, pas supposé. Les PR
+Dependabot correspondantes sont fermées et une règle `ignore` sur
+`version-update:semver-major` a été posée dans `.github/dependabot.yml` — sinon
+elles reviennent chaque semaine et tiennent des places sur
+`open-pull-requests-limit`. Ces règles ne masquent **pas** les correctifs de
+sécurité : une mise à jour de sécurité n'est pas une mise à jour de version, et
+elle ignore ces filtres comme la limite de PR ouvertes (vérifié le 27/07, voir
+plus bas).*
+
+- **zod 3.25.76 → 4.4.3** (ex-PR #11). **Casse réelle, mesurée** : `quality`
+  **et** `docker` rouges — pas seulement les jobs privés de secrets. zod est le
+  cœur de `packages/schemas`, donc de toute la validation d'API et du modèle de
+  domaine gravé au CONTRAT-V1 §3. Chantier à part, avec relecture des messages
+  d'erreur (le format `{ error: { code, message } }` du §4 en dépend).
+- **typescript 5.9.3 → 7.0.2** (ex-PR #8). Même constat : `quality` et `docker`
+  rouges. Majeure structurante, à planifier volontairement.
+- **eslint 9.39.4 → 10.7.0 + @eslint/js 9.39.4 → 10.0.1** (ex-PR #9 et #7).
+  **Indissociables** : les deux paquets sont versionnés ensemble en amont, et
+  chaque PR séparée laisse le dépôt avec un désaccord de version entre le
+  moteur et sa config. `quality` passait sur chacune prise isolément — ce qui
+  ne prouve rien sur la paire. À monter d'un seul geste, en vérifiant les
+  plugins (`eslint-plugin-react-hooks`, `typescript-eslint`).
+- **@types/node 22.20.1 → 26.1.1** (ex-PR #10). **Ni 22 ni 26 n'est la bonne
+  cible** : le runtime réel est **Node 24.x sur Vercel**, la CI tourne en
+  **22**, et le dépôt déclare `^22.10.0`. Monter à 26 mettrait les types
+  *au-dessus* du runtime — l'inverse du problème à résoudre. Le geste utile est
+  d'aligner types et runtime (`^24`) et de trancher la version de CI, pas de
+  suivre la dernière majeure publiée.
+
+### Résidus transitifs connus, non traités
+
+- **sharp 0.34.5 embarqué par next.** Notre dépendance directe est en 0.35.3
+  (corrigée), mais `next@15.5.21` embarque sa propre copie 0.34.5 pour son
+  optimiseur d'images — toujours porteuse de `GHSA-f88m-g3jw-g9cj`. Le dépôt
+  n'importe `next/image` nulle part et ne configure aucun
+  `images.remotePatterns` : les images de deal passent par la route proxy
+  `/img/deals/[publicId]` (CONTRAT-V1 §6), jamais par `/_next/image`. La forcer
+  demanderait un `overrides` pnpm sur une dépendance **native** du framework —
+  à faire consciemment, pas au passage.
+- **postcss (3 avis, dont 2 `high`)** : transitif de next également. Se résorbe
+  par une montée de next, pas par une action de notre côté.
+- **brace-expansion (`high`, dev)** : transitif d'eslint, se résorbe avec la
+  montée eslint 10 ci-dessus.
+
+### Ce que la limite de PR bloquait vraiment (mesuré)
+
+`open-pull-requests-limit: 10` était saturé par 10 PR npm ouvertes, ce qui a
+empêché Dependabot d'ouvrir la montée **de version** vers next 15.5.21 — 8 avis
+ouverts, dont 3 `high`, sont ainsi restés sans PR. En revanche, dès les alertes
+réactivées, Dependabot a ouvert sa PR **de sécurité** pour next (#26) alors que
+les 10 places étaient encore prises : la limite ne s'applique donc pas aux
+mises à jour de sécurité. Elle reste à 10 — la relever n'aurait rien débloqué.
+Ce qui manquait était le canal de sécurité, pas des places.
 
 ## UX auth
 
