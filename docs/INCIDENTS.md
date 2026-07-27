@@ -53,6 +53,57 @@ imprimé dans la sortie de la commande de fusion, et fusionné sans être lu.**
 Prouvé par le déploiement de préversion de la PR (le seul artefact qui prouve
 quoi que ce soit ici), puis par le déploiement de production `READY`.
 
+**Correction du diagnostic (même jour, après contre-épreuve).** L'explication
+« la racine d'installation diffère » ci-dessus **n'est pas confirmée**. Un job CI
+a été écrit pour la vérifier (`build-vercel` : `pnpm install --frozen-lockfile`
+puis `pnpm run build`, depuis `apps/web`), puis soumis à la régression réelle —
+les deux `@types` retirés de la racine, poussés sur une branche. Résultat :
+**le job est resté vert pendant que le déploiement Vercel de la même branche
+échouait.**
+
+Ce que cette contre-épreuve établit : une installation **propre** depuis
+`apps/web` résout correctement les types, même sans les déclarations racine. La
+différence restante avec Vercel n'est donc pas la racine d'installation, mais
+très probablement son **cache de build réutilisé** et son installation en delta
+— le log de la préversion fautive montre « Restored build cache from previous
+deployment » puis un install qui **retire 10 paquets** au lieu de reconstruire.
+L'argument « trois lockfiles différents, donc pas le cache » était trop rapide :
+les trois déploiements restauraient un cache issu de la **même** lignée
+antérieure à la suppression.
+
+Le correctif reste juste (la déclaration racine referme le cas), mais **la cause
+exacte reste ouverte**. Ce qui ne l'est pas : le seul verdict fiable est celui
+de Vercel lui-même.
+
+**Décision sur le garde-fou (27/07/2026) — le job CI est abandonné.** Le job
+`build-vercel` écrit pour couvrir ce chemin ne l'a pas couvert : la contre-épreuve
+ci-dessus le montre vert sur la régression réelle. Deux options se présentaient —
+le rendre fidèle en reproduisant le cache de Vercel, ou l'abandonner. **La
+première est écartée** : le cache de Vercel est son artefact interne (contenu,
+clé et politique d'invalidation non documentés), un `actions/cache` sur
+`node_modules` n'en serait qu'une imitation, et un garde-fou qui imite le mauvais
+mécanisme est pire que pas de garde-fou — il coûte une minute à chaque PR et
+rassure à tort. Le job est donc supprimé (PR fermée sans fusion).
+
+> **Sur ce chemin, le check `Vercel` est le seul garde-fou réel.** Il est
+> bloquant depuis le 27/07 (protection de branche), au même titre que `quality`,
+> `docker` et `openapi-check` — et il ne peut pas être contourné, `enforce_admins`
+> compris. Aucune vérification locale ni CI ne le remplace : elle ne construit
+> pas dans l'environnement qui sert la production.
+
+**Levier de désactivation du cache, si la cause devait être tranchée** (relevé
+dans la documentation Vercel, non appliqué) : il n'existe **pas** de réglage de
+projet « toujours sans cache ». Les deux mécanismes documentés sont
+**par déploiement** — `vercel deploy --force` (CLI) et un Deploy Hook appelé avec
+`?buildCache=false`. Les rendre systématiques en production supposerait de
+remplacer l'intégration Git par un déclenchement piloté (Action GitHub appelant
+le hook), c'est-à-dire de changer la façon dont la production est livrée. Coût
+mesuré du cache : build de production **67 s** avec cache (déploiement
+`a6e8d3b`) ; installation + build à froid mesurés à **~70 s** en CI sur un runner
+neuf — l'ordre de grandeur d'un build sans cache est donc de **1 min 40 à 2 min**,
+soit environ le double. À arbitrer si le sujet redevient bloquant ; pas pour
+aujourd'hui, le correctif tient.
+
 **Leçons.**
 
 > **Le seul build qui atteste de la production est celui qui l'installe comme
@@ -65,8 +116,15 @@ quoi que ce soit ici), puis par le déploiement de production `READY`.
   validé par une préversion Vercel, jamais par `tsc` seul.
 - **Un check imprimé mais non lu est un check absent.** La ligne `Vercel fail`
   était sous les yeux au moment de la fusion. Le garde-fou n'a pas manqué : la
-  lecture a manqué. Corollaire opératoire : avant toute fusion, lire le verdict
-  `Vercel` au même titre que les cinq jobs GitHub.
+  lecture a manqué. **Corrigé structurellement le 27/07** : protection de
+  branche sur `main`, avec `quality`, `docker`, `openapi-check` et **`Vercel`**
+  rendus **bloquants** (`enforce_admins` compris — la règle vaut aussi pour
+  celui qui l'a posée). Éprouvée : une PR au `quality` rouge s'est vue refuser
+  la fusion (`the base branch policy prohibits the merge`). `integration` et
+  `migrations-check` restent consultatifs — ils sont rouges sur toute PR
+  dependabot faute de secrets, les rendre bloquants paralyserait le dépôt.
+  *Une discipline qui repose sur l'attention finit par échouer un jour de
+  fatigue ; une règle refuse le merge tous les jours.*
 - L'audit du 27/07 qui a précédé la suppression était pourtant complet côté
   consommateurs *déclarés* (workflows, scripts, Dockerfile, configuration
   Vercel, liens entrants). Il a conclu « rien d'actif n'en dépend » — vrai pour
