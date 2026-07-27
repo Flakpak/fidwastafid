@@ -10,6 +10,9 @@
 #   4. Compresse et stocke le backup HORS Supabase :
 #         - toujours : artefact GitHub (protection immédiate, rétention 30 j) ;
 #         - si secrets R2 configurés : Cloudflare R2 (durable, S3-compatible → portable).
+#   5. En cas d'échec (n'importe quelle étape) : OUVRE UNE ISSUE GitHub — un run de
+#      cron n'envoie d'e-mail à personne. Voir l'étape « Alerte » en fin de fichier.
+#      Le chemin d'alerte s'éprouve à la main : Run workflow → simuler_echec.
 #
 # SECRETS À CONFIGURER (Settings → Secrets and variables → Actions) :
 #   SUPABASE_DB_URL   (obligatoire) chaîne du SESSION POOLER (IPv4), format :
@@ -28,6 +31,11 @@ on:
   schedule:
     - cron: '0 3 * * *'      # 03:00 UTC chaque jour (~04:00 heure du Maroc)
   workflow_dispatch:          # bouton "Run workflow" pour tester à la main
+    inputs:
+      simuler_echec:
+        description: "Éprouver le chemin d'alerte : fait échouer le run exprès, SANS toucher à la base"
+        type: boolean
+        default: false
 
 concurrency:
   group: db-backup
@@ -37,6 +45,13 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
+    # `issues: write` pour la seule étape d'alerte ci-dessous (le réglage par
+    # défaut du dépôt est en lecture seule). Aucune autre écriture demandée :
+    # ce workflow ne pousse rien, ne déploie rien.
+    permissions:
+      contents: read
+      issues: write
 
     # Postgres jetable qui sert UNIQUEMENT au test de restauration.
     services:
@@ -60,6 +75,16 @@ jobs:
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
 
     steps:
+      # Éprouve le chemin d'alerte sans toucher à la base — « un filet non
+      # testé n'existe pas », même règle que le test de restauration plus bas.
+      # Uniquement joignable par workflow_dispatch : sur le cron, `inputs` est
+      # nul, la condition est fausse, l'étape est sautée.
+      - name: Échec simulé (test du chemin d'alerte)
+        if: ${{ inputs.simuler_echec }}
+        run: |
+          echo "::error::Échec simulé — test du chemin d'alerte. La base n'a pas été touchée."
+          exit 1
+
       - name: Installer pg_dump 17 (dépôt officiel PGDG)
         run: |
           set -euo pipefail
@@ -161,3 +186,65 @@ jobs:
           aws s3 cp "${DUMP_FILE}.gz" "s3://${R2_BUCKET}/${KEY}" \
             --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
           echo "Backup durable : s3://${R2_BUCKET}/${KEY}"
+
+      # ------------------------------------------------------------------
+      # ALERTE — fait générateur du 27/07/2026.
+      #
+      # Le mot de passe de la base a été tourné dans la nuit ; le secret
+      # SUPABASE_DB_URL est resté sur l'ancienne valeur. Ce workflow a donc
+      # échoué (28P01) et PERSONNE ne l'a su : découvert le lendemain matin par
+      # un audit manuel, après une journée sans backup vérifié. GitHub n'envoie
+      # d'e-mail d'échec qu'à l'auteur du commit déclencheur — un run de cron
+      # n'en a pas.
+      #
+      # > Un filet de sécurité qui tombe sans bruit n'est pas un filet.
+      #
+      # Une seule issue ouverte à la fois (dédoublonnage par label) : un échec
+      # qui dure plusieurs jours ne doit pas noyer le dépôt, mais chaque
+      # nouvelle occurrence se commente sur l'issue déjà ouverte — le silence
+      # n'est jamais l'option.
+      # ------------------------------------------------------------------
+      - name: Alerte — ouvrir ou compléter une issue GitHub
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVENEMENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          # Le label peut déjà exister (échec précédent) : ce n'est pas une erreur.
+          gh label create alerte-backup -R "$REPO" --color B60205 \
+            --description "Échec du backup quotidien de la base" 2>/dev/null || true
+
+          cat > alerte.md <<EOF
+          Le workflow **Backup base de données (pg_dump quotidien)** a échoué.
+
+          | | |
+          |---|---|
+          | Run | $RUN_URL |
+          | Déclencheur | \`$EVENEMENT\` |
+          | Date (UTC) | $(date -u '+%Y-%m-%d %H:%M:%S') |
+
+          **Tant que cette issue est ouverte, la production n'a pas de backup vérifié du jour.**
+
+          Cause la plus fréquente, constatée le 27/07/2026 : le secret \`SUPABASE_DB_URL\`
+          ne correspond plus au mot de passe de la base (rotation appliquée ailleurs mais
+          pas ici) — l'erreur du run est alors \`password authentication failed\`.
+          Liste des détenteurs du mot de passe et ordre de mise à jour :
+          \`docs/RUNBOOK-securite.md\`, section « Rotation du mot de passe de la base ».
+          EOF
+
+          OUVERTE=$(gh issue list -R "$REPO" --label alerte-backup --state open \
+            --limit 1 --json number --jq '.[0].number // empty')
+
+          if [ -n "$OUVERTE" ]; then
+            gh issue comment "$OUVERTE" -R "$REPO" --body-file alerte.md
+            echo "Issue #$OUVERTE complétée (échec répété)."
+          else
+            gh issue create -R "$REPO" \
+              --title "Backup de la base en échec ($(date -u '+%Y-%m-%d'))" \
+              --label alerte-backup \
+              --body-file alerte.md
+          fi
