@@ -19,6 +19,37 @@ updates:
       - dependency-name: "next"
         update-types: ["version-update:semver-major"]
 
+      # Tri du 27/07/2026 — quatre majeures parquées, constats dans
+      # docs/IDEES.md (« Dépendances — montées majeures parquées »). Fermées et
+      # filtrées plutôt que laissées ouvertes : sans ça elles reviennent chaque
+      # semaine et tiennent des places sur open-pull-requests-limit, qui a déjà
+      # empêché la montée de next 15.5.21 (3 avis `high`) d'être proposée.
+      #
+      # Ces règles ne filtrent QUE les montées de version. Une mise à jour de
+      # SÉCURITÉ n'en est pas une : elle passe outre ces `ignore` comme elle
+      # passe outre la limite de PR ouvertes (vérifié le 27/07 — PR de sécurité
+      # next ouverte alors que les 10 places étaient prises). Aucune CVE n'est
+      # donc masquée ici.
+      #
+      # zod : casse réelle mesurée (quality ET docker rouges), et c'est le cœur
+      # de packages/schemas — donc du modèle de domaine du CONTRAT-V1 §3.
+      - dependency-name: "zod"
+        update-types: ["version-update:semver-major"]
+      # typescript 7 : même constat, majeure structurante à planifier.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # eslint et @eslint/js sont versionnés ensemble en amont : montés
+      # séparément, le moteur et sa config divergent. À faire d'un seul geste.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
+      # @types/node : la bonne cible est le runtime réel (Node 24.x sur Vercel),
+      # pas la dernière majeure publiée. Suivre Dependabot ici mettrait les
+      # types au-dessus du runtime — l'inverse du problème.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
