@@ -103,10 +103,11 @@ export const PUBLIC_STATUTS = new Set(["publie", "expire"]);
  * déjà dans DEAL_SELECT (lus pour la décision d'exposition publique) ; ici on
  * les rend TOUJOURS visibles, sans condition (CONTRAT-V1 §4).
  */
-export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.motif_rejet`;
+export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.motif_rejet, d.turnstile_verifie`;
 
 export interface DealAdminRow extends DealRow {
   motif_rejet: string | null;
+  turnstile_verifie: boolean;
 }
 
 export function toDealAdmin(row: DealAdminRow): DealAdmin {
@@ -115,6 +116,7 @@ export function toDealAdmin(row: DealAdminRow): DealAdmin {
     whatsappContact: row.whatsapp_contact,
     whatsappPublic: row.whatsapp_public,
     motifRejet: row.motif_rejet,
+    turnstileVerifie: row.turnstile_verifie,
   });
 }
 
