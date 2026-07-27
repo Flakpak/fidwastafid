@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { withTransaction, type PoolClient } from "@fidwastafid/db";
 import { requireAdmin } from "@fidwastafid/auth";
-import { dealAdminUpdateSchema, dealCoherenceIssues, type DealType } from "@fidwastafid/schemas";
+import {
+  dealAdminUpdateSchema,
+  dealCoherenceIssues,
+  motifRejetManquant,
+  type DealStatut,
+  type DealType,
+} from "@fidwastafid/schemas";
 import { apiError, withAuthErrors } from "../../../_lib/errors.js";
 import { parseJsonBody } from "../../../_lib/validation.js";
 import { DEAL_ADMIN_SELECT, DEAL_FROM, toDealAdmin, type DealAdminRow } from "../../../_lib/deals.js";
 import { logAudit } from "../../../_lib/audit.js";
+import { champsModifies, type ChampCompare, type SorteChamp } from "../../../_lib/auditDiff.js";
 
 type Context = { params: Promise<{ publicId: string }> };
 
@@ -14,6 +21,7 @@ interface DealEditableRow {
   statut: string;
   titre: string;
   description: string | null;
+  /** `numeric` — `pg` le renvoie en CHAÎNE pour ne pas tronquer sa précision. */
   prix_promo: string;
   prix_normal: string | null;
   categorie: string;
@@ -21,7 +29,9 @@ interface DealEditableRow {
   ville: string | null;
   date_fin: string | null;
   lien: string | null;
-  enseigne_id: number | null;
+  /** `bigint` — chaîne aussi, pour la même raison (le typer `number` était un
+   *  mensonge : il masquait le faux diff `"3" -> 3` sur enseigneSlug). */
+  enseigne_id: string | null;
   motif_rejet: string | null;
   nom_vendeur: string | null;
   adresse: string | null;
@@ -110,6 +120,17 @@ export const PATCH = withAuthErrors<Context>(async (request, { params }) => {
       return { kind: "invalid" as const, message: issues.map((i) => i.message).join(" | "), fields };
     }
 
+    // Motif de rejet obligatoire — vérifié sur l'état RÉSULTANT, comme la
+    // cohérence ci-dessus : rejeter exige un motif, mais éditer un deal déjà
+    // rejeté et déjà motivé n'a pas à le renvoyer (CONTRAT-V1 §3,
+    // motifRejetManquant dans packages/schemas). La garantie est ici, côté
+    // serveur : le formulaire la double, il ne la remplace pas.
+    const motifResultant = patch.motifRejet ?? deal.motif_rejet;
+    if (motifRejetManquant(patch.statut as DealStatut, motifResultant)) {
+      const message = "Un rejet doit être motivé : le soumetteur doit pouvoir comprendre pourquoi.";
+      return { kind: "invalid" as const, message, fields: { motifRejet: message } };
+    }
+
     await client.query(
       `update deals set
          statut = $1,
@@ -154,33 +175,38 @@ export const PATCH = withAuthErrors<Context>(async (request, { params }) => {
       ]
     );
 
-    // Diff pour le journal d'audit — uniquement les champs présents dans le
-    // corps de la requête (les autres n'ont pas bougé, coalesce oblige).
-    const FIELD_DB_MAP: Record<string, keyof DealEditableRow> = {
-      titre: "titre",
-      description: "description",
-      prixPromo: "prix_promo",
-      prixNormal: "prix_normal",
-      categorie: "categorie",
-      type: "type",
-      ville: "ville",
-      dateFin: "date_fin",
-      lien: "lien",
-      nomVendeur: "nom_vendeur",
-      adresse: "adresse",
-      lienMaps: "lien_maps",
-      whatsappContact: "whatsapp_contact",
-      whatsappPublic: "whatsapp_public",
-      motifRejet: "motif_rejet",
+    // Diff pour le journal d'audit — candidats : les champs présents dans le
+    // corps de la requête (les autres n'ont pas bougé, coalesce oblige). Le
+    // filtrage final ne garde que ceux dont la valeur a RÉELLEMENT changé, et
+    // normalise les deux côtés avant comparaison : `pg` renvoie numeric et
+    // bigint en chaîne alors que le corps JSON porte des nombres (cf.
+    // _lib/auditDiff.ts, fait générateur du 27/07/2026).
+    const FIELD_DB_MAP: Record<string, { colonne: keyof DealEditableRow; sorte: SorteChamp }> = {
+      titre: { colonne: "titre", sorte: "texte" },
+      description: { colonne: "description", sorte: "texte" },
+      prixPromo: { colonne: "prix_promo", sorte: "nombre" },
+      prixNormal: { colonne: "prix_normal", sorte: "nombre" },
+      categorie: { colonne: "categorie", sorte: "texte" },
+      type: { colonne: "type", sorte: "texte" },
+      ville: { colonne: "ville", sorte: "texte" },
+      dateFin: { colonne: "date_fin", sorte: "texte" },
+      lien: { colonne: "lien", sorte: "texte" },
+      nomVendeur: { colonne: "nom_vendeur", sorte: "texte" },
+      adresse: { colonne: "adresse", sorte: "texte" },
+      lienMaps: { colonne: "lien_maps", sorte: "texte" },
+      whatsappContact: { colonne: "whatsapp_contact", sorte: "texte" },
+      whatsappPublic: { colonne: "whatsapp_public", sorte: "booleen" },
+      motifRejet: { colonne: "motif_rejet", sorte: "texte" },
     };
-    const champs: Record<string, { avant: unknown; apres: unknown }> = {};
-    for (const [key, dbKey] of Object.entries(FIELD_DB_MAP)) {
+    const candidats: Record<string, ChampCompare> = {};
+    for (const [key, { colonne, sorte }] of Object.entries(FIELD_DB_MAP)) {
       const newValue = (patch as Record<string, unknown>)[key];
-      if (newValue !== undefined) champs[key] = { avant: deal[dbKey], apres: newValue };
+      if (newValue !== undefined) candidats[key] = { avant: deal[colonne], apres: newValue, sorte };
     }
     if (patch.enseigneSlug !== undefined) {
-      champs.enseigneSlug = { avant: deal.enseigne_id, apres: enseigne.value ?? null };
+      candidats.enseigneSlug = { avant: deal.enseigne_id, apres: enseigne.value ?? null, sorte: "nombre" };
     }
+    const champs = champsModifies(candidats);
 
     await logAudit(
       {

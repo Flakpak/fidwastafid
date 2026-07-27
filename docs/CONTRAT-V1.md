@@ -93,9 +93,29 @@ commerces informels marocains (hanout, marché, boutique sans enseigne curée) :
   blanche de host + chemin, voir `packages/schemas`) : jamais une URL arbitraire stockée comme lien
   de carte, pour éviter qu'un lien de phishing ou de redirection tierce se fasse passer pour une
   adresse Maps.
-- **`motif_rejet`** (texte, optionnel, **admin uniquement en écriture**) — raison d'un rejet, saisie
+- **`motif_rejet`** (texte, **admin uniquement en écriture**) — raison d'un rejet, saisie
   par le curateur, visible par le soumetteur dans son espace membre (`GET /api/v1/me`) : la
   communauté doit comprendre pourquoi son deal n'a pas été publié, pas juste constater le rejet.
+
+  **Amendement du 2026-07-27 — le motif n'est plus optionnel.** Fait générateur : au premier
+  rejet réel en production (deal `iih7fmypny`), `motif_rejet` est resté `NULL`. Le champ
+  existait et fonctionnait ; il vivait au fond du panneau « Éditer le deal », replié, alors que
+  le bouton « Rejeter » était en haut de la carte — on pouvait rejeter sans jamais le voir.
+  Un droit du soumetteur ne peut pas dépendre de l'agencement d'un formulaire, ni du zèle du
+  curateur : *un champ justifié par le droit de comprendre ne peut pas être facultatif.*
+  - **Contrainte applicative, pas DB** : la colonne reste `null`-able. Les lignes historiques ont
+    légitimement `NULL` (129 deals rejetés avant cette date) et une contrainte `NOT NULL`
+    obligerait à leur inventer un motif — exactement le genre de mensonge que ce contrat refuse
+    ailleurs (§« jamais de prix deviné »). Aucune migration pour ce lot.
+  - **Vérifiée sur l'état RÉSULTANT**, comme la cohérence physique/en_ligne : rejeter exige un
+    motif, mais éditer un deal déjà rejeté et déjà motivé n'a pas à le renvoyer
+    (`motifRejetManquant`, `packages/schemas`).
+  - **Les deux chemins d'écriture** sont couverts : `PATCH /api/v1/admin/deals/:publicId` **et**
+    `POST /api/v1/admin/deals/bulk` (motif commun au lot). Une garantie qui ne tient que sur un
+    chemin sur deux n'est pas une garantie.
+  - **Raccourcis obligatoires côté back-office** : six motifs préenregistrés en un clic + champ
+    libre. Un champ obligatoire sans raccourci se remplit de « x » — l'obligation seule déplace
+    le problème au lieu de le régler.
 
 **Amendement du 19/07/2026 — édition curateur complète + récupération d'image (troisième
 amendement conscient de la liste fermée, voir §4 ci-dessous)** : `PATCH /api/v1/admin/deals/:publicId`

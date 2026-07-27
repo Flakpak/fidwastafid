@@ -254,7 +254,10 @@ export type DealAdmin = z.infer<typeof dealAdminSchema>;
  */
 export const dealAdminUpdateSchema = z.object({
   statut: dealStatutSchema,
-  motifRejet: z.string().trim().max(500).optional(),
+  /** `min(3)` = plancher de forme, pas un gage de qualité : il écarte "" et
+   *  "x", rien de plus. L'obligation elle-même ne peut pas vivre ici (elle
+   *  dépend de l'état résultant) — voir motifRejetManquant ci-dessous. */
+  motifRejet: z.string().trim().min(3).max(500).optional(),
   nomVendeur: z.preprocess(blankToUndefined, z.string().trim().min(1).max(80).optional()),
   adresse: z.preprocess(blankToUndefined, z.string().trim().min(1).max(200).optional()),
   lienMaps: z.preprocess(blankToUndefined, lienMapsSchema.optional()),
@@ -275,3 +278,23 @@ export const dealAdminUpdateSchema = z.object({
   enseigneSlug: z.string().min(1).max(60).nullable().optional(),
 });
 export type DealAdminUpdate = z.infer<typeof dealAdminUpdateSchema>;
+
+/**
+ * Un deal `rejete` doit porter un motif — CONTRAT-V1 §3 : le champ est justifié
+ * par « la communauté doit comprendre pourquoi son deal n'a pas été publié ».
+ * Un droit exercé par le soumetteur (`GET /api/v1/me`, affiché dans `/compte`)
+ * ne peut pas dépendre du zèle du curateur : facultatif, il reste vide, et
+ * c'est exactement ce qui s'est produit au premier rejet réel en production
+ * (27/07/2026, deal `iih7fmypny` — `motif_rejet` NULL).
+ *
+ * La règle porte sur l'état **RÉSULTANT**, jamais sur le seul corps de la
+ * requête — même raison que `dealCoherenceIssues` : éditer un deal déjà rejeté
+ * et déjà motivé n'a pas à renvoyer le motif à chaque PATCH. Elle ne peut donc
+ * pas être un `superRefine` du schéma, qui ne voit pas la ligne existante.
+ *
+ * @param statut statut résultant du patch
+ * @param motifResultant motif après fusion patch + valeur en base
+ */
+export function motifRejetManquant(statut: DealStatut, motifResultant: string | null | undefined): boolean {
+  return statut === "rejete" && (motifResultant ?? "").trim().length === 0;
+}
