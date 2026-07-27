@@ -4,11 +4,10 @@
 
 ## Dette technique temporaire
 
-- `apps/web/src/app/api/v1/_lib/turnstile.ts` : log temporaire
-  (`[turnstile-diag]`) des `error-codes`/`hostname` retournés par
-  `siteverify` en cas d'échec — ajouté pour diagnostiquer le rejet
-  Turnstile en préversion (post-Bloc 5). À retirer une fois la cause
-  confirmée via les logs Vercel.
+*(Le log temporaire `[turnstile-diag]` a été retiré le 26/07/2026 : la
+journalisation d'échec est désormais permanente et structurée dans
+`_lib/turnstile.ts`, avec le statut HTTP et le nombre de tentatives — elle
+n'est plus un diagnostic ponctuel mais une propriété du wrapper.)*
 
 ## Refonte Tadelakt — suites (2026-07-24)
 
