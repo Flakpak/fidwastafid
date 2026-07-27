@@ -132,22 +132,30 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ------------------------------------------------------------------------
-  # Reproduit le CONTEXTE D'INSTALLATION de Vercel — incident du 27/07/2026
-  # (docs/INCIDENTS.md) : pendant une demi-journée, `quality` et `docker`
-  # étaient verts sur un état du dépôt où AUCUN déploiement Vercel n'aboutissait.
+  # Construit apps/web depuis SON dossier, comme Vercel (Root Directory =
+  # apps/web) — angle d'installation que ni `quality` (racine du workspace) ni
+  # `docker` (Dockerfile, contexte `.`) ne couvrent.
   #
-  # La différence tient en une ligne : `working-directory: apps/web`. Vercel
-  # construit avec Root Directory = apps/web ; `pnpm` remonte bien au workspace,
-  # mais la racine d'installation n'est pas la même, et la résolution des
-  # `@types/*` non plus. Le job `docker` installe depuis la racine du dépôt
-  # (Dockerfile, contexte `.`), comme le `pnpm typecheck` local : ni l'un ni
-  # l'autre ne peut voir cette classe de régression.
+  # ⚠️ CE QUE CE JOB NE FAIT PAS — mesuré, pas supposé (27/07/2026).
+  # Il a été éprouvé contre la régression réelle de l'incident du jour
+  # (docs/INCIDENTS.md) : retrait de `@types/react`/`@types/react-dom` du
+  # package.json racine, poussé sur une branche exprès. Résultat : **ce job est
+  # resté VERT** alors que le déploiement Vercel de la même branche échouait.
+  # Il ne reproduit donc PAS cette classe de panne.
   #
-  # > Le seul build qui atteste de la production est celui qui l'installe
-  # > comme la production.
+  # Ce que cette contre-épreuve établit : une installation PROPRE
+  # (`--frozen-lockfile`, sans cache) depuis apps/web résout correctement les
+  # types, même sans les déclarations racine. La différence restante avec
+  # Vercel n'est donc pas la racine d'installation, mais très probablement son
+  # **cache de build réutilisé** et son install en delta (le log de la
+  # préversion fautive montrait « Restored build cache » puis « -10 »
+  # paquets). Non reproductible ici sans reconstruire ce cache.
   #
-  # Ce job ne remplace pas `docker` (image finale, runtime standalone) : il
-  # couvre l'angle mort de l'INSTALLATION, pas celui de l'exécution.
+  # Conclusion opératoire : le garde-fou décisif reste le check `Vercel`, rendu
+  # BLOQUANT par la protection de branche le 27/07 — pas ce job. Il est
+  # conservé parce qu'il couvre un angle réel (l'installation depuis apps/web)
+  # et qu'il est rapide, mais il ne doit pas donner le sentiment de couvrir
+  # l'incident qui l'a motivé : il ne le couvre pas.
   # ------------------------------------------------------------------------
   build-vercel:
     runs-on: ubuntu-latest
