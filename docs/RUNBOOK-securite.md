@@ -69,6 +69,10 @@ visibles, et pas la question posée par cette revue). Un secret orphelin (nom qu
 correspond plus à rien dans les workflows) ou jamais renouvelé depuis longtemps est à
 signaler.
 
+Signal d'alerte spécifique : une date de mise à jour de `SUPABASE_DB_URL` **antérieure**
+à la dernière rotation du mot de passe de la base = backup et pipeline quotidien cassés
+(voir la section « Rotation du mot de passe de la base » plus bas).
+
 ### 6. Vercel
 Dashboard Vercel → liste des projets. **Attendu : `fidwastafid-prod` seul** (les
 projets `*-v1-legacy` ont été déconnectés/supprimés, cf. SUIVI). Vérifier aussi les
@@ -205,8 +209,77 @@ signalerait soit un retour à 5432, soit un nouveau facteur à instruire.
 
 ---
 
+## Rotation du mot de passe de la base — liste de contrôle (incident du 27/07/2026)
+
+**Fait générateur** : le mot de passe du rôle `postgres` a été tourné dans la nuit du
+26 au 27/07/2026 (vers 00:22 UTC), juste avant l'application de la migration 0010. Deux
+détenteurs sur trois ont été mis à jour ; le secret GitHub `SUPABASE_DB_URL` est resté
+sur l'ancienne valeur. Le backup quotidien du 27/07 a donc échoué (`password
+authentication failed`, 28P01) **sans que personne ne le sache** — découvert le
+lendemain matin par un audit manuel, après une journée sans backup vérifié. Le pipeline
+quotidien, qui lit le **même** secret, allait échouer dans l'heure.
+
+C'est la **deuxième** rotation à faire des dégâts (la première, le 23/07/2026, est
+consignée plus haut : confusion `SUPABASE_URL`/`DATABASE_URL`, ~15 min de 500). Deux
+occurrences font une règle : la rotation a besoin d'une liste, pas d'une mémoire.
+
+### Les détenteurs du mot de passe `postgres` — inventaire vérifié le 27/07/2026
+
+| # | Emplacement | Consommateur(s) | Port | Ce que casse un oubli |
+|---|---|---|---|---|
+| 1 | **Vercel** → `fidwastafid-prod` → *Environment Variables* → `DATABASE_URL`, cibles **Production ET Preview** | l'app web | **6543** (transaction pooler — jamais 5432, voir section EMAXCONNSESSION) | site entier en **500** (`28P01`) — le seul détenteur dont la panne est visible par un visiteur |
+| 2 | **GitHub** → secret Actions **`SUPABASE_DB_URL`** | **deux** workflows : `db-backup.yml` (pg_dump) **et** `pipeline-quotidien.yml` (mappé sur `DATABASE_URL`) | 5432 | backup quotidien **et** scraping/expiration quotidiens — deux pannes, pas une |
+| 3 | **Local** → `packages/db/.env.migration.local` (jamais commité) | `migrate`, `seed`, `ajouter-enseigne` | 5432 | plus aucune migration ni script de données possible |
+
+**Identifiant distinct, à ne pas confondre** : le secret `CI_MIGRATIONS_CHECK_URL` porte
+le mot de passe du rôle **`ci_migrations_check`** (migrations 0005/0009), pas celui de
+`postgres`. Tourner l'un ne touche pas l'autre. Un oubli de ce côté rend le job
+`migrations-check` rouge sur **toutes** les branches (précédent des 22-23/07, plus haut).
+
+**Non-détenteurs, vérifiés le 27/07/2026** — inutile de les rouvrir à chaque rotation :
+`.env` (clés API seulement), `apps/web/.env.local` (Postgres **Docker local**),
+`apps/web/.env.storage-prod.local` (clés API Supabase), `docker-compose.yml` et
+`ci.yml` (Postgres jetable de CI), aucun secret dependabot, aucune variable de dépôt,
+aucun secret d'environnement GitHub.
+
+### Ordre de mise à jour
+
+1. **Tourner** le mot de passe côté Supabase (*Project Settings* → *Database* → *Reset
+   database password*). À partir de cet instant, les trois détenteurs sont périmés :
+   la fenêtre de casse est ouverte, elle se referme à l'étape 4.
+2. **Vercel d'abord** (détenteur 1, Production **et** Preview), **puis redéployer** — une
+   variable Vercel ne prend effet qu'au déploiement suivant. C'est la seule panne que le
+   public voit : elle se ferme en premier.
+3. **Secret GitHub** `SUPABASE_DB_URL` (détenteur 2). Un seul secret, deux workflows.
+4. **Fichier local** `packages/db/.env.migration.local` (détenteur 3).
+5. **Vérifier chacun par exécution réelle**, jamais par relecture :
+   - app : charger le feed et une fiche deal (200, données présentes) ;
+   - backup : `gh workflow run db-backup.yml` → conclusion `success` exigée ;
+   - pipeline : dispatch manuel, ou attendre le run du lendemain et le regarder ;
+   - local : une requête en lecture avec la chaîne locale (`select count(*) from deals`).
+6. **Consigner** la rotation dans le SUIVI ci-dessous (date, motif, détenteurs mis à jour).
+
+### Règles gravées par cet incident
+
+- **Une rotation n'est terminée que quand les trois détenteurs sont à jour ET vérifiés
+  par une exécution.** Deux sur trois, c'est une panne différée, pas une rotation.
+- **Un secret partagé par deux workflows est deux pannes.** `SUPABASE_DB_URL` alimente
+  le backup et le pipeline : le compter pour un seul système est l'erreur du 27/07.
+- **Un garde-fou muet n'est pas un garde-fou.** GitHub n'envoie d'e-mail d'échec qu'à
+  l'auteur du commit déclencheur — un run de cron n'en a pas. `db-backup.yml` ouvre
+  désormais une **issue GitHub** en cas d'échec (label `alerte-backup`, une seule issue
+  ouverte à la fois, chaque récidive commentée dessus). Le chemin d'alerte lui-même
+  s'éprouve à la main : *Run workflow* → `simuler_echec` — un filet non testé n'existe
+  pas, comme le test de restauration du backup.
+- **Limite connue, non couverte** : GitHub désactive un workflow planifié après 60 jours
+  sans activité dans le dépôt. L'alerte couvre « le run a échoué », pas « le run n'a pas
+  eu lieu ». À instruire si le dépôt devient dormant (`IDEES.md`).
+
+---
+
 ## SUIVI DES REVUES
 
 | Date | Fait par | Résultat | Notes |
 |---|---|---|---|
 | 22/07/2026 | Première revue (séance du jour) | Nominal | RLS actif sans policy sur les 9 tables `public` (cf. rappel ci-dessus) ; état advisor de référence figé au CONTRAT-V1 §9 le jour même de l'incident qui a motivé cette routine. |
+| 27/07/2026 | Claude Code — audit de reprise | **Une anomalie, corrigée** | Rotation du mot de passe DB de la nuit : `SUPABASE_DB_URL` resté sur l'ancienne valeur → backup du jour en échec, silencieux. Secret réécrit, run manuel vérifié (succès, 9 tables et 1051 lignes `deals` restaurées), alerte par issue ajoutée au workflow, liste de contrôle de rotation écrite ci-dessus. Advisors relus : nominal (9 `INFO` + 1 `WARN`). Item 6 (Vercel) : `fidwastafid-prod` seul, domaines conformes. |
