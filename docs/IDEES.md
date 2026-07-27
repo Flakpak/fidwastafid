@@ -24,7 +24,34 @@ n'est plus un diagnostic ponctuel mais une propriété du wrapper.)*
   plein `hot`/`cold`) optimiste côté client : il ne reçoit que le score, pas le
   sens du vote de l'utilisateur, donc l'état ne survit pas à un rechargement.
 
-## Scaffold Vite/React racine résiduel (2026-07-21)
+## ~~Scaffold Vite/React racine résiduel (2026-07-21)~~ — FAIT le 27/07/2026
+
+> Décommissionné : `index.html`, `vite.config.js`, `src/`, `package-lock.json`,
+> les scripts `dev`/`build`/`preview` et les dépendances associées du
+> `package.json` racine (react, react-dom, vite, @vitejs/plugin-react,
+> @types/react, @types/react-dom, eslint-plugin-react-refresh,
+> @supabase/supabase-js — chacune déclarée par ailleurs dans le workspace qui
+> l'utilise réellement). Le bloc eslint `**/*.{js,jsx}`, qui n'existait que
+> pour cette app, est remplacé par un bloc `**/*.js` en globals Node.
+>
+> Audit préalable — aucun consommateur actif : **Vercel** construit `apps/web`
+> en Root Directory (`Running "pnpm run build"` → `next build`, lu dans le log
+> de build du déploiement de prod, pas déduit) ; la **CI** ne lance jamais
+> `pnpm build` racine (`lint`/`typecheck`/`test` + job docker sur le
+> Dockerfile) ; le **Dockerfile** ne construit que
+> `--filter @fidwastafid/web` ; `.claude/launch.json` cible `@fidwastafid/web` ;
+> `package-lock.json` n'était lu par aucun `npm ci`. Le projet Vercel v1 avait
+> été supprimé le 21/07 et le routage v1 était en hash, jamais indexé
+> (CONTRAT-V1 §2).
+>
+> Limite acceptée : plusieurs commentaires du code citent `index.html` comme
+> source de portage (`packages/schemas/src/enums.ts` pour VILLES/CATEGORIES,
+> `apps/web/src/lib/format.ts`, `HeroBand.tsx`, `Ticker.tsx`…). Ces
+> références restent exactes historiquement mais ne pointent plus vers un
+> fichier présent : la provenance se relit désormais dans l'historique git et
+> au tag `v1-legacy`.
+
+*Texte d'origine conservé pour le fait générateur :*
 
 `index.html`, `vite.config.js`, `src/App.jsx`, `src/main.jsx`,
 `src/index.css`, `src/assets` à la racine du repo, plus les scripts

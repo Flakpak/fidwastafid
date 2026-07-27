@@ -199,12 +199,15 @@ a été appliquée sur aswbu avant de passer au suivant — le filet CI
 repart de zéro — attendu), remontées WhatsApp.
 
 **J+7 — clôture**
-- [ ] Suppression de index.html racine (⚠️ PAS src/App.jsx, prototype
-      orphelin). Rollback dès lors dégradé mais pas perdu : redéploiement
-      possible depuis le tag v1-legacy (~15 min au lieu d'instantané).
-      Réserve ouverte, groupée avec la suppression définitive des projets v1
-      — prévue ~23/07/2026 après une semaine pleine de stabilité (cf. SUIVI
-      clôture).
+- [x] Suppression de index.html racine — **fait le 27/07/2026**, avec tout
+      le scaffold Vite/React (`vite.config.js`, `src/`, scripts et
+      dépendances du `package.json` racine, `package-lock.json`) : le
+      décommissionnement complet, pas seulement le fichier. La réserve
+      « ⚠️ PAS src/App.jsx » de la rédaction d'origine est levée — l'audit du
+      27/07 a établi qu'aucun consommateur actif n'en dépend (Vercel
+      construit `apps/web` en Root Directory, vérifié dans le log de build ;
+      la CI ne lance jamais `pnpm build` racine ; le Dockerfile ne construit
+      que `--filter @fidwastafid/web`). Rollback : tag v1-legacy, inchangé.
 - [ ] Analytics : vérifier que la v2 remonte dans Vercel Web Analytics
       (@vercel/analytics côté Next, pas la balise script v1). `<Analytics/>`
       ajouté et vérifié actif en prod le 18/07/2026 (script chargé, zéro
