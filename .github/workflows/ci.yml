@@ -131,6 +131,52 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # ------------------------------------------------------------------------
+  # Reproduit le CONTEXTE D'INSTALLATION de Vercel — incident du 27/07/2026
+  # (docs/INCIDENTS.md) : pendant une demi-journée, `quality` et `docker`
+  # étaient verts sur un état du dépôt où AUCUN déploiement Vercel n'aboutissait.
+  #
+  # La différence tient en une ligne : `working-directory: apps/web`. Vercel
+  # construit avec Root Directory = apps/web ; `pnpm` remonte bien au workspace,
+  # mais la racine d'installation n'est pas la même, et la résolution des
+  # `@types/*` non plus. Le job `docker` installe depuis la racine du dépôt
+  # (Dockerfile, contexte `.`), comme le `pnpm typecheck` local : ni l'un ni
+  # l'autre ne peut voir cette classe de régression.
+  #
+  # > Le seul build qui atteste de la production est celui qui l'installe
+  # > comme la production.
+  #
+  # Ce job ne remplace pas `docker` (image finale, runtime standalone) : il
+  # couvre l'angle mort de l'INSTALLATION, pas celui de l'exécution.
+  # ------------------------------------------------------------------------
+  build-vercel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Volontairement PAS de `--filter` ni de `--dir` : c'est exactement la
+      # commande que lance Vercel, depuis exactement le même dossier.
+      - name: Installer comme Vercel (racine = apps/web)
+        working-directory: apps/web
+        run: pnpm install --frozen-lockfile
+
+      - name: Construire apps/web dans ce contexte
+        working-directory: apps/web
+        env:
+          # Mêmes valeurs de forme que le build Docker : la clé Turnstile est
+          # publique par nature (NEXT_PUBLIC_*), la valeur exacte n'importe pas
+          # pour un build de validation.
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+          NEXT_PUBLIC_SITE_URL: https://fidwastafid.com
+        run: pnpm run build
+
   integration:
     runs-on: ubuntu-latest
 
