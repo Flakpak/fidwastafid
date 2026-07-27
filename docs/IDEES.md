@@ -9,6 +9,14 @@ journalisation d'échec est désormais permanente et structurée dans
 `_lib/turnstile.ts`, avec le statut HTTP et le nombre de tentatives — elle
 n'est plus un diagnostic ponctuel mais une propriété du wrapper.)*
 
+- `apps/web/public/openapi.json` est un artefact généré
+  (`pnpm --filter @fidwastafid/web openapi:generate`) qu'AUCUN job CI ne
+  vérifie. Constaté le 27/07/2026 : `emailIndisponible`, ajouté à `/me`
+  par le correctif du 24/07, n'y était jamais arrivé — la spec publiée
+  affirmait encore `email` requis. Ajouter un job qui régénère puis
+  `git diff --exit-code` : une spec peut mentir sur l'API sans que rien
+  ne rougisse, c'est la version documentaire du fallback silencieux.
+
 ## Refonte Tadelakt — suites (2026-07-24)
 
 - Brancher le vote courant en SSR/API pour un état voté persistant — lot
