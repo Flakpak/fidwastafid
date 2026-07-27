@@ -10,6 +10,71 @@ en a appris. Une leçon gravée ici a vocation à être citée depuis le code ou
 
 ---
 
+## 2026-07-27 — Plus aucun déploiement Vercel : deux installations qui ne résolvent pas les mêmes types
+
+**Symptôme.** À partir de `356edd7` (décommissionnement du scaffold v1),
+**aucun déploiement Vercel n'aboutit** — ni production, ni préversion. La
+production continue de servir le dernier déploiement sain (`2bf406d`) : rien ne
+tombe côté visiteur, mais **plus rien ne peut être livré**. Trois PR fusionnées
+dans cet intervalle sont déployées « sur le papier » seulement.
+
+```
+./src/app/mot-de-passe-oublie/page.tsx:41:15
+Type error: Property 'src' does not exist on type 'IntrinsicAttributes & ScriptProps'.
+```
+
+**Diagnostic.** L'erreur est **identique sur trois branches et trois lockfiles
+différents** (main, une PR de code, une PR dependabot) : ce n'est donc ni un
+cache de build ni un hasard de résolution. Le commit fautif retire
+`@types/react` et `@types/react-dom` du `package.json` **racine**, au motif
+qu'elles servaient le prototype v1. C'était vrai — et insuffisant : elles
+étaient **en plus porteuses** de la résolution de types pour tout le workspace.
+
+**Cause.** Vercel construit avec **Root Directory = `apps/web`**. Cet arbre
+d'installation ne résout pas les types comme une installation depuis la racine
+du workspace : avec la déclaration racine, une seule copie de `@types/react` est
+visible de tout le monde, `next/script` comprise ; sans elle, le `ScriptProps`
+de next se résout contre une autre copie et perd ses props.
+
+**Pourquoi la CI ne l'a pas vu** — et c'est le vrai sujet :
+
+| Vérification | Installe depuis | Verdict |
+|---|---|---|
+| `pnpm typecheck` en local | racine du workspace | vert |
+| job `docker` (Dockerfile, contexte `.`) | racine du workspace | vert |
+| **Vercel** | **`apps/web`** | **rouge** |
+
+Les deux garde-fous les plus stricts du dépôt étaient verts. Le seul build qui
+installe comme la production est celui de Vercel, et son verdict figure bien
+dans les checks de PR sous le nom `Vercel` : **il était rouge sur #44, il a été
+imprimé dans la sortie de la commande de fusion, et fusionné sans être lu.**
+
+**Correctif.** `dae392f` — les deux paquets rendus au `package.json` racine.
+Prouvé par le déploiement de préversion de la PR (le seul artefact qui prouve
+quoi que ce soit ici), puis par le déploiement de production `READY`.
+
+**Leçons.**
+
+> **Le seul build qui atteste de la production est celui qui l'installe comme
+> la production.** `tsc` vert et `docker` vert ne disent rien de Vercel tant que
+> les deux n'installent pas depuis la même racine.
+
+- **Une dépendance n'est pas morte parce qu'aucun `import` ne la nomme.** Les
+  paquets `@types/*` sont porteurs par *résolution*, pas par import : aucun grep
+  ne les relie à un consommateur. Tout retrait d'un paquet de types doit être
+  validé par une préversion Vercel, jamais par `tsc` seul.
+- **Un check imprimé mais non lu est un check absent.** La ligne `Vercel fail`
+  était sous les yeux au moment de la fusion. Le garde-fou n'a pas manqué : la
+  lecture a manqué. Corollaire opératoire : avant toute fusion, lire le verdict
+  `Vercel` au même titre que les cinq jobs GitHub.
+- L'audit du 27/07 qui a précédé la suppression était pourtant complet côté
+  consommateurs *déclarés* (workflows, scripts, Dockerfile, configuration
+  Vercel, liens entrants). Il a conclu « rien d'actif n'en dépend » — vrai pour
+  `index.html` et `src/`, faux pour deux lignes de `devDependencies`. Un
+  inventaire de références ne remplace pas un build dans l'environnement cible.
+
+---
+
 ## 2026-07-26 — `/opengraph-image` en 500 : satori refuse les nœuds `<text>`
 
 **Symptôme.** `GET /opengraph-image` répondait **500** après l'ajout du médaillon du sceau
