@@ -554,6 +554,48 @@ laqwg vert — premiers runs GitHub Actions après la suppression du
 résidu fonctionnel. Le dossier v1 (suppression des projets Vercel/Supabase
 legacy, canari de confirmation) est clos.
 
+**Chaîne de soumission éprouvée de bout en bout en production — 27/07/2026.**
+Premier test réel du parcours complet sur la prod, deal « Test turn »
+(`iih7fmypny`), consigné ici et non dans `docs/INCIDENTS.md` : ce fichier-là ne
+reçoit que ce qui a cassé (sa propre règle en tête), et rien n'a cassé.
+
+| Étape | Constat | Preuve |
+|---|---|---|
+| Soumission | acceptée, `201` | `rate_limits` incrémenté à 06:58:57, insertion à 06:58:58 — un seul essai |
+| Turnstile | **`valide`** | `turnstile_verifie = true` en base. Chemin nominal : seule une réponse 200 + `success:true` produit cette valeur ; un token absent donnerait `refuse` → 400 sans insertion |
+| File de validation | `statut = en_attente` | invisible du public : `GET /api/v1/deals/:id` **404**, page deal **404**, absent du feed, et aucun `statut=` ne sort du blanc-seing `PUBLIC_STATUTS` (testé avec `en_attente`, `rejete`, `auto_draft`, `REJETE`, combiné à `tri=recent`) |
+| Rejet curateur | `statut = rejete` | back-office, 11:29:07 UTC |
+| Journal d'audit | écrit | `journal_audit` #239, `admin_id` du curateur, `en_attente → rejete`, horodaté |
+| Après rejet | toujours **404** web et API | aucune fuite par paramètre |
+
+**Ce que ce test NE couvre pas** — la classe nominale, et elle seule. Les trois
+autres classes de `verifierTurnstile` (`refuse` sur 200+`success:false` ;
+`TurnstileIndisponibleError` sur 429/5xx/réseau, qui déclenche le repli
+`turnstile_verifie = false` et le badge du back-office ;
+`TurnstileConfigError` sur 401/403, fail-closed) **restent non éprouvées en
+production** — par construction : on ne provoque pas une panne Cloudflare pour
+voir. Elles sont couvertes par le test d'intégration (`apps/web/tests/`, quatre
+classes + retries bornés), qui reste leur seule vérification. Corollaire : le
+badge « non vérifiée par Turnstile » n'a encore jamais été rendu en prod, faute
+d'occasion — aucune ligne à `false` en base.
+
+**Deux observations du test, ni bloquantes ni silencieuses** :
+
+1. **`motif_rejet` est resté `NULL`.** Le champ existe et fonctionne
+   (`AdminDealItem.tsx`, « Motif (visible par le soumetteur, envoyé avec
+   *Rejeter*) ») ; il a simplement été laissé vide, et l'API applique
+   `coalesce($2, motif_rejet)` — omis vaut inchangé, conforme au §3. Or le
+   contrat justifie ce champ par « la communauté doit comprendre pourquoi son
+   deal n'a pas été publié » : un rejet sans motif n'affiche rien dans
+   `/compte`. Rien à corriger dans le code ; à décider côté produit si le motif
+   doit devenir obligatoire pour `rejete`.
+2. **Le journal d'audit a enregistré une modification fantôme.** Un second
+   enregistrement du formulaire (#240, 11:29:40, sans changement réel) a produit
+   un diff `prixPromo: "100.00" → 100` : la colonne `numeric` revient en chaîne
+   depuis pg et est comparée à un nombre JS. L'entrée est exacte sur le fond
+   (rien n'a changé) mais bruyante — un journal qui signale des changements
+   inexistants s'use aussi vite qu'un garde-fou muet. Noté dans `IDEES.md`.
+
 **PROCHAINE TÂCHE** : lot Diffusion v1 (code), puis Phase 8. Reste en
 parallèle : clore 4 — validation parité v1↔v2 sur mobile réel (action
 Kamel) ; confirmer Vercel Pro et la remontée Analytics au dashboard.
