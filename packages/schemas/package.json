@@ -10,7 +10,7 @@
     "test": "tsx src/verify.ts"
   },
   "dependencies": {
-    "nanoid": "^5.0.9",
+    "nanoid": "^6.0.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
