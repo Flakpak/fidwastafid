@@ -320,8 +320,33 @@ est inchangé — seul l'opérateur de cache diffère selon la phase d'hébergem
 - Nouvelles valeurs d'enum en français ; `auto_draft` excepté (historique, voir section 3).
 - La CI vérifie en lecture seule la cohérence bidirectionnelle entre
   `packages/db/migrations/` et `schema_migrations` de la prod. Un écart =
-  CI rouge. L'application des migrations en prod reste un geste humain
-  via le runner (`pnpm migrate`) — la CI ne modifie jamais la prod.
+  CI rouge. **La CI ne modifie jamais la prod** — cette phrase-là ne bouge pas.
+
+**Amendement du 2026-07-27 — qui exécute les migrations en production.**
+
+La rédaction précédente disait « geste humain via le runner ». En pratique
+Kamel n'exécutait rien lui-même : la migration attendait, la CI restait
+rouge, et le décalage entre le repo et la prod durait. Un garde-fou qu'on
+contourne par lassitude n'en est pas un.
+
+- **L'exécuteur est Claude Code**, depuis la machine locale, via
+  `pnpm --filter @fidwastafid/db migrate` sur le **port 5432** (Session
+  pooler — voir la règle des deux ports dans `docs/RUNBOOK-securite.md` ;
+  6543 est réservé à l'app serverless).
+- **Sur confirmation explicite et par opération.** Une confirmation vaut
+  pour la migration nommée, et pour elle seule : elle ne se reporte ni sur
+  la suivante, ni sur un rejeu. Aucune migration n'est appliquée en prod
+  « au passage », dans le flux d'un autre lot.
+- **La confirmation vaut geste.** C'est le point de l'amendement : la
+  décision reste humaine, l'exécution ne l'est plus. Ce qui est protégé,
+  c'est l'intention, pas le clavier.
+- **Le connecteur Supabase reste en lecture seule.** Il sert à vérifier
+  après coup, par un chemin différent de celui qui a écrit — une
+  vérification qui emprunte la même connexion que l'écriture ne vérifie
+  rien. Il n'applique jamais de migration, même s'il en a la capacité.
+- Ordre imposé : **migration d'abord, fusion ensuite**, quand la migration
+  est rétrocompatible (ajout de colonne avec défaut, que le code courant
+  ignore). L'inverse déploie du code qui lit une colonne inexistante.
 
 ## 8 — Design tokens (déjà tranchés, non-négociables)
 
