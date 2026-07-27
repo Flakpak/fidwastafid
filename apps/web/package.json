@@ -14,7 +14,7 @@
     "test:integration": "tsx tests/integration.ts"
   },
   "dependencies": {
-    "@asteasolutions/zod-to-openapi": "^7.3.0",
+    "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@fidwastafid/auth": "workspace:*",
     "@fidwastafid/db": "workspace:*",
     "@fidwastafid/schemas": "workspace:*",
