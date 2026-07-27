@@ -1,0 +1,63 @@
+# .github/actions/alerte-issue/action.yml
+#
+# Ouvre une issue GitHub — ou commente celle qui est déjà ouverte sur le même
+# label. Mutualisé entre les deux workflows quotidiens (backup, pipeline) :
+# l'alerte a été écrite deux fois avant d'être factorisée ici, et deux copies
+# d'un garde-fou dérivent toujours l'une de l'autre.
+#
+# Une seule issue ouverte par label, quelle que soit la cause (échec de run OU
+# absence d'exécution) : un problème qui dure plusieurs jours ne doit pas noyer
+# le dépôt, mais chaque nouvelle occurrence se commente sur l'issue existante —
+# le silence n'est jamais l'option.
+#
+# GH_TOKEN doit être fourni par l'appelant (permissions: issues: write).
+
+name: Alerte par issue GitHub
+description: Ouvre une issue, ou commente celle déjà ouverte portant le même label.
+
+inputs:
+  label:
+    description: "Label de dédoublonnage — une seule issue ouverte par label."
+    required: true
+  couleur-label:
+    description: "Couleur du label s'il doit être créé."
+    required: false
+    default: B60205
+  titre:
+    description: "Titre de l'issue, utilisé seulement à la création."
+    required: true
+  corps:
+    description: "Corps de l'issue ou du commentaire (markdown)."
+    required: true
+  depot:
+    description: "Dépôt cible, au format owner/repo."
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        LABEL: ${{ inputs.label }}
+        COULEUR: ${{ inputs.couleur-label }}
+        TITRE: ${{ inputs.titre }}
+        CORPS: ${{ inputs.corps }}
+        DEPOT: ${{ inputs.depot }}
+      run: |
+        set -euo pipefail
+
+        # Le label peut déjà exister (alerte précédente) : ce n'est pas une erreur.
+        gh label create "$LABEL" -R "$DEPOT" --color "$COULEUR" \
+          --description "Alerte automatique — voir les issues portant ce label" 2>/dev/null || true
+
+        printf '%s\n' "$CORPS" > alerte-corps.md
+
+        OUVERTE=$(gh issue list -R "$DEPOT" --label "$LABEL" --state open \
+          --limit 1 --json number --jq '.[0].number // empty')
+
+        if [ -n "$OUVERTE" ]; then
+          gh issue comment "$OUVERTE" -R "$DEPOT" --body-file alerte-corps.md
+          echo "Issue #$OUVERTE complétée (occurrence répétée)."
+        else
+          gh issue create -R "$DEPOT" --title "$TITRE" --label "$LABEL" --body-file alerte-corps.md
+        fi

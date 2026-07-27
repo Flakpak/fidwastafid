@@ -35,7 +35,16 @@ on:
     # 05:00 UTC = 06:00 Casablanca (WET toute l'année, le Maroc n'observe
     # pas le changement d'heure d'été/hiver comme l'Europe).
     - cron: "0 5 * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      simuler_echec:
+        description: "Éprouver le chemin d'alerte : fait échouer le run exprès, AVANT tout scraping ou écriture en base"
+        type: boolean
+        default: false
+      seuil_heures:
+        description: "Seuil de fraîcheur du backup, en heures (30 par défaut). Mettre 0 pour éprouver l'alerte d'absence d'exécution."
+        type: string
+        required: false
 
 concurrency:
   # File d'attente, jamais d'annulation brutale : interrompre un run en
@@ -62,8 +71,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    # `issues: write` pour la seule étape d'alerte en fin de job (le réglage
+    # par défaut du dépôt est en lecture seule).
+    permissions:
+      contents: read
+      issues: write
+
     steps:
       - uses: actions/checkout@v7
+
+      # Éprouve le chemin d'alerte SANS scraper ni écrire en base : première
+      # étape, avant toute installation. Uniquement joignable par
+      # workflow_dispatch — sur le cron, `inputs` est nul, l'étape est sautée.
+      - name: Échec simulé (test du chemin d'alerte)
+        if: ${{ inputs.simuler_echec }}
+        run: |
+          echo "::error::Échec simulé — test du chemin d'alerte. Aucun scraping, aucune écriture."
+          exit 1
 
       - uses: pnpm/action-setup@v6
 
@@ -271,3 +295,104 @@ jobs:
           path: apps/pipeline/extractions/
           retention-days: 30
           if-no-files-found: ignore
+
+      # Même raison que pour le backup (fait générateur du 27/07/2026, cf.
+      # db-backup.yml) : la note en tête de ce fichier disait « GitHub notifie
+      # par email, suffisant à cette échelle » — c'est faux pour un run de cron,
+      # qui n'a pas d'auteur de commit à notifier. La chaîne principale échouait
+      # donc en silence. Mécanique d'issue partagée avec le backup
+      # (.github/actions/alerte-issue).
+      - name: Alerte — échec du pipeline
+        if: failure()
+        uses: ./.github/actions/alerte-issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          label: alerte-pipeline
+          depot: ${{ github.repository }}
+          titre: "Pipeline quotidien en échec"
+          corps: |
+            Le workflow **Pipeline quotidien** a **échoué**.
+
+            | | |
+            |---|---|
+            | Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
+            | Déclencheur | `${{ github.event_name }}` |
+
+            La chaîne principale (expiration → Bringo → insertion → revalidation) est
+            sans `continue-on-error` : l'échec vient de l'une de ces étapes. Les sources
+            secondaires (inwi, universparadiscount, decathlon) ne peuvent pas faire échouer
+            le run — leurs incidents se lisent en annotations `::warning::`.
+
+            Cause déjà rencontrée : le secret `SUPABASE_DB_URL` périmé après une rotation
+            du mot de passe de la base (il alimente **aussi** ce workflow, pas seulement le
+            backup) — voir `docs/RUNBOOK-securite.md`, section « Rotation du mot de passe
+            de la base ».
+
+  # ----------------------------------------------------------------------
+  # SURVEILLANCE CROISÉE — le cas « aucune exécution » (voir la justification
+  # complète en tête du job équivalent dans db-backup.yml). Ici c'est le
+  # pipeline qui veille sur le backup ; là-bas, l'inverse.
+  # ----------------------------------------------------------------------
+  surveillance-backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Fraîcheur du dernier succès du backup quotidien
+        id: fraicheur
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPOT: ${{ github.repository }}
+          SEUIL_HEURES: ${{ inputs.seuil_heures || 30 }}
+        run: |
+          set -euo pipefail
+
+          DERNIER=$(gh run list -R "$DEPOT" --workflow db-backup.yml \
+            --status success --limit 1 --json createdAt --jq '.[0].createdAt // empty')
+
+          if [ -z "$DERNIER" ]; then
+            echo "alerte=oui" >> "$GITHUB_OUTPUT"
+            echo "detail=aucun run réussi trouvé dans l'historique consultable" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          AGE=$(( ( $(date -u +%s) - $(date -u -d "$DERNIER" +%s) ) / 3600 ))
+          echo "Dernier succès du backup : $DERNIER (il y a ${AGE} h, seuil ${SEUIL_HEURES} h)"
+
+          if [ "$AGE" -gt "$SEUIL_HEURES" ]; then
+            echo "alerte=oui" >> "$GITHUB_OUTPUT"
+            echo "detail=dernier succès il y a ${AGE} h (seuil ${SEUIL_HEURES} h), le ${DERNIER}" >> "$GITHUB_OUTPUT"
+          else
+            echo "alerte=non" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Alerte — le backup quotidien ne tourne plus
+        if: steps.fraicheur.outputs.alerte == 'oui'
+        uses: ./.github/actions/alerte-issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          label: alerte-backup
+          depot: ${{ github.repository }}
+          titre: "Backup de la base : aucune exécution récente"
+          corps: |
+            Le workflow **Backup base de données** n'a **pas tourné** dans la fenêtre attendue.
+
+            | | |
+            |---|---|
+            | Constat | ${{ steps.fraicheur.outputs.detail }} |
+            | Vu depuis | run [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) du pipeline |
+
+            **Tant que cette issue est ouverte, la production n'a pas de backup vérifié
+            récent.** Ce cas ne produit aucun échec à observer : c'est une **absence**,
+            détectée par surveillance croisée.
+
+            À vérifier dans l'ordre : le workflow est-il encore `active` (GitHub désactive
+            un workflow planifié après 60 jours d'inactivité du dépôt) ? Le cron a-t-il été
+            supprimé ou modifié ?

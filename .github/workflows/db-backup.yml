@@ -36,6 +36,10 @@ on:
         description: "Éprouver le chemin d'alerte : fait échouer le run exprès, SANS toucher à la base"
         type: boolean
         default: false
+      seuil_heures:
+        description: "Seuil de fraîcheur du pipeline, en heures (30 par défaut). Mettre 0 pour éprouver l'alerte d'absence d'exécution."
+        type: string
+        required: false
 
 concurrency:
   group: db-backup
@@ -75,6 +79,10 @@ jobs:
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
 
     steps:
+      # Nécessaire pour `uses: ./.github/actions/alerte-issue` (action locale) :
+      # sans checkout, le runner n'a pas le fichier d'action sur disque.
+      - uses: actions/checkout@v7
+
       # Éprouve le chemin d'alerte sans toucher à la base — « un filet non
       # testé n'existe pas », même règle que le test de restauration plus bas.
       # Uniquement joignable par workflow_dispatch : sur le cron, `inputs` est
@@ -199,52 +207,113 @@ jobs:
       #
       # > Un filet de sécurité qui tombe sans bruit n'est pas un filet.
       #
-      # Une seule issue ouverte à la fois (dédoublonnage par label) : un échec
-      # qui dure plusieurs jours ne doit pas noyer le dépôt, mais chaque
-      # nouvelle occurrence se commente sur l'issue déjà ouverte — le silence
-      # n'est jamais l'option.
+      # Mécanique d'ouverture/dédoublonnage factorisée dans
+      # .github/actions/alerte-issue (partagée avec le pipeline quotidien).
       # ------------------------------------------------------------------
-      - name: Alerte — ouvrir ou compléter une issue GitHub
+      - name: Alerte — échec du backup
         if: failure()
+        uses: ./.github/actions/alerte-issue
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          EVENEMENT: ${{ github.event_name }}
+        with:
+          label: alerte-backup
+          depot: ${{ github.repository }}
+          titre: "Backup de la base en échec"
+          corps: |
+            Le workflow **Backup base de données (pg_dump quotidien)** a **échoué**.
+
+            | | |
+            |---|---|
+            | Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
+            | Déclencheur | `${{ github.event_name }}` |
+
+            **Tant que cette issue est ouverte, la production n'a pas de backup vérifié du jour.**
+
+            Cause la plus fréquente, constatée le 27/07/2026 : le secret `SUPABASE_DB_URL`
+            ne correspond plus au mot de passe de la base (rotation appliquée ailleurs mais
+            pas ici) — l'erreur du run est alors `password authentication failed`.
+            Liste des détenteurs du mot de passe et ordre de mise à jour :
+            `docs/RUNBOOK-securite.md`, section « Rotation du mot de passe de la base ».
+
+  # ----------------------------------------------------------------------
+  # SURVEILLANCE CROISÉE — le cas « aucune exécution ».
+  #
+  # L'alerte d'échec ci-dessus ne couvre que « le run a échoué ». Le 27/07/2026,
+  # le pipeline quotidien n'a pas tourné du tout pendant plus de trois heures
+  # après sa fenêtre habituelle : rien à observer, donc rien à alerter — c'est
+  # le cas qui nous a échappé.
+  #
+  # Choix : chaque workflow quotidien vérifie la FRAÎCHEUR DE L'AUTRE. Aucun
+  # workflow de surveillance supplémentaire (il faudrait le surveiller à son
+  # tour : un cron qui se surveille lui-même ne détecte pas son propre
+  # silence), et aucune sentinelle en base (elle exige un lecteur qui tourne,
+  # c'est-à-dire un cron de plus). Pour que le silence passe inaperçu, il
+  # faudrait que les DEUX crons cessent le même jour — cas résiduel assumé,
+  # documenté dans docs/RUNBOOK-securite.md (GitHub désactive un workflow
+  # planifié après 60 jours d'inactivité du dépôt).
+  # ----------------------------------------------------------------------
+  surveillance-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Fraîcheur du dernier succès du pipeline quotidien
+        id: fraicheur
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPOT: ${{ github.repository }}
+          # 30 h = un jour + marge pour la dérive de planification observée chez
+          # GitHub (jusqu'à ~3 h 30 de retard sur l'heure du cron).
+          SEUIL_HEURES: ${{ inputs.seuil_heures || 30 }}
         run: |
           set -euo pipefail
 
-          # Le label peut déjà exister (échec précédent) : ce n'est pas une erreur.
-          gh label create alerte-backup -R "$REPO" --color B60205 \
-            --description "Échec du backup quotidien de la base" 2>/dev/null || true
+          DERNIER=$(gh run list -R "$DEPOT" --workflow pipeline-quotidien.yml \
+            --status success --limit 1 --json createdAt --jq '.[0].createdAt // empty')
 
-          cat > alerte.md <<EOF
-          Le workflow **Backup base de données (pg_dump quotidien)** a échoué.
-
-          | | |
-          |---|---|
-          | Run | $RUN_URL |
-          | Déclencheur | \`$EVENEMENT\` |
-          | Date (UTC) | $(date -u '+%Y-%m-%d %H:%M:%S') |
-
-          **Tant que cette issue est ouverte, la production n'a pas de backup vérifié du jour.**
-
-          Cause la plus fréquente, constatée le 27/07/2026 : le secret \`SUPABASE_DB_URL\`
-          ne correspond plus au mot de passe de la base (rotation appliquée ailleurs mais
-          pas ici) — l'erreur du run est alors \`password authentication failed\`.
-          Liste des détenteurs du mot de passe et ordre de mise à jour :
-          \`docs/RUNBOOK-securite.md\`, section « Rotation du mot de passe de la base ».
-          EOF
-
-          OUVERTE=$(gh issue list -R "$REPO" --label alerte-backup --state open \
-            --limit 1 --json number --jq '.[0].number // empty')
-
-          if [ -n "$OUVERTE" ]; then
-            gh issue comment "$OUVERTE" -R "$REPO" --body-file alerte.md
-            echo "Issue #$OUVERTE complétée (échec répété)."
-          else
-            gh issue create -R "$REPO" \
-              --title "Backup de la base en échec ($(date -u '+%Y-%m-%d'))" \
-              --label alerte-backup \
-              --body-file alerte.md
+          if [ -z "$DERNIER" ]; then
+            echo "alerte=oui" >> "$GITHUB_OUTPUT"
+            echo "detail=aucun run réussi trouvé dans l'historique consultable" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          AGE=$(( ( $(date -u +%s) - $(date -u -d "$DERNIER" +%s) ) / 3600 ))
+          echo "Dernier succès du pipeline : $DERNIER (il y a ${AGE} h, seuil ${SEUIL_HEURES} h)"
+
+          if [ "$AGE" -gt "$SEUIL_HEURES" ]; then
+            echo "alerte=oui" >> "$GITHUB_OUTPUT"
+            echo "detail=dernier succès il y a ${AGE} h (seuil ${SEUIL_HEURES} h), le ${DERNIER}" >> "$GITHUB_OUTPUT"
+          else
+            echo "alerte=non" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Alerte — le pipeline quotidien ne tourne plus
+        if: steps.fraicheur.outputs.alerte == 'oui'
+        uses: ./.github/actions/alerte-issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          label: alerte-pipeline
+          depot: ${{ github.repository }}
+          titre: "Pipeline quotidien : aucune exécution récente"
+          corps: |
+            Le workflow **Pipeline quotidien** n'a **pas tourné** dans la fenêtre attendue.
+
+            | | |
+            |---|---|
+            | Constat | ${{ steps.fraicheur.outputs.detail }} |
+            | Vu depuis | run [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) du backup |
+
+            Ce cas-là ne produit aucun échec à observer : c'est une **absence**. Il est
+            détecté par surveillance croisée — le backup vérifie la fraîcheur du pipeline,
+            le pipeline celle du backup.
+
+            À vérifier dans l'ordre : le workflow est-il encore `active`
+            (GitHub désactive un workflow planifié après 60 jours d'inactivité du dépôt) ?
+            Le cron a-t-il été supprimé ou modifié ? Les runs échouent-ils avant d'écrire
+            quoi que ce soit ?
