@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { dealUrlSlug, type Deal, type Commentaire } from "@fidwastafid/schemas";
+import { dealUrlSlug, type Deal } from "@fidwastafid/schemas";
 import { GET as getDealHandler } from "../../api/v1/deals/[publicId]/route.js";
 import { GET as getCommentairesHandler } from "../../api/v1/deals/[publicId]/commentaires/route.js";
 import { SiteHeader } from "../../../components/SiteHeader.js";
@@ -11,6 +11,8 @@ import { ShareButton } from "../../../components/ShareButton.js";
 import { UrgenceCountdown } from "../../../components/UrgenceCountdown.js";
 import { Avatar } from "../../../components/Avatar.js";
 import { CommentForm } from "./CommentForm.js";
+import { CommentairesErreur } from "./CommentairesErreur.js";
+import { lireCommentaires, type ResultatCommentaires } from "./commentaires.js";
 import { dealDescription, dealJsonLd, dealOgDescription, truncateOgTitle } from "./seo.js";
 import { dealTypeLabel, relativeDate, shortDate } from "../../../lib/format.js";
 import { urgence } from "../../../lib/urgence.js";
@@ -44,14 +46,12 @@ async function fetchDeal(publicId: string): Promise<Deal | null> {
   return (await response.json()) as Deal;
 }
 
-async function fetchCommentaires(publicId: string): Promise<Commentaire[]> {
-  const response = await getCommentairesHandler(
-    new Request(`http://localhost/api/v1/deals/${publicId}/commentaires`),
-    { params: Promise.resolve({ publicId }) }
+function fetchCommentaires(publicId: string): Promise<ResultatCommentaires> {
+  return lireCommentaires(publicId, () =>
+    getCommentairesHandler(new Request(`http://localhost/api/v1/deals/${publicId}/commentaires`), {
+      params: Promise.resolve({ publicId }),
+    })
   );
-  if (!response.ok) return [];
-  const body = (await response.json()) as { data: Commentaire[] };
-  return body.data;
 }
 
 /** Image OG générique du site (app/opengraph-image.tsx — mêmes valeurs que
@@ -133,7 +133,7 @@ export default async function DealPage({ params }: PageParams) {
   }
 
   const dealHref = `/deal/${canonical}`;
-  const commentaires = await fetchCommentaires(deal.publicId);
+  const resultatCommentaires = await fetchCommentaires(deal.publicId);
   const expire = deal.statut === "expire";
   const pct = reduction(deal);
   const urg = urgence(deal);
@@ -389,19 +389,31 @@ export default async function DealPage({ params }: PageParams) {
 
         {/* CARTE 3 — commentaires. */}
         <section id="commentaires" className="bg-surface rounded-2xl border border-border shadow-[0_1px_2px_rgba(26,24,21,0.05)] p-6 md:p-8 flex flex-col gap-4">
-          <h2 className="text-lg font-black">Commentaires ({commentaires.length})</h2>
+          {/* Le compteur du titre vient du deal (sous-requête count(*) de
+              DEAL_SELECT), pas de la longueur de la liste : il reste juste même
+              quand la liste, elle, n'a pas pu être chargée. Même source qu'en
+              haut de page — deux compteurs divergents seraient un bug visible. */}
+          <h2 className="text-lg font-black">Commentaires ({deal.commentairesCount})</h2>
           <CommentForm publicId={deal.publicId} />
-          <ul className="flex flex-col gap-3">
-            {commentaires.map((c) => (
-              <li key={c.createdAt} className="flex gap-2.5 border-t border-border pt-3 text-sm">
-                <Avatar pseudo={c.pseudo} couleurAvatar={c.couleurAvatar} size="md" />
-                <div>
-                  <p className="font-black text-ink text-xs mb-0.5">{c.pseudo}</p>
-                  <p className="text-ink-muted">{c.contenu}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {!resultatCommentaires.ok ? (
+            <CommentairesErreur />
+          ) : resultatCommentaires.commentaires.length === 0 ? (
+            <p className="text-ink-muted text-sm border-t border-border pt-3">
+              Aucun commentaire pour l&apos;instant. Sois le premier.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {resultatCommentaires.commentaires.map((c) => (
+                <li key={c.createdAt} className="flex gap-2.5 border-t border-border pt-3 text-sm">
+                  <Avatar pseudo={c.pseudo} couleurAvatar={c.couleurAvatar} size="md" />
+                  <div>
+                    <p className="font-black text-ink text-xs mb-0.5">{c.pseudo}</p>
+                    <p className="text-ink-muted">{c.contenu}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </main>
       <SiteFooter />
