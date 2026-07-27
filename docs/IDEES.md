@@ -59,6 +59,33 @@ première étape du décommissionnement, et la moins risquée (aucun consommateu
 
 ## Dépendances — montées majeures parquées (2026-07-27)
 
+> ⚠️ **L'`ignore semver-major` est une dette différée, pas une décision.**
+> zod 4, TypeScript 7 et eslint 10 devront être traités : ce sont les versions
+> vers lesquelles l'écosystème va, et rester sur les majeures précédentes se
+> paiera un jour en incompatibilité de plugins, de types ou d'outillage. Le
+> filtre ne résout rien — **il rend le sujet invisible**, ce qui est
+> exactement le mécanisme par lequel une dette cesse d'être décidée pour
+> devenir subie. C'est un report conscient, à durée non nulle mais non
+> infinie.
+>
+> **Déclencheur de revue** (le premier qui se produit, pas une date — une date
+> passe sans que personne ne la lise) :
+>
+> 1. un avis de sécurité tombe sur zod, typescript, eslint ou `@eslint/js` :
+>    la mise à jour de sécurité passera outre l'`ignore` et arrivera seule,
+>    peut-être sans chemin de montée propre — c'est le pire moment pour
+>    découvrir la casse ;
+> 2. une dépendance qu'on veut ajouter ou monter exige l'une de ces majeures
+>    (peer dependency) : le report devient bloquant pour autre chose ;
+> 3. la migration Next 16 / Turbopack est engagée (elle a sa propre règle
+>    `ignore` ci-dessus) : elle touche le même outillage, autant grouper ;
+> 4. à défaut, à la **première revue sécurité mensuelle qui suit la mise en
+>    prod de la v2** (`docs/RUNBOOK-securite.md`), item Dependabot : relire
+>    ces quatre entrées et décider — reconduire ou traiter, mais décider.
+>
+> Retirer une règle `ignore` est une ligne de YAML ; ce qui coûte, c'est la
+> montée elle-même. Ne pas confondre les deux au moment de la revue.
+
 *Tri du jour : les correctifs de sécurité et les montées à rayon d'impact nul
 sont passés (next 15.5.21, sharp 0.35.3, lot sûr #30). Restent quatre chantiers
 majeurs, parqués ici avec ce qui a été **constaté**, pas supposé. Les PR

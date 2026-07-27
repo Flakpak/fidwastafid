@@ -25,6 +25,13 @@ updates:
       # semaine et tiennent des places sur open-pull-requests-limit, qui a déjà
       # empêché la montée de next 15.5.21 (3 avis `high`) d'être proposée.
       #
+      # CES QUATRE RÈGLES SONT UNE DETTE DIFFÉRÉE, PAS UNE DÉCISION. Elles
+      # rendent le sujet invisible — le mécanisme même par lequel une dette
+      # cesse d'être décidée pour devenir subie. Déclencheur de revue explicite
+      # (avis de sécurité sur l'un de ces paquets, peer dependency qui l'exige,
+      # migration Next 16, ou première revue sécurité après la mise en prod
+      # v2) : voir docs/IDEES.md, même section.
+      #
       # Ces règles ne filtrent QUE les montées de version. Une mise à jour de
       # SÉCURITÉ n'en est pas une : elle passe outre ces `ignore` comme elle
       # passe outre la limite de PR ouvertes (vérifié le 27/07 — PR de sécurité
