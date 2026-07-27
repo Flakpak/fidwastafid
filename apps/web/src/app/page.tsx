@@ -92,26 +92,24 @@ export default async function Home({ searchParams }: PageParams) {
 
   return (
     <div className="min-h-screen bg-surface-base text-ink">
-      {/* L'en-tête est passé au Feed, pas rendu ici : il forme avec la barre
-          de filtres UN SEUL bloc collant (Feed.tsx, étape 1 du lot 7). Il
-          reste un composant SERVEUR — c'est un `children` traversant, jamais
-          hydraté par le composant client qui l'accueille. */}
+      {/* Ordre de page identique à celui d'avant le lot 7 : en-tête, bandeau
+          de message, ticker, hero. Seule la barre de filtres est collante
+          (Feed.tsx) — l'en-tête défile normalement, ce qui rend sa hauteur au
+          contenu pendant la navigation. */}
+      <SiteHeader collant={false} />
+      {message && (
+        <div className="mx-auto mt-4 max-w-2xl px-4">
+          <div className="rounded-xl border border-accent/30 bg-surface p-4 text-center text-sm font-bold text-accent">
+            {message}
+          </div>
+        </div>
+      )}
+      <Ticker />
       <Feed
-        header={<SiteHeader collant={false} />}
-        intro={
-          <>
-            {message && (
-              <div className="mx-auto mt-4 max-w-2xl px-4">
-                <div className="rounded-xl border border-accent/30 bg-surface p-4 text-center text-sm font-bold text-accent">
-                  {message}
-                </div>
-              </div>
-            )}
-            <Ticker />
-            <div className="mx-auto w-full max-w-2xl px-4 pt-4 lg:max-w-5xl">
-              <HeroBand />
-            </div>
-          </>
+        hero={
+          <div className="mx-auto w-full max-w-2xl px-4 pt-4 lg:max-w-5xl">
+            <HeroBand />
+          </div>
         }
         initialDeals={premierePage.data}
         initialCursor={premierePage.nextCursor}

@@ -10,6 +10,7 @@ import {
   type TypeAchat,
 } from "../lib/filtresFeed.js";
 import {
+  ACTIF,
   CADRE,
   CONTENEUR,
   ChampRecherche,
@@ -69,37 +70,41 @@ export function BarreFiltres({
   return (
     <div className={`${CONTENEUR} flex flex-col gap-2 py-2`}>
       <>
-        {/* ── Compact (jusqu'à lg) — rangée 2 : recherche pleine largeur + réglages ── */}
+        {/* ── Compact (jusqu'à lg) — UNE seule rangée, UNE seule commande ──
+            Le bouton réglages et les deux sélecteurs ouvraient la même
+            feuille : trois commandes pour une fonction, dont la troisième
+            laissait croire qu'elle en cachait une autre. Corrigé par
+            suppression — la rangée des deux sélecteurs disparaît, et avec
+            elle une rangée de barre collante.
+
+            L'état des filtres n'est donc plus lisible ici : il l'est
+            entièrement dans le compteur de résultats sous la barre (nombre,
+            filtres nommés en clair, réinitialisation). Ce bouton n'en porte
+            que le décompte. */}
         <div className="flex h-11 gap-2 lg:hidden">
           <ChampRecherche valeur={saisie} onChange={onSaisie} className="h-full flex-1" />
           <button
             type="button"
             onClick={(e) => onOuvrir("reglages", e.currentTarget)}
             aria-haspopup="dialog"
-            aria-label={nbActifs > 0 ? `Filtres (${nbActifs} actifs)` : "Filtres"}
-            className={`${CADRE} ${nbActifs > 0 ? "border-accent bg-accent-soft text-accent" : NEUTRE} relative flex h-full w-11 shrink-0 items-center justify-center`}
+            aria-label={nbActifs > 0 ? `Filtrer — ${nbActifs} filtre${nbActifs > 1 ? "s" : ""} actif${nbActifs > 1 ? "s" : ""}` : "Filtrer"}
+            className={`${CADRE} ${nbActifs > 0 ? ACTIF : NEUTRE} flex h-full shrink-0 items-center gap-2 px-3 text-sm font-medium`}
           >
-            <IconeReglages className="h-5 w-5" />
-            {/* Pastille MASQUÉE à zéro : un compteur qui affiche « 0 » dit
-                qu'il se passe quelque chose là où il ne se passe rien. */}
+            <IconeReglages className="h-5 w-5 shrink-0" />
+            Filtrer
+            {/* Décompte MASQUÉ à zéro : un compteur qui affiche « 0 » dit
+                qu'il se passe quelque chose là où il ne se passe rien. Le
+                tri n'y entre pas — il y en a toujours un, le compter rendrait
+                le badge inutile. */}
             {nbActifs > 0 && (
               <span
                 aria-hidden="true"
-                className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border border-surface bg-accent px-1 text-[11px] font-bold tabular-nums text-white"
+                className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[11px] font-bold tabular-nums text-white"
               >
                 {nbActifs}
               </span>
             )}
           </button>
-        </div>
-
-        {/* ── Compact — rangée 3 : deux sélecteurs à parts égales ──
-            `grid-cols-2` + `min-w-0` (dans SelecteurDimension) : les deux
-            moitiés restent strictement égales quelle que soit la longueur des
-            valeurs, qui sont coupées aux points de suspension. */}
-        <div className="grid h-11 grid-cols-2 gap-2 lg:hidden">
-          {selecteurCategorie}
-          {selecteurVille}
         </div>
 
         {/* ── Desktop (≥ lg) — une seule rangée, plus aucune puce défilante ──

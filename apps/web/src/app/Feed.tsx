@@ -31,8 +31,7 @@ export function Feed({
   initialCursor,
   initialFiltres,
   initialFacettes,
-  header,
-  intro,
+  hero,
 }: {
   initialDeals: Deal[];
   /** Curseur de la page suivante, tel que renvoyé par l'API — `null` si la
@@ -42,8 +41,9 @@ export function Feed({
    *  s'ouvre déjà filtré, sans passe client. */
   initialFiltres: EtatFiltres;
   initialFacettes: Facettes | null;
-  header: React.ReactNode;
-  intro: React.ReactNode;
+  /** Rendu AU-DESSUS de la barre de filtres, donc au-dessus du contenu
+   *  collant : le hero et ses trois cartes restent en haut de page. */
+  hero: React.ReactNode;
 }) {
   const [deals, setDeals] = useState(initialDeals);
   /** Curseur courant. Retransmis verbatim à l'API : il encode `asOf` (fige le
@@ -61,6 +61,9 @@ export function Feed({
    *  feuille ouverte (`showModal()` déplace le focus à l'intérieur). */
   const [feuille, setFeuille] = useState<{ section: SectionFeuille; declencheur: HTMLElement | null } | null>(null);
   const resumeRef = useRef<HTMLDivElement>(null);
+  const sentinelleRef = useRef<HTMLDivElement>(null);
+  /** Barre collée en haut du cadre — pilote la seule ombre, rien d'autre. */
+  const [epinglee, setEpinglee] = useState(false);
 
   const { facettes } = useFacettes(filtres, initialFacettes);
 
@@ -98,6 +101,18 @@ export function Feed({
     window.history.pushState(null, "", `${window.location.pathname}${ecrireFiltresUrl(normalise)}`);
   }, []);
 
+  /** La sentinelle sort du cadre par le haut <=> la barre est collée. */
+  useEffect(() => {
+    const sentinelle = sentinelleRef.current;
+    if (!sentinelle) return;
+    const observateur = new IntersectionObserver(
+      ([entree]) => setEpinglee(!!entree && !entree.isIntersecting),
+      { threshold: 0 }
+    );
+    observateur.observe(sentinelle);
+    return () => observateur.disconnect();
+  }, []);
+
   /** Retour/avance du navigateur : l'URL redevient la source de vérité. */
   useEffect(() => {
     const onPop = () => {
@@ -128,9 +143,9 @@ export function Feed({
     }
 
     // Un changement de filtre en cours de scroll ramène le compteur de
-    // résultats (donc le haut de la liste filtrée) sous le bloc collant —
+    // résultats (donc le haut de la liste filtrée) sous la barre collante —
     // sinon l'utilisateur reste au milieu d'une liste qui vient de changer
-    // sous ses yeux. `scroll-mt` sur la cible réserve la hauteur du bloc.
+    // sous ses yeux. `scroll-mt` sur la cible réserve la hauteur de la barre.
     resumeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
     let cancelled = false;
@@ -216,41 +231,48 @@ export function Feed({
 
   return (
     <>
+      {hero}
+
+      {/* Sentinelle d'épinglage : 1px juste au-dessus de la barre. Quand elle
+          quitte le haut du cadre, la barre est collée — c'est le seul moyen
+          portable de le savoir (il n'existe pas de sélecteur `:stuck`
+          largement disponible). Purement visuel : l'ombre en dépend, jamais
+          le collage lui-même. */}
+      <div ref={sentinelleRef} aria-hidden="true" className="h-px" />
+
       {/*
-       * UN SEUL conteneur collant, `top-0`, englobant l'en-tête ET les
-       * filtres (étape 1). Avant ce lot, l'en-tête et la barre collaient
-       * séparément, la seconde à un `top-[70px]` recopié à la main alors que
-       * l'en-tête mesure 60px : le feed défilait dans les 10px d'écart, et sur
-       * desktop la barre — enfermée dans `<main>` — laissait passer une carte
-       * entière au-dessus d'elle. Un décalage recopié se désynchronise à la
-       * première modification de l'en-tête ; un conteneur unique, jamais.
+       * UN SEUL élément collant sur cette page, `top-0` : la barre de
+       * filtres. L'en-tête ne colle plus (page.tsx) et défile normalement —
+       * sa hauteur revient donc au contenu pendant la navigation, ce qui
+       * compte sur mobile. Un seul élément collant, donc aucun interstice
+       * possible entre deux : c'était la cause du bug d'origine, où la barre
+       * collait à un `top-[70px]` recopié pour un en-tête de 60px et laissait
+       * défiler le feed dans les 10px d'écart.
        *
-       * Fond OPAQUE (`surface-base`, `surface` pour l'en-tête), sans
-       * transparence ni flou : sur iOS un fond translucide laisse voir le
-       * contenu en transit sous la barre.
+       * Fond OPAQUE (`surface-base`), sans transparence ni flou : sur iOS un
+       * fond translucide laisse voir le contenu en transit. Filet permanent,
+       * et ombre UNE FOIS ÉPINGLÉE seulement — au repos, dans le flux, elle
+       * n'aurait rien à détacher.
        *
        * Aucun ancêtre ne porte `overflow: hidden` ni `transform` (body ->
        * div de page -> ce bloc), les deux neutraliseraient silencieusement le
-       * collage. Le `overflow-hidden` du hero et le `transform` du ticker sont
-       * sur des FRÈRES, sans effet ici.
+       * collage. Le `overflow-hidden` du hero et le `transform` du ticker
+       * sont sur des FRÈRES, sans effet ici.
        */}
-      <div className="sticky top-0 z-20 bg-surface-base">
-        {/* L'en-tête reste au-dessus de la barre dans le même bloc : son menu
-            compte se déploie par-dessus, pas dessous. */}
-        <div className="relative z-10">{header}</div>
-        <div className="border-b border-border bg-surface-base">
-          <BarreFiltres
-            filtres={filtres}
-            saisie={saisie}
-            nbActifs={nbActifs}
-            onSaisie={setSaisie}
-            onChange={(patch) => appliquer({ ...filtres, ...patch })}
-            onOuvrir={ouvrirFeuille}
-          />
-        </div>
+      <div
+        className={`sticky top-0 z-20 border-b border-border bg-surface-base transition-shadow duration-[130ms] motion-reduce:transition-none ${
+          epinglee ? "shadow-[0_2px_10px_-4px_rgba(26,24,21,0.30)]" : ""
+        }`}
+      >
+        <BarreFiltres
+          filtres={filtres}
+          saisie={saisie}
+          nbActifs={nbActifs}
+          onSaisie={setSaisie}
+          onChange={(patch) => appliquer({ ...filtres, ...patch })}
+          onOuvrir={ouvrirFeuille}
+        />
       </div>
-
-      {intro}
 
       {/*
        * Le rail desktop est RETIRÉ. Il ne portait plus que la navigation par
@@ -278,7 +300,7 @@ export function Feed({
             id={ANCRE_RESULTATS}
             tabIndex={-1}
             aria-live="polite"
-            className="mb-3 flex scroll-mt-[180px] flex-wrap items-baseline gap-x-2 gap-y-1 text-sm focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent md:scroll-mt-[120px]"
+            className="mb-3 flex scroll-mt-[72px] flex-wrap items-baseline gap-x-2 gap-y-1 text-sm focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
           >
             <span className="font-bold text-ink">
               {total === null ? "…" : total === 1 ? "1 deal" : `${total} deals`}
