@@ -13,7 +13,7 @@
     "typecheck": "pnpm -r --if-present typecheck"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.99.2",
+    "@supabase/supabase-js": "^2.110.8",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
