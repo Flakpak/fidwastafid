@@ -85,6 +85,35 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
 
+  # openapi.json est un artefact GÉNÉRÉ mais versionné (servi publiquement sur
+  # /openapi.json). Rien ne le vérifiait : le champ `emailIndisponible` ajouté
+  # à /me le 24/07/2026 n'y est jamais arrivé, et la spec publiée a affirmé
+  # pendant trois jours que `email` était requis. Une spec qui ment sur l'API
+  # sans que rien ne rougisse, c'est la version documentaire du fallback
+  # silencieux. Ce job régénère et compare — hors ligne, aucun secret.
+  openapi-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @fidwastafid/web openapi:generate
+
+      - name: openapi.json versionné == openapi.json régénéré
+        run: |
+          if ! git diff --exit-code -- apps/web/public/openapi.json; then
+            echo "::error file=apps/web/public/openapi.json::La spec versionnée ne correspond plus aux schémas. Lance : pnpm --filter @fidwastafid/web openapi:generate, puis commite le résultat."
+            exit 1
+          fi
+
   docker:
     runs-on: ubuntu-latest
     steps:
