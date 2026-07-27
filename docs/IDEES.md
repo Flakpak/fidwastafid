@@ -152,6 +152,15 @@ plus bas).*
   cœur de `packages/schemas`, donc de toute la validation d'API et du modèle de
   domaine gravé au CONTRAT-V1 §3. Chantier à part, avec relecture des messages
   d'erreur (le format `{ error: { code, message } }` du §4 en dépend).
+  - **Rattaché à ce chantier : `@asteasolutions/zod-to-openapi` 7.3.4 → 9.1.0**
+    (ex-PR #37, fermée le 27/07/2026). Ce n'est **pas** une décision séparée :
+    depuis la 8.0, ses `peerDependencies` exigent `zod: ^4.0.0` (la 7.3.4
+    demandait `^3.20.2`). Vérifié sur le registre npm, pas déduit. C'est aussi
+    ce qui expliquait `openapi-check` rouge sur cette PR — la spec est générée
+    par une bibliothèque qui attend un zod qu'on n'a pas. La monter seule
+    laisserait un désaccord de peer dependency, ou tirerait zod 4 par la bande.
+    Elle se traitera **dans le même lot** que zod 4, et elle en est un
+    argument de plus : rester en zod 3 gèle aussi l'outillage OpenAPI.
 - **typescript 5.9.3 → 7.0.2** (ex-PR #8). Même constat : `quality` et `docker`
   rouges. Majeure structurante, à planifier volontairement.
 - **eslint 9.39.4 → 10.7.0 + @eslint/js 9.39.4 → 10.0.1** (ex-PR #9 et #7).

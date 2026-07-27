@@ -56,6 +56,15 @@ updates:
       # types au-dessus du runtime — l'inverse du problème.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # zod-to-openapi : PAS une décision séparée — depuis la 8.0, ses
+      # peerDependencies exigent `zod: ^4.0.0` (7.3.4 : ^3.20.2). Le dépôt est
+      # en zod ^3.23.8, et zod 4 est parqué juste au-dessus. Cette montée
+      # appartient donc au chantier zod 4 et suit son sort : la traiter seule
+      # laisserait un désaccord de peer dependency, ou tirerait zod 4 par la
+      # bande — exactement ce que le parking veut éviter. Constaté le
+      # 27/07/2026 sur l'ex-PR #37 (openapi-check rouge).
+      - dependency-name: "@asteasolutions/zod-to-openapi"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
