@@ -189,7 +189,9 @@ GET /api/v1/deals?cursor=xxx&limit=20  →  { "data": [...], "nextCursor": "yyy"
 
 ```
 # Public, lecture (sans auth)
-GET  /api/v1/deals                          liste (filtres: statut=publie par défaut, enseigne, ville, categorie, type)
+GET  /api/v1/deals                          liste (filtres: statut=publie par défaut, enseigne, ville, categorie, type, q)
+GET  /api/v1/deals/facettes                 compteurs contextuels du feed (mêmes filtres, sans pagination)
+                                             — ajouté le 27/07/2026, septième amendement conscient
 GET  /api/v1/deals/:publicId                détail
 GET  /api/v1/enseignes                      liste des enseignes
 GET  /api/v1/deals/:publicId/commentaires   liste, pagination par curseur — ajouté en Phase 4 :
@@ -222,6 +224,35 @@ POST   /api/v1/admin/deals/:publicId/image  upload manuel (multipart/form-data, 
 ```
 
 **Notes** :
+- **Amendement du 27/07/2026 — compteurs de filtres (septième amendement conscient, lot 7)** :
+  `GET /api/v1/deals/facettes` renvoie, pour un jeu de filtres donné, le nombre de deals que
+  `GET /api/v1/deals` renverra, plus le nombre par catégorie et par ville si l'on changeait cette
+  seule dimension. Endpoint séparé et non champ ajouté à la liste : la feuille de filtres recalcule
+  ses compteurs pendant que l'utilisateur compose sa sélection, avant de l'appliquer — les coller à
+  la liste imposerait de télécharger une page de deals à chaque option cochée.
+  - **Prédicats partagés, jamais réécrits** (`apps/web/src/app/api/v1/_lib/dealsFilters.ts`) : les
+    deux endpoints construisent leur `WHERE` avec les mêmes fonctions. C'est la seule garantie
+    tenable que « le compteur annonce ce que le filtre renverra » — un second `WHERE` écrit à côté
+    dériverait un jour, et cette dérive ne lève aucune erreur.
+  - **`ville` change de sens** : filtrer sur une ville renvoie les deals de cette ville **plus** les
+    deals `National` **plus** les deals disponibles en ligne. Motif : un deal en ligne est achetable
+    depuis n'importe quelle ville ; l'égalité stricte d'avant retirait de la vue des offres
+    réellement disponibles, sans le dire. Corollaire : quand `type=en_ligne`, `ville` est ignorée
+    (normalisée à l'entrée) — l'interface désactive le sélecteur avec sa raison plutôt que de le
+    laisser sans effet.
+  - **`type` se lit en DISPONIBILITÉ, pas en égalité** : `physique` → `{physique, les_deux}`,
+    `en_ligne` → `{en_ligne, les_deux}`. Un deal `les_deux` appartient aux deux ensembles ; l'égalité
+    stricte le faisait disparaître des deux filtres à la fois. Aucune ligne `les_deux` en base à ce
+    jour : comportement observable inchangé, mais il cesse d'être faux quand le pipeline en produira.
+  - **`q` devient un filtre SERVEUR** (titre + enseigne, `ilike`, jokers échappés). Avant ce lot la
+    recherche ne filtrait que les deals déjà téléchargés côté client : au-delà de la première page,
+    elle ne trouvait rien, et aucun compteur n'aurait pu s'accorder avec elle.
+  - **Le curseur embarque la signature des filtres** qui l'ont produit, et le serveur refuse
+    (`VALIDATION_ERROR`) tout curseur présenté avec d'autres filtres. Un curseur est une position
+    dans un jeu de résultats donné : rejoué ailleurs, il saute ou duplique des lignes en silence.
+    La règle « tout changement de filtre réinitialise la pagination » ne dépend plus de la
+    discipline du client. Les curseurs émis avant ce lot ne sont plus décodables — sans effet en
+    pratique, ils ne vivent que le temps d'une session de défilement.
 - Amendement du 16/07/2026 — espace membre : exercice des droits d'accès/rectification/effacement
   (loi 09-08). Premier amendement conscient de la liste fermée.
 - Amendement du 18/07/2026 — consentement WhatsApp public (deuxième amendement conscient, voir §3) :

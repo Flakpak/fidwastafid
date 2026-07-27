@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import type { Deal } from "@fidwastafid/schemas";
 import { GET as getDealsHandler } from "./api/v1/deals/route.js";
+import { GET as getFacettesHandler } from "./api/v1/deals/facettes/route.js";
 import { SiteHeader } from "../components/SiteHeader.js";
 import { SiteFooter } from "../components/SiteFooter.js";
 import { Ticker } from "../components/Ticker.js";
 import { HeroBand } from "../components/HeroBand.js";
 import { Feed } from "./Feed.js";
-import { construireParamsFeed } from "../lib/feedPagination.js";
+import { construireParamsFacettes, construireParamsFeed } from "../lib/feedPagination.js";
+import { lireFiltresUrl, type EtatFiltres } from "../lib/filtresFeed.js";
+import type { Facettes } from "./api/v1/_lib/dealsFacettes.js";
 
 const DESCRIPTION = "Les meilleurs bons plans et promotions au Maroc, votés par la communauté : alimentaire, high-tech, mode et plus.";
 
@@ -15,6 +18,8 @@ export const metadata: Metadata = {
   // titre porte déjà le nom du site.
   title: { absolute: "Fidwastafid — Bons plans au Maroc" },
   description: DESCRIPTION,
+  // Une vue filtrée reste une vue de l'accueil : canonique unique, jamais
+  // une page indexable par combinaison de filtres.
   alternates: { canonical: "/" },
   openGraph: { title: "Fidwastafid — Bons plans au Maroc", description: DESCRIPTION, url: "/" },
 };
@@ -34,26 +39,50 @@ interface DealsPage {
 }
 
 /**
- * Appel direct du handler de route plutôt qu'un fetch HTTP vers soi-même :
+ * Appel direct des handlers de route plutôt qu'un fetch HTTP vers soi-même :
  * pas de base URL à deviner (dev/Docker/Vercel ont des origines
  * différentes), et ça reste la même API que le web/mobile consommeront
  * plus tard (CONTRAT-V1 : une seule porte d'entrée /api/v1).
  *
- * Renvoie désormais le `nextCursor` en plus des deals : il était typé ici
- * depuis toujours mais jamais transmis, si bien que le feed s'arrêtait à la
- * première page (57 des 81 deals publiés invisibles en production).
+ * Les DEUX appels partent des mêmes filtres, lus dans l'URL : un feed filtré
+ * partagé s'ouvre déjà filtré, avec son compteur de résultats déjà juste —
+ * sans passe client ni valeur qui change sous les yeux après hydratation.
  */
-async function fetchFeed(): Promise<DealsPage> {
-  const params = construireParamsFeed({ tri: "tendance" });
+async function fetchFeed(filtres: EtatFiltres): Promise<DealsPage> {
+  const params = construireParamsFeed(filtres);
   const response = await getDealsHandler(new Request(`http://localhost/api/v1/deals?${params.toString()}`));
   const body = (await response.json()) as DealsPage;
   return { data: body.data, nextCursor: body.nextCursor };
 }
 
-type PageParams = { searchParams: Promise<{ compte?: string; motdepasse?: string }> };
+async function fetchFacettes(filtres: EtatFiltres): Promise<Facettes | null> {
+  const params = construireParamsFacettes(filtres);
+  const response = await getFacettesHandler(new Request(`http://localhost/api/v1/deals/facettes?${params.toString()}`));
+  if (!response.ok) return null;
+  return (await response.json()) as Facettes;
+}
+
+type PageParams = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+/** Les valeurs répétées (`?ville=A&ville=B`) sont réduites à la première :
+ *  l'interface ne peut en produire qu'une, et les filtres restent à choix
+ *  unique. */
+function versSearchParams(brut: Record<string, string | string[] | undefined>): URLSearchParams {
+  const params = new URLSearchParams();
+  for (const [cle, valeur] of Object.entries(brut)) {
+    const premiere = Array.isArray(valeur) ? valeur[0] : valeur;
+    if (typeof premiere === "string") params.set(cle, premiere);
+  }
+  return params;
+}
 
 export default async function Home({ searchParams }: PageParams) {
-  const [premierePage, { compte, motdepasse }] = await Promise.all([fetchFeed(), searchParams]);
+  const brut = await searchParams;
+  const filtres = lireFiltresUrl(versSearchParams(brut));
+  const [premierePage, facettes] = await Promise.all([fetchFeed(filtres), fetchFacettes(filtres)]);
+
+  const compte = typeof brut.compte === "string" ? brut.compte : undefined;
+  const motdepasse = typeof brut.motdepasse === "string" ? brut.motdepasse : undefined;
   const message =
     compte === "supprime"
       ? "Ton compte a bien été supprimé. Merci d'avoir fait partie de la communauté."
@@ -63,16 +92,32 @@ export default async function Home({ searchParams }: PageParams) {
 
   return (
     <div className="min-h-screen bg-surface-base text-ink">
-      <SiteHeader />
-      {message && (
-        <div className="max-w-2xl mx-auto mt-4 px-4">
-          <div className="bg-surface border border-accent/30 rounded-xl p-4 text-sm font-bold text-accent text-center">
-            {message}
-          </div>
-        </div>
-      )}
-      <Ticker />
-      <Feed initialDeals={premierePage.data} initialCursor={premierePage.nextCursor} hero={<HeroBand />} />
+      {/* L'en-tête est passé au Feed, pas rendu ici : il forme avec la barre
+          de filtres UN SEUL bloc collant (Feed.tsx, étape 1 du lot 7). Il
+          reste un composant SERVEUR — c'est un `children` traversant, jamais
+          hydraté par le composant client qui l'accueille. */}
+      <Feed
+        header={<SiteHeader collant={false} />}
+        intro={
+          <>
+            {message && (
+              <div className="mx-auto mt-4 max-w-2xl px-4">
+                <div className="rounded-xl border border-accent/30 bg-surface p-4 text-center text-sm font-bold text-accent">
+                  {message}
+                </div>
+              </div>
+            )}
+            <Ticker />
+            <div className="mx-auto w-full max-w-2xl px-4 pt-4 lg:max-w-5xl">
+              <HeroBand />
+            </div>
+          </>
+        }
+        initialDeals={premierePage.data}
+        initialCursor={premierePage.nextCursor}
+        initialFiltres={filtres}
+        initialFacettes={facettes}
+      />
       <SiteFooter />
     </div>
   );

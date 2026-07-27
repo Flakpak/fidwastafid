@@ -18,10 +18,34 @@ import {
 import { lireCommentaires } from "../src/app/deal/[slugAndId]/commentaires.js";
 import {
   TAILLE_PAGE,
+  construireParamsFacettes,
   construireParamsFeed,
   fusionnerSansDoublon,
   messageErreurFeed,
 } from "../src/lib/feedPagination.js";
+import {
+  FILTRES_PAR_DEFAUT,
+  ecrireFiltresUrl,
+  lireFiltresUrl,
+  nbFiltresActifs,
+  normaliserFiltres,
+  optionDesactivee,
+  resumeFiltres,
+  etiquetteSelecteur,
+  type EtatFiltres,
+} from "../src/lib/filtresFeed.js";
+import {
+  conditionCategorie,
+  conditionType,
+  conditionVille,
+  conditionsBase,
+  lireFiltres,
+  signatureFiltres,
+  type Lieur,
+} from "../src/app/api/v1/_lib/dealsFilters.js";
+import { assemblerFacettes, requeteFacettes } from "../src/app/api/v1/_lib/dealsFacettes.js";
+import { encodeCursor } from "../src/app/api/v1/_lib/pagination.js";
+import { GET as getDeals } from "../src/app/api/v1/deals/route.js";
 import { champsModifies, normaliserValeurAudit } from "../src/app/api/v1/_lib/auditDiff.js";
 import { motifRejetManquant, type Deal } from "@fidwastafid/schemas";
 
@@ -128,6 +152,7 @@ async function runAsyncChecks() {
   await checkWrapperAdminSupabase();
   await checkTurnstile();
   await checkCommentaires();
+  await checkCurseurFiltres();
 
   console.log(`\n${pass} passés, ${fail} échoués`);
   if (fail > 0) process.exit(1);
@@ -617,9 +642,12 @@ function dealFictif(publicId: string): Deal {
 }
 
 // -- Construction des paramètres : le curseur part VERBATIM.
-const paramsSansCurseur = construireParamsFeed({ tri: "tendance", type: "tous" });
+// « Partout » est l'ABSENCE de filtre de disponibilité, et se représente par
+// la chaîne vide depuis le lot 7 (avant : la valeur sentinelle "tous", qui
+// ressemblait à une valeur d'enum sans en être une).
+const paramsSansCurseur = construireParamsFeed({ tri: "tendance", type: "" });
 check("params : limit = taille de page", paramsSansCurseur.get("limit") === String(TAILLE_PAGE));
-check("params : type=tous n'est pas transmis (absence de filtre)", paramsSansCurseur.get("type") === null);
+check("params : « partout » n'est pas transmis (absence de filtre)", paramsSansCurseur.get("type") === null);
 check("params : pas de cursor sur la première page", paramsSansCurseur.get("cursor") === null);
 
 const curseurOpaque = "eyJ0cmkiOiJ0ZW5kYW5jZSIsImFzT2YiOiIyMDI2LTA3LTI2VDE4OjQ2OjE4LjQyMloifQ";
@@ -783,5 +811,173 @@ check(
 check("publication sans motif -> conforme", !motifRejetManquant("publie", null));
 check("mise en attente sans motif -> conforme", !motifRejetManquant("en_attente", null));
 check("motif exigé seulement pour rejete", !motifRejetManquant("expire", null));
+
+// ---------------------------------------------------------------------------
+// Lot 7 — filtres du feed.
+//
+// Ces vérifications sont HORS LIGNE : elles portent sur la construction des
+// prédicats et sur la logique d'interface, pas sur le résultat d'une requête.
+// L'égalité empiriquement mesurée « compteur == lignes réellement renvoyées »
+// exige une vraie base et vit dans tests/integration.ts ; ici on verrouille
+// ce qui la rend structurellement vraie : les deux endpoints construisent
+// leurs conditions avec LES MÊMES fonctions.
+// ---------------------------------------------------------------------------
+
+function filtres(partiel: Partial<Parameters<typeof signatureFiltres>[0]> = {}) {
+  return { statut: "publie", enseigne: null, ville: null, categorie: null, type: null, q: null, ...partiel };
+}
+
+console.log("\nFiltres — ville et deals en ligne (CONTRAT-V1 §3, lot 7)");
+{
+  const l: Lieur = { values: [] };
+  const sql = conditionVille(filtres({ ville: "Casablanca" }), l, "d");
+  check("choisir une ville lie la ville en paramètre", l.values[0] === "Casablanca");
+  check("… et retient les deals de cette ville", sql.includes("d.ville = $1"));
+  check("… PLUS les deals nationaux", sql.includes("d.ville = 'National'"));
+  check("… PLUS les deals disponibles en ligne", sql.includes("d.type in ('en_ligne', 'les_deux')"));
+  check("aucune ville choisie -> aucune restriction", conditionVille(filtres(), { values: [] }, "d") === "true");
+}
+
+// « En boutique »/« En ligne » se lisent en DISPONIBILITÉ : un deal
+// `les_deux` appartient aux deux ensembles, il ne doit disparaître d'aucun.
+check(
+  "« en boutique » retient aussi les deals disponibles des deux façons",
+  conditionType(filtres({ type: "physique" }), { values: [] }, "d") === "d.type in ('physique', 'les_deux')"
+);
+check(
+  "« en ligne » retient aussi les deals disponibles des deux façons",
+  conditionType(filtres({ type: "en_ligne" }), { values: [] }, "d") === "d.type in ('en_ligne', 'les_deux')"
+);
+
+// La ville est SANS OBJET quand « en ligne » est demandé : normalisée à
+// l'entrée, côté serveur comme côté client. Sans ça, une URL fabriquée à la
+// main produirait une liste et un compteur qui ne se ressemblent pas.
+{
+  const lu = lireFiltres(new URLSearchParams("type=en_ligne&ville=Casablanca"));
+  check("« en ligne » + ville -> la ville est effacée côté serveur", lu.ville === null);
+  check(
+    "… et la signature est celle de « en ligne » seul",
+    signatureFiltres(lu) === signatureFiltres(lireFiltres(new URLSearchParams("type=en_ligne")))
+  );
+}
+check(
+  "une ville hors de la liste fermée est ignorée",
+  lireFiltres(new URLSearchParams("ville=Tombouctou")).ville === null
+);
+
+console.log("\nCompteurs — mêmes prédicats que la liste");
+{
+  const f = filtres({ ville: "Rabat", categorie: "Mode", type: "physique", q: "tv" });
+  const { text } = requeteFacettes(f);
+
+  // Chaque fragment que la LISTE utilisera doit apparaître tel quel dans la
+  // requête de comptage — c'est ce qui interdit à un compteur de compter
+  // autrement que ce que le filtre renverra.
+  // Mêmes alias et même ORDRE de liaison que requeteFacettes : les `$n`
+  // reconstruits ici doivent coïncider avec ceux de la requête réelle.
+  const lListe: Lieur = { values: [] };
+  const base = conditionsBase(f, lListe, "d").join(" and ");
+  const ville = conditionVille(f, lListe, "b");
+  const categorie = conditionCategorie(f, lListe, "b");
+  const type = conditionType(f, lListe, "b");
+
+  check("la requête de comptage porte le même filtre de statut/enseigne/recherche", text.includes(base.split(" and ")[0] ?? ""));
+  check("… le même prédicat de ville", text.includes(ville));
+  check("… le même prédicat de catégorie", text.includes(categorie));
+  check("… le même prédicat de disponibilité", text.includes(type));
+  check("la recherche est bien un filtre SERVEUR", base.includes("ilike"));
+  check("les jokers LIKE d'une saisie sont échappés", requeteFacettes(filtres({ q: "100%" })).values.includes("%100\\%%"));
+
+  // Le compteur d'une dimension ignore SON PROPRE filtre et applique les
+  // autres : « combien si je choisis cette catégorie, à ville constante ».
+  const catsBloc = text.slice(text.indexOf("cats as ("), text.indexOf("vls as ("));
+  check("le compteur de catégorie n'applique pas le filtre de catégorie", !catsBloc.includes(categorie));
+  check("… mais applique bien celui de ville", catsBloc.includes(ville));
+}
+
+check(
+  "les compteurs sont demandés avec exactement les filtres de la liste, sans pagination",
+  construireParamsFacettes({ tri: "recent", ville: "Rabat", q: "tv", cursor: "abc" }).toString() ===
+    "ville=Rabat&q=tv"
+);
+
+check(
+  "une valeur d'enum sans aucun deal ressort à 0 plutôt que de disparaître",
+  assemblerFacettes([
+    { dim: "total", valeur: "", n: 3 },
+    { dim: "categorie", valeur: "Mode", n: 3 },
+    { dim: "categorie", valeur: "Gaming", n: 0 },
+  ]).categories.some((c) => c.valeur === "Gaming" && c.n === 0)
+);
+
+console.log("\nCurseur — réinitialisation au changement de filtre (étape 8)");
+{
+  const aRabat = signatureFiltres(lireFiltres(new URLSearchParams("ville=Rabat")));
+  const aCasa = signatureFiltres(lireFiltres(new URLSearchParams("ville=Casablanca")));
+  check("deux jeux de filtres différents ont des signatures différentes", aRabat !== aCasa);
+  check(
+    "deux URL équivalentes ont la même signature (pagination non cassée pour rien)",
+    signatureFiltres(lireFiltres(new URLSearchParams("ville=Rabat&limit=24"))) === aRabat
+  );
+
+}
+
+/**
+ * Refus vérifié sur le VRAI handler : il tranche AVANT toute requête SQL,
+ * donc sans base de données — c'est justement ce qui rend la garantie
+ * testable ici plutôt qu'en intégration seulement.
+ */
+async function checkCurseurFiltres() {
+  console.log("\nCurseur — refus par le handler (aucune requête SQL atteinte)");
+  const aRabat = signatureFiltres(lireFiltres(new URLSearchParams("ville=Rabat")));
+  const curseurPerime = encodeCursor({ tri: "tendance", value: "1", publicId: "abcdefghij", filtres: aRabat });
+
+  const res = await getDeals(
+    new Request(`http://localhost/api/v1/deals?ville=Casablanca&cursor=${encodeURIComponent(curseurPerime)}`)
+  );
+  const body = (await res.json()) as { error?: { code: string } };
+  check("un curseur d'un autre jeu de filtres est refusé (400)", res.status === 400);
+  check("… avec le code d'erreur du contrat", body.error?.code === "VALIDATION_ERROR");
+
+  // Un curseur d'avant ce lot (sans signature) n'est plus décodable : il est
+  // rejeté au lieu d'être appliqué à l'aveugle sur un jeu inconnu.
+  const ancienFormat = Buffer.from(JSON.stringify({ tri: "tendance", value: "1", publicId: "abcdefghij" })).toString(
+    "base64url"
+  );
+  const resAncien = await getDeals(new Request(`http://localhost/api/v1/deals?cursor=${ancienFormat}`));
+  check("un curseur sans signature de filtres est refusé", resAncien.status === 400);
+}
+
+console.log("\nFeuille — une option vide ne doit pas pouvoir enfermer");
+check("catégorie à 0 deal -> non sélectionnable", optionDesactivee({ n: 0, choisi: false }));
+check(
+  "catégorie à 0 deal MAIS déjà choisie -> reste sélectionnable (sinon on ne peut plus en sortir)",
+  !optionDesactivee({ n: 0, choisi: true })
+);
+check("catégorie non vide -> sélectionnable", !optionDesactivee({ n: 4, choisi: false }));
+check("compteur pas encore chargé -> ne désactive rien", !optionDesactivee({ n: null, choisi: false }));
+check("dimension sans objet -> désactivée quel que soit le compteur", optionDesactivee({ n: 9, choisi: false, sansObjet: true }));
+
+console.log("\nÉtat des filtres — URL, étiquettes et rappel en clair");
+{
+  const etat: EtatFiltres = { categorie: "Mode", ville: "Rabat", type: "physique", tri: "recent", q: "tv" };
+  check("l'état s'écrit dans l'URL", ecrireFiltresUrl(etat) === "?categorie=Mode&ville=Rabat&type=physique&tri=recent&q=tv");
+  check("… et se relit à l'identique (partage et retour arrière)", ecrireFiltresUrl(lireFiltresUrl(new URLSearchParams(ecrireFiltresUrl(etat).slice(1)))) === ecrireFiltresUrl(etat));
+  check("l'état par défaut ne pollue pas l'URL", ecrireFiltresUrl(FILTRES_PAR_DEFAUT) === "");
+  check("« en ligne » efface la ville côté client aussi", normaliserFiltres({ ...etat, type: "en_ligne" }).ville === "");
+}
+check("le tri n'est pas compté comme un filtre", nbFiltresActifs({ ...FILTRES_PAR_DEFAUT, tri: "score" }) === 0);
+check("la recherche n'est pas comptée (elle a son propre champ)", nbFiltresActifs({ ...FILTRES_PAR_DEFAUT, q: "tv" }) === 0);
+check("trois filtres actifs -> pastille à 3", nbFiltresActifs({ categorie: "Mode", ville: "Rabat", type: "physique", tri: "tendance", q: "" }) === 3);
+check(
+  "au repos, un sélecteur affiche le NOM de la dimension",
+  etiquetteSelecteur("categorie", "") === "Catégorie" && etiquetteSelecteur("ville", "") === "Ville"
+);
+check("une fois choisie, il affiche LA valeur", etiquetteSelecteur("ville", "Agadir") === "Agadir");
+check(
+  "le rappel en clair énumère les filtres, jamais le tri",
+  resumeFiltres({ categorie: "Mode", ville: "Rabat", type: "en_ligne", tri: "score", q: "tv" }).join(" · ") ===
+    "Mode · En ligne · « tv »"
+);
 
 void runAsyncChecks();

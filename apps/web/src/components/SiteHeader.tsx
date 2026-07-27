@@ -19,12 +19,22 @@ import { Brand } from "./Brand.js";
  * viewBox). Sous `sm`, le cadre est trop étroit pour 245px de wordmark : le
  * monogramme prend le relais. Une seule action pleine ici — « Soumettre un
  * deal » ; « Connexion » reste secondaire neutre.
+ *
+ * `collant` : l'en-tête est collant PAR LUI-MÊME sur toutes les pages sauf
+ * l'accueil, où il est englobé avec la barre de filtres dans un unique
+ * conteneur collant (lot 7, Feed.tsx). Deux éléments collants imbriqués
+ * rouvriraient exactement l'écart par lequel le feed passait entre l'en-tête
+ * et les filtres.
  */
-export async function SiteHeader() {
+export async function SiteHeader({ collant = true }: { collant?: boolean } = {}) {
   const user = await resolveCurrentUser();
 
   return (
-    <header className="bg-surface border-b border-border sticky top-0 z-10 h-[60px] px-4 sm:px-6 flex items-center justify-between gap-3">
+    <header
+      className={`bg-surface border-b border-border h-[60px] px-4 sm:px-6 flex items-center justify-between gap-3 ${
+        collant ? "sticky top-0 z-10" : ""
+      }`}
+    >
       <Link href="/" className="shrink-0" aria-label="Fidwastafid — accueil">
         <Brand forme="mark" hauteur={32} alt="" className="sm:hidden" />
         <Brand forme="wordmark" hauteur={30} alt="" className="hidden sm:block" />

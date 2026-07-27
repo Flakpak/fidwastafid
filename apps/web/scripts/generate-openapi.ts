@@ -67,9 +67,13 @@ registry.registerPath({
     query: z.object({
       statut: z.string().optional().openapi({ description: "publie|expire — publie par défaut" }),
       enseigne: z.string().optional(),
-      ville: z.string().optional(),
+      ville: z
+        .string()
+        .optional()
+        .openapi({ description: "Cette ville + les deals nationaux + les deals disponibles en ligne" }),
       categorie: z.string().optional(),
-      type: z.string().optional(),
+      type: z.string().optional().openapi({ description: "physique|en_ligne — disponibilité, pas égalité stricte" }),
+      q: z.string().optional().openapi({ description: "Recherche sur le titre et l'enseigne" }),
       tri: z.string().optional().openapi({ description: "tendance|score|recent — tendance par défaut" }),
       cursor: z.string().optional(),
       limit: z.string().optional(),
@@ -77,7 +81,42 @@ registry.registerPath({
   },
   responses: {
     200: { description: "OK", content: { "application/json": { schema: paginated(Deal, "DealPage") } } },
-    400: errorResponse("Curseur invalide"),
+    400: errorResponse("Curseur invalide pour ce tri ou pour ces filtres"),
+  },
+  tags: ["deals"],
+});
+
+const Facettes = registry.register(
+  "Facettes",
+  z.object({
+    total: z.number().int(),
+    totalSansCategorie: z.number().int(),
+    totalSansVille: z.number().int(),
+    categories: z.array(z.object({ valeur: z.string(), n: z.number().int() })),
+    villes: z.array(z.object({ valeur: z.string(), n: z.number().int() })),
+  })
+);
+
+registry.registerPath({
+  method: "get",
+  path: "/deals/facettes",
+  summary: "Compteurs contextuels du feed (CONTRAT-V1 §4, septième amendement)",
+  description:
+    "Mêmes filtres que GET /deals, sans pagination. Chaque dimension est comptée en appliquant " +
+    "les autres filtres actifs mais pas le sien. Les prédicats sont partagés avec GET /deals : " +
+    "un compteur annonce exactement ce que la liste renverra.",
+  request: {
+    query: z.object({
+      statut: z.string().optional(),
+      enseigne: z.string().optional(),
+      ville: z.string().optional(),
+      categorie: z.string().optional(),
+      type: z.string().optional(),
+      q: z.string().optional(),
+    }),
+  },
+  responses: {
+    200: { description: "OK", content: { "application/json": { schema: Facettes } } },
   },
   tags: ["deals"],
 });

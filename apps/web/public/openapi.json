@@ -862,6 +862,63 @@
           "data",
           "nextCursor"
         ]
+      },
+      "Facettes": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "totalSansCategorie": {
+            "type": "integer"
+          },
+          "totalSansVille": {
+            "type": "integer"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "valeur": {
+                  "type": "string"
+                },
+                "n": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "valeur",
+                "n"
+              ]
+            }
+          },
+          "villes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "valeur": {
+                  "type": "string"
+                },
+                "n": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "valeur",
+                "n"
+              ]
+            }
+          }
+        },
+        "required": [
+          "total",
+          "totalSansCategorie",
+          "totalSansVille",
+          "categories",
+          "villes"
+        ]
       }
     },
     "parameters": {}
@@ -893,7 +950,8 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "Cette ville + les deals nationaux + les deals disponibles en ligne"
             },
             "required": false,
             "name": "ville",
@@ -909,10 +967,20 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "physique|en_ligne — disponibilité, pas égalité stricte"
             },
             "required": false,
             "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Recherche sur le titre et l'enseigne"
+            },
+            "required": false,
+            "name": "q",
             "in": "query"
           },
           {
@@ -953,7 +1021,7 @@
             }
           },
           "400": {
-            "description": "Curseur invalide",
+            "description": "Curseur invalide pour ce tri ou pour ces filtres",
             "content": {
               "application/json": {
                 "schema": {
@@ -1036,6 +1104,77 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/facettes": {
+      "get": {
+        "summary": "Compteurs contextuels du feed (CONTRAT-V1 §4, septième amendement)",
+        "description": "Mêmes filtres que GET /deals, sans pagination. Chaque dimension est comptée en appliquant les autres filtres actifs mais pas le sien. Les prédicats sont partagés avec GET /deals : un compteur annonce exactement ce que la liste renverra.",
+        "tags": [
+          "deals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "statut",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "enseigne",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "ville",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "categorie",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Facettes"
                 }
               }
             }

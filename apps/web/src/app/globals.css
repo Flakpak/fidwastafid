@@ -114,17 +114,11 @@ body {
   animation-play-state: paused;
 }
 
-/* Conteneur à défilement horizontal tactile de la barre de filtres — chips
-   catégorie mobile (lot UX filtres, 21/07/2026) et ligne recherche/ville/
-   type/tri (micro-lot suivi, 22/07/2026, défaut 1) : masque la barre de
-   scroll native sur un overflow-x tactile, sans désactiver le défilement
-   lui-même — cross-browser (Firefox, Chromium/WebKit). */
-.no-scrollbar {
-  scrollbar-width: none;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
+/* `.no-scrollbar` (masquage de la scrollbar d'un défilement horizontal
+   tactile) est RETIRÉ avec le lot 7 : la barre de filtres ne défile plus
+   horizontalement, ni en mobile ni en desktop, donc plus rien à masquer.
+   Une barre de scroll cachée était le symptôme, pas le remède — un contrôle
+   hors écran restait hors écran. */
 
 /* CSP/perf : pas d'animation infinie pour les utilisateurs qui la refusent. */
 @media (prefers-reduced-motion: reduce) {
