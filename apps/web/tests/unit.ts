@@ -11,6 +11,12 @@ import {
 } from "../src/app/api/v1/_lib/supabaseAdmin.js";
 import { resolveMeEmail } from "../src/app/api/v1/_lib/me.js";
 import {
+  verifierTurnstile,
+  TurnstileIndisponibleError,
+  TurnstileConfigError,
+} from "../src/app/api/v1/_lib/turnstile.js";
+import { lireCommentaires } from "../src/app/deal/[slugAndId]/commentaires.js";
+import {
   TAILLE_PAGE,
   construireParamsFeed,
   fusionnerSansDoublon,
@@ -119,6 +125,8 @@ async function runAsyncChecks() {
   check("mauvais jeton -> 401", mauvaisJetonRes.status === 401);
 
   await checkWrapperAdminSupabase();
+  await checkTurnstile();
+  await checkCommentaires();
 
   console.log(`\n${pass} passés, ${fail} échoués`);
   if (fail > 0) process.exit(1);
@@ -224,6 +232,200 @@ async function checkWrapperAdminSupabase() {
   } finally {
     globalThis.fetch = fetchOriginal;
   }
+}
+
+/**
+ * Turnstile (_lib/turnstile.ts) — les QUATRE classes, jamais confondues.
+ * Avant ce lot, un unique `if (!response.ok) return false` les écrasait toutes
+ * dans « robot » : une panne Cloudflare rejetait silencieusement chaque
+ * soumission. Chaque test ci-dessous vérifie qu'une classe reste distinguable
+ * des trois autres — c'est là tout l'intérêt du correctif.
+ *
+ * `fetch` global bouchonné (harnais hors ligne), puis restauré.
+ */
+async function checkTurnstile() {
+  console.log("\nTurnstile — quatre classes : valide / refusé / panne / configuration");
+
+  const secretOriginal = process.env.TURNSTILE_SECRET_KEY;
+  process.env.TURNSTILE_SECRET_KEY = "cle_fixture_jamais_reelle";
+
+  const fetchOriginal = globalThis.fetch;
+  let appels = 0;
+
+  function stubFetch(reponses: { status: number; body?: string }[]) {
+    appels = 0;
+    globalThis.fetch = (async () => {
+      const r = reponses[Math.min(appels, reponses.length - 1)]!;
+      appels++;
+      return new Response(r.body ?? "", { status: r.status });
+    }) as typeof globalThis.fetch;
+  }
+
+  /** Panne réseau : `fetch` jette, aucune réponse HTTP n'existe. */
+  function stubFetchReseau() {
+    appels = 0;
+    globalThis.fetch = (async () => {
+      appels++;
+      throw new TypeError("fetch failed");
+    }) as typeof globalThis.fetch;
+  }
+
+  try {
+    // CLASSE 1 — 200 + success:true.
+    stubFetch([{ status: 200, body: '{"success":true}' }]);
+    const valide = await verifierTurnstile("jeton-fixture");
+    check("200 + success:true -> valide", valide.verdict === "valide");
+    check("valide -> un seul appel", appels === 1);
+
+    // CLASSE 2 — 200 + success:false : Cloudflare a répondu, et il dit non.
+    // C'est un verdict, pas une panne : aucun retry, aucune exception.
+    stubFetch([{ status: 200, body: '{"success":false,"error-codes":["invalid-input-response"]}' }]);
+    const refuse = await verifierTurnstile("jeton-fixture");
+    check("200 + success:false -> refusé (jamais une exception)", refuse.verdict === "refuse");
+    check(
+      "refusé -> codes Cloudflare conservés pour le diagnostic",
+      refuse.verdict === "refuse" && refuse.codes.includes("invalid-input-response")
+    );
+    check("refusé -> aucun retry (1 seul appel)", appels === 1);
+
+    // Token absent : le widget n'a rien produit — la vérification n'a pas eu
+    // lieu côté client. C'est un refus, pas une panne, et aucun appel réseau.
+    stubFetch([{ status: 200, body: '{"success":true}' }]);
+    const sansJeton = await verifierTurnstile(null);
+    check("jeton absent -> refusé", sansJeton.verdict === "refuse");
+    check(
+      "jeton absent -> code missing-input-response",
+      sansJeton.verdict === "refuse" && sansJeton.codes.includes("missing-input-response")
+    );
+    check("jeton absent -> aucun appel à Cloudflare", appels === 0);
+
+    // Panne transitoire qui se résorbe : 500 puis 200 -> succès après retry.
+    stubFetch([{ status: 500, body: "boom" }, { status: 200, body: '{"success":true}' }]);
+    const apresRetry = await verifierTurnstile("jeton-fixture");
+    check("500 puis 200 -> valide après retry", apresRetry.verdict === "valide");
+    check("500 puis 200 -> exactement 2 appels", appels === 2);
+
+    // CLASSE 3 — 5xx persistant : panne d'infrastructure, JAMAIS « robot ».
+    stubFetch([{ status: 503, body: "indisponible" }]);
+    let panne: unknown = null;
+    try {
+      await verifierTurnstile("jeton-fixture");
+    } catch (err) {
+      panne = err;
+    }
+    check("5xx persistant -> TurnstileIndisponibleError", panne instanceof TurnstileIndisponibleError);
+    check(
+      "5xx persistant -> statut réel porté par l'erreur",
+      panne instanceof TurnstileIndisponibleError && panne.status === 503
+    );
+    check("5xx persistant -> tentatives bornées (3 appels max)", appels === 3);
+
+    // CLASSE 3 (bis) — 429 : quota, pas une faute de l'utilisateur.
+    stubFetch([{ status: 429, body: "rate limited" }]);
+    let quota: unknown = null;
+    try {
+      await verifierTurnstile("jeton-fixture");
+    } catch (err) {
+      quota = err;
+    }
+    check("429 persistant -> TurnstileIndisponibleError (pas un refus)", quota instanceof TurnstileIndisponibleError);
+
+    // CLASSE 3 (ter) — panne réseau : aucune réponse HTTP, status null.
+    stubFetchReseau();
+    let reseau: unknown = null;
+    try {
+      await verifierTurnstile("jeton-fixture");
+    } catch (err) {
+      reseau = err;
+    }
+    check("panne réseau -> TurnstileIndisponibleError", reseau instanceof TurnstileIndisponibleError);
+    check(
+      "panne réseau -> statut null (aucune réponse HTTP reçue)",
+      reseau instanceof TurnstileIndisponibleError && reseau.status === null
+    );
+    check("panne réseau -> tentatives bornées", appels === 3);
+
+    // CLASSE 4 — 401/403 : NOTRE clé est morte. Fail-closed, aucun retry
+    // (retenter une clé révoquée ne fait que retarder le diagnostic —
+    // incident du 19/07/2026).
+    stubFetch([{ status: 401, body: '{"message":"invalid secret"}' }]);
+    let config: unknown = null;
+    try {
+      await verifierTurnstile("jeton-fixture");
+    } catch (err) {
+      config = err;
+    }
+    check("401 -> TurnstileConfigError", config instanceof TurnstileConfigError);
+    check("401 -> jamais confondu avec une panne", !(config instanceof TurnstileIndisponibleError));
+    check("401 -> aucun retry (1 seul appel)", appels === 1);
+
+    stubFetch([{ status: 403, body: "forbidden" }]);
+    let interdit: unknown = null;
+    try {
+      await verifierTurnstile("jeton-fixture");
+    } catch (err) {
+      interdit = err;
+    }
+    check("403 -> TurnstileConfigError", interdit instanceof TurnstileConfigError);
+    check("403 -> aucun retry", appels === 1);
+
+    // CLASSE 4 (bis) — clé absente : misconfiguration, même classe qu'un 401.
+    delete process.env.TURNSTILE_SECRET_KEY;
+    stubFetch([{ status: 200, body: '{"success":true}' }]);
+    let sansCle: unknown = null;
+    try {
+      await verifierTurnstile("jeton-fixture");
+    } catch (err) {
+      sansCle = err;
+    }
+    check("TURNSTILE_SECRET_KEY absent -> TurnstileConfigError", sansCle instanceof TurnstileConfigError);
+    check("TURNSTILE_SECRET_KEY absent -> aucun appel à Cloudflare", appels === 0);
+  } finally {
+    globalThis.fetch = fetchOriginal;
+    if (secretOriginal === undefined) delete process.env.TURNSTILE_SECRET_KEY;
+    else process.env.TURNSTILE_SECRET_KEY = secretOriginal;
+  }
+}
+
+/**
+ * Commentaires — « aucun commentaire » et « chargement impossible » sont deux
+ * faits différents. Avant ce lot, `if (!response.ok) return []` affichait
+ * « Commentaires (0) » sur un deal qui en avait : une panne d'API devenait une
+ * affirmation fausse à l'écran.
+ */
+async function checkCommentaires() {
+  console.log("\nCommentaires — succès / vide / échec de chargement");
+
+  const unCommentaire = { pseudo: "Amine", couleurAvatar: "#2F6B57", contenu: "Bon plan", createdAt: "2026-07-26T10:00:00.000Z" };
+
+  const ok = await lireCommentaires("abc123", async () => Response.json({ data: [unCommentaire] }));
+  check("200 avec données -> ok", ok.ok === true);
+  check("200 avec données -> liste rendue", ok.ok === true && ok.commentaires.length === 1);
+
+  // Vide LÉGITIME : la discussion existe, elle est simplement sans message.
+  const vide = await lireCommentaires("abc123", async () => Response.json({ data: [] }));
+  check("200 avec liste vide -> ok (vide légitime, pas un échec)", vide.ok === true);
+  check("200 avec liste vide -> aucune erreur affichée", vide.ok === true && vide.commentaires.length === 0);
+
+  // Échec : distinguable du vide. C'est tout l'objet du correctif.
+  const cinqCent = await lireCommentaires("abc123", async () => new Response("boom", { status: 500 }));
+  check("500 -> échec (jamais une liste vide)", cinqCent.ok === false);
+
+  const quatreCentQuatre = await lireCommentaires("abc123", async () => new Response("", { status: 404 }));
+  check("404 -> échec", quatreCentQuatre.ok === false);
+
+  // Le handler jette au lieu de répondre (base injoignable).
+  const jete = await lireCommentaires("abc123", async () => {
+    throw new Error("base injoignable");
+  });
+  check("handler en exception -> échec (la page reste servie)", jete.ok === false);
+
+  // 200 mais corps inexploitable : un échec de lecture, pas une liste vide.
+  const corpsCasse = await lireCommentaires("abc123", async () => Response.json({ donnees: [] }));
+  check("200 sans tableau data -> échec (jamais déguisé en liste vide)", corpsCasse.ok === false);
+
+  const jsonIllisible = await lireCommentaires("abc123", async () => new Response("pas du json", { status: 200 }));
+  check("200 avec JSON illisible -> échec", jsonIllisible.ok === false);
 }
 
 console.log("\nog:image — extraction depuis HTML");
