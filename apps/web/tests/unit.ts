@@ -22,7 +22,8 @@ import {
   fusionnerSansDoublon,
   messageErreurFeed,
 } from "../src/lib/feedPagination.js";
-import type { Deal } from "@fidwastafid/schemas";
+import { champsModifies, normaliserValeurAudit } from "../src/app/api/v1/_lib/auditDiff.js";
+import { motifRejetManquant, type Deal } from "@fidwastafid/schemas";
 
 // Jeton de test purement local (Phase 7B) — jamais le vrai REVALIDATE_TOKEN,
 // qui n'existe que côté Vercel/secrets GitHub. Comparable au
@@ -682,5 +683,105 @@ check("page vide -> liste inchangée", fusionnerSansDoublon(apresPage3, []).leng
 check("erreur 429 -> message spécifique", messageErreurFeed(429).includes("Trop de requêtes"));
 check("erreur 5xx -> message serveur", messageErreurFeed(503).includes("serveur"));
 check("erreur réseau -> message générique non vide", messageErreurFeed().length > 0);
+
+// ---------------------------------------------------------------------------
+// Journal d'audit — un diff qui ne mentionne QUE ce qui a changé.
+//
+// Fait générateur : entrée journal_audit #240 du 27/07/2026. Un enregistrement
+// du formulaire d'édition sans aucun changement a produit
+// `prixPromo: "100.00" -> 100` (colonne numeric renvoyée en chaîne par pg,
+// comparée à un nombre JS) et quatre autres champs identiques de part et
+// d'autre. Un journal qui enregistre de faux changements perd sa valeur
+// probante.
+// ---------------------------------------------------------------------------
+console.log("\nJournal d'audit — normalisation avant comparaison");
+
+// Le cas exact de l'entrée #240.
+check(
+  'numeric "100.00" vs nombre 100 -> aucun changement',
+  Object.keys(champsModifies({ prixPromo: { avant: "100.00", apres: 100, sorte: "nombre" } })).length === 0
+);
+check(
+  'numeric "119.99" vs nombre 119.99 -> aucun changement',
+  Object.keys(champsModifies({ prixNormal: { avant: "119.99", apres: 119.99, sorte: "nombre" } })).length === 0
+);
+// bigint : même écart de type, sur enseigne_id (le typer `number` le masquait).
+check(
+  'bigint "3" vs nombre 3 -> aucun changement',
+  Object.keys(champsModifies({ enseigneSlug: { avant: "3", apres: 3, sorte: "nombre" } })).length === 0
+);
+
+// Un vrai changement doit toujours ressortir — et en forme normalisée.
+{
+  const diff = champsModifies({ prixPromo: { avant: "100.00", apres: 89.9, sorte: "nombre" } });
+  check("changement réel de prix -> retenu", "prixPromo" in diff);
+  check("valeur avant normalisée en nombre", diff.prixPromo?.avant === 100);
+  check("valeur après conservée", diff.prixPromo?.apres === 89.9);
+}
+
+// Texte, booléen, null/undefined.
+check(
+  "texte identique -> aucun changement",
+  Object.keys(champsModifies({ titre: { avant: "Test turn", apres: "Test turn", sorte: "texte" } })).length === 0
+);
+check(
+  "texte modifié -> retenu",
+  "titre" in champsModifies({ titre: { avant: "Test turn", apres: "Test tour", sorte: "texte" } })
+);
+check(
+  "booléen identique -> aucun changement",
+  Object.keys(champsModifies({ whatsappPublic: { avant: false, apres: false, sorte: "booleen" } })).length === 0
+);
+check(
+  "booléen modifié -> retenu",
+  "whatsappPublic" in champsModifies({ whatsappPublic: { avant: false, apres: true, sorte: "booleen" } })
+);
+check(
+  "null en base vs undefined dans le patch -> aucun changement",
+  Object.keys(champsModifies({ ville: { avant: null, apres: undefined, sorte: "texte" } })).length === 0
+);
+check(
+  "null en base vs valeur fournie -> retenu",
+  "ville" in champsModifies({ ville: { avant: null, apres: "Casablanca", sorte: "texte" } })
+);
+
+// Le cas complet de #240 : cinq champs renvoyés à l'identique -> diff vide.
+check(
+  "enregistrement sans modification -> diff vide (cas de l'entrée #240)",
+  Object.keys(
+    champsModifies({
+      titre: { avant: "Test turn", apres: "Test turn", sorte: "texte" },
+      type: { avant: "physique", apres: "physique", sorte: "texte" },
+      categorie: { avant: "Alimentaire", apres: "Alimentaire", sorte: "texte" },
+      prixPromo: { avant: "100.00", apres: 100, sorte: "nombre" },
+      prixNormal: { avant: "119.99", apres: 119.99, sorte: "nombre" },
+      whatsappPublic: { avant: false, apres: false, sorte: "booleen" },
+    })
+  ).length === 0
+);
+
+// Valeur non convertible : ni NaN (qui différerait de lui-même à chaque
+// écriture), ni null (qui confondrait deux valeurs distinctes).
+check("nombre illisible -> chaîne brute conservée", normaliserValeurAudit("abc", "nombre") === "abc");
+check(
+  "deux valeurs illisibles différentes -> changement détecté",
+  "prixPromo" in champsModifies({ prixPromo: { avant: "abc", apres: "def", sorte: "nombre" } })
+);
+
+// ---------------------------------------------------------------------------
+// Motif de rejet obligatoire — CONTRAT-V1 §3, sur l'état RÉSULTANT.
+// ---------------------------------------------------------------------------
+console.log("\nMotif de rejet — obligation sur l'état résultant");
+check("rejet sans motif -> manquant", motifRejetManquant("rejete", null));
+check("rejet avec motif vide -> manquant", motifRejetManquant("rejete", ""));
+check("rejet avec motif d'espaces -> manquant", motifRejetManquant("rejete", "   "));
+check("rejet motivé -> conforme", !motifRejetManquant("rejete", "Doublon"));
+check(
+  "édition d'un deal déjà rejeté, motif déjà en base -> conforme (pas de renvoi exigé)",
+  !motifRejetManquant("rejete", "Prix erroné")
+);
+check("publication sans motif -> conforme", !motifRejetManquant("publie", null));
+check("mise en attente sans motif -> conforme", !motifRejetManquant("en_attente", null));
+check("motif exigé seulement pour rejete", !motifRejetManquant("expire", null));
 
 void runAsyncChecks();

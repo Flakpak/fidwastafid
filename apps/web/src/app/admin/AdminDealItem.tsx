@@ -4,6 +4,7 @@ import { useState } from "react";
 import { VILLES, CATEGORIES, dealUrlSlug, type DealAdmin, type DealStatut, type Enseigne } from "@fidwastafid/schemas";
 import type { DoublonInfo } from "../api/v1/_lib/deals.js";
 import { joinMeta } from "../../lib/format.js";
+import { MotifRejet } from "./MotifRejet.js";
 
 /** Libellés courts de statut pour le badge de doublon (l'onglet où retrouver
  *  l'existant). Le deal page public ne résout que publie/expire — pour les
@@ -163,7 +164,8 @@ export function AdminDealItem({
   onUploadImage: (file: File) => Promise<ImageFetchResult>;
 }) {
   const [fields, setFields] = useState<DealEditFields>(() => toEditFields(deal));
-  const [motifRejet, setMotifRejet] = useState("");
+  /** Le rejet passe par le panneau de motif — jamais directement par le bouton. */
+  const [demandeMotif, setDemandeMotif] = useState(false);
   const [savingFields, setSavingFields] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -313,7 +315,13 @@ export function AdminDealItem({
             <button
               key={action.label}
               type="button"
-              onClick={() => void onAction(action.statut, action.statut === "rejete" ? motifRejet || undefined : undefined)}
+              // Un rejet n'agit plus au clic : il ouvre le choix du motif
+              // juste en dessous (CONTRAT-V1 §3 — un rejet sans motif est
+              // refusé côté API, autant le demander ici plutôt que faire
+              // échouer l'action).
+              onClick={() =>
+                action.statut === "rejete" ? setDemandeMotif(true) : void onAction(action.statut, undefined)
+              }
               disabled={pending}
               className={`rounded-lg px-3 py-1.5 text-xs font-bold cursor-pointer transition-colors duration-[130ms] disabled:opacity-50 motion-reduce:transition-none ${ACTION_CLASSES[action.variant]}`}
             >
@@ -322,6 +330,18 @@ export function AdminDealItem({
           ))}
         </div>
       </div>
+
+      {demandeMotif && (
+        <MotifRejet
+          libelleConfirmation="Rejeter"
+          pending={pending}
+          onAnnuler={() => setDemandeMotif(false)}
+          onRejeter={async (motif) => {
+            await onAction("rejete", motif);
+            setDemandeMotif(false);
+          }}
+        />
+      )}
 
       <details className="border-t border-border pt-2">
         <summary className="text-xs font-bold text-ink-muted hover:text-ink cursor-pointer select-none">Éditer le deal</summary>
@@ -566,16 +586,16 @@ export function AdminDealItem({
             )}
           </div>
 
-          <label className="flex flex-col gap-1 text-xs font-bold mt-1">
-            Motif (visible par le soumetteur, envoyé avec « Rejeter »)
-            <textarea
-              value={motifRejet}
-              onChange={(e) => setMotifRejet(e.target.value)}
-              rows={2}
-              maxLength={500}
-              className="border border-border-strong bg-surface text-ink rounded-[7px] px-2 py-1 font-normal text-sm focus:border-accent focus:outline-none"
-            />
-          </label>
+          {/* Le champ « Motif » vivait ici, replié au fond du panneau
+              d'édition, alors que « Rejeter » est en haut de la carte : on
+              pouvait rejeter sans jamais le voir — c'est ce qui s'est produit
+              au premier rejet réel en prod (27/07/2026). Il est remonté au
+              moment du rejet, avec des raccourcis (voir MotifRejet.tsx). */}
+          {deal.motifRejet && (
+            <p className="text-xs text-ink-muted mt-1">
+              Motif enregistré : <span className="font-bold text-ink">{deal.motifRejet}</span>
+            </p>
+          )}
         </div>
       </details>
     </li>

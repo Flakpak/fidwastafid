@@ -8,6 +8,7 @@ import {
 } from "../src/app/api/v1/deals/[publicId]/commentaires/route.js";
 import { GET as getMe, PATCH as patchMe } from "../src/app/api/v1/me/route.js";
 import { PATCH as patchAdminDeal } from "../src/app/api/v1/admin/deals/[publicId]/route.js";
+import { POST as postBulk } from "../src/app/api/v1/admin/deals/bulk/route.js";
 import { POST as postImageDepuisLien } from "../src/app/api/v1/admin/deals/[publicId]/image-depuis-lien/route.js";
 import { POST as postDealImage } from "../src/app/api/v1/admin/deals/[publicId]/image/route.js";
 import { GET as getImgProxy } from "../src/app/img/deals/[publicId]/route.js";
@@ -557,6 +558,81 @@ async function main() {
   const dealRejeteDansMe = (meAvecRejetBody.mesDeals ?? []).find((d) => d.publicId === dealPrivePublicId);
   check("GET /me -> motifRejet du deal rejeté visible", dealRejeteDansMe?.motifRejet === "Photo manquante");
 
+  // Motif obligatoire (CONTRAT-V1 §3) — la garantie est côté serveur, le
+  // formulaire ne fait que la doubler. Fait générateur : premier rejet réel en
+  // prod le 27/07/2026, motif resté NULL.
+  console.log("\nPATCH admin — un rejet sans motif est refusé");
+  const rejetSansMotifRes = await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "rejete" }),
+    }),
+    { params: Promise.resolve({ publicId: terrainPublicId }) }
+  );
+  const rejetSansMotifBody = (await rejetSansMotifRes.json()) as { error?: { fields?: Record<string, string> } };
+  check("rejet sans motif -> 400 VALIDATION_ERROR", rejetSansMotifRes.status === 400);
+  check(
+    "rejet sans motif -> champ fautif désigné (fields.motifRejet)",
+    typeof rejetSansMotifBody.error?.fields?.motifRejet === "string"
+  );
+
+  const motifVideRes = await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "rejete", motifRejet: "  " }),
+    }),
+    { params: Promise.resolve({ publicId: terrainPublicId }) }
+  );
+  check("rejet avec motif vide -> 400 (plancher min(3) du schéma)", motifVideRes.status === 400);
+
+  // L'obligation porte sur l'état RÉSULTANT : un deal déjà rejeté ET déjà
+  // motivé n'a pas à renvoyer son motif à chaque édition ultérieure.
+  const rejetDejaMotiveRes = await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${dealPrivePublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "rejete" }),
+    }),
+    { params: Promise.resolve({ publicId: dealPrivePublicId }) }
+  );
+  const rejetDejaMotiveBody = (await rejetDejaMotiveRes.json()) as { motifRejet?: string };
+  check("deal déjà rejeté et motivé, PATCH sans motif -> 200", rejetDejaMotiveRes.status === 200);
+  check("motif existant préservé", rejetDejaMotiveBody.motifRejet === "Photo manquante");
+
+  console.log("\nbulk — un rejet groupé sans motif est refusé (l'endpoint n'est pas une porte de sortie)");
+  const bulkSansMotifRes = await postBulk(
+    authedRequest("http://localhost/api/v1/admin/deals/bulk", token, {
+      method: "POST",
+      body: JSON.stringify({ publicIds: [dealPrivePublicId], statut: "rejete" }),
+    }),
+    noParams
+  );
+  check("bulk rejete sans motif -> 400", bulkSansMotifRes.status === 400);
+
+  const bulkAvecMotifRes = await postBulk(
+    authedRequest("http://localhost/api/v1/admin/deals/bulk", token, {
+      method: "POST",
+      body: JSON.stringify({ publicIds: [dealPrivePublicId], statut: "rejete", motifRejet: "Doublon" }),
+    }),
+    noParams
+  );
+  const bulkAvecMotifBody = (await bulkAvecMotifRes.json()) as { updated?: string[] };
+  check("bulk rejete avec motif -> 200", bulkAvecMotifRes.status === 200);
+  check("bulk rejete avec motif -> deal traité", (bulkAvecMotifBody.updated ?? []).includes(dealPrivePublicId));
+  const motifApresBulk = await query<{ motif_rejet: string | null }>(
+    "select motif_rejet from deals where public_id = $1",
+    [dealPrivePublicId]
+  );
+  check("bulk rejete -> motif écrit en base", motifApresBulk[0]?.motif_rejet === "Doublon");
+
+  const bulkPublieRes = await postBulk(
+    authedRequest("http://localhost/api/v1/admin/deals/bulk", token, {
+      method: "POST",
+      body: JSON.stringify({ publicIds: [dealPrivePublicId], statut: "publie" }),
+    }),
+    noParams
+  );
+  check("bulk publie sans motif -> 200 (l'obligation ne vaut que pour rejete)", bulkPublieRes.status === 200);
+
   console.log(
     "\nPATCH admin — édition curateur complète (CONTRAT-V1 §3/§4, troisième amendement conscient du 19/07/2026)"
   );
@@ -599,6 +675,58 @@ async function main() {
     [terrainPublicId]
   );
   check("journal_audit -> édition admin tracée (action update_deal)", auditRows.length > 0);
+
+  // Diff fidèle : rejouer le MÊME corps ne doit produire aucun champ modifié.
+  // Reproduction exacte de l'entrée #240 du 27/07/2026, mais sur de vrais types
+  // pg — ce que le test unitaire de auditDiff.ts ne peut pas faire : les
+  // colonnes numeric reviennent en chaîne ("20.00") et sont comparées aux
+  // nombres du corps JSON (20).
+  console.log("\njournal d'audit — un enregistrement sans changement ne consigne aucun champ");
+  const corpsIdentique = JSON.stringify({
+    statut: "publie",
+    titre: "Hanout test intégration modifié",
+    description: "Nouvelle description du test d'intégration",
+    prixPromo: 20,
+    prixNormal: 30,
+    categorie: "Maison",
+    dateFin: "2026-12-31",
+    ville: "Rabat",
+  });
+  const rejeuRes = await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}`, token, {
+      method: "PATCH",
+      body: corpsIdentique,
+    }),
+    { params: Promise.resolve({ publicId: terrainPublicId }) }
+  );
+  check("rejeu à l'identique -> 200", rejeuRes.status === 200);
+  const rejeuAudit = await query<{ details: { champs?: Record<string, unknown> } }>(
+    "select details from journal_audit where cible_id = $1 and action = 'update_deal' order by created_at desc limit 1",
+    [terrainPublicId]
+  );
+  const champsRejeu = rejeuAudit[0]?.details?.champs ?? {};
+  check(
+    "rejeu à l'identique -> aucun champ dans le journal (plus de diff fantôme)",
+    Object.keys(champsRejeu).length === 0
+  );
+
+  // La correction ne doit pas rendre le journal muet, seulement exact.
+  const changementReelRes = await patchAdminDeal(
+    authedRequest(`http://localhost/api/v1/admin/deals/${terrainPublicId}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ statut: "publie", prixPromo: 18.5 }),
+    }),
+    { params: Promise.resolve({ publicId: terrainPublicId }) }
+  );
+  check("changement réel de prix -> 200", changementReelRes.status === 200);
+  const auditChangement = await query<{ details: { champs?: Record<string, { avant?: unknown; apres?: unknown }> } }>(
+    "select details from journal_audit where cible_id = $1 and action = 'update_deal' order by created_at desc limit 1",
+    [terrainPublicId]
+  );
+  const champsChangement = auditChangement[0]?.details?.champs ?? {};
+  check("changement réel -> prixPromo consigné", "prixPromo" in champsChangement);
+  check('changement réel -> avant normalisé en nombre (20, pas "20.00")', champsChangement.prixPromo?.avant === 20);
+  check("changement réel -> après consigné", champsChangement.prixPromo?.apres === 18.5);
 
   console.log("\nédition complète — cohérence physique/en_ligne vérifiée sur l'état résultant (patch + existant)");
   const coherenceViolationRes = await patchAdminDeal(

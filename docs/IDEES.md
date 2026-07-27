@@ -17,24 +17,28 @@ n'est plus un diagnostic ponctuel mais une propriété du wrapper.)*
   trois jours. Une spec peut mentir sur l'API sans que rien ne rougisse —
   version documentaire du fallback silencieux.
 
-- **Le journal d'audit enregistre des modifications fantômes** (constaté le
-  27/07/2026 pendant le test de bout en bout en prod, entrée `journal_audit`
-  #240) : un enregistrement du formulaire d'édition sans changement réel a
-  produit un diff `prixPromo: "100.00" → 100`. La colonne est `numeric`, pg la
-  renvoie en **chaîne** pour ne pas tronquer sa précision, et le PATCH admin la
-  compare à un **nombre** JS — l'inégalité est de type, pas de valeur. À
-  corriger par une comparaison numérique explicite sur les colonnes `numeric`
-  (`prix_promo`, `prix_normal`) avant construction du diff. Sur le fond
-  l'entrée est exacte (rien n'a changé), mais un journal qui signale des
-  changements inexistants s'use aussi vite qu'un garde-fou muet : au bout de
-  quelques entrées on cesse de le lire.
-- **Rejet sans motif** (même test) : `motif_rejet` est facultatif, et un rejet
-  l'a laissé vide — le soumetteur ne voit alors aucune explication dans
-  `/compte`, alors que le CONTRAT-V1 §3 justifie le champ par « la communauté
-  doit comprendre pourquoi son deal n'a pas été publié ». Le champ existe et
-  fonctionne (`AdminDealItem.tsx`) : ce n'est pas un bug, c'est une décision
-  produit à prendre — rendre le motif obligatoire pour `statut = rejete`, ou
-  assumer le rejet muet.
+- ~~**Le journal d'audit enregistre des modifications fantômes**~~ **Corrigé le
+  27/07/2026** — `_lib/auditDiff.ts` : normalisation par type déclaré (`nombre`
+  / `texte` / `booleen`) des deux côtés, puis filtrage — seuls les champs
+  réellement modifiés entrent au journal. Fait générateur conservé : entrée
+  `journal_audit` #240, un enregistrement sans changement réel avait produit
+  `prixPromo: "100.00" → 100` (colonne `numeric` renvoyée en **chaîne** par pg,
+  comparée à un **nombre** JS — inégalité de type, pas de valeur) plus quatre
+  autres champs identiques de part et d'autre, parce qu'**aucune comparaison
+  n'était faite** : tout champ présent dans le corps entrait dans le diff.
+  Deuxième défaut trouvé au passage : `enseigne_id` (`bigint`) revient aussi en
+  chaîne, et était typé `number` — le faux diff `"3" → 3` attendait son tour.
+  Couvert par un test unitaire (le helper) **et** un test d'intégration (rejeu
+  d'un PATCH identique sur de vrais types pg, seule preuve possible du
+  round-trip).
+- ~~**Rejet sans motif**~~ **Tranché le 27/07/2026 : le motif devient
+  obligatoire.** Amendement du CONTRAT-V1 §3 (contrainte applicative, colonne
+  laissée `null`-able pour les 129 rejets historiques), refus 400 sur les deux
+  chemins d'écriture (`PATCH` unitaire et `bulk`), et six motifs préenregistrés
+  en un clic dans le back-office. La cause n'était pas la négligence : le champ
+  vivait replié au fond du panneau d'édition alors que « Rejeter » était en haut
+  de la carte — on pouvait rejeter sans jamais le voir. Un champ obligatoire
+  sans raccourci se remplit de « x » ; l'agencement fait partie de la garantie.
 
 ## Refonte Tadelakt — suites (2026-07-24)
 

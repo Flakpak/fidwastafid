@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DealAdmin, DealStatut, Enseigne } from "@fidwastafid/schemas";
 import type { DoublonInfo } from "../api/v1/_lib/deals.js";
 import { AdminDealItem, type DealEditFields, type SaveResult, type ImageFetchResult } from "./AdminDealItem.js";
+import { MotifRejet } from "./MotifRejet.js";
 import { Button } from "../../components/Button.js";
 
 /** Deal admin enrichi de l'info de doublon produit (visibilité seule, lot du
@@ -73,6 +74,8 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   const [total, setTotal] = useState(0);
   const [onglet, setOnglet] = useState<DealStatut>("en_attente");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  /** Le rejet groupé passe par le panneau de motif, jamais par le bouton seul. */
+  const [demandeMotifLot, setDemandeMotifLot] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -102,6 +105,8 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   function changerOnglet(t: DealStatut) {
     setOnglet(t);
     setSelected(new Set());
+    // Sinon le panneau de motif reste ouvert au-dessus d'une sélection vidée.
+    setDemandeMotifLot(false);
   }
 
   const comptes = useMemo(() => {
@@ -226,7 +231,13 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     return { ok: true };
   }
 
-  async function bulk(statut: "publie" | "rejete") {
+  /**
+   * `motifRejet` est exigé par l'API pour un rejet groupé (CONTRAT-V1 §3) —
+   * l'endpoint bulk était sinon un contournement complet de l'obligation de
+   * motiver. Le motif est commun au lot, ce qui correspond au geste réel :
+   * rejeter d'un coup vingt `auto_draft` pour la même raison.
+   */
+  async function bulk(statut: "publie" | "rejete", motifRejet?: string) {
     if (selected.size === 0) return;
     setPending(true);
     setError(null);
@@ -234,7 +245,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       const res = await fetch("/api/v1/admin/deals/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicIds: Array.from(selected), statut }),
+        body: JSON.stringify({ publicIds: Array.from(selected), statut, motifRejet }),
       });
       if (!res.ok) {
         const body = (await res.json()) as ApiErrorBody;
@@ -242,6 +253,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         return;
       }
       setSelected(new Set());
+      setDemandeMotifLot(false);
       await fetchDeals();
     } finally {
       setPending(false);
@@ -281,13 +293,28 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       )}
 
       {BULK_ONGLETS.has(onglet) && parOnglet.length > 0 && (
-        <div className="flex items-center gap-2">
-          <Button variant="primary" size="sm" onClick={() => void bulk("publie")} disabled={pending || selected.size === 0}>
-            Valider la sélection ({selected.size})
-          </Button>
-          <Button variant="danger" size="sm" onClick={() => void bulk("rejete")} disabled={pending || selected.size === 0}>
-            Rejeter la sélection
-          </Button>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Button variant="primary" size="sm" onClick={() => void bulk("publie")} disabled={pending || selected.size === 0}>
+              Valider la sélection ({selected.size})
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => setDemandeMotifLot(true)}
+              disabled={pending || selected.size === 0}
+            >
+              Rejeter la sélection
+            </Button>
+          </div>
+          {demandeMotifLot && selected.size > 0 && (
+            <MotifRejet
+              libelleConfirmation={`Rejeter les ${selected.size}`}
+              pending={pending}
+              onAnnuler={() => setDemandeMotifLot(false)}
+              onRejeter={(motif) => bulk("rejete", motif)}
+            />
+          )}
         </div>
       )}
 
