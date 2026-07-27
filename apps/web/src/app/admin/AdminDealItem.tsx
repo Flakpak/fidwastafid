@@ -285,6 +285,27 @@ export function AdminDealItem({
               )}
             </div>
           )}
+          {/* Soumission acceptée alors que Turnstile était injoignable
+              (migration 0010). Elle est passée SANS vérification anti-robot :
+              c'est précisément le cas où la relecture humaine, seul filet
+              restant, doit être plus attentive. Badge `warn` — une alerte, pas
+              un rejet : la soumission peut être parfaitement légitime. */}
+          {!deal.turnstileVerifie && (
+            <div className="text-xs bg-warn-soft border border-warn/40 rounded-lg px-2.5 py-1.5 text-ink flex flex-col gap-0.5">
+              <span className="font-bold flex items-center gap-1">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true" className="h-3.5 w-3.5 text-warn shrink-0">
+                  <path d="M12 9v4" />
+                  <path d="M12 17h.01" />
+                  <path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+                </svg>
+                Soumission non vérifiée par Turnstile
+              </span>
+              <span className="text-ink-muted">
+                Cloudflare était injoignable au moment de l&apos;envoi : la soumission est passée sans contrôle
+                anti-robot. Rien ne dit qu&apos;elle est mauvaise — mais tu es le seul filet restant.
+              </span>
+            </div>
+          )}
           <div className="text-xs text-ink-subtle">Soumis par {deal.submitterPublicId ?? "collecte automatique"}</div>
         </div>
         <div className="flex flex-col gap-1 flex-shrink-0">

@@ -221,6 +221,10 @@ export const dealAdminSchema = dealSchema.extend({
   whatsappContact: z.string().nullable(),
   whatsappPublic: z.boolean(),
   motifRejet: z.string().nullable(),
+  /** `false` = soumission acceptée alors que Cloudflare Turnstile était
+   *  injoignable (panne 429/5xx/réseau, migration 0010). Admin uniquement :
+   *  c'est une information de modération, jamais un fait public. */
+  turnstileVerifie: z.boolean(),
 });
 export type DealAdmin = z.infer<typeof dealAdminSchema>;
 
