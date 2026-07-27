@@ -1,5 +1,6 @@
 import { withTransaction, closePool, query } from "@fidwastafid/db";
-import { POST as postDeal } from "../src/app/api/v1/deals/route.js";
+import { POST as postDeal, GET as getDealsList } from "../src/app/api/v1/deals/route.js";
+import { GET as getFacettes } from "../src/app/api/v1/deals/facettes/route.js";
 import { GET as getDeal } from "../src/app/api/v1/deals/[publicId]/route.js";
 import { POST as postVote, DELETE as deleteVote } from "../src/app/api/v1/deals/[publicId]/votes/route.js";
 import {
@@ -159,6 +160,21 @@ function authedFormRequest(url: string, token: string, formData: FormData, extra
   });
 }
 
+/** Fixtures du lot 7 — les quatre situations de localisation d'un deal.
+ *  Catégorie isolée : les vérifications restent vraies quel que soit le
+ *  contenu réel de la base. */
+const CATEGORIE_LOCALISATION = "Gaming";
+const DEAL_EN_LIGNE = "itgen1qa2a";
+const DEAL_NATIONAL = "itgnat1qa2";
+const DEAL_CASA = "itgcas1qa2";
+const DEAL_RABAT = "itgrab1qa2";
+const DEALS_LOCALISATION: [string, string | null, string][] = [
+  [DEAL_EN_LIGNE, null, "en_ligne"],
+  [DEAL_NATIONAL, "National", "physique"],
+  [DEAL_CASA, "Casablanca", "physique"],
+  [DEAL_RABAT, "Rabat", "physique"],
+];
+
 const ENSEIGNE_SLUG = "test-integration";
 const DEAL_PUBLIC_ID = "itgd2a9qa2";
 
@@ -211,6 +227,20 @@ async function seedFixtures(userId: string): Promise<void> {
      on conflict (public_id) do update set score = 0`,
     [DEAL_PUBLIC_ID, enseigneId, userId]
   );
+
+  // Quatre deals publiés couvrant les quatre situations de localisation
+  // (lot 7) : en ligne sans ville, national, et deux villes distinctes. Ils
+  // partagent une catégorie à part pour ne pas dépendre du contenu réel de
+  // la base — les vérifications ci-dessous portent sur l'APPARTENANCE de ces
+  // quatre-là, jamais sur des totaux absolus.
+  for (const [publicId, ville, type] of DEALS_LOCALISATION) {
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, ville, categorie, type, prix_promo, statut, submitter_id, score)
+       values ($1, $2, $3, $4, $5, $6, 1, 'publie', $7, 0)
+       on conflict (public_id) do update set ville = excluded.ville, type = excluded.type, statut = 'publie'`,
+      [publicId, `Localisation ${publicId}`, enseigneId, ville, CATEGORIE_LOCALISATION, type, userId]
+    );
+  }
 }
 
 async function main() {
@@ -1018,6 +1048,90 @@ async function main() {
     noParams
   );
   check("PATCH /me couleur hors enum -> 400 VALIDATION_ERROR", patchBadColorRes.status === 400);
+
+  // -------------------------------------------------------------------------
+  // Lot 7 — ville, deals en ligne et compteurs, mesurés sur la VRAIE base.
+  //
+  // Les tests hors ligne verrouillent le partage des prédicats entre la liste
+  // et les compteurs. Ici on vérifie ce que ce partage est censé produire :
+  // le compteur annoncé est le nombre de lignes réellement servies.
+  // -------------------------------------------------------------------------
+  console.log("\nlot 7 — ville + deals en ligne, et compteurs contextuels");
+
+  /** Épuise la pagination : le total annoncé se compare au nombre RÉEL de
+   *  deals servis, pas à une première page. */
+  async function listerTout(qs: string): Promise<string[]> {
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 50; page++) {
+      const url = `http://localhost/api/v1/deals?${qs}&limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+      const res = await getDealsList(new Request(url));
+      if (res.status !== 200) throw new Error(`GET /deals ${qs} -> ${res.status}`);
+      const body = (await res.json()) as { data: { publicId: string }[]; nextCursor: string | null };
+      ids.push(...body.data.map((d) => d.publicId));
+      cursor = body.nextCursor;
+      if (!cursor) break;
+    }
+    return ids;
+  }
+
+  async function total(qs: string): Promise<number> {
+    const res = await getFacettes(new Request(`http://localhost/api/v1/deals/facettes?${qs}`));
+    const body = (await res.json()) as { total: number };
+    return body.total;
+  }
+
+  const qsRabat = `categorie=${CATEGORIE_LOCALISATION}&ville=Rabat`;
+  const idsRabat = await listerTout(qsRabat);
+  check("ville choisie -> les deals de cette ville", idsRabat.includes(DEAL_RABAT));
+  check("ville choisie -> PLUS les deals nationaux", idsRabat.includes(DEAL_NATIONAL));
+  check("ville choisie -> PLUS les deals en ligne", idsRabat.includes(DEAL_EN_LIGNE));
+  check("ville choisie -> jamais ceux d'une AUTRE ville", !idsRabat.includes(DEAL_CASA));
+  check("compteur == nombre de deals réellement renvoyés (ville)", (await total(qsRabat)) === idsRabat.length);
+
+  const qsEnLigne = `categorie=${CATEGORIE_LOCALISATION}&type=en_ligne`;
+  const idsEnLigne = await listerTout(qsEnLigne);
+  check("« en ligne » -> le deal en ligne", idsEnLigne.includes(DEAL_EN_LIGNE));
+  check("« en ligne » -> aucun deal de boutique", !idsEnLigne.includes(DEAL_CASA) && !idsEnLigne.includes(DEAL_NATIONAL));
+  check("compteur == nombre réellement renvoyé (en ligne)", (await total(qsEnLigne)) === idsEnLigne.length);
+  check(
+    "« en ligne » rend la ville sans objet : même résultat avec ou sans ville",
+    (await total(`${qsEnLigne}&ville=Casablanca`)) === idsEnLigne.length
+  );
+
+  const qsBoutique = `categorie=${CATEGORIE_LOCALISATION}&type=physique`;
+  const idsBoutique = await listerTout(qsBoutique);
+  check("« en boutique » -> jamais le deal en ligne", !idsBoutique.includes(DEAL_EN_LIGNE));
+  check("compteur == nombre réellement renvoyé (en boutique)", (await total(qsBoutique)) === idsBoutique.length);
+
+  // Chaque compteur de la feuille est vérifié contre ce que le filtre
+  // correspondant renvoie vraiment — c'est le contrat de ce lot, dimension
+  // par dimension et pas seulement sur le total.
+  const facettesRes = await getFacettes(
+    new Request(`http://localhost/api/v1/deals/facettes?categorie=${CATEGORIE_LOCALISATION}`)
+  );
+  const facettes = (await facettesRes.json()) as { villes: { valeur: string; n: number }[] };
+  let compteursJustes = true;
+  for (const ville of facettes.villes) {
+    const reels = await listerTout(`categorie=${CATEGORIE_LOCALISATION}&ville=${encodeURIComponent(ville.valeur)}`);
+    if (reels.length !== ville.n) {
+      compteursJustes = false;
+      console.log(`      ville ${ville.valeur} : compteur ${ville.n} != ${reels.length} servis`);
+    }
+  }
+  check("chaque compteur de ville == ce que le filtre de cette ville renvoie", compteursJustes);
+
+  // Un curseur d'un autre jeu de filtres ne peut pas être rejoué (étape 8).
+  const premierePage = await getDealsList(new Request("http://localhost/api/v1/deals?ville=Rabat&limit=1"));
+  const { nextCursor } = (await premierePage.json()) as { nextCursor: string | null };
+  if (nextCursor) {
+    const rejoue = await getDealsList(
+      new Request(`http://localhost/api/v1/deals?ville=Casablanca&limit=1&cursor=${encodeURIComponent(nextCursor)}`)
+    );
+    check("curseur d'un autre jeu de filtres -> 400, jamais une page silencieusement fausse", rejoue.status === 400);
+  } else {
+    check("curseur d'un autre jeu de filtres -> 400 (non exercé : une seule page)", true);
+  }
 
   console.log(
     "\n(DELETE /api/v1/me non testé automatiquement — suppression réelle du compte de test, à valider manuellement.)"

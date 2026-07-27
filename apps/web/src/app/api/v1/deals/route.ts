@@ -7,7 +7,16 @@ import { parseJsonBody, parseCandidate } from "../_lib/validation.js";
 import { isRateLimited, getClientIp } from "../_lib/rateLimit.js";
 import { verifierTurnstile, TurnstileIndisponibleError } from "../_lib/turnstile.js";
 import { decodeCursor, encodeCursor, type TriDeals } from "../_lib/pagination.js";
-import { DEAL_SELECT, DEAL_FROM, PUBLIC_STATUTS, toDeal, type DealRow } from "../_lib/deals.js";
+import {
+  conditionCategorie,
+  conditionType,
+  conditionVille,
+  conditionsBase,
+  lireFiltres,
+  signatureFiltres,
+  type Lieur,
+} from "../_lib/dealsFilters.js";
+import { DEAL_SELECT, DEAL_FROM, toDeal, type DealRow } from "../_lib/deals.js";
 import { processAndStoreDealImage, InvalidImageError, ImageProcessingError } from "../_lib/dealImage.js";
 
 export const runtime = "nodejs";
@@ -94,14 +103,21 @@ function tendanceExpr(asOfParamIdx: number): string {
  * Filtres : statut (restreint aux valeurs publiques, `publie` par défaut —
  * en_attente/rejete/auto_draft ne sortent jamais de cet endpoint non
  * authentifié, c'est le rôle de /api/v1/admin/deals), enseigne, ville,
- * categorie, type. Pagination par curseur (jamais offset), tri
+ * categorie, type, q. Pagination par curseur (jamais offset), tri
  * tendance (défaut) | score | recent.
+ *
+ * La lecture des filtres et la construction du WHERE vivent dans
+ * `_lib/dealsFilters.ts`, partagées avec `GET /api/v1/deals/facettes` :
+ * `ville` y signifie « cette ville + les deals nationaux + les deals
+ * disponibles en ligne » (lot 7), et `q` y est un filtre SERVEUR sur le
+ * titre et l'enseigne — avant ce lot, la recherche ne filtrait que les deals
+ * déjà téléchargés côté client, donc jamais au-delà de la première page.
  */
 export async function GET(request: Request): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
 
-  const statutParam = searchParams.get("statut");
-  const statut = statutParam && PUBLIC_STATUTS.has(statutParam) ? statutParam : "publie";
+  const filtres = lireFiltres(searchParams);
+  const signature = signatureFiltres(filtres);
 
   const triParam = searchParams.get("tri");
   const tri: TriDeals = triParam === "score" || triParam === "recent" ? triParam : "tendance";
@@ -117,20 +133,25 @@ export async function GET(request: Request): Promise<NextResponse> {
     if (!cursor || cursor.tri !== tri) {
       return apiError("VALIDATION_ERROR", "Curseur invalide pour ce tri.");
     }
+    // Refus ACTIF d'un curseur issu d'un autre jeu de filtres (lot 7,
+    // étape 8) : il pointerait une position dans une liste qui n'existe
+    // plus, en sautant ou en dupliquant des lignes sans rien signaler.
+    if (cursor.filtres !== signature) {
+      return apiError("VALIDATION_ERROR", "Curseur invalide pour ces filtres.");
+    }
   }
 
-  const conditions: string[] = ["d.statut = $1"];
-  const values: unknown[] = [statut];
-
-  const pushCondition = (column: string, value: string | null) => {
-    if (!value) return;
-    values.push(value);
-    conditions.push(`${column} = $${values.length}`);
-  };
-  pushCondition("e.slug", searchParams.get("enseigne"));
-  pushCondition("d.ville", searchParams.get("ville"));
-  pushCondition("d.categorie", searchParams.get("categorie"));
-  pushCondition("d.type", searchParams.get("type"));
+  // Mêmes prédicats que les compteurs (_lib/dealsFilters.ts) — c'est ce
+  // partage, et lui seul, qui garantit qu'un compteur annonce exactement ce
+  // que cette liste renverra.
+  const lieur: Lieur = { values: [] };
+  const conditions: string[] = [
+    ...conditionsBase(filtres, lieur),
+    conditionVille(filtres, lieur),
+    conditionCategorie(filtres, lieur),
+    conditionType(filtres, lieur),
+  ];
+  const values = lieur.values;
 
   // Figé à la première page (pas de curseur) puis reconduit tel quel par le
   // curseur pour chaque page suivante — jamais recalculé en cours de
@@ -194,7 +215,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (hasMore && last) {
     const value =
       tri === "score" ? String(last.score) : tri === "recent" ? new Date(last.created_at).toISOString() : String(last.tendance_rang);
-    nextCursor = encodeCursor({ tri, value, publicId: last.public_id, asOf: asOf ?? undefined });
+    nextCursor = encodeCursor({ tri, value, publicId: last.public_id, asOf: asOf ?? undefined, filtres: signature });
   }
 
   return NextResponse.json({ data: pageRows.map(toDeal), nextCursor });

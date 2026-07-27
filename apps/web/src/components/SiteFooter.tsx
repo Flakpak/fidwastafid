@@ -29,6 +29,14 @@ export function SiteFooter() {
           périmètre du 26/07/2026) : seule la couleur change. */}
       <p className="font-arabic text-ink text-lg text-center">فيد و ستافيد — partage et fais profiter</p>
       <div className="flex items-center gap-3 mt-1 text-xs text-ink-muted">
+        {/* « Le concept » descend ici avec le lot 7 : il vivait dans le rail
+            desktop de l'accueil, retiré par ce lot. Au pied de page, il est
+            atteignable depuis TOUT le site — et depuis mobile, où le rail
+            n'a jamais existé. */}
+        <Link href="/concept" className="hover:text-ink">
+          Le concept
+        </Link>
+        <span aria-hidden="true">·</span>
         <Link href="/confidentialite" className="hover:text-ink">
           Confidentialité
         </Link>

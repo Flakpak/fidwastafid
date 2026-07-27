@@ -33,6 +33,16 @@ export interface DealsCursor {
   publicId: string;
   /** Instant de référence figé pour le rang `tendance` — absent pour score/recent. */
   asOf?: string;
+  /**
+   * Signature des filtres qui ont produit ce curseur (`signatureFiltres`,
+   * _lib/dealsFilters.ts). Un curseur est une POSITION dans un jeu de
+   * résultats : réinjecté dans un jeu construit avec d'autres filtres, il
+   * saute ou duplique des lignes en silence. Le serveur le refuse donc quand
+   * la signature ne correspond pas à la requête courante — la garantie
+   * « tout changement de filtre réinitialise la pagination » ne dépend plus
+   * de la discipline du client.
+   */
+  filtres: string;
 }
 
 export function encodeCursor(cursor: DealsCursor): string {
@@ -41,12 +51,13 @@ export function encodeCursor(cursor: DealsCursor): string {
 
 function isDealsCursor(value: unknown): value is DealsCursor {
   if (typeof value !== "object" || value === null) return false;
-  const { tri, value: v, publicId, asOf } = value as Record<string, unknown>;
+  const { tri, value: v, publicId, asOf, filtres } = value as Record<string, unknown>;
   return (
     (tri === "score" || tri === "recent" || tri === "tendance") &&
     typeof v === "string" &&
     typeof publicId === "string" &&
-    (asOf === undefined || typeof asOf === "string")
+    (asOf === undefined || typeof asOf === "string") &&
+    typeof filtres === "string"
   );
 }
 

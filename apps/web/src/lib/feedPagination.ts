@@ -20,10 +20,31 @@ export interface FiltresFeed {
   tri: string;
   ville?: string;
   categorie?: string;
-  /** "tous" n'est pas transmis : c'est l'absence de filtre. */
+  /** Chaîne vide = pas de filtre de disponibilité (« partout »). */
   type?: string;
+  /** Recherche — filtre SERVEUR depuis le lot 7 (titre + enseigne). */
+  q?: string;
   /** Curseur opaque de la page précédente, retransmis TEL QUEL. */
   cursor?: string | null;
+}
+
+/**
+ * Paramètres de filtre communs à la liste et aux compteurs. Extraits pour
+ * que les deux appels ne puissent pas dériver l'un de l'autre : des
+ * compteurs calculés sur d'autres filtres que la liste seraient faux sans
+ * qu'aucune erreur ne le signale.
+ */
+function ajouterFiltres(params: URLSearchParams, f: FiltresFeed): URLSearchParams {
+  if (f.ville) params.set("ville", f.ville);
+  if (f.categorie) params.set("categorie", f.categorie);
+  if (f.type) params.set("type", f.type);
+  if (f.q) params.set("q", f.q);
+  return params;
+}
+
+/** Query string de `GET /api/v1/deals/facettes` — ni tri, ni limite, ni curseur. */
+export function construireParamsFacettes(f: FiltresFeed): URLSearchParams {
+  return ajouterFiltres(new URLSearchParams(), f);
 }
 
 /**
@@ -36,10 +57,7 @@ export interface FiltresFeed {
  * casserait les deux garanties.
  */
 export function construireParamsFeed(f: FiltresFeed): URLSearchParams {
-  const params = new URLSearchParams({ limit: String(TAILLE_PAGE), tri: f.tri });
-  if (f.ville) params.set("ville", f.ville);
-  if (f.categorie) params.set("categorie", f.categorie);
-  if (f.type && f.type !== "tous") params.set("type", f.type);
+  const params = ajouterFiltres(new URLSearchParams({ limit: String(TAILLE_PAGE), tri: f.tri }), f);
   if (f.cursor) params.set("cursor", f.cursor);
   return params;
 }
