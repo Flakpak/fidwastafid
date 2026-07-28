@@ -90,8 +90,6 @@ const Facettes = registry.register(
   "Facettes",
   z.object({
     total: z.number().int(),
-    totalSansCategorie: z.number().int(),
-    totalSansVille: z.number().int(),
     categories: z.array(z.object({ valeur: z.string(), n: z.number().int() })),
     villes: z.array(z.object({ valeur: z.string(), n: z.number().int() })),
   })

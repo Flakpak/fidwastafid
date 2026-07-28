@@ -31,14 +31,13 @@ export const FILTRES_PAR_DEFAUT: EtatFiltres = {
 };
 
 /**
- * Étiquettes des deux sélecteurs. `nom` est ce qu'affiche le sélecteur AU
- * REPOS : le nom de la dimension, pas « toutes les… ». Un sélecteur au repos
- * n'applique aucun filtre — l'afficher comme s'il en appliquait un rendrait
- * l'état actif illisible, puisque tout serait toujours actif.
+ * Les deux dimensions filtrables, et leurs deux libellés.
  *
- * `neutre` est le libellé de la même option DANS la feuille, où il faut au
- * contraire une formulation qui se choisit : on ne clique pas sur
- * « Catégorie » pour tout afficher, on clique sur « Toutes les catégories ».
+ * `nom` titre la SECTION (colonne desktop, feuille mobile) : c'est le nom de
+ * la dimension, pas une valeur. `neutre` est le libellé de l'OPTION qui
+ * n'applique aucun filtre — il lui faut une formulation qui se choisit : on
+ * ne clique pas sur « Catégorie » pour tout afficher, on clique sur
+ * « Toutes les catégories ».
  */
 export const DIMENSIONS = {
   categorie: { nom: "Catégorie", neutre: "Toutes les catégories", valeurs: CATEGORIES as readonly string[] },
@@ -167,7 +166,3 @@ export function optionDesactivee({
   return sansObjet || (n === 0 && !choisi);
 }
 
-/** Étiquette d'un sélecteur : le nom de la dimension au repos, la valeur choisie sinon. */
-export function etiquetteSelecteur(dimension: keyof typeof DIMENSIONS, valeur: string): string {
-  return valeur || DIMENSIONS[dimension].nom;
-}

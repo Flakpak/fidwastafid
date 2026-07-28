@@ -13,24 +13,15 @@ import { OU_ACHETER, type TypeAchat } from "../lib/filtresFeed.js";
  */
 
 /**
- * Conteneur de page partagé par la barre collante et le contenu du feed.
+ * Conteneur de page — porte À LA FOIS la grille deux colonnes (colonne de
+ * filtres + feed) et tout ce qui s'y aligne. Un seul jeu de classes, donc
+ * aucune largeur recopiée qui pourrait se désynchroniser.
  *
- * Un seul jeu de classes pour les deux : la rangée de filtres est alignée sur
- * la colonne de contenu par CONSTRUCTION, et non par une valeur recopiée qui
- * se désynchroniserait à la première modification de l'autre — le même piège
- * que l'ancien `top-[70px]` recopié de la sidebar vers la barre de filtres.
- * La barre s'arrête donc à la largeur du contenu, elle ne va plus de bord à
- * bord.
+ * Le palier `xl` évite que le feed reste figé à sa largeur de 1024px sur les
+ * grands écrans : la colonne garde ses 232px, c'est le feed qui prend le
+ * reste.
  */
-export const CONTENEUR = "mx-auto w-full max-w-2xl px-4 lg:max-w-5xl";
-
-/**
- * Seuil de la rangée unique desktop. `lg` et non `md` : mesuré en
- * vérification, les cinq contrôles (recherche, catégorie, ville, « Où
- * acheter », « Trier par ») ne tiennent pas sous 1024px sans déborder
- * horizontalement — c'est précisément le défaut que ce lot supprime. En
- * dessous, la disposition en trois rangées s'applique, à toute largeur.
- */
+export const CONTENEUR = "mx-auto w-full max-w-2xl px-4 lg:max-w-5xl xl:max-w-6xl";
 
 export const NEUTRE = "border-border-strong bg-surface text-ink-muted hover:border-accent-line hover:text-accent";
 export const ACTIF = "border-accent bg-accent-soft text-accent";
@@ -55,14 +46,6 @@ export function IconeReglages({ className }: { className?: string }) {
       <path d="M4 7h10M18 7h2M4 17h4M12 17h8" strokeLinecap="round" />
       <circle cx="16" cy="7" r="2.2" />
       <circle cx="10" cy="17" r="2.2" />
-    </svg>
-  );
-}
-
-export function IconeChevron({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true" className={className}>
-      <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -94,46 +77,6 @@ export function ChampRecherche({
         className={`${CADRE} h-full w-full border-border-strong bg-surface pl-9 pr-3 text-sm text-ink placeholder:text-ink-subtle focus:border-accent focus:outline-none`}
       />
     </div>
-  );
-}
-
-/**
- * Sélecteur d'une dimension — ouvre la feuille sur la section correspondante.
- *
- * `min-w-0` + `truncate` : une valeur trop longue est coupée par des points
- * de suspension. Ni retour à la ligne ni rétrécissement de police, qui
- * désaligneraient les deux sélecteurs de la rangée 3 l'un par rapport à
- * l'autre.
- */
-export function SelecteurDimension({
-  etiquette,
-  actif,
-  desactive,
-  titre,
-  onClick,
-  className,
-}: {
-  etiquette: string;
-  actif: boolean;
-  desactive?: boolean;
-  titre?: string;
-  onClick: (declencheur: HTMLButtonElement) => void;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => onClick(e.currentTarget)}
-      disabled={desactive}
-      title={titre}
-      aria-haspopup="dialog"
-      className={`${CADRE} flex h-full min-w-0 items-center gap-1.5 px-3 text-sm font-medium disabled:cursor-default disabled:opacity-50 ${
-        actif ? ACTIF : NEUTRE
-      } ${className ?? ""}`}
-    >
-      <span className="truncate">{etiquette}</span>
-      <IconeChevron className="ml-auto h-4 w-4 shrink-0 opacity-70" />
-    </button>
   );
 }
 

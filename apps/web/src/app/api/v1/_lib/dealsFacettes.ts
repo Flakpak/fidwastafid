@@ -36,14 +36,12 @@ export interface Facette {
 }
 
 export interface Facettes {
-  /** Nombre de deals que la liste renverra avec CES filtres, exactement. */
+  /** Nombre de deals que la liste renverra avec CES filtres, exactement.
+   *  Seul nombre encore AFFICHÉ par l'interface. */
   total: number;
-  /** Compteurs des options neutres de la feuille (« Toutes les catégories »,
-   *  « Toutes les villes »). Calculés, jamais déduits par somme : les villes
-   *  se recouvrent (un deal en ligne compte dans toutes), leur somme n'est
-   *  donc pas le total. */
-  totalSansCategorie: number;
-  totalSansVille: number;
+  /** Par dimension : plus affichés depuis le lot 7 bis (aucune valeur d'usage
+   *  constatée), mais toujours calculés — ils servent à GRISER les options
+   *  sans deal, pour qu'on ne puisse pas s'enfermer dans un filtre vide. */
   categories: Facette[];
   villes: Facette[];
 }
@@ -114,12 +112,6 @@ export function requeteFacettes(f: FiltresDeals): { text: string; values: unknow
       select 'total'::text as dim, ''::text as valeur, 0::bigint as ord, count(*)::int as n
       from base b
       where ${okVille} and ${okCategorie} and ${okType}
-      union all
-      select 'total_sans_categorie', '', 0::bigint, count(*)::int
-      from base b where ${okVille} and ${okType}
-      union all
-      select 'total_sans_ville', '', 0::bigint, count(*)::int
-      from base b where ${okCategorie} and ${okType}
     )
     select dim, valeur, n
     from (select * from cats union all select * from vls union all select * from tot) x
@@ -131,11 +123,9 @@ export function requeteFacettes(f: FiltresDeals): { text: string; values: unknow
 
 /** Regroupe les lignes plates de `requeteFacettes` en réponse d'API. */
 export function assemblerFacettes(rows: FacetteRow[]): Facettes {
-  const facettes: Facettes = { total: 0, totalSansCategorie: 0, totalSansVille: 0, categories: [], villes: [] };
+  const facettes: Facettes = { total: 0, categories: [], villes: [] };
   for (const row of rows) {
     if (row.dim === "total") facettes.total = row.n;
-    else if (row.dim === "total_sans_categorie") facettes.totalSansCategorie = row.n;
-    else if (row.dim === "total_sans_ville") facettes.totalSansVille = row.n;
     else if (row.dim === "categorie") facettes.categories.push({ valeur: row.valeur, n: row.n });
     else if (row.dim === "ville") facettes.villes.push({ valeur: row.valeur, n: row.n });
   }
