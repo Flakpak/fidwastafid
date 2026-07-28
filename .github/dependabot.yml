@@ -9,6 +9,28 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+
+    # Délai de refroidissement — aligné sur la politique pnpm (28/07/2026).
+    #
+    # Fait générateur : la PR supabase-js 2.110.9 est arrivée rouge sur les
+    # CINQ jobs, non pour une régression mais parce que les six paquets
+    # @supabase/* avaient été publiés 1h43 plus tôt —
+    # ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION, cutoff mesuré à 24h pile
+    # (publication 2026-07-27T15:14Z, cutoff 2026-07-26T16:57Z). Dependabot
+    # proposait une montée que notre propre politique d'installation refuse :
+    # cinq jobs rouges qui n'apprennent rien, et une PR à rouvrir plus tard.
+    #
+    # 2 jours et non 1 : à un jour, la borne Dependabot coïnciderait avec le
+    # seuil pnpm de 24h, et une PR ouverte pile sur la borne repasserait
+    # rouge pour quelques minutes d'écart entre l'ouverture et le run CI.
+    #
+    # NE RETARDE PAS LES CORRECTIFS DE SÉCURITÉ : comme les règles `ignore`
+    # ci-dessous et comme open-pull-requests-limit, le cooldown ne s'applique
+    # qu'aux montées de version. Les mises à jour de sécurité Dependabot en
+    # sont exemptées — c'est la condition à laquelle ce délai est acceptable.
+    cooldown:
+      default-days: 2
+
     ignore:
       # Incident du 19/07/2026 : le PR Dependabot next-16.2.10 (major) casse le
       # build Vercel — Next 16 active Turbopack par défaut, incompatible avec
