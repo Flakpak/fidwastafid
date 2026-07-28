@@ -1,4 +1,5 @@
 import { withTransaction, closePool, query } from "@fidwastafid/db";
+import { PUBLIC_IDS_FIXTURES, PUBLIC_ID_INEXISTANT } from "./fixtures.js";
 import { POST as postDeal, GET as getDealsList } from "../src/app/api/v1/deals/route.js";
 import { GET as getFacettes } from "../src/app/api/v1/deals/facettes/route.js";
 import { GET as getDeal } from "../src/app/api/v1/deals/[publicId]/route.js";
@@ -164,10 +165,10 @@ function authedFormRequest(url: string, token: string, formData: FormData, extra
  *  Catégorie isolée : les vérifications restent vraies quel que soit le
  *  contenu réel de la base. */
 const CATEGORIE_LOCALISATION = "Gaming";
-const DEAL_EN_LIGNE = "itgen1qa2a";
-const DEAL_NATIONAL = "itgnat1qa2";
-const DEAL_CASA = "itgcas1qa2";
-const DEAL_RABAT = "itgrab1qa2";
+const DEAL_EN_LIGNE = PUBLIC_IDS_FIXTURES.dealEnLigne;
+const DEAL_NATIONAL = PUBLIC_IDS_FIXTURES.dealNational;
+const DEAL_CASA = PUBLIC_IDS_FIXTURES.dealCasablanca;
+const DEAL_RABAT = PUBLIC_IDS_FIXTURES.dealRabat;
 const DEALS_LOCALISATION: [string, string | null, string][] = [
   [DEAL_EN_LIGNE, null, "en_ligne"],
   [DEAL_NATIONAL, "National", "physique"],
@@ -176,7 +177,7 @@ const DEALS_LOCALISATION: [string, string | null, string][] = [
 ];
 
 const ENSEIGNE_SLUG = "test-integration";
-const DEAL_PUBLIC_ID = "itgd2a9qa2";
+const DEAL_PUBLIC_ID = PUBLIC_IDS_FIXTURES.dealPrincipal;
 
 // 1x1 PNG transparent minimal — juste assez pour que sharp le décode et que
 // le sniffing magic bytes le reconnaisse comme un vrai PNG. Module-scope :
@@ -193,14 +194,14 @@ const AUTRE_PSEUDO = "PseudoDejaPris";
 async function seedFixtures(userId: string): Promise<void> {
   await withTransaction(async (client) => {
     await client.query(
-      `insert into users (id, public_id, pseudo) values ($1, 'itg2p9qa23', 'IntegrationTest')
+      `insert into users (id, public_id, pseudo) values ($1, $2, 'IntegrationTest')
        on conflict (id) do nothing`,
-      [userId]
+      [userId, PUBLIC_IDS_FIXTURES.utilisateurTest]
     );
     await client.query(
-      `insert into users (id, public_id, pseudo) values ($1, 'aut2p9qa23', $2)
+      `insert into users (id, public_id, pseudo) values ($1, $2, $3)
        on conflict (id) do nothing`,
-      [AUTRE_USER_ID, AUTRE_PSEUDO]
+      [AUTRE_USER_ID, PUBLIC_IDS_FIXTURES.utilisateurAutre, AUTRE_PSEUDO]
     );
     await client.query(`insert into enseignes (slug, nom) values ($1, 'Test Integration') on conflict (slug) do nothing`, [
       ENSEIGNE_SLUG,
@@ -861,8 +862,8 @@ async function main() {
   check("image-depuis-lien SSRF -> message d'erreur clair", typeof imgSsrfBody.error?.message === "string");
 
   const imgNotFoundRes = await postImageDepuisLien(
-    authedRequest("http://localhost/api/v1/admin/deals/zzzzzzzzzz/image-depuis-lien", token, { method: "POST" }),
-    { params: Promise.resolve({ publicId: "zzzzzzzzzz" }) }
+    authedRequest(`http://localhost/api/v1/admin/deals/${PUBLIC_ID_INEXISTANT}/image-depuis-lien`, token, { method: "POST" }),
+    { params: Promise.resolve({ publicId: PUBLIC_ID_INEXISTANT }) }
   );
   check("image-depuis-lien deal inconnu -> 404", imgNotFoundRes.status === 404);
 
@@ -919,8 +920,8 @@ async function main() {
   check("upload sans fichier -> 400 VALIDATION_ERROR", missingFileRes.status === 400);
 
   const uploadNotFoundRes = await postDealImage(
-    authedFormRequest("http://localhost/api/v1/admin/deals/zzzzzzzzzz/image", token, new FormData()),
-    { params: Promise.resolve({ publicId: "zzzzzzzzzz" }) }
+    authedFormRequest(`http://localhost/api/v1/admin/deals/${PUBLIC_ID_INEXISTANT}/image`, token, new FormData()),
+    { params: Promise.resolve({ publicId: PUBLIC_ID_INEXISTANT }) }
   );
   check("upload deal inconnu -> 404", uploadNotFoundRes.status === 404);
 

@@ -47,7 +47,8 @@ import { assemblerFacettes, requeteFacettes } from "../src/app/api/v1/_lib/deals
 import { encodeCursor } from "../src/app/api/v1/_lib/pagination.js";
 import { GET as getDeals } from "../src/app/api/v1/deals/route.js";
 import { champsModifies, normaliserValeurAudit } from "../src/app/api/v1/_lib/auditDiff.js";
-import { motifRejetManquant, type Deal } from "@fidwastafid/schemas";
+import { motifRejetManquant, publicIdSchema, PUBLIC_ID_ALPHABET, type Deal } from "@fidwastafid/schemas";
+import { PUBLIC_IDS_FIXTURES, PUBLIC_ID_INEXISTANT, TOUS_LES_PUBLIC_IDS } from "./fixtures.js";
 
 // Jeton de test purement local (Phase 7B) — jamais le vrai REVALIDATE_TOKEN,
 // qui n'existe que côté Vercel/secrets GitHub. Comparable au
@@ -979,5 +980,38 @@ check(
   resumeFiltres({ categorie: "Mode", ville: "Rabat", type: "en_ligne", tri: "score", q: "tv" }).join(" · ") ===
     "Mode · En ligne · « tv »"
 );
+
+// ---------------------------------------------------------------------------
+// Fixtures d'intégration — conformité des public_id, VÉRIFIÉE HORS LIGNE.
+//
+// Fait générateur (28/07/2026, PR #59) : quatre fixtures ajoutées à la main
+// portaient le chiffre `1`, absent de PUBLIC_ID_ALPHABET. Les `insert`
+// échouaient sur `deals_public_id_check` (SQLSTATE 23514), quatre fois
+// d'affilée — et uniquement dans le job `integration`, qui n'est pas bloquant
+// parce que dependabot n'a pas les secrets, pas pour laisser passer une
+// régression.
+//
+// Ces vérifications sont ICI, dans le test hors ligne, pour que la faute tombe
+// dans `quality` : elle n'a besoin ni de base, ni de JWT, ni de secrets. Un
+// identifiant écrit à la main est une donnée de test comme une autre — rien ne
+// justifie d'attendre Postgres pour apprendre qu'il est malformé.
+// ---------------------------------------------------------------------------
+console.log("\nFixtures — public_id conformes à l'alphabet (CONTRAT-V1 §1)");
+for (const [nom, id] of Object.entries(PUBLIC_IDS_FIXTURES)) {
+  check(`fixture ${nom} (${id}) conforme`, publicIdSchema.safeParse(id).success);
+}
+check(
+  `identifiant « introuvable » (${PUBLIC_ID_INEXISTANT}) de forme VALIDE`,
+  publicIdSchema.safeParse(PUBLIC_ID_INEXISTANT).success
+);
+check("aucun doublon entre fixtures", new Set(TOUS_LES_PUBLIC_IDS).size === TOUS_LES_PUBLIC_IDS.length);
+
+// Contrôle négatif : sans lui, ces vérifications passeraient tout aussi bien
+// avec un schéma cassé. Ce sont les quatre valeurs réellement rejetées par
+// Postgres le 28/07 qui servent de témoin.
+for (const rejete of ["itgen1qa2a", "itgnat1qa2", "itgcas1qa2", "itgrab1qa2"]) {
+  check(`témoin — ${rejete} (chiffre « 1 ») bien refusé`, !publicIdSchema.safeParse(rejete).success);
+}
+check("l'alphabet exclut 0, 1, l et o", !/[01lo]/.test(PUBLIC_ID_ALPHABET));
 
 void runAsyncChecks();

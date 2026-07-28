@@ -1,5 +1,7 @@
 import { Pool } from "pg";
+import { publicIdSchema } from "@fidwastafid/schemas";
 import { getPool, closePool, query, withTransaction } from "./index.js";
+import { SEED_PUBLIC_IDS } from "./seedFixtures.js";
 
 let pass = 0;
 let fail = 0;
@@ -60,6 +62,17 @@ async function main() {
   } else {
     process.env.DATABASE_URL = original;
   }
+
+  // Public_id du seed — vérifiés SANS base (28/07/2026) : un identifiant
+  // écrit à la main hors de PUBLIC_ID_ALPHABET n'échouerait sinon qu'à
+  // l'`insert`, sur `deals_public_id_check`, chez qui exécute le seed.
+  console.log("\nSeed — public_id conformes à l'alphabet (CONTRAT-V1 §1)");
+  for (const [nom, id] of Object.entries(SEED_PUBLIC_IDS)) {
+    check(`seed ${nom} (${id}) conforme`, publicIdSchema.safeParse(id).success);
+  }
+  const idsSeed = Object.values(SEED_PUBLIC_IDS);
+  check("aucun doublon dans les public_id du seed", new Set(idsSeed).size === idsSeed.length);
+  check("témoin — un identifiant portant « 1 » est refusé", !publicIdSchema.safeParse("d3m2p9qa1").success);
 
   console.log(`\n${pass} passés, ${fail} échoués`);
   if (fail > 0) process.exit(1);
