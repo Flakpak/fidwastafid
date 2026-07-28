@@ -1,4 +1,6 @@
+import { publicIdSchema } from "@fidwastafid/schemas";
 import { query, withTransaction, closePool } from "./client.js";
+import { SEED_PUBLIC_IDS } from "./seedFixtures.js";
 
 /**
  * Données de dev — pas la prod. `SEED_ADMIN_USER_ID` doit être l'uuid réel
@@ -15,7 +17,13 @@ function readAdminUserId(): string {
   return id;
 }
 
-const ADMIN_PUBLIC_ID = process.env.SEED_ADMIN_PUBLIC_ID ?? "kdm2p9qa23";
+/**
+ * Les valeurs figées sont vérifiées hors ligne (verify.ts) ; celle qui vient
+ * de l'environnement ne peut l'être qu'ici. Sans ce garde, un
+ * SEED_ADMIN_PUBLIC_ID malformé n'échouerait qu'au moment de l'`insert`, sur
+ * une violation de contrainte Postgres qui ne dit pas d'où vient la valeur.
+ */
+const ADMIN_PUBLIC_ID = publicIdSchema.parse(process.env.SEED_ADMIN_PUBLIC_ID ?? SEED_PUBLIC_IDS.admin);
 const ADMIN_PSEUDO = process.env.SEED_ADMIN_PSEUDO ?? "Kamel";
 
 // Référentiel de référence = la prod (aswbu) : bim/bringo/carrefour/marjane.
@@ -44,7 +52,7 @@ interface DealSeed {
 
 const DEALS: DealSeed[] = [
   {
-    publicId: "d3m2p9qa23",
+    publicId: SEED_PUBLIC_IDS.huileLesieur,
     titre: "Huile Lesieur 5L",
     enseigneSlug: "marjane",
     ville: "Casablanca",
@@ -56,7 +64,7 @@ const DEALS: DealSeed[] = [
     statut: "publie",
   },
   {
-    publicId: "d3m2p9qa24",
+    publicId: SEED_PUBLIC_IDS.ecouteurs,
     titre: "Écouteurs sans fil",
     // enseigneSlug suit le renommage jumia → bringo ci-dessus (15/07/2026).
     enseigneSlug: "bringo",
@@ -69,7 +77,7 @@ const DEALS: DealSeed[] = [
     statut: "publie",
   },
   {
-    publicId: "d3m2p9qa25",
+    publicId: SEED_PUBLIC_IDS.couchesBebe,
     titre: "Pack couches bébé",
     enseigneSlug: "carrefour",
     ville: "Rabat",
