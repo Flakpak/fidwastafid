@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { HeroArabicTypewriter } from "./HeroArabicTypewriter.js";
+import { buttonClasses } from "./Button.js";
 
 /**
  * Contenu RESTAURÉ à l'identique depuis main (correction de périmètre du
@@ -84,7 +86,7 @@ export function HeroBand() {
         <HeroArabicTypewriter />
       </div>
 
-      <div className="relative grid grid-cols-1 md:grid-cols-3 gap-2.5 hero-steps-anim">
+      <div className="relative mb-4 grid grid-cols-1 md:grid-cols-3 gap-2.5 hero-steps-anim">
         {STEPS.map((step) => (
           <div key={step.num} className="flex md:block gap-3 items-start bg-surface border border-border rounded-2xl p-3.5 md:p-4">
             <div className="flex items-center gap-2 mb-0 md:mb-2.5">
@@ -101,6 +103,34 @@ export function HeroBand() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/*
+       * Ligne de clôture du hero — RÉCUPÉRATION du lot 7 : ces deux entrées
+       * vivaient dans le rail desktop supprimé par ce lot, et personne
+       * n'avait décidé de les supprimer. Elles reviennent ici, qui est leur
+       * place logique : le hero explique le concept en trois étapes, la
+       * suite naturelle est d'en savoir plus ou de contribuer.
+       *
+       * Visibles en mobile ET en desktop, alors que le rail était
+       * `hidden md:flex` — l'absence mobile était déjà un manque, pas une
+       * décision.
+       *
+       * Libellé arabe repris VERBATIM du rail (git, Feed.tsx avant ce lot) :
+       * `فيد و ستافيد`. Ce n'est pas « شارك دييل » — aucun libellé n'est
+       * inventé ici.
+       */}
+      <div className="relative flex flex-col items-center gap-3 border-t border-accent-line pt-5 sm:flex-row sm:justify-center">
+        <Link
+          href="/soumettre"
+          aria-label="Partage un bon plan — soumettre un deal"
+          className={buttonClasses({ variant: "primary", arabic: true })}
+        >
+          فيد و ستافيد
+        </Link>
+        <Link href="/concept" className={buttonClasses({ variant: "brand" })}>
+          Le concept Fidwastafid
+        </Link>
       </div>
     </div>
   );
