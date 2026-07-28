@@ -1,35 +1,21 @@
 "use client";
 
-import {
-  RAISON_VILLE_SANS_OBJET,
-  TRIS,
-  etiquetteSelecteur,
-  villeSansObjet,
-  type EtatFiltres,
-  type TriFeed,
-  type TypeAchat,
-} from "../lib/filtresFeed.js";
-import {
-  ACTIF,
-  CADRE,
-  CONTENEUR,
-  ChampRecherche,
-  IconeReglages,
-  NEUTRE,
-  SegmenteOuAcheter,
-  SelecteurDimension,
-} from "./controlesFiltres.js";
+import { TRIS, type EtatFiltres, type TriFeed } from "../lib/filtresFeed.js";
+import { ACTIF, CADRE, ChampRecherche, IconeReglages, NEUTRE } from "./controlesFiltres.js";
 import type { SectionFeuille } from "./FeuilleFiltres.js";
 
 /**
- * Barre de filtres — rangées 2 et 3 du bloc collant (la rangée 1 est
- * l'en-tête du site, rendu par le même conteneur collant).
+ * Rangée haute du bloc collant — recherche, et selon la largeur : le bouton
+ * « Filtrer » (mobile) ou le tri (desktop).
  *
- * Aucun défilement horizontal, à aucune largeur : les contrôles qui ne
- * tiennent pas en mobile ne sont pas poussés hors écran, ils vivent dans la
- * feuille. Les deux rangées ont une hauteur fixe (h-11, cible tactile ≥44px)
- * — la hauteur du bloc collant ne dépend donc ni du nombre de contrôles ni de
- * la longueur des valeurs choisies.
+ * PLUS AUCUN FILTRE DE DIMENSION ICI. En mobile ils vivent dans la feuille,
+ * en desktop dans la colonne latérale. Cette rangée ne porte donc plus que ce
+ * qui n'est pas une dimension : la recherche, et le tri — qui ne réduit pas
+ * l'ensemble, il le réordonne.
+ *
+ * Aucun défilement horizontal, à aucune largeur : la rangée a une hauteur
+ * fixe et un seul élément élastique (la recherche), qui absorbe la largeur
+ * restante. Aucun contrôle ne peut être poussé hors écran.
  */
 export function BarreFiltres({
   filtres,
@@ -49,26 +35,8 @@ export function BarreFiltres({
    *  (`showModal()` a déjà déplacé le focus dans la feuille). */
   onOuvrir: (section: SectionFeuille, declencheur: HTMLElement) => void;
 }) {
-  const villeInactive = villeSansObjet(filtres);
-  const selecteurVille = (
-    <SelecteurDimension
-      etiquette={etiquetteSelecteur("ville", filtres.ville)}
-      actif={!!filtres.ville}
-      desactive={villeInactive}
-      titre={villeInactive ? RAISON_VILLE_SANS_OBJET : undefined}
-      onClick={(el) => onOuvrir("ville", el)}
-    />
-  );
-  const selecteurCategorie = (
-    <SelecteurDimension
-      etiquette={etiquetteSelecteur("categorie", filtres.categorie)}
-      actif={!!filtres.categorie}
-      onClick={(el) => onOuvrir("categorie", el)}
-    />
-  );
-
   return (
-    <div className={`${CONTENEUR} flex flex-col gap-2 py-2`}>
+    <div className="flex flex-col gap-2">
       <>
         {/* ── Compact (jusqu'à lg) — UNE seule rangée, UNE seule commande ──
             Le bouton réglages et les deux sélecteurs ouvraient la même
@@ -107,25 +75,15 @@ export function BarreFiltres({
           </button>
         </div>
 
-        {/* ── Desktop (≥ lg) — une seule rangée, plus aucune puce défilante ──
-            « Trier par » est séparé à droite par un filet : ce n'est pas un
-            filtre, il ne retire aucun deal.
-
-            Seule la recherche est élastique (`flex-1 min-w-0`) ; tout le
-            reste est `shrink-0` à largeur intrinsèque. C'est elle, et elle
-            seule, qui absorbe la largeur restante — aucun contrôle ne peut
-            donc être poussé hors écran. */}
-        <div className="hidden h-10 items-center gap-2 lg:flex">
-          <ChampRecherche valeur={saisie} onChange={onSaisie} className="h-full min-w-0 flex-1" />
-          <div className="h-full w-[9.5rem] shrink-0">{selecteurCategorie}</div>
-          <div className="h-full w-32 shrink-0">{selecteurVille}</div>
-          <SegmenteOuAcheter
-            name="barre-ou-acheter"
-            valeur={filtres.type}
-            onChange={(t: TypeAchat) => onChange({ type: t })}
-            className="h-full shrink-0"
-          />
-          <div className="flex h-full shrink-0 items-center gap-2 border-l border-border pl-3">
+        {/* ── Desktop (≥ lg) — recherche à gauche, tri à droite. AUCUN filtre ──
+            Les quatre dimensions sont passées dans la colonne latérale : une
+            rangée horizontale ne les tenait pas (libellés tronqués,
+            espacements inégaux). Ne restent ici que la recherche et le tri,
+            qui ne sont pas des filtres de dimension — le tri ne réduit rien,
+            il réordonne, d'où sa place au-dessus du contenu qu'il ordonne. */}
+        <div className="hidden h-10 items-center gap-4 lg:flex">
+          <ChampRecherche valeur={saisie} onChange={onSaisie} className="h-full min-w-0 max-w-sm flex-1" />
+          <div className="ml-auto flex h-full shrink-0 items-center gap-2">
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-ink-subtle">Trier par</span>
             <select
               value={filtres.tri}

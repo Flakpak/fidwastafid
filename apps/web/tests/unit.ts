@@ -31,7 +31,6 @@ import {
   normaliserFiltres,
   optionDesactivee,
   resumeFiltres,
-  etiquetteSelecteur,
   type EtatFiltres,
 } from "../src/lib/filtresFeed.js";
 import {
@@ -970,11 +969,6 @@ console.log("\nÉtat des filtres — URL, étiquettes et rappel en clair");
 check("le tri n'est pas compté comme un filtre", nbFiltresActifs({ ...FILTRES_PAR_DEFAUT, tri: "score" }) === 0);
 check("la recherche n'est pas comptée (elle a son propre champ)", nbFiltresActifs({ ...FILTRES_PAR_DEFAUT, q: "tv" }) === 0);
 check("trois filtres actifs -> pastille à 3", nbFiltresActifs({ categorie: "Mode", ville: "Rabat", type: "physique", tri: "tendance", q: "" }) === 3);
-check(
-  "au repos, un sélecteur affiche le NOM de la dimension",
-  etiquetteSelecteur("categorie", "") === "Catégorie" && etiquetteSelecteur("ville", "") === "Ville"
-);
-check("une fois choisie, il affiche LA valeur", etiquetteSelecteur("ville", "Agadir") === "Agadir");
 check(
   "le rappel en clair énumère les filtres, jamais le tri",
   resumeFiltres({ categorie: "Mode", ville: "Rabat", type: "en_ligne", tri: "score", q: "tv" }).join(" · ") ===

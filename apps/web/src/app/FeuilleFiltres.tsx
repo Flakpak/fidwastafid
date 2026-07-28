@@ -28,7 +28,13 @@ const ANCRES: Record<SectionFeuille, string> = {
   reglages: "categorie",
 };
 
-function compteur(facettes: Facettes | null, dimension: "categories" | "villes", valeur: string): number | null {
+/**
+ * Nombre de deals d'une option — lu, jamais affiché. Les compteurs par option
+ * ont été retirés (aucune valeur d'usage constatée) ; ce nombre ne sert plus
+ * qu'à GRISER une option vide, pour qu'on ne puisse pas s'enfermer dans un
+ * filtre sans résultat.
+ */
+function nbDeals(facettes: Facettes | null, dimension: "categories" | "villes", valeur: string): number | null {
   if (!facettes) return null;
   const trouve: Facette | undefined = facettes[dimension].find((f) => f.valeur === valeur);
   return trouve ? trouve.n : null;
@@ -79,9 +85,6 @@ function Option({
         className="sr-only"
       />
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      {n !== null && (
-        <span className={`shrink-0 text-xs tabular-nums ${choisi ? "text-accent" : "text-ink-subtle"}`}>{n}</span>
-      )}
     </label>
   );
 }
@@ -277,7 +280,7 @@ export function FeuilleFiltres({
               label={DIMENSIONS.categorie.neutre}
               valeur=""
               choisi={brouillon.categorie === ""}
-              n={facettes ? facettes.totalSansCategorie : null}
+              n={null}
               onChoisir={(v) => modifier({ categorie: v })}
             />
             {DIMENSIONS.categorie.valeurs.map((c) => (
@@ -287,7 +290,7 @@ export function FeuilleFiltres({
                 label={c}
                 valeur={c}
                 choisi={brouillon.categorie === c}
-                n={compteur(facettes, "categories", c)}
+                n={nbDeals(facettes, "categories", c)}
                 onChoisir={(v) => modifier({ categorie: v })}
               />
             ))}
@@ -306,7 +309,7 @@ export function FeuilleFiltres({
               valeur=""
               choisi={brouillon.ville === ""}
               desactive={villeInactive}
-              n={villeInactive || !facettes ? null : facettes.totalSansVille}
+              n={null}
               onChoisir={(v) => modifier({ ville: v })}
             />
             {DIMENSIONS.ville.valeurs.map((v) => (
@@ -317,7 +320,7 @@ export function FeuilleFiltres({
                 valeur={v}
                 choisi={brouillon.ville === v}
                 desactive={villeInactive}
-                n={villeInactive ? null : compteur(facettes, "villes", v)}
+                n={villeInactive ? null : nbDeals(facettes, "villes", v)}
                 onChoisir={(x) => modifier({ ville: x })}
               />
             ))}

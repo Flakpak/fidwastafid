@@ -16,6 +16,7 @@ import {
   type EtatFiltres,
 } from "../lib/filtresFeed.js";
 import { BarreFiltres } from "./BarreFiltres.js";
+import { ColonneFiltres } from "./ColonneFiltres.js";
 import { FeuilleFiltres, type SectionFeuille } from "./FeuilleFiltres.js";
 import { CONTENEUR } from "./controlesFiltres.js";
 import { useFacettes } from "./useFacettes.js";
@@ -142,11 +143,13 @@ export function Feed({
       return;
     }
 
-    // Un changement de filtre en cours de scroll ramène le compteur de
-    // résultats (donc le haut de la liste filtrée) sous la barre collante —
-    // sinon l'utilisateur reste au milieu d'une liste qui vient de changer
-    // sous ses yeux. `scroll-mt` sur la cible réserve la hauteur de la barre.
-    resumeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Un changement de filtre en cours de scroll ramène le haut de la liste
+    // filtrée sous le bloc collant — sinon l'utilisateur reste au milieu
+    // d'une liste qui vient de changer sous ses yeux. La cible est la
+    // SENTINELLE et non le compteur : celui-ci vit désormais DANS le bloc
+    // collant, donc épinglé en haut du cadre, où `scrollIntoView` n'aurait
+    // plus rien à faire défiler.
+    sentinelleRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
     let cancelled = false;
     setChargement(true);
@@ -259,65 +262,92 @@ export function Feed({
        * collage. Le `overflow-hidden` du hero et le `transform` du ticker
        * sont sur des FRÈRES, sans effet ici.
        */}
-      <div
-        className={`sticky top-0 z-20 border-b border-border bg-surface-base transition-shadow duration-[130ms] motion-reduce:transition-none ${
-          epinglee ? "shadow-[0_2px_10px_-4px_rgba(26,24,21,0.30)]" : ""
-        }`}
-      >
-        <BarreFiltres
-          filtres={filtres}
-          saisie={saisie}
-          nbActifs={nbActifs}
-          onSaisie={setSaisie}
-          onChange={(patch) => appliquer({ ...filtres, ...patch })}
-          onOuvrir={ouvrirFeuille}
-        />
-      </div>
-
       {/*
-       * Le rail desktop est RETIRÉ. Il ne portait plus que la navigation par
-       * catégories et le tri, désormais dans la barre et dans la feuille —
-       * les y laisser aurait donné deux sources de vérité pour le même état.
-       * Vidé de cela, ses 220px empêchaient surtout la rangée unique de
-       * tenir : mesurée à 1347px de large pour 1265 disponibles sur un écran
-       * de 1280, elle rouvrait le défilement horizontal que ce lot supprime.
-       * Ses deux liens survivants sont repris ailleurs : « Soumettre un
-       * deal » était déjà dans l'en-tête, « Le concept » passe au pied de
-       * page — donc visible sur tout le site, et plus seulement ici.
+       * Deux colonnes à partir de lg : colonne de filtres 232px, gouttière
+       * 28px, feed dans le reste. `items-start` est indispensable — sans lui
+       * chaque cellule s'étire à la hauteur de la rangée et le collage des
+       * enfants n'a plus de course.
        */}
-      <div>
-        <main className={`${CONTENEUR} py-4`}>
+      <div className={`${CONTENEUR} lg:grid lg:grid-cols-[232px_1fr] lg:items-start lg:gap-x-7`}>
+        {/* Colonne de filtres — collante à top-0 elle aussi, avec SON PROPRE
+            rembourrage intérieur (`pt-4`), le même que celui du bloc de
+            droite : c'est ce qui aligne le haut des deux colonnes sans
+            qu'aucune valeur de décalage n'existe nulle part.
+            `max-h-screen` + défilement propre : douze catégories plus les
+            trois autres sections dépassent un écran court, et une colonne
+            collante plus haute que le cadre ne se déroule jamais. */}
+        <aside className="hidden lg:sticky lg:top-0 lg:block lg:max-h-screen lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:pt-4">
+          <ColonneFiltres
+            filtres={filtres}
+            facettes={facettes}
+            nbActifs={nbActifs}
+            onChange={(patch) => appliquer({ ...filtres, ...patch })}
+            onReinitialiser={reinitialiser}
+          />
+        </aside>
+
+        <div className="min-w-0">
           {/*
-           * Compteur de résultats (étape 6) — sans lui, un feed filtré à zéro
-           * est indiscernable d'un site en panne. Le nombre vient de
-           * `/facettes`, qui applique EXACTEMENT les prédicats de la liste :
-           * il ne peut pas annoncer autre chose que ce qui s'affiche.
-           * `scroll-mt-*` réserve la hauteur du bloc collant quand on ramène
-           * ce repère en vue après un changement de filtre.
+           * UN SEUL bloc collant pour la colonne de droite : recherche, tri
+           * et compteur ensemble, `top-0`, fond OPAQUE.
+           *
+           * Le rembourrage supérieur est À L'INTÉRIEUR du bloc (`pt-4`), pas
+           * au-dessus : avec un `top-16px` ou une marge externe, il resterait
+           * une bande de 16px où le contenu défile visiblement au-dessus du
+           * bloc. C'était exactement le bug d'origine, et aucune valeur de
+           * décalage n'existe donc dans cette page — ni ici, ni sur la
+           * colonne, ni sur l'en-tête (qui ne colle plus du tout).
+           *
+           * Fond `surface-base` sans transparence ni flou : sur iOS un fond
+           * translucide laisse voir le contenu en transit. Filet en bas du
+           * bloc, et ombre une fois épinglé seulement.
            */}
           <div
-            ref={resumeRef}
-            id={ANCRE_RESULTATS}
-            tabIndex={-1}
-            aria-live="polite"
-            className="mb-3 flex scroll-mt-[72px] flex-wrap items-baseline gap-x-2 gap-y-1 text-sm focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+            className={`sticky top-0 z-20 border-b border-border bg-surface-base pt-4 transition-shadow duration-[130ms] motion-reduce:transition-none ${
+              epinglee ? "shadow-[0_2px_10px_-4px_rgba(26,24,21,0.30)]" : ""
+            }`}
           >
-            <span className="font-bold text-ink">
-              {total === null ? "…" : total === 1 ? "1 deal" : `${total} deals`}
-            </span>
-            {resume.length > 0 && <span className="text-ink-muted">{resume.join(" · ")}</span>}
-            {!parDefaut && (
-              <button
-                type="button"
-                onClick={reinitialiser}
-                className="rounded-[6px] font-bold text-accent underline underline-offset-2 hover:bg-accent-soft focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                Réinitialiser
-              </button>
-            )}
+            <BarreFiltres
+              filtres={filtres}
+              saisie={saisie}
+              nbActifs={nbActifs}
+              onSaisie={setSaisie}
+              onChange={(patch) => appliquer({ ...filtres, ...patch })}
+              onOuvrir={ouvrirFeuille}
+            />
+
+            {/*
+             * Compteur de résultats — sans lui, un feed filtré à zéro est
+             * indiscernable d'un site en panne. Le nombre vient de
+             * `/facettes`, qui applique EXACTEMENT les prédicats de la
+             * liste : il ne peut pas annoncer autre chose que ce qui
+             * s'affiche. C'est désormais le SEUL nombre de l'interface.
+             */}
+            <div
+              ref={resumeRef}
+              id={ANCRE_RESULTATS}
+              tabIndex={-1}
+              aria-live="polite"
+              className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-2 text-sm focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+            >
+              <span className="font-bold text-ink">
+                {total === null ? "…" : total === 1 ? "1 deal" : `${total} deals`}
+              </span>
+              {resume.length > 0 && <span className="text-ink-muted">{resume.join(" · ")}</span>}
+              {!parDefaut && (
+                <button
+                  type="button"
+                  onClick={reinitialiser}
+                  className="rounded-[6px] font-bold text-accent underline underline-offset-2 hover:bg-accent-soft focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  Réinitialiser
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex flex-col gap-3">
+          <main className="py-4">
+            <div className="flex flex-col gap-3">
             {deals.length === 0 && !chargement && !erreur && (
               // État vide EXPLIQUÉ : ce qui a été filtré, et de quoi élargir.
               // Sans filtre actif, le message d'origine est conservé — c'est
@@ -385,10 +415,11 @@ export function Feed({
 
           {/* Fin de liste explicite : sans elle, l'absence de bouton est
               ambiguë (fin réelle ou bouton disparu ?). */}
-          {!cursor && !erreur && deals.length > 0 && (
-            <p className="py-6 text-center text-xs text-ink-subtle">Tu as vu tous les bons plans du moment.</p>
-          )}
-        </main>
+            {!cursor && !erreur && deals.length > 0 && (
+              <p className="py-6 text-center text-xs text-ink-subtle">Tu as vu tous les bons plans du moment.</p>
+            )}
+          </main>
+        </div>
       </div>
 
       {/* Montée UNIQUEMENT à l'ouverture, et remontée à chaque changement de

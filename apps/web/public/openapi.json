@@ -869,12 +869,6 @@
           "total": {
             "type": "integer"
           },
-          "totalSansCategorie": {
-            "type": "integer"
-          },
-          "totalSansVille": {
-            "type": "integer"
-          },
           "categories": {
             "type": "array",
             "items": {
@@ -914,8 +908,6 @@
         },
         "required": [
           "total",
-          "totalSansCategorie",
-          "totalSansVille",
           "categories",
           "villes"
         ]
