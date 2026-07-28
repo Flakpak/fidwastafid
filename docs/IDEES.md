@@ -47,6 +47,33 @@ n'est plus un diagnostic ponctuel mais une propriété du wrapper.)*
   plein `hot`/`cold`) optimiste côté client : il ne reçoit que le score, pas le
   sens du vote de l'utilisateur, donc l'état ne survit pas à un rechargement.
 
+## Bloc de marque du rail d'accueil — RETRAIT ASSUMÉ (2026-07-28)
+
+Le lot 7 (refonte des filtres, PR #59) a supprimé le rail desktop de l'accueil :
+sa navigation par catégories et son tri faisaient doublon avec la nouvelle barre,
+et ses 220px empêchaient la rangée unique de tenir sans défilement horizontal
+(1347px mesurés pour 1265 disponibles à 1280px de large).
+
+Deux entrées du rail ont été **récupérées** en ligne de clôture du hero (CTA de
+soumission `فيد و ستافيد` et lien « Le concept Fidwastafid ») — elles y sont
+désormais visibles en mobile ET en desktop, alors que le rail était
+`hidden md:flex`.
+
+Une troisième ne l'a **pas** été, volontairement : le bloc de marque du rail —
+monogramme FwS (`Brand forme="mark" hauteur={72}`) surmonté de la mention
+« Bons plans marocains ».
+
+**Motif** : avec le logotype de l'en-tête et le hero juste dessous, il portait le
+troisième rappel de marque d'un même écran. La charte Tadelakt tient la page pour
+un cadre plâtre + encre où « l'UI est un cadre, pas un concurrent »
+(CONTRAT-V1 §8, principe 1) — trois marquages dans le premier écran vont contre.
+
+**Ce n'est donc pas un oubli.** Si la question revient : la décision a été prise
+le 28/07/2026, en connaissance de ce qui disparaissait, et la chaîne
+« Bons plans marocains » n'existe plus nulle part dans le dépôt (vérifié). La
+rétablir suppose de décider d'abord lequel des trois rappels de marque cède la
+place.
+
 ## ~~Scaffold Vite/React racine résiduel (2026-07-21)~~ — FAIT le 27/07/2026
 
 > Décommissionné : `index.html`, `vite.config.js`, `src/`, `package-lock.json`,

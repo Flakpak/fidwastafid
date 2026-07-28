@@ -120,15 +120,25 @@ export function HeroBand() {
        * `فيد و ستافيد`. Ce n'est pas « شارك دييل » — aucun libellé n'est
        * inventé ici.
        */}
-      <div className="relative flex flex-col items-center gap-3 border-t border-accent-line pt-5 sm:flex-row sm:justify-center">
+      {/*
+       * Variante `brand` et NON `primary` : §8 règle 1 — une seule action
+       * pleine par écran, et c'est « Soumettre un deal » dans l'en-tête, qui
+       * est persistant là où ce hero se traverse une fois. Le rail d'origine
+       * n'était pas non plus un aplat. Le lien concept reste un lien texte,
+       * pour qu'il ne se confonde pas avec le bouton juste à côté.
+       */}
+      <div className="relative flex flex-col items-center gap-3 border-t border-accent-line pt-5 sm:flex-row sm:justify-center sm:gap-5">
         <Link
           href="/soumettre"
           aria-label="Partage un bon plan — soumettre un deal"
-          className={buttonClasses({ variant: "primary", arabic: true })}
+          className={buttonClasses({ variant: "brand", arabic: true })}
         >
           فيد و ستافيد
         </Link>
-        <Link href="/concept" className={buttonClasses({ variant: "brand" })}>
+        <Link
+          href="/concept"
+          className="min-h-11 inline-flex items-center text-sm font-bold text-accent underline underline-offset-4 hover:text-accent-hi focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
           Le concept Fidwastafid
         </Link>
       </div>
