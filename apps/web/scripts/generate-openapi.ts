@@ -86,23 +86,15 @@ registry.registerPath({
   tags: ["deals"],
 });
 
-const Facettes = registry.register(
-  "Facettes",
-  z.object({
-    total: z.number().int(),
-    categories: z.array(z.object({ valeur: z.string(), n: z.number().int() })),
-    villes: z.array(z.object({ valeur: z.string(), n: z.number().int() })),
-  })
-);
+const CompteDeals = registry.register("CompteDeals", z.object({ total: z.number().int() }));
 
 registry.registerPath({
   method: "get",
-  path: "/deals/facettes",
-  summary: "Compteurs contextuels du feed (CONTRAT-V1 §4, septième amendement)",
+  path: "/deals/compte",
+  summary: "Nombre de deals correspondant aux filtres (CONTRAT-V1 §4, septième amendement)",
   description:
-    "Mêmes filtres que GET /deals, sans pagination. Chaque dimension est comptée en appliquant " +
-    "les autres filtres actifs mais pas le sien. Les prédicats sont partagés avec GET /deals : " +
-    "un compteur annonce exactement ce que la liste renverra.",
+    "Mêmes filtres que GET /deals, sans pagination. Les prédicats sont partagés avec GET /deals : " +
+    "le total annonce exactement ce que la liste renverra.",
   request: {
     query: z.object({
       statut: z.string().optional(),
@@ -114,7 +106,7 @@ registry.registerPath({
     }),
   },
   responses: {
-    200: { description: "OK", content: { "application/json": { schema: Facettes } } },
+    200: { description: "OK", content: { "application/json": { schema: CompteDeals } } },
   },
   tags: ["deals"],
 });

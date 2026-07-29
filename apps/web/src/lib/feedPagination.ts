@@ -42,8 +42,8 @@ function ajouterFiltres(params: URLSearchParams, f: FiltresFeed): URLSearchParam
   return params;
 }
 
-/** Query string de `GET /api/v1/deals/facettes` — ni tri, ni limite, ni curseur. */
-export function construireParamsFacettes(f: FiltresFeed): URLSearchParams {
+/** Query string de `GET /api/v1/deals/compte` — ni tri, ni limite, ni curseur. */
+export function construireParamsCompte(f: FiltresFeed): URLSearchParams {
   return ajouterFiltres(new URLSearchParams(), f);
 }
 

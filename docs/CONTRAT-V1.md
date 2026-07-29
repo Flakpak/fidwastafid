@@ -190,7 +190,7 @@ GET /api/v1/deals?cursor=xxx&limit=20  →  { "data": [...], "nextCursor": "yyy"
 ```
 # Public, lecture (sans auth)
 GET  /api/v1/deals                          liste (filtres: statut=publie par défaut, enseigne, ville, categorie, type, q)
-GET  /api/v1/deals/facettes                 compteurs contextuels du feed (mêmes filtres, sans pagination)
+GET  /api/v1/deals/compte                   nombre de deals correspondant aux filtres (sans pagination)
                                              — ajouté le 27/07/2026, septième amendement conscient
 GET  /api/v1/deals/:publicId                détail
 GET  /api/v1/enseignes                      liste des enseignes
@@ -224,15 +224,22 @@ POST   /api/v1/admin/deals/:publicId/image  upload manuel (multipart/form-data, 
 ```
 
 **Notes** :
-- **Amendement du 27/07/2026 — compteurs de filtres (septième amendement conscient, lot 7)** :
-  `GET /api/v1/deals/facettes` renvoie, pour un jeu de filtres donné, le nombre de deals que
-  `GET /api/v1/deals` renverra, plus le nombre par catégorie et par ville si l'on changeait cette
-  seule dimension. Endpoint séparé et non champ ajouté à la liste : la feuille de filtres recalcule
-  ses compteurs pendant que l'utilisateur compose sa sélection, avant de l'appliquer — les coller à
-  la liste imposerait de télécharger une page de deals à chaque option cochée.
+- **Amendement du 27/07/2026 — compte de résultats (septième amendement conscient, lot 7)** :
+  `GET /api/v1/deals/compte` renvoie, pour un jeu de filtres donné, le nombre de deals que
+  `GET /api/v1/deals` renverra. Endpoint séparé et non champ ajouté à la liste : la feuille de
+  filtres annonce ce nombre pendant que l'utilisateur compose sa sélection, avant de l'appliquer —
+  le coller à la liste imposerait de télécharger une page de deals à chaque option cochée.
+  - **Révision du 28/07/2026** : l'endpoint s'appelait `/deals/facettes` et renvoyait AUSSI un
+    compte par catégorie et par ville, qui alimentait des compteurs affichés option par option puis
+    le grisé des options sans deal. Les deux ont été retirés — les compteurs faute de valeur
+    d'usage constatée, le grisé parce que sept catégories pâles sur douze, sans un chiffre pour les
+    expliquer, donnaient une colonne à moitié morte. L'agrégation croisée est partie avec eux : il
+    ne restait qu'un `count(*)`, et une agrégation par dimension entretenue pour un seul scalaire
+    n'aurait plus rien justifié. C'est l'ÉTAT VIDE du feed qui prend le relais — il nomme ce qui a
+    été filtré et propose d'élargir, ce qu'une option grisée ne disait pas.
   - **Prédicats partagés, jamais réécrits** (`apps/web/src/app/api/v1/_lib/dealsFilters.ts`) : les
     deux endpoints construisent leur `WHERE` avec les mêmes fonctions. C'est la seule garantie
-    tenable que « le compteur annonce ce que le filtre renverra » — un second `WHERE` écrit à côté
+    tenable que « le total annonce ce que le filtre renverra » — un second `WHERE` écrit à côté
     dériverait un jour, et cette dérive ne lève aucune erreur.
   - **`ville` change de sens** : filtrer sur une ville renvoie les deals de cette ville **plus** les
     deals `National` **plus** les deals disponibles en ligne. Motif : un deal en ligne est achetable

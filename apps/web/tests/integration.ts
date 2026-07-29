@@ -1,7 +1,7 @@
 import { withTransaction, closePool, query } from "@fidwastafid/db";
 import { PUBLIC_IDS_FIXTURES, PUBLIC_ID_INEXISTANT } from "./fixtures.js";
 import { POST as postDeal, GET as getDealsList } from "../src/app/api/v1/deals/route.js";
-import { GET as getFacettes } from "../src/app/api/v1/deals/facettes/route.js";
+import { GET as getCompte } from "../src/app/api/v1/deals/compte/route.js";
 import { GET as getDeal } from "../src/app/api/v1/deals/[publicId]/route.js";
 import { POST as postVote, DELETE as deleteVote } from "../src/app/api/v1/deals/[publicId]/votes/route.js";
 import {
@@ -1057,7 +1057,7 @@ async function main() {
   // et les compteurs. Ici on vérifie ce que ce partage est censé produire :
   // le compteur annoncé est le nombre de lignes réellement servies.
   // -------------------------------------------------------------------------
-  console.log("\nlot 7 — ville + deals en ligne, et compteurs contextuels");
+  console.log("\nlot 7 — ville + deals en ligne, et total de résultats");
 
   /** Épuise la pagination : le total annoncé se compare au nombre RÉEL de
    *  deals servis, pas à une première page. */
@@ -1077,7 +1077,7 @@ async function main() {
   }
 
   async function total(qs: string): Promise<number> {
-    const res = await getFacettes(new Request(`http://localhost/api/v1/deals/facettes?${qs}`));
+    const res = await getCompte(new Request(`http://localhost/api/v1/deals/compte?${qs}`));
     const body = (await res.json()) as { total: number };
     return body.total;
   }
@@ -1088,13 +1088,13 @@ async function main() {
   check("ville choisie -> PLUS les deals nationaux", idsRabat.includes(DEAL_NATIONAL));
   check("ville choisie -> PLUS les deals en ligne", idsRabat.includes(DEAL_EN_LIGNE));
   check("ville choisie -> jamais ceux d'une AUTRE ville", !idsRabat.includes(DEAL_CASA));
-  check("compteur == nombre de deals réellement renvoyés (ville)", (await total(qsRabat)) === idsRabat.length);
+  check("total == nombre de deals réellement renvoyés (ville)", (await total(qsRabat)) === idsRabat.length);
 
   const qsEnLigne = `categorie=${CATEGORIE_LOCALISATION}&type=en_ligne`;
   const idsEnLigne = await listerTout(qsEnLigne);
   check("« en ligne » -> le deal en ligne", idsEnLigne.includes(DEAL_EN_LIGNE));
   check("« en ligne » -> aucun deal de boutique", !idsEnLigne.includes(DEAL_CASA) && !idsEnLigne.includes(DEAL_NATIONAL));
-  check("compteur == nombre réellement renvoyé (en ligne)", (await total(qsEnLigne)) === idsEnLigne.length);
+  check("total == nombre réellement renvoyé (en ligne)", (await total(qsEnLigne)) === idsEnLigne.length);
   check(
     "« en ligne » rend la ville sans objet : même résultat avec ou sans ville",
     (await total(`${qsEnLigne}&ville=Casablanca`)) === idsEnLigne.length
@@ -1103,24 +1103,27 @@ async function main() {
   const qsBoutique = `categorie=${CATEGORIE_LOCALISATION}&type=physique`;
   const idsBoutique = await listerTout(qsBoutique);
   check("« en boutique » -> jamais le deal en ligne", !idsBoutique.includes(DEAL_EN_LIGNE));
-  check("compteur == nombre réellement renvoyé (en boutique)", (await total(qsBoutique)) === idsBoutique.length);
+  check("total == nombre réellement renvoyé (en boutique)", (await total(qsBoutique)) === idsBoutique.length);
 
-  // Chaque compteur de la feuille est vérifié contre ce que le filtre
-  // correspondant renvoie vraiment — c'est le contrat de ce lot, dimension
-  // par dimension et pas seulement sur le total.
-  const facettesRes = await getFacettes(
-    new Request(`http://localhost/api/v1/deals/facettes?categorie=${CATEGORIE_LOCALISATION}`)
-  );
-  const facettes = (await facettesRes.json()) as { villes: { valeur: string; n: number }[] };
-  let compteursJustes = true;
-  for (const ville of facettes.villes) {
-    const reels = await listerTout(`categorie=${CATEGORIE_LOCALISATION}&ville=${encodeURIComponent(ville.valeur)}`);
-    if (reels.length !== ville.n) {
-      compteursJustes = false;
-      console.log(`      ville ${ville.valeur} : compteur ${ville.n} != ${reels.length} servis`);
+  // L'agrégation par dimension est supprimée avec les compteurs par option :
+  // il n'y a plus qu'un total à vérifier. On l'éprouve donc sur PLUSIEURS
+  // jeux de filtres plutôt que sur plusieurs dimensions d'un seul.
+  let totauxJustes = true;
+  for (const qs of [
+    `categorie=${CATEGORIE_LOCALISATION}`,
+    `categorie=${CATEGORIE_LOCALISATION}&ville=Casablanca`,
+    `categorie=${CATEGORIE_LOCALISATION}&ville=National`,
+    `categorie=${CATEGORIE_LOCALISATION}&type=physique&ville=Rabat`,
+    `q=${encodeURIComponent("Localisation")}`,
+  ]) {
+    const annonce = await total(qs);
+    const reels = await listerTout(qs);
+    if (annonce !== reels.length) {
+      totauxJustes = false;
+      console.log(`      ${qs} : total ${annonce} != ${reels.length} deals servis`);
     }
   }
-  check("chaque compteur de ville == ce que le filtre de cette ville renvoie", compteursJustes);
+  check("le total annoncé == le nombre de deals réellement servis, sur cinq jeux de filtres", totauxJustes);
 
   // Un curseur d'un autre jeu de filtres ne peut pas être rejoué (étape 8).
   const premierePage = await getDealsList(new Request("http://localhost/api/v1/deals?ville=Rabat&limit=1"));

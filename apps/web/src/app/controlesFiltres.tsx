@@ -13,15 +13,13 @@ import { OU_ACHETER, type TypeAchat } from "../lib/filtresFeed.js";
  */
 
 /**
- * Conteneur de page — porte À LA FOIS la grille deux colonnes (colonne de
- * filtres + feed) et tout ce qui s'y aligne. Un seul jeu de classes, donc
- * aucune largeur recopiée qui pourrait se désynchroniser.
- *
- * Le palier `xl` évite que le feed reste figé à sa largeur de 1024px sur les
- * grands écrans : la colonne garde ses 232px, c'est le feed qui prend le
- * reste.
+ * Colonne de CONTENU, à droite de la colonne de filtres — repris de main :
+ * centré et borné en mobile (où il n'y a pas de colonne latérale), puis
+ * PLEINE LARGEUR au-delà. Aucune largeur maximale en desktop : elle
+ * laisserait de larges marges vides des deux côtés alors que la colonne
+ * latérale est, elle, collée au bord gauche de la fenêtre.
  */
-export const CONTENEUR = "mx-auto w-full max-w-2xl px-4 lg:max-w-5xl xl:max-w-6xl";
+export const CONTENEUR = "mx-auto w-full max-w-2xl px-4 md:mx-0 md:max-w-none";
 
 export const NEUTRE = "border-border-strong bg-surface text-ink-muted hover:border-accent-line hover:text-accent";
 export const ACTIF = "border-accent bg-accent-soft text-accent";
