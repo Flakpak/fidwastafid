@@ -18,7 +18,7 @@ import {
 import { lireCommentaires } from "../src/app/deal/[slugAndId]/commentaires.js";
 import {
   TAILLE_PAGE,
-  construireParamsFacettes,
+  construireParamsCompte,
   construireParamsFeed,
   fusionnerSansDoublon,
   messageErreurFeed,
@@ -29,7 +29,6 @@ import {
   lireFiltresUrl,
   nbFiltresActifs,
   normaliserFiltres,
-  optionDesactivee,
   resumeFiltres,
   type EtatFiltres,
 } from "../src/lib/filtresFeed.js";
@@ -42,7 +41,7 @@ import {
   signatureFiltres,
   type Lieur,
 } from "../src/app/api/v1/_lib/dealsFilters.js";
-import { assemblerFacettes, requeteFacettes } from "../src/app/api/v1/_lib/dealsFacettes.js";
+import { requeteTotal } from "../src/app/api/v1/_lib/dealsTotal.js";
 import { encodeCursor } from "../src/app/api/v1/_lib/pagination.js";
 import { GET as getDeals } from "../src/app/api/v1/deals/route.js";
 import { champsModifies, normaliserValeurAudit } from "../src/app/api/v1/_lib/auditDiff.js";
@@ -865,49 +864,38 @@ check(
   lireFiltres(new URLSearchParams("ville=Tombouctou")).ville === null
 );
 
-console.log("\nCompteurs — mêmes prédicats que la liste");
+console.log("\nTotal de résultats — mêmes prédicats que la liste");
 {
   const f = filtres({ ville: "Rabat", categorie: "Mode", type: "physique", q: "tv" });
-  const { text } = requeteFacettes(f);
+  const { text } = requeteTotal(f);
 
   // Chaque fragment que la LISTE utilisera doit apparaître tel quel dans la
-  // requête de comptage — c'est ce qui interdit à un compteur de compter
-  // autrement que ce que le filtre renverra.
-  // Mêmes alias et même ORDRE de liaison que requeteFacettes : les `$n`
-  // reconstruits ici doivent coïncider avec ceux de la requête réelle.
+  // requête de comptage — c'est ce qui interdit au total d'annoncer autre
+  // chose que ce que le filtre renverra. Mêmes alias et même ORDRE de
+  // liaison : les `$n` reconstruits ici doivent coïncider avec ceux de la
+  // requête réelle.
   const lListe: Lieur = { values: [] };
-  const base = conditionsBase(f, lListe, "d").join(" and ");
-  const ville = conditionVille(f, lListe, "b");
-  const categorie = conditionCategorie(f, lListe, "b");
-  const type = conditionType(f, lListe, "b");
+  const base = conditionsBase(f, lListe).join(" and ");
+  const ville = conditionVille(f, lListe);
+  const categorie = conditionCategorie(f, lListe);
+  const type = conditionType(f, lListe);
 
-  check("la requête de comptage porte le même filtre de statut/enseigne/recherche", text.includes(base.split(" and ")[0] ?? ""));
+  check("le total porte le même filtre de statut/enseigne/recherche", text.includes(base.split(" and ")[0] ?? ""));
   check("… le même prédicat de ville", text.includes(ville));
   check("… le même prédicat de catégorie", text.includes(categorie));
   check("… le même prédicat de disponibilité", text.includes(type));
   check("la recherche est bien un filtre SERVEUR", base.includes("ilike"));
-  check("les jokers LIKE d'une saisie sont échappés", requeteFacettes(filtres({ q: "100%" })).values.includes("%100\\%%"));
+  check("les jokers LIKE d'une saisie sont échappés", requeteTotal(filtres({ q: "100%" })).values.includes("%100\\%%"));
 
-  // Le compteur d'une dimension ignore SON PROPRE filtre et applique les
-  // autres : « combien si je choisis cette catégorie, à ville constante ».
-  const catsBloc = text.slice(text.indexOf("cats as ("), text.indexOf("vls as ("));
-  check("le compteur de catégorie n'applique pas le filtre de catégorie", !catsBloc.includes(categorie));
-  check("… mais applique bien celui de ville", catsBloc.includes(ville));
+  // Plus aucune agrégation croisée : elle ne servait qu'aux compteurs par
+  // option et à leur grisé, tous deux retirés. Un seul `count(*)` subsiste.
+  check("aucune agrégation par dimension ne subsiste", !/unnest|with ordinality|group by/i.test(text));
+  check("un seul comptage", (text.match(/count\(\*\)/g) ?? []).length === 1);
 }
 
 check(
-  "les compteurs sont demandés avec exactement les filtres de la liste, sans pagination",
-  construireParamsFacettes({ tri: "recent", ville: "Rabat", q: "tv", cursor: "abc" }).toString() ===
-    "ville=Rabat&q=tv"
-);
-
-check(
-  "une valeur d'enum sans aucun deal ressort à 0 plutôt que de disparaître",
-  assemblerFacettes([
-    { dim: "total", valeur: "", n: 3 },
-    { dim: "categorie", valeur: "Mode", n: 3 },
-    { dim: "categorie", valeur: "Gaming", n: 0 },
-  ]).categories.some((c) => c.valeur === "Gaming" && c.n === 0)
+  "le total est demandé avec exactement les filtres de la liste, sans pagination",
+  construireParamsCompte({ tri: "recent", ville: "Rabat", q: "tv", cursor: "abc" }).toString() === "ville=Rabat&q=tv"
 );
 
 console.log("\nCurseur — réinitialisation au changement de filtre (étape 8)");
@@ -948,17 +936,13 @@ async function checkCurseurFiltres() {
   check("un curseur sans signature de filtres est refusé", resAncien.status === 400);
 }
 
-console.log("\nFeuille — une option vide ne doit pas pouvoir enfermer");
-check("catégorie à 0 deal -> non sélectionnable", optionDesactivee({ n: 0, choisi: false }));
-check(
-  "catégorie à 0 deal MAIS déjà choisie -> reste sélectionnable (sinon on ne peut plus en sortir)",
-  !optionDesactivee({ n: 0, choisi: true })
-);
-check("catégorie non vide -> sélectionnable", !optionDesactivee({ n: 4, choisi: false }));
-check("compteur pas encore chargé -> ne désactive rien", !optionDesactivee({ n: null, choisi: false }));
-check("dimension sans objet -> désactivée quel que soit le compteur", optionDesactivee({ n: 9, choisi: false, sansObjet: true }));
+// Le grisé des options sans deal est retiré (et avec lui `optionDesactivee`)
+// : sept catégories pâles sur douze, sans compteur pour les expliquer,
+// donnaient une colonne à moitié morte. C'est l'ÉTAT VIDE du feed qui prend
+// le relais — vérifié ci-dessous par le rappel en clair, qui nomme ce qui a
+// été filtré.
 
-console.log("\nÉtat des filtres — URL, étiquettes et rappel en clair");
+console.log("\nÉtat des filtres — URL et rappel en clair");
 {
   const etat: EtatFiltres = { categorie: "Mode", ville: "Rabat", type: "physique", tri: "recent", q: "tv" };
   check("l'état s'écrit dans l'URL", ecrireFiltresUrl(etat) === "?categorie=Mode&ville=Rabat&type=physique&tri=recent&q=tv");

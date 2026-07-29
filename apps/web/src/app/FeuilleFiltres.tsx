@@ -9,15 +9,14 @@ import {
   TRIS,
   FILTRES_PAR_DEFAUT,
   normaliserFiltres,
-  optionDesactivee,
   villeSansObjet,
   type EtatFiltres,
   type TypeAchat,
   type TriFeed,
 } from "../lib/filtresFeed.js";
 import { SegmenteOuAcheter } from "./controlesFiltres.js";
-import { useFacettes } from "./useFacettes.js";
-import type { Facette, Facettes } from "./api/v1/_lib/dealsFacettes.js";
+import { useTotalResultats } from "./useTotalResultats.js";
+
 
 export type SectionFeuille = "categorie" | "ville" | "reglages";
 
@@ -29,32 +28,20 @@ const ANCRES: Record<SectionFeuille, string> = {
 };
 
 /**
- * Nombre de deals d'une option — lu, jamais affiché. Les compteurs par option
- * ont été retirés (aucune valeur d'usage constatée) ; ce nombre ne sert plus
- * qu'à GRISER une option vide, pour qu'on ne puisse pas s'enfermer dans un
- * filtre sans résultat.
- */
-function nbDeals(facettes: Facettes | null, dimension: "categories" | "villes", valeur: string): number | null {
-  if (!facettes) return null;
-  const trouve: Facette | undefined = facettes[dimension].find((f) => f.valeur === valeur);
-  return trouve ? trouve.n : null;
-}
-
-/**
  * Ligne d'option — choix unique. Un vrai `<input type="radio">` masqué :
  * exclusivité, groupement et navigation aux flèches natifs. Cible tactile
  * ≥44px (`min-h-11`).
  *
- * À zéro, l'option est GRISÉE et non sélectionnable — sauf si c'est le choix
- * courant, qu'il faut toujours pouvoir quitter. On apprend ainsi qu'elle
- * existe sans pouvoir s'y enfermer.
+ * Plus aucune option n'est grisée pour absence de deal : un grisé sans
+ * compteur pour l'expliquer donnait une liste à moitié morte. Seul
+ * `desactive` subsiste, et il porte une raison lisible — la ville quand
+ * « En ligne » est choisi. L'état vide du feed prend le relais.
  */
 function Option({
   name,
   label,
   valeur,
   choisi,
-  n,
   desactive = false,
   onChoisir,
 }: {
@@ -62,15 +49,13 @@ function Option({
   label: string;
   valeur: string;
   choisi: boolean;
-  n: number | null;
   desactive?: boolean;
   onChoisir: (v: string) => void;
 }) {
-  const vide = optionDesactivee({ n, choisi, sansObjet: desactive });
   return (
     <label
       className={`flex min-h-11 items-center gap-3 rounded-[9px] px-3 text-sm ${
-        vide
+        desactive
           ? "cursor-default text-ink-subtle opacity-50"
           : `cursor-pointer ${choisi ? "bg-accent-soft font-bold text-accent" : "text-ink hover:bg-surface-subtle"}`
       } has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-[-2px] has-[:focus-visible]:outline-accent`}
@@ -80,7 +65,7 @@ function Option({
         name={name}
         value={valeur}
         checked={choisi}
-        disabled={vide}
+        disabled={desactive}
         onChange={() => onChoisir(valeur)}
         className="sr-only"
       />
@@ -161,7 +146,7 @@ export function FeuilleFiltres({
   section,
   declencheur,
   filtres,
-  facettesInitiales,
+  totalInitial,
   onFermer,
   onAppliquer,
 }: {
@@ -171,14 +156,14 @@ export function FeuilleFiltres({
    *  déplacé à l'intérieur de la feuille. */
   declencheur: HTMLElement | null;
   filtres: EtatFiltres;
-  facettesInitiales: Facettes | null;
+  totalInitial: number | null;
   onFermer: () => void;
   onAppliquer: (e: EtatFiltres) => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const corpsRef = useRef<HTMLDivElement>(null);
   const [brouillon, setBrouillon] = useState<EtatFiltres>(filtres);
-  const { facettes } = useFacettes(brouillon, facettesInitiales);
+  const total = useTotalResultats(brouillon, totalInitial);
 
   const villeInactive = villeSansObjet(brouillon);
 
@@ -280,7 +265,6 @@ export function FeuilleFiltres({
               label={DIMENSIONS.categorie.neutre}
               valeur=""
               choisi={brouillon.categorie === ""}
-              n={null}
               onChoisir={(v) => modifier({ categorie: v })}
             />
             {DIMENSIONS.categorie.valeurs.map((c) => (
@@ -290,7 +274,6 @@ export function FeuilleFiltres({
                 label={c}
                 valeur={c}
                 choisi={brouillon.categorie === c}
-                n={nbDeals(facettes, "categories", c)}
                 onChoisir={(v) => modifier({ categorie: v })}
               />
             ))}
@@ -309,7 +292,6 @@ export function FeuilleFiltres({
               valeur=""
               choisi={brouillon.ville === ""}
               desactive={villeInactive}
-              n={null}
               onChoisir={(v) => modifier({ ville: v })}
             />
             {DIMENSIONS.ville.valeurs.map((v) => (
@@ -320,7 +302,6 @@ export function FeuilleFiltres({
                 valeur={v}
                 choisi={brouillon.ville === v}
                 desactive={villeInactive}
-                n={villeInactive ? null : nbDeals(facettes, "villes", v)}
                 onChoisir={(x) => modifier({ ville: x })}
               />
             ))}
@@ -347,7 +328,6 @@ export function FeuilleFiltres({
                 choisi={brouillon.tri === t.value}
                 // Le tri ne retire aucun deal : un compteur par option
                 // n'aurait rien à compter, il serait le même partout.
-                n={null}
                 onChoisir={(v) => modifier({ tri: v as TriFeed })}
               />
             ))}
@@ -356,7 +336,7 @@ export function FeuilleFiltres({
 
         <footer className="shrink-0 border-t border-border p-3">
           <Button variant="primary" onClick={appliquer} className="h-11 w-full">
-            {libelleApplication(facettes ? facettes.total : null)}
+            {libelleApplication(total)}
           </Button>
         </footer>
       </div>

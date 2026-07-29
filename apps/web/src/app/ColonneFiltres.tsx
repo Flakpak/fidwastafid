@@ -4,141 +4,104 @@ import {
   DIMENSIONS,
   OU_ACHETER,
   RAISON_VILLE_SANS_OBJET,
-  optionDesactivee,
+  TRIS,
   villeSansObjet,
   type EtatFiltres,
+  type TriFeed,
   type TypeAchat,
 } from "../lib/filtresFeed.js";
 import { CADRE, NEUTRE } from "./controlesFiltres.js";
-import type { Facettes } from "./api/v1/_lib/dealsFacettes.js";
 
 /**
- * Colonne de filtres — desktop (≥ lg) UNIQUEMENT.
+ * Colonne latérale — REPRISE DE MAIN À L'IDENTIQUE pour tout ce qui est
+ * traitement visuel et positionnement (panneau `surface`, filet à droite,
+ * collée au bord gauche de la fenêtre, pleine hauteur). Le lot 7 l'avait
+ * supprimée, puis redessinée : les deux étaient des erreurs. Seul son
+ * CONTENU change ici.
  *
- * Quatre dimensions ne tiennent pas sur une rangée horizontale : le lot
- * précédent l'avait constaté en libellés tronqués (« En bou… ») et en
- * espacements inégaux. Un jeu de filtres de cette taille se met en colonne,
- * comme chez Dealabs, HotUKDeals ou Amazon — la verticale donne à chaque
- * dimension la largeur d'une ligne entière, et le nombre de dimensions cesse
- * d'être une contrainte de mise en page.
+ * Ce qu'elle gagne : les deux filtres qui vivaient dans la rangée
+ * horizontale — Ville et Où acheter. Cette rangée ne tenait pas quatre
+ * dimensions (libellés tronqués, espacements inégaux) ; la colonne, si.
  *
- * La colonne ne porte QUE des filtres : ni CTA, ni bloc de marque. Le CTA
- * arabe et le lien concept vivent dans la ligne de clôture du hero, qui
- * existe aussi en mobile — ce que l'ancien rail n'a jamais fait. Les remettre
- * ici en ferait des doublons visibles côte à côte sur le même écran.
+ * Ce qu'elle garde de main, au même endroit et dans le même style : « Trier
+ * par » et « Catégories ». Le tri reste ici — c'est sa place sur main, et le
+ * remonter au-dessus du feed était une complication inutile.
  *
- * Le tri n'y est pas non plus : il ne réduit pas l'ensemble, il le réordonne.
- * Sa place est au-dessus du contenu qu'il ordonne.
+ * Ce qu'elle ne reprend PAS : le bloc de marque et le CTA arabe. Retrait
+ * acté (docs/IDEES.md, 2026-07-28) — le CTA et le lien concept vivent dans la
+ * ligne de clôture du hero, qui existe aussi en mobile.
  */
 
-const TITRE_SECTION = "px-1 pb-2 text-[11px] font-extrabold uppercase tracking-wider text-ink-subtle";
-
-/** Ligne de la liste verticale — choix unique, `<input type="radio">` masqué :
- *  exclusivité, groupement et navigation aux flèches natifs. */
-function Ligne({
-  name,
-  label,
-  valeur,
-  choisi,
-  desactive,
-  onChoisir,
-}: {
-  name: string;
-  label: string;
-  valeur: string;
-  choisi: boolean;
-  desactive: boolean;
-  onChoisir: (v: string) => void;
-}) {
-  return (
-    <label
-      className={`flex min-h-9 items-center rounded-[8px] px-2.5 text-[13px] ${
-        desactive
-          ? "cursor-default text-ink-subtle opacity-45"
-          : choisi
-            ? "cursor-pointer bg-accent-soft font-semibold text-accent"
-            : "cursor-pointer text-ink-muted hover:bg-surface-subtle hover:text-ink"
-      } has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-[-2px] has-[:focus-visible]:outline-accent`}
-    >
-      <input
-        type="radio"
-        name={name}
-        value={valeur}
-        checked={choisi}
-        disabled={desactive}
-        onChange={() => onChoisir(valeur)}
-        className="sr-only"
-      />
-      <span className="truncate">{label}</span>
-    </label>
-  );
+/** Bouton vertical de la sidebar — porté depuis .sidebar-btn (index.html racine, v1). */
+function sidebarBtnClass(active: boolean): string {
+  return `flex items-center gap-2 px-4 py-2 text-xs font-bold text-left border-l-[3px] w-full ${
+    active
+      ? "text-accent bg-accent-soft border-l-accent"
+      : "text-ink-muted border-l-transparent hover:bg-accent-soft hover:text-accent"
+  }`;
 }
+
+/** Bouton catégorie de la sidebar — porté depuis .cat-btn (index.html racine, v1). */
+function catBtnClass(active: boolean): string {
+  return `flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-bold text-left ${
+    active ? "bg-accent-soft text-accent border border-accent" : "border border-transparent text-ink-muted hover:bg-accent-soft hover:text-accent"
+  }`;
+}
+
+const TITRE = "px-4 pt-3 pb-1 text-[9px] font-extrabold tracking-wider uppercase text-ink-subtle";
 
 export function ColonneFiltres({
   filtres,
-  facettes,
-  nbActifs,
   onChange,
-  onReinitialiser,
 }: {
   filtres: EtatFiltres;
-  /** Sert UNIQUEMENT à désactiver les options sans deal — plus aucun nombre
-   *  n'est affiché. Sans elle, on pourrait s'enfermer dans un filtre vide. */
-  facettes: Facettes | null;
-  nbActifs: number;
   onChange: (patch: Partial<EtatFiltres>) => void;
-  onReinitialiser: () => void;
 }) {
   const villeInactive = villeSansObjet(filtres);
-  const nbCategorie = (valeur: string) => facettes?.categories.find((c) => c.valeur === valeur)?.n ?? null;
 
   return (
-    <div className="flex flex-col gap-6 pb-6">
-      {/* ── Catégorie : liste verticale EN CLAIR, toutes visibles ──
-          Pas de menu déroulant : douze valeurs tiennent dans une colonne, et
-          les voir toutes est précisément ce qu'un menu empêche. */}
-      <section aria-labelledby="colonne-categorie">
-        <h2 id="colonne-categorie" className={TITRE_SECTION}>
-          {DIMENSIONS.categorie.nom}
-        </h2>
-        <div className="flex flex-col">
-          <Ligne
-            name="colonne-categorie"
-            label={DIMENSIONS.categorie.neutre}
-            valeur=""
-            choisi={filtres.categorie === ""}
-            desactive={false}
-            onChoisir={(v) => onChange({ categorie: v })}
-          />
-          {DIMENSIONS.categorie.valeurs.map((c) => (
-            <Ligne
-              key={c}
-              name="colonne-categorie"
-              label={c}
-              valeur={c}
-              choisi={filtres.categorie === c}
-              desactive={optionDesactivee({ n: nbCategorie(c), choisi: filtres.categorie === c })}
-              onChoisir={(v) => onChange({ categorie: v })}
-            />
-          ))}
-        </div>
-      </section>
+    <>
+      {/* ── Trier par — inchangé depuis main ── */}
+      <p className={`${TITRE} pt-2`}>Trier par</p>
+      {TRIS.map((t) => (
+        <button
+          key={t.value}
+          type="button"
+          onClick={() => onChange({ tri: t.value as TriFeed })}
+          className={sidebarBtnClass(filtres.tri === t.value)}
+        >
+          {t.label}
+        </button>
+      ))}
 
-      {/* ── Ville : menu déroulant ──
-          Neuf valeurs aujourd'hui, et c'est la dimension qui s'allongera si
-          le SEO local se développe : une liste verticale y deviendrait plus
-          longue que la colonne entière. */}
-      <section aria-labelledby="colonne-ville">
-        <h2 id="colonne-ville" className={TITRE_SECTION}>
-          {DIMENSIONS.ville.nom}
-        </h2>
+      {/* ── Catégories — inchangé depuis main. Aucune n'est grisée : sept
+             entrées en gris pâle sans compteur pour les expliquer donnaient
+             une colonne à moitié morte. Une catégorie sans deal se choisit
+             donc normalement, et l'état vide du feed dit ce qui s'est passé
+             et propose d'élargir — plus honnête qu'un grisé muet. ── */}
+      <p className={TITRE}>Catégories</p>
+      <div className="px-4 flex flex-col gap-0.5">
+        <button type="button" onClick={() => onChange({ categorie: "" })} className={catBtnClass(filtres.categorie === "")}>
+          {DIMENSIONS.categorie.neutre}
+        </button>
+        {DIMENSIONS.categorie.valeurs.map((c) => (
+          <button key={c} type="button" onClick={() => onChange({ categorie: c })} className={catBtnClass(filtres.categorie === c)}>
+            {c}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Ville — menu déroulant : neuf valeurs aujourd'hui, et c'est la
+             dimension qui s'allongera si le SEO local se développe. ── */}
+      <p className={TITRE}>{DIMENSIONS.ville.nom}</p>
+      <div className="px-4">
         <select
           value={filtres.ville}
           disabled={villeInactive}
           title={villeInactive ? RAISON_VILLE_SANS_OBJET : undefined}
           onChange={(e) => onChange({ ville: e.target.value })}
           aria-label={DIMENSIONS.ville.nom}
-          className={`${CADRE} ${filtres.ville ? "border-accent bg-accent-soft font-semibold text-accent" : NEUTRE} h-9 w-full px-2 text-[13px] focus:border-accent focus:outline-none disabled:cursor-default disabled:opacity-50`}
+          className={`${CADRE} ${filtres.ville ? "border-accent bg-accent-soft font-bold text-accent" : NEUTRE} h-9 w-full px-2 text-[11px] font-bold focus:border-accent focus:outline-none disabled:cursor-default disabled:opacity-50`}
         >
           <option value="">{DIMENSIONS.ville.neutre}</option>
           {DIMENSIONS.ville.valeurs.map((v) => (
@@ -147,41 +110,22 @@ export function ColonneFiltres({
             </option>
           ))}
         </select>
-        {villeInactive && <p className="px-1 pt-2 text-xs text-ink-muted">{RAISON_VILLE_SANS_OBJET}</p>}
-      </section>
+        {villeInactive && <p className="pt-1.5 text-[10px] leading-snug text-ink-muted">{RAISON_VILLE_SANS_OBJET}</p>}
+      </div>
 
-      {/* ── Où acheter : trois options exclusives, en liste verticale ── */}
-      <section aria-labelledby="colonne-ou-acheter">
-        <h2 id="colonne-ou-acheter" className={TITRE_SECTION}>
-          Où acheter
-        </h2>
-        <div className="flex flex-col">
-          {OU_ACHETER.map((o) => (
-            <Ligne
-              key={o.value || "partout"}
-              name="colonne-ou-acheter"
-              label={o.label}
-              valeur={o.value}
-              choisi={filtres.type === o.value}
-              desactive={false}
-              onChoisir={(v) => onChange({ type: v as TypeAchat })}
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* Pied de colonne — n'apparaît que s'il y a quelque chose à effacer :
-          un lien de réinitialisation permanent sur une vue non filtrée
-          annonce un état qui n'existe pas. */}
-      {nbActifs > 0 && (
+      {/* ── Où acheter — trois options exclusives, même traitement vertical
+             que « Trier par ». ── */}
+      <p className={TITRE}>Où acheter</p>
+      {OU_ACHETER.map((o) => (
         <button
+          key={o.value || "partout"}
           type="button"
-          onClick={onReinitialiser}
-          className="self-start rounded-[6px] px-1 text-[13px] font-bold text-accent underline underline-offset-4 hover:text-accent-hi focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          onClick={() => onChange({ type: o.value as TypeAchat })}
+          className={sidebarBtnClass(filtres.type === o.value)}
         >
-          Réinitialiser les filtres
+          {o.label}
         </button>
-      )}
-    </div>
+      ))}
+    </>
   );
 }

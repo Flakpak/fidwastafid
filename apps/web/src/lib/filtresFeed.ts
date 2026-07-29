@@ -142,27 +142,4 @@ export function resumeFiltres(e: EtatFiltres): string[] {
   return parts;
 }
 
-/**
- * Une option de la feuille est grisée et non sélectionnable quand elle ne
- * ramènerait aucun deal — on apprend qu'elle existe sans pouvoir s'y
- * enfermer. Deux exceptions :
- * - le choix COURANT reste toujours sélectionnable, sinon on ne peut plus en
- *   sortir (cas atteignable par une URL partagée devenue vide) ;
- * - `sansObjet` désactive toute une dimension (la ville quand « En ligne »
- *   est choisi), indépendamment des compteurs.
- *
- * `n === null` (compteurs pas encore chargés) ne désactive rien : une option
- * dont on ignore le compteur n'est pas une option vide.
- */
-export function optionDesactivee({
-  n,
-  choisi,
-  sansObjet = false,
-}: {
-  n: number | null;
-  choisi: boolean;
-  sansObjet?: boolean;
-}): boolean {
-  return sansObjet || (n === 0 && !choisi);
-}
 

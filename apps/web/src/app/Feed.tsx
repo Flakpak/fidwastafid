@@ -19,8 +19,8 @@ import { BarreFiltres } from "./BarreFiltres.js";
 import { ColonneFiltres } from "./ColonneFiltres.js";
 import { FeuilleFiltres, type SectionFeuille } from "./FeuilleFiltres.js";
 import { CONTENEUR } from "./controlesFiltres.js";
-import { useFacettes } from "./useFacettes.js";
-import type { Facettes } from "./api/v1/_lib/dealsFacettes.js";
+import { useTotalResultats } from "./useTotalResultats.js";
+
 
 /** Délai avant qu'une frappe dans le champ de recherche ne parte au serveur.
  *  La recherche est un filtre serveur depuis le lot 7 : sans ce délai, chaque
@@ -31,7 +31,7 @@ export function Feed({
   initialDeals,
   initialCursor,
   initialFiltres,
-  initialFacettes,
+  initialTotal,
   hero,
 }: {
   initialDeals: Deal[];
@@ -41,7 +41,7 @@ export function Feed({
   /** Filtres lus dans l'URL par le rendu serveur : un feed filtré partagé
    *  s'ouvre déjà filtré, sans passe client. */
   initialFiltres: EtatFiltres;
-  initialFacettes: Facettes | null;
+  initialTotal: number | null;
   /** Rendu AU-DESSUS de la barre de filtres, donc au-dessus du contenu
    *  collant : le hero et ses trois cartes restent en haut de page. */
   hero: React.ReactNode;
@@ -66,7 +66,7 @@ export function Feed({
   /** Barre collée en haut du cadre — pilote la seule ombre, rien d'autre. */
   const [epinglee, setEpinglee] = useState(false);
 
-  const { facettes } = useFacettes(filtres, initialFacettes);
+  const total = useTotalResultats(filtres, initialTotal);
 
   /**
    * Le bouton « Charger plus » est rendu par le SSR mais ne répond qu'une fois
@@ -230,66 +230,47 @@ export function Feed({
   const nbActifs = nbFiltresActifs(filtres);
   const resume = resumeFiltres(filtres);
   const parDefaut = filtresParDefaut(filtres);
-  const total = facettes ? facettes.total : null;
+
 
   return (
     <>
-      {hero}
-
-      {/* Sentinelle d'épinglage : 1px juste au-dessus de la barre. Quand elle
-          quitte le haut du cadre, la barre est collée — c'est le seul moyen
-          portable de le savoir (il n'existe pas de sélecteur `:stuck`
-          largement disponible). Purement visuel : l'ombre en dépend, jamais
-          le collage lui-même. */}
-      <div ref={sentinelleRef} aria-hidden="true" className="h-px" />
-
       {/*
-       * UN SEUL élément collant sur cette page, `top-0` : la barre de
-       * filtres. L'en-tête ne colle plus (page.tsx) et défile normalement —
-       * sa hauteur revient donc au contenu pendant la navigation, ce qui
-       * compte sur mobile. Un seul élément collant, donc aucun interstice
-       * possible entre deux : c'était la cause du bug d'origine, où la barre
-       * collait à un `top-[70px]` recopié pour un en-tête de 60px et laissait
-       * défiler le feed dans les 10px d'écart.
-       *
-       * Fond OPAQUE (`surface-base`), sans transparence ni flou : sur iOS un
-       * fond translucide laisse voir le contenu en transit. Filet permanent,
-       * et ombre UNE FOIS ÉPINGLÉE seulement — au repos, dans le flux, elle
-       * n'aurait rien à détacher.
-       *
-       * Aucun ancêtre ne porte `overflow: hidden` ni `transform` (body ->
-       * div de page -> ce bloc), les deux neutraliseraient silencieusement le
-       * collage. Le `overflow-hidden` du hero et le `transform` du ticker
-       * sont sur des FRÈRES, sans effet ici.
+       * Grille reprise de main À L'IDENTIQUE : colonne latérale de 220px au
+       * BORD GAUCHE DE LA FENÊTRE (aucun conteneur centré, aucune largeur
+       * maximale qui laisserait des marges vides des deux côtés), contenu
+       * dans le reste. Le hero est DANS la colonne de contenu, à droite de la
+       * colonne latérale — pas au-dessus d'elle.
        */}
-      {/*
-       * Deux colonnes à partir de lg : colonne de filtres 232px, gouttière
-       * 28px, feed dans le reste. `items-start` est indispensable — sans lui
-       * chaque cellule s'étire à la hauteur de la rangée et le collage des
-       * enfants n'a plus de course.
-       */}
-      <div className={`${CONTENEUR} lg:grid lg:grid-cols-[232px_1fr] lg:items-start lg:gap-x-7`}>
-        {/* Colonne de filtres — collante à top-0 elle aussi, avec SON PROPRE
-            rembourrage intérieur (`pt-4`), le même que celui du bloc de
-            droite : c'est ce qui aligne le haut des deux colonnes sans
-            qu'aucune valeur de décalage n'existe nulle part.
-            `max-h-screen` + défilement propre : douze catégories plus les
-            trois autres sections dépassent un écran court, et une colonne
-            collante plus haute que le cadre ne se déroule jamais. */}
-        <aside className="hidden lg:sticky lg:top-0 lg:block lg:max-h-screen lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:pt-4">
-          <ColonneFiltres
-            filtres={filtres}
-            facettes={facettes}
-            nbActifs={nbActifs}
-            onChange={(patch) => appliquer({ ...filtres, ...patch })}
-            onReinitialiser={reinitialiser}
-          />
+      <div className="md:grid md:grid-cols-[220px_1fr] md:items-start">
+        {/*
+         * Colonne latérale — panneau `surface` (blanc, pas le plâtre de la
+         * page), filet à droite, pleine hauteur, son propre défilement.
+         * Traitement visuel et positionnement REPRIS DE MAIN sans
+         * modification ; seul le contenu change.
+         *
+         * Seul écart, imposé : `top-0`/`h-screen` au lieu du `top-[70px]`/
+         * `h-[calc(100vh-70px)]` de main. Cet offset compensait un en-tête
+         * alors collant ; l'en-tête ne colle plus, et le conserver rouvrirait
+         * en haut de la colonne exactement la bande de 70px par laquelle le
+         * feed passait — le bug d'origine de ce lot.
+         */}
+        <aside className="hidden md:flex md:flex-col md:sticky md:top-0 md:h-screen md:overflow-y-auto bg-surface border-r border-border py-5">
+          <ColonneFiltres filtres={filtres} onChange={(patch) => appliquer({ ...filtres, ...patch })} />
         </aside>
 
-        <div className="min-w-0">
+        <div className={CONTENEUR}>
+          {hero}
+
+          {/* Sentinelle d'épinglage : 1px juste au-dessus du bloc. Quand elle
+              quitte le haut du cadre, le bloc est collé — c'est le seul moyen
+              portable de le savoir (il n'existe pas de sélecteur `:stuck`
+              largement disponible). Purement visuel : l'ombre en dépend,
+              jamais le collage lui-même. */}
+          <div ref={sentinelleRef} aria-hidden="true" className="h-px" />
           {/*
-           * UN SEUL bloc collant pour la colonne de droite : recherche, tri
-           * et compteur ensemble, `top-0`, fond OPAQUE.
+           * UN SEUL bloc collant pour la colonne de contenu : recherche et
+           * compteur de résultats, `top-0`, fond OPAQUE. Le tri n'y est plus
+           * — il est retourné dans la colonne, où il vit sur main.
            *
            * Le rembourrage supérieur est À L'INTÉRIEUR du bloc (`pt-4`), pas
            * au-dessus : avec un `top-16px` ou une marge externe, il resterait
@@ -307,14 +288,7 @@ export function Feed({
               epinglee ? "shadow-[0_2px_10px_-4px_rgba(26,24,21,0.30)]" : ""
             }`}
           >
-            <BarreFiltres
-              filtres={filtres}
-              saisie={saisie}
-              nbActifs={nbActifs}
-              onSaisie={setSaisie}
-              onChange={(patch) => appliquer({ ...filtres, ...patch })}
-              onOuvrir={ouvrirFeuille}
-            />
+            <BarreFiltres saisie={saisie} nbActifs={nbActifs} onSaisie={setSaisie} onOuvrir={ouvrirFeuille} />
 
             {/*
              * Compteur de résultats — sans lui, un feed filtré à zéro est
@@ -431,7 +405,7 @@ export function Feed({
           section={feuille.section}
           declencheur={feuille.declencheur}
           filtres={filtres}
-          facettesInitiales={facettes}
+          totalInitial={total}
           onFermer={fermerFeuille}
           onAppliquer={appliquer}
         />

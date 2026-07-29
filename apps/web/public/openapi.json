@@ -863,53 +863,15 @@
           "nextCursor"
         ]
       },
-      "Facettes": {
+      "CompteDeals": {
         "type": "object",
         "properties": {
           "total": {
             "type": "integer"
-          },
-          "categories": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "valeur": {
-                  "type": "string"
-                },
-                "n": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "valeur",
-                "n"
-              ]
-            }
-          },
-          "villes": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "valeur": {
-                  "type": "string"
-                },
-                "n": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "valeur",
-                "n"
-              ]
-            }
           }
         },
         "required": [
-          "total",
-          "categories",
-          "villes"
+          "total"
         ]
       }
     },
@@ -1103,10 +1065,10 @@
         }
       }
     },
-    "/deals/facettes": {
+    "/deals/compte": {
       "get": {
-        "summary": "Compteurs contextuels du feed (CONTRAT-V1 §4, septième amendement)",
-        "description": "Mêmes filtres que GET /deals, sans pagination. Chaque dimension est comptée en appliquant les autres filtres actifs mais pas le sien. Les prédicats sont partagés avec GET /deals : un compteur annonce exactement ce que la liste renverra.",
+        "summary": "Nombre de deals correspondant aux filtres (CONTRAT-V1 §4, septième amendement)",
+        "description": "Mêmes filtres que GET /deals, sans pagination. Les prédicats sont partagés avec GET /deals : le total annonce exactement ce que la liste renverra.",
         "tags": [
           "deals"
         ],
@@ -1166,7 +1128,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Facettes"
+                  "$ref": "#/components/schemas/CompteDeals"
                 }
               }
             }

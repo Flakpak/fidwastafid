@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import type { Deal } from "@fidwastafid/schemas";
 import { GET as getDealsHandler } from "./api/v1/deals/route.js";
-import { GET as getFacettesHandler } from "./api/v1/deals/facettes/route.js";
+import { GET as getCompteHandler } from "./api/v1/deals/compte/route.js";
 import { SiteHeader } from "../components/SiteHeader.js";
 import { SiteFooter } from "../components/SiteFooter.js";
 import { Ticker } from "../components/Ticker.js";
 import { HeroBand } from "../components/HeroBand.js";
 import { Feed } from "./Feed.js";
-import { construireParamsFacettes, construireParamsFeed } from "../lib/feedPagination.js";
+import { construireParamsCompte, construireParamsFeed } from "../lib/feedPagination.js";
 import { lireFiltresUrl, type EtatFiltres } from "../lib/filtresFeed.js";
-import type { Facettes } from "./api/v1/_lib/dealsFacettes.js";
+
 
 const DESCRIPTION = "Les meilleurs bons plans et promotions au Maroc, votés par la communauté : alimentaire, high-tech, mode et plus.";
 
@@ -55,11 +55,11 @@ async function fetchFeed(filtres: EtatFiltres): Promise<DealsPage> {
   return { data: body.data, nextCursor: body.nextCursor };
 }
 
-async function fetchFacettes(filtres: EtatFiltres): Promise<Facettes | null> {
-  const params = construireParamsFacettes(filtres);
-  const response = await getFacettesHandler(new Request(`http://localhost/api/v1/deals/facettes?${params.toString()}`));
+async function fetchTotal(filtres: EtatFiltres): Promise<number | null> {
+  const params = construireParamsCompte(filtres);
+  const response = await getCompteHandler(new Request(`http://localhost/api/v1/deals/compte?${params.toString()}`));
   if (!response.ok) return null;
-  return (await response.json()) as Facettes;
+  return ((await response.json()) as { total: number }).total;
 }
 
 type PageParams = { searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -79,7 +79,7 @@ function versSearchParams(brut: Record<string, string | string[] | undefined>): 
 export default async function Home({ searchParams }: PageParams) {
   const brut = await searchParams;
   const filtres = lireFiltresUrl(versSearchParams(brut));
-  const [premierePage, facettes] = await Promise.all([fetchFeed(filtres), fetchFacettes(filtres)]);
+  const [premierePage, total] = await Promise.all([fetchFeed(filtres), fetchTotal(filtres)]);
 
   const compte = typeof brut.compte === "string" ? brut.compte : undefined;
   const motdepasse = typeof brut.motdepasse === "string" ? brut.motdepasse : undefined;
@@ -107,14 +107,14 @@ export default async function Home({ searchParams }: PageParams) {
       <Ticker />
       <Feed
         hero={
-          <div className="mx-auto w-full max-w-2xl px-4 pt-4 lg:max-w-5xl">
+          <div className="pt-4">
             <HeroBand />
           </div>
         }
         initialDeals={premierePage.data}
         initialCursor={premierePage.nextCursor}
         initialFiltres={filtres}
-        initialFacettes={facettes}
+        initialTotal={total}
       />
       <SiteFooter />
     </div>
