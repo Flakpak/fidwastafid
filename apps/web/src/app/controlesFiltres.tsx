@@ -19,7 +19,7 @@ import { OU_ACHETER, type TypeAchat } from "../lib/filtresFeed.js";
  * laisserait de larges marges vides des deux côtés alors que la colonne
  * latérale est, elle, collée au bord gauche de la fenêtre.
  */
-export const CONTENEUR = "mx-auto w-full max-w-2xl px-4 md:mx-0 md:max-w-none";
+export const CONTENEUR = "mx-auto w-full max-w-2xl px-4 md:mx-0 md:max-w-none md:px-6 xl:px-8";
 
 export const NEUTRE = "border-border-strong bg-surface text-ink-muted hover:border-accent-line hover:text-accent";
 export const ACTIF = "border-accent bg-accent-soft text-accent";

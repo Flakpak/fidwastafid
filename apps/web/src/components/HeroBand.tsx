@@ -121,13 +121,20 @@ export function HeroBand() {
        * inventé ici.
        */}
       {/*
+       * Ligne de clôture — MOBILE UNIQUEMENT (`md:hidden`) depuis le
+       * 28/07/2026 : au-delà de md, la colonne latérale porte le CTA et le
+       * lien concept à leur place d'origine (celle de main), et les garder
+       * ici en ferait des doublons visibles côte à côte. Sous md il n'y a pas
+       * de colonne — c'est le seul endroit où ces deux entrées existent, et
+       * l'ancien rail ne les y a jamais offertes.
+       *
        * Variante `brand` et NON `primary` : §8 règle 1 — une seule action
        * pleine par écran, et c'est « Soumettre un deal » dans l'en-tête, qui
        * est persistant là où ce hero se traverse une fois. Le rail d'origine
        * n'était pas non plus un aplat. Le lien concept reste un lien texte,
        * pour qu'il ne se confonde pas avec le bouton juste à côté.
        */}
-      <div className="relative flex flex-col items-center gap-3 border-t border-accent-line pt-5 sm:flex-row sm:justify-center sm:gap-5">
+      <div className="relative flex flex-col items-center gap-3 border-t border-accent-line pt-5 sm:flex-row sm:justify-center sm:gap-5 md:hidden">
         <Link
           href="/soumettre"
           aria-label="Partage un bon plan — soumettre un deal"

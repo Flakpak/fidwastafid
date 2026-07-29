@@ -302,7 +302,7 @@ export function Feed({
               id={ANCRE_RESULTATS}
               tabIndex={-1}
               aria-live="polite"
-              className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-2 text-sm focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+              className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pb-3 pt-2.5 text-sm focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
             >
               <span className="font-bold text-ink">
                 {total === null ? "…" : total === 1 ? "1 deal" : `${total} deals`}
