@@ -10,6 +10,8 @@ import {
   type TriFeed,
   type TypeAchat,
 } from "../lib/filtresFeed.js";
+import Link from "next/link";
+import { Brand } from "../components/Brand.js";
 import { CADRE, NEUTRE } from "./controlesFiltres.js";
 
 /**
@@ -61,6 +63,22 @@ export function ColonneFiltres({
 
   return (
     <>
+      {/* ── Bloc de marque et lien concept — RÉTABLIS à l'identique de main
+             (28/07/2026). Ils avaient été retirés, puis le retrait consigné
+             dans IDEES.md ; la revue visuelle a tranché l'inverse. La colonne
+             les reprend donc à leur place d'origine, en tête. ── */}
+      <div className="text-center px-4 pb-4 mb-3 border-b border-border">
+        <Brand forme="mark" hauteur={72} className="mx-auto mb-2" alt="" />
+        <p className="text-[10px] text-ink-muted font-semibold">Bons plans marocains</p>
+      </div>
+
+      <Link
+        href="/concept"
+        className="mx-3 mb-1 rounded-[10px] border border-accent-line bg-surface text-left text-xs font-extrabold px-3.5 py-2.5 text-accent hover:bg-accent-soft hover:border-accent transition-colors duration-[130ms] motion-reduce:transition-none"
+      >
+        Le concept Fidwastafid
+      </Link>
+
       {/* ── Trier par — inchangé depuis main ── */}
       <p className={`${TITRE} pt-2`}>Trier par</p>
       {TRIS.map((t) => (
@@ -126,6 +144,20 @@ export function ColonneFiltres({
           {o.label}
         </button>
       ))}
+
+      {/* ── CTA de soumission — rétabli en pied de colonne, à l'identique de
+             main. Il reste AUSSI dans la ligne de clôture du hero, mais celle-ci
+             est désormais réservée au mobile (`md:hidden`), où la colonne
+             n'existe pas : les deux ne coexistent jamais à l'écran. ── */}
+      <Link
+        href="/soumettre"
+        className="mx-3 mt-4 rounded-2xl border border-accent-soft bg-accent-soft text-center p-3.5 hover:bg-[#dbe7df] transition-colors duration-[130ms] motion-reduce:transition-none"
+      >
+        <span dir="rtl" className="font-arabic block text-lg font-bold text-accent">
+          فيد و ستافيد
+        </span>
+        <span className="block text-[10px] text-accent/80 mt-0.5">Partage un bon plan →</span>
+      </Link>
     </>
   );
 }

@@ -47,7 +47,24 @@ n'est plus un diagnostic ponctuel mais une propriété du wrapper.)*
   plein `hot`/`cold`) optimiste côté client : il ne reçoit que le score, pas le
   sens du vote de l'utilisateur, donc l'état ne survit pas à un rechargement.
 
-## Bloc de marque du rail d'accueil — RETRAIT ASSUMÉ (2026-07-28)
+## ~~Bloc de marque du rail d'accueil — RETRAIT ASSUMÉ (2026-07-28)~~ — ANNULÉ le 28/07/2026
+
+> **Le retrait décrit ci-dessous n'a pas tenu la revue visuelle**, le jour même.
+> Le bloc de marque (monogramme FwS + « Bons plans marocains »), le lien
+> « Le concept Fidwastafid » et le CTA de soumission sont RÉTABLIS dans la
+> colonne latérale, à leur place et dans leur style d'origine. L'argument des
+> trois rappels de marque n'a pas résisté à l'écran : sans son bloc de tête,
+> la colonne démarrait à froid sur une liste de filtres.
+>
+> Ce qui subsiste de la décision : la ligne de clôture du hero, née de ce
+> retrait, est conservée **en mobile uniquement** (`md:hidden`). Sous md il n'y
+> a pas de colonne, et l'ancien rail — `hidden md:flex` — n'a jamais offert ces
+> deux entrées aux mobiles. Au-dessus de md, la colonne les porte seule : les
+> deux ne coexistent jamais à l'écran.
+>
+> Note conservée ci-dessous pour la trace du raisonnement, pas comme état actuel.
+
+## Bloc de marque du rail d'accueil — retrait (2026-07-28, annulé)
 
 Le lot 7 (refonte des filtres, PR #59) a supprimé le rail desktop de l'accueil :
 sa navigation par catégories et son tri faisaient doublon avec la nouvelle barre,
