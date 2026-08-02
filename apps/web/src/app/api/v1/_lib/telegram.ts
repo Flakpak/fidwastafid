@@ -4,9 +4,10 @@
  * curation manuelle depuis l'admin, jamais de seuil automatique).
  *
  * PAS DE DÉPENDANCE (ni telegraf, ni node-telegram-bot-api) : on appelle
- * deux méthodes HTTP (`sendPhoto`, `sendMessage`) sur un endpoint documenté
- * et stable. Une bibliothèque complète apporterait ici un polling, un
- * système de commandes et une surface de mise à jour, pour zéro usage.
+ * trois méthodes HTTP (`sendPhoto`, `sendMessage`, `deleteMessage`) sur un
+ * endpoint documenté et stable. Une bibliothèque complète apporterait ici un
+ * polling, un système de commandes et une surface de mise à jour, pour zéro
+ * usage.
  *
  * PAS DE REPLI SILENCIEUX (docs/INCIDENTS.md, motif des 19/07, 24/07 et
  * 02/08) : aucune fonction de ce module ne renvoie `null` ou `false` sur
@@ -77,7 +78,7 @@ export function diffusionConfiguree(): boolean {
   return Boolean(process.env.TELEGRAM_BOT_TOKEN && (process.env.TELEGRAM_CHAT_ID_TEST || process.env.TELEGRAM_CHAT_ID));
 }
 
-async function appeler(methode: string, corps: Record<string, unknown>): Promise<{ message_id: number }> {
+async function appelerBrut(methode: string, corps: Record<string, unknown>): Promise<{ ok: true; result: unknown }> {
   const token = lireJeton();
   let response: Response;
   try {
@@ -111,12 +112,21 @@ async function appeler(methode: string, corps: Record<string, unknown>): Promise
     );
   }
 
-  const messageId = payload.result?.message_id;
+  return { ok: true, result: payload.result };
+}
+
+/** Appel dont on exige un `message_id` en retour (envois). */
+async function appelerAvecMessageId(
+  methode: string,
+  corps: Record<string, unknown>
+): Promise<{ message_id: number }> {
+  const { result } = await appelerBrut(methode, corps);
+  const messageId = (result as { message_id?: number } | undefined)?.message_id;
   if (typeof messageId !== "number") {
     // Telegram dit ok mais ne renvoie pas d'identifiant : on ne peut pas
     // tracer la diffusion. Échec franc plutôt qu'une ligne à message_id null
     // qu'on prendrait plus tard pour un envoi Discord.
-    throw new TelegramError(`Telegram a répondu sans message_id sur ${methode}.`, response.status, null);
+    throw new TelegramError(`Telegram a répondu sans message_id sur ${methode}.`, null, null);
   }
   return { message_id: messageId };
 }
@@ -135,8 +145,33 @@ export async function publierDeal(params: {
 
   const commun = { chat_id: chatId, parse_mode: "HTML", disable_web_page_preview: false };
   const resultat = params.photoUrl
-    ? await appeler("sendPhoto", { ...commun, photo: params.photoUrl, caption: params.legende })
-    : await appeler("sendMessage", { ...commun, text: params.legende });
+    ? await appelerAvecMessageId("sendPhoto", { ...commun, photo: params.photoUrl, caption: params.legende })
+    : await appelerAvecMessageId("sendMessage", { ...commun, text: params.legende });
 
   return { messageId: resultat.message_id, chatId, test };
+}
+
+/**
+ * Retire un message déjà publié (`deleteMessage`).
+ *
+ * POURQUOI CETTE FONCTION EXISTE : sans elle, une diffusion était
+ * définitive par construction — le jeton du bot ne vit que côté serveur,
+ * donc rien hors du code déployé ne pouvait défaire un envoi. Un prix
+ * erroné parti dans le canal ne se rattrapait qu'à la main dans Telegram.
+ *
+ * `chat_id` est relu de l'environnement plutôt que stocké par diffusion :
+ * la table `diffusions` ne conserve pas la destination, et la relire garantit
+ * qu'on supprime dans le canal où l'on publie AUJOURD'HUI. Corollaire assumé,
+ * et c'est le comportement voulu : si `TELEGRAM_CHAT_ID_TEST` a été posée
+ * depuis l'envoi, la suppression visera le canal de test et Telegram
+ * répondra « message to delete not found » — un refus lisible, jamais une
+ * suppression au mauvais endroit.
+ *
+ * Limite propre à Telegram, à connaître : un bot ne peut supprimer un
+ * message d'un canal que s'il y est administrateur, et au-delà de 48 h la
+ * suppression peut être refusée. Ces refus remontent tels quels.
+ */
+export async function supprimerMessage(messageId: number): Promise<void> {
+  const { chatId } = lireChatId();
+  await appelerBrut("deleteMessage", { chat_id: chatId, message_id: messageId });
 }

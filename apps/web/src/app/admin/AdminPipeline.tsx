@@ -9,6 +9,7 @@ import {
   type SaveResult,
   type ImageFetchResult,
   type DiffusionResult,
+  type AnnulationResult,
 } from "./AdminDealItem.js";
 import { MotifRejet } from "./MotifRejet.js";
 import { Button } from "../../components/Button.js";
@@ -253,6 +254,20 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     return { ok: true, canalTest: Boolean(body.canalTest) };
   }
 
+  /** Annulation d'une diffusion — retire le message du canal ET la ligne
+   *  `diffusions`, rendant le deal rediffusable. Même relecture depuis la
+   *  base au succès : l'état affiché doit venir de ce qui est écrit, jamais
+   *  d'un optimisme local. */
+  async function annulerDiffusion(publicId: string): Promise<AnnulationResult> {
+    const res = await fetch(`/api/v1/admin/deals/${publicId}/diffuser`, { method: "DELETE" });
+    if (!res.ok) {
+      const body = (await res.json()) as ApiErrorBody;
+      return { ok: false, message: body.error?.message ?? "Annulation impossible." };
+    }
+    await fetchDeals();
+    return { ok: true };
+  }
+
   /**
    * `motifRejet` est exigé par l'API pour un rejet groupé (CONTRAT-V1 §3) —
    * l'endpoint bulk était sinon un contournement complet de l'obligation de
@@ -359,6 +374,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
             onFetchImageFromLink={() => fetchImageFromLink(deal.publicId)}
             onUploadImage={(file) => uploadImage(deal.publicId, file)}
             onDiffuser={() => diffuser(deal.publicId)}
+            onAnnulerDiffusion={() => annulerDiffusion(deal.publicId)}
           />
         ))}
       </ul>

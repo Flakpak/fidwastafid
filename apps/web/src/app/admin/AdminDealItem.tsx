@@ -54,6 +54,10 @@ export type ImageFetchResult = { ok: true } | { ok: false; message: string };
  *  envoi vers le canal public ne se rapportent pas de la même façon. */
 export type DiffusionResult = { ok: true; canalTest: boolean } | { ok: false; message: string };
 
+/** Annulation : retire le message du canal ET la ligne `diffusions`. Un échec
+ *  laisse les deux en place — l'étiquette « Diffusé ✓ » reste alors vraie. */
+export type AnnulationResult = { ok: true } | { ok: false; message: string };
+
 function toEditFields(deal: DealAdmin): DealEditFields {
   return {
     titre: deal.titre,
@@ -152,6 +156,7 @@ export function AdminDealItem({
   onFetchImageFromLink,
   onUploadImage,
   onDiffuser,
+  onAnnulerDiffusion,
 }: {
   deal: DealAdmin;
   /** Autre deal du même produit s'il en existe un (visibilité seule, lot du
@@ -168,6 +173,7 @@ export function AdminDealItem({
   onFetchImageFromLink: () => Promise<ImageFetchResult>;
   onUploadImage: (file: File) => Promise<ImageFetchResult>;
   onDiffuser: () => Promise<DiffusionResult>;
+  onAnnulerDiffusion: () => Promise<AnnulationResult>;
 }) {
   const [fields, setFields] = useState<DealEditFields>(() => toEditFields(deal));
   /** Le rejet passe par le panneau de motif — jamais directement par le bouton. */
@@ -182,6 +188,8 @@ export function AdminDealItem({
   const [diffState, setDiffState] = useState<"idle" | "pending" | "error">("idle");
   const [diffError, setDiffError] = useState<string | null>(null);
   const [diffInfo, setDiffInfo] = useState<string | null>(null);
+  /** Deux temps sur l'annulation : le geste touche un canal public. */
+  const [confirmAnnul, setConfirmAnnul] = useState(false);
   const [uploadState, setUploadState] = useState<"idle" | "pending" | "error">("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -216,6 +224,25 @@ export function AdminDealItem({
     if (result.ok) {
       setDiffState("idle");
       setDiffInfo(result.canalTest ? "Envoyé sur le canal de TEST" : null);
+    } else {
+      setDiffState("error");
+      setDiffError(result.message);
+    }
+  }
+
+  /** Annulation de diffusion — le succès remet la carte en « Diffuser »
+   *  parce que `fetchDeals()` relit l'état depuis la base ; un échec laisse
+   *  volontairement l'étiquette « Diffusé ✓ », qui reste vraie tant que le
+   *  message est dans le canal. */
+  async function handleAnnulerDiffusion() {
+    setDiffState("pending");
+    setDiffError(null);
+    setDiffInfo(null);
+    const result = await onAnnulerDiffusion();
+    setConfirmAnnul(false);
+    if (result.ok) {
+      setDiffState("idle");
+      setDiffInfo("Retiré du canal");
     } else {
       setDiffState("error");
       setDiffError(result.message);
@@ -366,12 +393,34 @@ export function AdminDealItem({
               le second envoi de toute façon. */}
           {deal.statut === "publie" &&
             (deal.diffuseTelegram ? (
-              <span
-                className="rounded-lg px-3 py-1.5 text-xs font-bold text-center bg-accent-soft border border-accent-line text-accent"
-                title="Déjà publié sur le canal Telegram"
-              >
-                Diffusé ✓
-              </span>
+              <>
+                <span
+                  className="rounded-lg px-3 py-1.5 text-xs font-bold text-center bg-accent-soft border border-accent-line text-accent"
+                  title="Déjà publié sur le canal Telegram"
+                >
+                  Diffusé ✓
+                </span>
+                {/* Annulation : retire le message du canal ET la ligne
+                    `diffusions`, rendant le deal rediffusable. Confirmation
+                    demandée — le geste touche un canal public, il ne doit pas
+                    partir d'un clic distrait. */}
+                <button
+                  type="button"
+                  onClick={() => (confirmAnnul ? void handleAnnulerDiffusion() : setConfirmAnnul(true))}
+                  disabled={pending || diffState === "pending"}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold cursor-pointer border transition-colors duration-[130ms] disabled:opacity-50 motion-reduce:transition-none ${
+                    confirmAnnul
+                      ? "border-hot-line bg-surface text-hot hover:bg-hot-soft"
+                      : "border-border-strong bg-surface text-ink-muted hover:bg-surface-subtle"
+                  }`}
+                >
+                  {diffState === "pending"
+                    ? "Annulation..."
+                    : confirmAnnul
+                      ? "Confirmer le retrait"
+                      : "Annuler la diffusion"}
+                </button>
+              </>
             ) : (
               <button
                 type="button"

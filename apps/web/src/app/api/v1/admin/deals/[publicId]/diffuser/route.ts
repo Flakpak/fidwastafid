@@ -3,7 +3,7 @@ import { query } from "@fidwastafid/db";
 import { requireAdmin } from "@fidwastafid/auth";
 import { apiError, withAuthErrors } from "../../../../_lib/errors.js";
 import { logAudit } from "../../../../_lib/audit.js";
-import { publierDeal, TelegramError, TelegramConfigError } from "../../../../_lib/telegram.js";
+import { publierDeal, supprimerMessage, TelegramError, TelegramConfigError } from "../../../../_lib/telegram.js";
 import { buildLegendeTelegram, lienDiffusion } from "../../../../_lib/diffusionMessage.js";
 import { SITE_URL } from "../../../../../../../lib/siteUrl.js";
 
@@ -136,4 +136,89 @@ export const POST = withAuthErrors<Context>(async (request, { params }) => {
      *  savoir qu'il vient de tester, pas de publier. */
     canalTest: envoi.test,
   });
+});
+
+/**
+ * DELETE /api/v1/admin/deals/:publicId/diffuser — annule une diffusion.
+ *
+ * FAIT GÉNÉRATEUR (02/08/2026) : sans cet endpoint, une diffusion était
+ * DÉFINITIVE PAR CONSTRUCTION. Le jeton du bot ne vit que côté serveur, donc
+ * rien hors du code déployé ne pouvait retirer un message — un prix erroné
+ * parti dans le canal ne se rattrapait qu'à la main dans Telegram, et la
+ * ligne `diffusions` restait, interdisant toute rediffusion corrigée.
+ *
+ * ORDRE MIROIR DE L'ENVOI, et pour la même raison : suppression Telegram
+ * D'ABORD, suppression de la ligne ENSUITE. Si Telegram refuse (bot non
+ * administrateur du canal, message trop ancien, déjà supprimé à la main),
+ * la ligne RESTE — elle décrit alors la réalité : le message est toujours
+ * là. Supprimer la ligne quand même rendrait le deal rediffusable et
+ * produirait un doublon dans le canal, exactement ce que la table existe
+ * pour empêcher.
+ */
+export const DELETE = withAuthErrors<Context>(async (request, { params }) => {
+  const admin = await requireAdmin(request);
+  const { publicId } = await params;
+
+  const rows = await query<{ id: string; diffusion_id: string | null; telegram_message_id: string | null }>(
+    `select d.id,
+            df.id as diffusion_id,
+            df.telegram_message_id
+       from deals d
+       left join diffusions df on df.deal_id = d.id and df.canal = $2
+      where d.public_id = $1`,
+    [publicId, CANAL]
+  );
+  const deal = rows[0];
+  if (!deal) return apiError("NOT_FOUND", "Deal introuvable.");
+  if (!deal.diffusion_id) {
+    return apiError("NOT_FOUND", "Ce deal n'a pas de diffusion Telegram à annuler.");
+  }
+
+  // `bigint` revient en chaîne côté pg (même piège que le faux diff
+  // `enseigne_id` du 27/07, cf. IDEES) — conversion explicite, jamais
+  // implicite.
+  const messageId = deal.telegram_message_id === null ? null : Number(deal.telegram_message_id);
+  if (messageId === null || !Number.isFinite(messageId)) {
+    return apiError(
+      "CONFLICT",
+      "Diffusion enregistrée sans identifiant de message : suppression automatique impossible."
+    );
+  }
+
+  try {
+    await supprimerMessage(messageId);
+  } catch (err) {
+    if (err instanceof TelegramConfigError) {
+      return apiError("VALIDATION_ERROR", "Diffusion Telegram non configurée sur cet environnement.");
+    }
+    if (err instanceof TelegramError) {
+      console.error(
+        JSON.stringify({
+          evenement: "annulation_telegram_echec",
+          publicId,
+          statut: err.statut,
+          description: err.description,
+        })
+      );
+      return apiError(
+        "VALIDATION_ERROR",
+        `Telegram a refusé la suppression${err.statut ? ` (HTTP ${err.statut})` : ""}${
+          err.description ? ` : ${err.description}` : "."
+        } La diffusion reste enregistrée — le message est toujours dans le canal.`
+      );
+    }
+    throw err;
+  }
+
+  await query("delete from diffusions where id = $1", [deal.diffusion_id]);
+
+  await logAudit({
+    adminId: admin.id,
+    action: "annuler_diffusion_telegram",
+    cibleType: "deal",
+    cibleId: publicId,
+    details: { messageId },
+  });
+
+  return NextResponse.json({ diffuse: false, canal: CANAL, messageSupprime: messageId });
 });

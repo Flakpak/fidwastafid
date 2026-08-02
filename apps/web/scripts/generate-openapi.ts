@@ -376,6 +376,35 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: "delete",
+  path: "/admin/deals/{publicId}/diffuser",
+  summary:
+    "Annule la diffusion Telegram — supprime le message du canal (deleteMessage) puis la ligne `diffusions`. " +
+    "Si Telegram refuse, la ligne reste : le message est toujours dans le canal.",
+  security: [{ [bearerAuth.name]: [] }],
+  request: { params: z.object({ publicId: z.string() }) },
+  responses: {
+    200: {
+      description: "OK — message retiré et diffusion effacée",
+      content: {
+        "application/json": {
+          schema: z.object({
+            diffuse: z.literal(false),
+            canal: z.literal("telegram"),
+            messageSupprime: z.number().int(),
+          }),
+        },
+      },
+    },
+    400: errorResponse("Diffusion non configurée, ou suppression refusée par Telegram (la diffusion reste enregistrée)"),
+    403: errorResponse("Accès refusé (non-admin)"),
+    404: errorResponse("Deal introuvable, ou aucune diffusion Telegram à annuler"),
+    409: errorResponse("Diffusion enregistrée sans identifiant de message"),
+  },
+  tags: ["admin"],
+});
+
+registry.registerPath({
   method: "post",
   path: "/admin/deals/bulk",
   summary: "Action groupée — statut appliqué à un lot de public_id (max 100)",
