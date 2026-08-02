@@ -18,7 +18,7 @@ import {
 import { BarreFiltres } from "./BarreFiltres.js";
 import { ColonneFiltres } from "./ColonneFiltres.js";
 import { FeuilleFiltres, type SectionFeuille } from "./FeuilleFiltres.js";
-import { CONTENEUR } from "./controlesFiltres.js";
+import { CONTENEUR, MARGES_CONTENU } from "./controlesFiltres.js";
 import { useTotalResultats } from "./useTotalResultats.js";
 
 
@@ -146,9 +146,9 @@ export function Feed({
     // Un changement de filtre en cours de scroll ramène le haut de la liste
     // filtrée sous le bloc collant — sinon l'utilisateur reste au milieu
     // d'une liste qui vient de changer sous ses yeux. La cible est la
-    // SENTINELLE et non le compteur : celui-ci vit désormais DANS le bloc
-    // collant, donc épinglé en haut du cadre, où `scrollIntoView` n'aurait
-    // plus rien à faire défiler.
+    // SENTINELLE : c'est le dernier élément AU-DESSUS du bloc collant à avoir
+    // une position propre dans le document. Viser le bloc lui-même ne ferait
+    // rien dès qu'il est épinglé, puisqu'il est déjà en haut du cadre.
     sentinelleRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
     let cancelled = false;
@@ -255,11 +255,16 @@ export function Feed({
          * feed passait — le bug d'origine de ce lot.
          */}
         <aside className="hidden md:flex md:flex-col md:sticky md:top-0 md:h-screen md:overflow-y-auto bg-surface border-r border-border py-5">
-          <ColonneFiltres filtres={filtres} onChange={(patch) => appliquer({ ...filtres, ...patch })} />
+          <ColonneFiltres
+            filtres={filtres}
+            nbActifs={nbActifs}
+            onChange={(patch) => appliquer({ ...filtres, ...patch })}
+            onReinitialiser={reinitialiser}
+          />
         </aside>
 
         <div className={CONTENEUR}>
-          {hero}
+          <div className={`${MARGES_CONTENU} pt-4`}>{hero}</div>
 
           {/* Sentinelle d'épinglage : 1px juste au-dessus du bloc. Quand elle
               quitte le haut du cadre, le bloc est collé — c'est le seul moyen
@@ -268,59 +273,60 @@ export function Feed({
               jamais le collage lui-même. */}
           <div ref={sentinelleRef} aria-hidden="true" className="h-px" />
           {/*
-           * UN SEUL bloc collant pour la colonne de contenu : recherche et
-           * compteur de résultats, `top-0`, fond OPAQUE. Le tri n'y est plus
-           * — il est retourné dans la colonne, où il vit sur main.
+           * UN SEUL bloc collant pour la colonne de contenu : la recherche,
+           * et rien d'autre. `top-0`, fond OPAQUE.
            *
-           * Le rembourrage supérieur est À L'INTÉRIEUR du bloc (`pt-4`), pas
-           * au-dessus : avec un `top-16px` ou une marge externe, il resterait
-           * une bande de 16px où le contenu défile visiblement au-dessus du
-           * bloc. C'était exactement le bug d'origine, et aucune valeur de
-           * décalage n'existe donc dans cette page — ni ici, ni sur la
-           * colonne, ni sur l'en-tête (qui ne colle plus du tout).
+           * Le bloc va d'un BORD À L'AUTRE de la colonne et porte les marges
+           * à l'intérieur (`MARGES_CONTENU`), les mêmes que `<main>`. Deux
+           * raisons, et les deux comptent : son fond opaque couvre alors
+           * toute la largeur — sinon il reste de chaque côté une bande non
+           * peinte où le feed défile visiblement à côté du bloc — et son
+           * contenu s'aligne au pixel sur les cartes, par construction et non
+           * par deux valeurs à garder en phase.
+           *
+           * Le rembourrage supérieur est lui aussi À L'INTÉRIEUR (`pt-4`) :
+           * avec un `top-16px` ou une marge externe, il resterait une bande
+           * de 16px où le contenu défile au-dessus du bloc. C'était le bug
+           * d'origine, et aucune valeur de décalage n'existe donc dans cette
+           * page — ni ici, ni sur la colonne, ni sur l'en-tête (qui ne colle
+           * plus du tout).
            *
            * Fond `surface-base` sans transparence ni flou : sur iOS un fond
            * translucide laisse voir le contenu en transit. Filet en bas du
            * bloc, et ombre une fois épinglé seulement.
            */}
           <div
-            className={`sticky top-0 z-20 border-b border-border bg-surface-base pt-4 transition-shadow duration-[130ms] motion-reduce:transition-none ${
+            className={`sticky top-0 z-20 border-b border-border bg-surface-base ${MARGES_CONTENU} py-4 transition-shadow duration-[130ms] motion-reduce:transition-none ${
               epinglee ? "shadow-[0_2px_10px_-4px_rgba(26,24,21,0.30)]" : ""
             }`}
           >
             <BarreFiltres saisie={saisie} nbActifs={nbActifs} onSaisie={setSaisie} onOuvrir={ouvrirFeuille} />
-
-            {/*
-             * Compteur de résultats — sans lui, un feed filtré à zéro est
-             * indiscernable d'un site en panne. Le nombre vient de
-             * `/facettes`, qui applique EXACTEMENT les prédicats de la
-             * liste : il ne peut pas annoncer autre chose que ce qui
-             * s'affiche. C'est désormais le SEUL nombre de l'interface.
-             */}
-            <div
-              ref={resumeRef}
-              id={ANCRE_RESULTATS}
-              tabIndex={-1}
-              aria-live="polite"
-              className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pb-3 pt-2.5 text-sm focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-            >
-              <span className="font-bold text-ink">
-                {total === null ? "…" : total === 1 ? "1 deal" : `${total} deals`}
-              </span>
-              {resume.length > 0 && <span className="text-ink-muted">{resume.join(" · ")}</span>}
-              {!parDefaut && (
-                <button
-                  type="button"
-                  onClick={reinitialiser}
-                  className="rounded-[6px] font-bold text-accent underline underline-offset-2 hover:bg-accent-soft focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  Réinitialiser
-                </button>
-              )}
-            </div>
           </div>
 
-          <main className="py-4">
+          {/*
+           * Le compteur de résultats VISIBLE est retiré. Son annonce, elle,
+           * est reportée ici : sans région live, un changement de filtre
+           * devenait imperceptible au lecteur d'écran — la liste se
+           * remplaçait en silence, sans qu'aucun élément focalisé ne bouge.
+           * Cette région ne coûte aucune place à l'écran et dit la seule
+           * chose utile : combien de deals répondent aux filtres.
+           *
+           * Elle porte aussi l'ancre de repli du focus à la fermeture de la
+           * feuille (`ANCRE_RESULTATS`) — le focus y atterrit et l'annonce
+           * est lue, ce qui est précisément l'information attendue après
+           * avoir appliqué des filtres.
+           */}
+          <div
+            ref={resumeRef}
+            id={ANCRE_RESULTATS}
+            tabIndex={-1}
+            aria-live="polite"
+            className="sr-only"
+          >
+            {total === null ? "" : `${total === 1 ? "1 deal" : `${total} deals`}${resume.length > 0 ? ` — ${resume.join(", ")}` : ""}`}
+          </div>
+
+          <main className={`${MARGES_CONTENU} py-4`}>
             <div className="flex flex-col gap-3">
             {deals.length === 0 && !chargement && !erreur && (
               // État vide EXPLIQUÉ : ce qui a été filtré, et de quoi élargir.

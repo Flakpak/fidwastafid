@@ -106,11 +106,7 @@ export default async function Home({ searchParams }: PageParams) {
       )}
       <Ticker />
       <Feed
-        hero={
-          <div className="pt-4">
-            <HeroBand />
-          </div>
-        }
+        hero={<HeroBand />}
         initialDeals={premierePage.data}
         initialCursor={premierePage.nextCursor}
         initialFiltres={filtres}
