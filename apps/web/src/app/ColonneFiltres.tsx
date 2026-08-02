@@ -54,10 +54,14 @@ const TITRE = "px-4 pt-3 pb-1 text-[9px] font-extrabold tracking-wider uppercase
 
 export function ColonneFiltres({
   filtres,
+  nbActifs,
   onChange,
+  onReinitialiser,
 }: {
   filtres: EtatFiltres;
+  nbActifs: number;
   onChange: (patch: Partial<EtatFiltres>) => void;
+  onReinitialiser: () => void;
 }) {
   const villeInactive = villeSansObjet(filtres);
 
@@ -144,6 +148,21 @@ export function ColonneFiltres({
           {o.label}
         </button>
       ))}
+
+      {/* ── Réinitialisation — DÉPLACÉE ICI (28/07/2026) : elle vivait sur la
+             rangée du compteur de résultats, retirée du bloc collant. Sans
+             elle, effacer trois dimensions demandait trois gestes. N'apparaît
+             que s'il y a quelque chose à effacer — un lien permanent sur une
+             vue non filtrée annonce un état qui n'existe pas. ── */}
+      {nbActifs > 0 && (
+        <button
+          type="button"
+          onClick={onReinitialiser}
+          className="mx-4 mt-3 self-start rounded-[6px] text-left text-[11px] font-bold text-accent underline underline-offset-4 hover:text-accent-hi focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          Réinitialiser les filtres
+        </button>
+      )}
 
       {/* ── CTA de soumission — rétabli en pied de colonne, à l'identique de
              main. Il reste AUSSI dans la ligne de clôture du hero, mais celle-ci

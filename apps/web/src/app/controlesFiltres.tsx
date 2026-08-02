@@ -19,7 +19,20 @@ import { OU_ACHETER, type TypeAchat } from "../lib/filtresFeed.js";
  * laisserait de larges marges vides des deux côtés alors que la colonne
  * latérale est, elle, collée au bord gauche de la fenêtre.
  */
-export const CONTENEUR = "mx-auto w-full max-w-2xl px-4 md:mx-0 md:max-w-none md:px-6 xl:px-8";
+export const CONTENEUR = "mx-auto w-full max-w-2xl md:mx-0 md:max-w-none";
+
+/**
+ * Marges intérieures de la colonne de contenu, portées par CHAQUE bloc et
+ * jamais par la colonne elle-même.
+ *
+ * C'est ce qui permet au bloc collant de peindre son fond d'un bord à l'autre
+ * de la colonne — sinon il reste de chaque côté une bande non peinte, large
+ * de la marge, où le feed défile visiblement à côté du bloc — tout en
+ * alignant son CONTENU exactement sur les cartes, qui portent les mêmes
+ * marges. Une seule constante pour les deux : l'alignement est acquis par
+ * construction, pas par deux valeurs à garder en phase.
+ */
+export const MARGES_CONTENU = "px-4 md:px-6 xl:px-8";
 
 export const NEUTRE = "border-border-strong bg-surface text-ink-muted hover:border-accent-line hover:text-accent";
 export const ACTIF = "border-accent bg-accent-soft text-accent";
