@@ -221,10 +221,33 @@ POST   /api/v1/admin/deals/:publicId/image-depuis-lien
 POST   /api/v1/admin/deals/:publicId/image  upload manuel (multipart/form-data, jpeg/png/webp,
                                              5 Mo max) — fallback si image-depuis-lien est
                                              bloqué par la source ; même amendement du 19/07/2026
-POST   /api/v1/admin/deals/:publicId/diffuser
-                                             publie le deal sur le canal Telegram communautaire
-                                             — ajouté le 02/08/2026, huitième amendement conscient
+POST   /api/v1/admin/deals/:publicId/diffuser/telegram
+DELETE /api/v1/admin/deals/:publicId/diffuser/telegram
+POST   /api/v1/admin/deals/:publicId/diffuser/discord
+DELETE /api/v1/admin/deals/:publicId/diffuser/discord
+                                             diffusion communautaire, un canal par chemin —
+                                             ajouté le 02/08/2026, huitième amendement conscient
 ```
+
+**Révision du 02/08/2026 (même journée) — le canal passe DANS le chemin.** La première
+rédaction exposait `/diffuser` sans canal, Telegram étant le seul. Dès le second canal
+(Discord), un chemin implicite serait devenu un piège : rien n'y aurait dit *où* part le
+message, et le jour d'un troisième canal il aurait fallu inventer un paramètre. Les deux
+canaux se diffusent et s'annulent **indépendamment** — l'anti-double-envoi est lui-même par
+canal (`unique (deal_id, canal)`), donc diffuser sur Discord un deal déjà sur Telegram est
+légitime, et l'inverse aussi.
+
+- **Gardes, ordre des opérations et traduction des échecs sont écrits UNE fois**
+  (`_lib/diffusion.ts`), les routes ne font que nommer leur canal. Deux copies de cette
+  logique auraient dérivé — même raison que la validation zod partagée du pipeline.
+- **Discord passe par un webhook entrant appelé avec `?wait=true`.** Ce n'est pas un
+  réglage de confort : sans lui Discord répond `204` sans corps, on n'apprend jamais
+  l'identifiant du message, et la diffusion devient **indélébile** — exactement le défaut
+  corrigé côté Telegram le même jour.
+- **`diffusions.telegram_message_id` devient `external_message_id` (`text`)**, migration
+  0012. En `text` parce que les identifiants Discord sont des snowflakes 64 bits transportés
+  en chaîne : les faire transiter par un `Number` JavaScript les arrondirait, et un
+  identifiant arrondi ne supprime pas le bon message.
 
 **Amendement du 02/08/2026 — diffusion communautaire (huitième amendement conscient, lot Telegram)** :
 `POST /api/v1/admin/deals/:publicId/diffuser` publie un deal **déjà `publie`** sur le canal Telegram

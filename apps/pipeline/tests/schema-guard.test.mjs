@@ -86,7 +86,95 @@ const toutesLesMigrations = readdirSync(MIGRATIONS_DIR)
   .filter((f) => f.endsWith(".sql"))
   .map((f) => readFileSync(path.join(MIGRATIONS_DIR, f), "utf8"))
   .join("\n");
-check("aucun `rename column` détecté dans packages/db/migrations/", !/rename column/i.test(toutesLesMigrations));
+
+/**
+ * Renommages de colonnes, PAR TABLE.
+ *
+ * Cette garde protège le parseur naïf ci-dessus, qui ne sait lire QUE la
+ * table `deals` dans 0001_init.sql. Elle interdisait jusqu'au 02/08/2026
+ * tout `rename column` du dépôt, quelle que soit la table — plus large que
+ * son objet. La migration 0012 (`diffusions.telegram_message_id` →
+ * `external_message_id`) l'a fait échouer alors qu'elle ne touche pas une
+ * ligne de ce que le parseur lit.
+ *
+ * La règle est donc resserrée sur son intention réelle : un renommage sur
+ * `deals` reste interdit (il rendrait le parseur silencieusement faux) ;
+ * ailleurs, il est permis. Un renommage dont on n'arrive PAS à identifier la
+ * table échoue quand même — on ne présume pas de l'innocuité de ce qu'on ne
+ * sait pas lire.
+ */
+function tablesRenommant(sql) {
+  const tables = [];
+  // `[^;]*?` et non `[\s\S]*?` : le rattachement doit rester DANS la même
+  // instruction SQL. Une classe qui traverse les `;` relie n'importe quel
+  // `alter table deals` antérieur au `rename column` d'une autre table, et
+  // la garde accuse alors la mauvaise migration (constaté en écrivant 0012).
+  const re = /alter\s+table\s+(?:only\s+)?(?:public\.)?["']?(\w+)["']?[^;]*?rename\s+column/gi;
+  let m;
+  while ((m = re.exec(sql)) !== null) tables.push(m[1].toLowerCase());
+  // Occurrences de `rename column` non rattachables à un `alter table` :
+  // comptées comme inconnues, donc bloquantes.
+  const total = (sql.match(/rename\s+column/gi) ?? []).length;
+  const inconnues = total - tables.length;
+  return { tables, inconnues };
+}
+
+const renommages = tablesRenommant(toutesLesMigrations);
+check(
+  "aucun `rename column` sur `deals` (le parseur ci-dessus deviendrait faux)",
+  !renommages.tables.includes("deals")
+);
+check(
+  "tout `rename column` est rattaché à une table identifiable",
+  renommages.inconnues === 0
+);
+
+// ---------------------------------------------------------------------------
+// Le détecteur ci-dessus est lui-même éprouvé, sur du SQL SYNTHÉTIQUE.
+//
+// Sans ces cas, la garde resserrée passerait au vert pour la pire des
+// raisons : ne plus rien détecter du tout. Le compte global de tests verts
+// ne dit rien là-dessus — il aurait été tout aussi vert avec une regex qui
+// ne matche jamais. C'est le contrôle positif qui fait la différence.
+// ---------------------------------------------------------------------------
+console.log("\ndétecteur de renommage — éprouvé sur du SQL synthétique");
+{
+  // POSITIF : ce qui doit encore déclencher la garde.
+  const surDeals = tablesRenommant("alter table deals rename column titre to nom;");
+  check("POSITIF — `alter table deals rename column` est détecté", surDeals.tables.includes("deals"));
+  check("POSITIF — et il ne compte aucun renommage non attribué", surDeals.inconnues === 0);
+
+  const surDealsQualifie = tablesRenommant("alter table public.deals rename column a to b;");
+  check("POSITIF — la forme `public.deals` est détectée aussi", surDealsQualifie.tables.includes("deals"));
+
+  // NÉGATIF : ce qui ne doit PLUS déclencher la garde (cas réel de 0012).
+  const surDiffusions = tablesRenommant("alter table diffusions rename column telegram_message_id to external_message_id;");
+  check(
+    "NÉGATIF — un renommage sur `diffusions` n'accuse pas `deals`",
+    !surDiffusions.tables.includes("deals") && surDiffusions.tables.includes("diffusions")
+  );
+
+  // NÉGATIF — l'amalgame entre instructions, cause du faux positif initial :
+  // un `alter table deals` ANTÉRIEUR ne doit pas être rattaché au
+  // `rename column` d'une autre table située après un `;`.
+  const deuxInstructions = tablesRenommant(
+    "alter table deals add column turnstile_verifie boolean not null default true;\n" +
+      "alter table diffusions rename column telegram_message_id to external_message_id;"
+  );
+  check(
+    "NÉGATIF — deux instructions séparées par `;` ne sont plus amalgamées",
+    !deuxInstructions.tables.includes("deals")
+  );
+  check(
+    "NÉGATIF — et la bonne table est bien celle retenue",
+    deuxInstructions.tables.length === 1 && deuxInstructions.tables[0] === "diffusions"
+  );
+
+  // Un `rename column` orphelin (aucun `alter table` rattachable) doit rester
+  // bloquant : on ne présume pas de l'innocuité de ce qu'on ne sait pas lire.
+  const orphelin = tablesRenommant("-- rename column a to b (hors instruction)\n");
+  check("un `rename column` non rattachable est compté comme inconnu", orphelin.inconnues === 1);
+}
 
 // Colonnes et valeurs de statut que expirer-auto-draft.mjs suppose exister
 // — tenues à la main, à jour avec sa vraie requête SQL. C'est précisément

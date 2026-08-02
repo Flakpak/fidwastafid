@@ -231,6 +231,10 @@ export const dealAdminSchema = dealSchema.extend({
    *  `POST /api/v1/admin/deals/:publicId/diffuser` l'écrit, et seulement
    *  après un envoi réellement abouti. */
   diffuseTelegram: z.boolean(),
+  /** Idem pour le canal Discord. Deux booléens distincts, jamais un seul
+   *  « diffuse » : les canaux se diffusent et s'annulent indépendamment, et
+   *  l'anti-double-envoi est lui-même par canal. */
+  diffuseDiscord: z.boolean(),
 });
 export type DealAdmin = z.infer<typeof dealAdminSchema>;
 
