@@ -193,12 +193,22 @@ la destination.
 appliquée en prod, endpoint `POST /api/v1/admin/deals/:publicId/diffuser` (CONTRAT-V1 §4,
 huitième amendement), bouton « Diffuser » sur les deals publiés avec état « Diffusé ✓ » inerte.
 
-> ⚠️ **Ce qui bloque la recette, et c'est volontaire** : `TELEGRAM_CHAT_ID_TEST` **n'existe pas**
-> côté Vercel (vérifié le 02/08 — seules `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID` y sont).
-> Le code retombe donc sur le canal **public**, et un « test » y publierait devant les abonnés,
-> sans retour arrière possible. Aucun envoi réel n'a été fait. Pour débloquer : poser
-> `TELEGRAM_CHAT_ID_TEST` (canal privé jetable, le bot doit y être administrateur) et exposer les
-> trois variables à l'environnement **Preview**, puis diffuser un deal publié depuis la préversion.
+> ⚠️ **Ce qui bloque la recette.** `TELEGRAM_CHAT_ID_TEST` **n'existe pas** côté Vercel (vérifié le
+> 02/08 — seules `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID` y sont, scopées **Production and
+> Preview** ; l'affirmation « production seule » d'une première lecture était fausse). Le code
+> retombe donc sur le canal **public**.
+>
+> **Second blocage, découvert en préparant le test réel : il n'existe aucun moyen de DÉFAIRE une
+> diffusion.** Supprimer un message demande un appel `deleteMessage` authentifié par
+> `TELEGRAM_BOT_TOKEN`, qui ne vit que côté Vercel — donc uniquement atteignable depuis du code
+> serveur déployé. Aucun endpoint ne le fait aujourd'hui. Conséquence : **tout envoi est
+> définitif par construction**, y compris un envoi de test.
+>
+> Deux voies pour débloquer, à trancher : (1) poser `TELEGRAM_CHAT_ID_TEST` sur un canal privé
+> jetable — le bot doit y être administrateur ; (2) ajouter `DELETE /api/v1/admin/deals/:publicId/diffuser`
+> qui appelle `deleteMessage` et retire la ligne `diffusions`, faisant de l'annulation une capacité
+> du produit plutôt qu'un geste manuel. La (2) est utile au-delà du test : une diffusion partie
+> avec une erreur de prix se rattrape aujourd'hui à la main dans Telegram.
 
 Discord et WhatsApp restent entiers.
 
