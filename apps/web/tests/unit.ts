@@ -10,7 +10,9 @@ import {
   UTM_MEDIUM,
   UTM_CAMPAIGN,
 } from "../src/app/api/v1/_lib/diffusionMessage.js";
-import { lireChatId, diffusionConfiguree, TelegramConfigError } from "../src/app/api/v1/_lib/telegram.js";
+import { lireChatId, canalTelegram } from "../src/app/api/v1/_lib/telegram.js";
+import { canalDiscord, decouperWebhook, buildEmbedDiscord } from "../src/app/api/v1/_lib/discord.js";
+import { DiffusionConfigError } from "../src/app/api/v1/_lib/diffusionCanal.js";
 import {
   fetchAuthUserEmail,
   SupabaseAdminUnavailableError,
@@ -1065,15 +1067,15 @@ console.log("\nDiffusion — destination : le canal de test prime, par PRÉSENCE
   try {
     lireChatId();
   } catch (err) {
-    leve = err instanceof TelegramConfigError;
+    leve = err instanceof DiffusionConfigError;
   }
   check("aucune destination : erreur de config, jamais un envoi au hasard", leve);
 
   process.env.TELEGRAM_BOT_TOKEN = "jeton-de-test";
   process.env.TELEGRAM_CHAT_ID = "-100public";
-  check("diffusionConfiguree() vraie avec jeton + destination", diffusionConfiguree() === true);
+  check("canalTelegram.estConfigure() vraie avec jeton + destination", canalTelegram.estConfigure() === true);
   delete process.env.TELEGRAM_BOT_TOKEN;
-  check("diffusionConfiguree() fausse sans jeton", diffusionConfiguree() === false);
+  check("canalTelegram.estConfigure() fausse sans jeton", canalTelegram.estConfigure() === false);
 
   if (avant.test === undefined) delete process.env.TELEGRAM_CHAT_ID_TEST;
   else process.env.TELEGRAM_CHAT_ID_TEST = avant.test;
@@ -1081,6 +1083,75 @@ console.log("\nDiffusion — destination : le canal de test prime, par PRÉSENCE
   else process.env.TELEGRAM_CHAT_ID = avant.prod;
   if (avant.token === undefined) delete process.env.TELEGRAM_BOT_TOKEN;
   else process.env.TELEGRAM_BOT_TOKEN = avant.token;
+}
+
+// ---------------------------------------------------------------------------
+// Canal Discord — webhook. Deux points gardés, et ce sont les deux façons
+// dont une diffusion Discord peut devenir indélébile ou taper à côté :
+//  - le découpage (id, token) de l'URL de webhook, nécessaire pour SUPPRIMER
+//    un message (l'URL brute ne sait que publier) ;
+//  - l'embed, qui ne doit jamais inventer de remise.
+// ---------------------------------------------------------------------------
+console.log("\nDiffusion Discord — découpage de l'URL de webhook");
+{
+  const { id, token, base } = decouperWebhook("https://discord.com/api/webhooks/123456789/aBcD-eF_gH");
+  check("id extrait", id === "123456789");
+  check("token extrait", token === "aBcD-eF_gH");
+  check("origine conservée", base === "https://discord.com");
+
+  const avecSlash = decouperWebhook("https://discord.com/api/webhooks/42/tok/");
+  check("slash final toléré", avecSlash.id === "42" && avecSlash.token === "tok");
+
+  for (const mauvaise of ["pas-une-url", "https://discord.com/api/webhooks/", "https://example.com/autre"]) {
+    let leve = false;
+    try {
+      decouperWebhook(mauvaise);
+    } catch (err) {
+      leve = err instanceof DiffusionConfigError;
+    }
+    check(`URL invalide rejetée : ${mauvaise.slice(0, 40)}`, leve);
+  }
+}
+
+console.log("\nDiffusion Discord — embed : jamais de remise devinée");
+{
+  const base = { titre: "Chaise", photoUrl: null, enseigneNom: null, lien: "https://x.io/d" };
+  const avec = buildEmbedDiscord({ ...base, prixPromo: 300, prixNormal: 600 });
+  check("prix barré et pourcentage réel", String(avec.description).includes("~~600 DH~~") && String(avec.description).includes("50%"));
+  check("titre et lien portés par l'embed", avec.title === "Chaise" && avec.url === "https://x.io/d");
+  check("couleur = accent de la charte (#2F6B57)", avec.color === 0x2f6b57);
+
+  const sans = buildEmbedDiscord({ ...base, prixPromo: 300, prixNormal: null });
+  check("sans prix normal : aucun pourcentage inventé", !String(sans.description).includes("%"));
+  check("sans image : pas de champ image vide", sans.image === undefined);
+
+  const incoherent = buildEmbedDiscord({ ...base, prixPromo: 300, prixNormal: 200 });
+  check("prix normal sous le promo : aucune remise affichée", !String(incoherent.description).includes("%"));
+
+  const complet = buildEmbedDiscord({
+    ...base,
+    prixPromo: 10,
+    prixNormal: 20,
+    enseigneNom: "Kiabi",
+    photoUrl: "https://x.io/i.webp",
+  });
+  check("enseigne en auteur", (complet.author as { name?: string })?.name === "Kiabi");
+  check("image portée", (complet.image as { url?: string })?.url === "https://x.io/i.webp");
+}
+
+console.log("\nDiffusion Discord — configuration");
+{
+  const avant = { url: process.env.DISCORD_WEBHOOK_URL, test: process.env.DISCORD_WEBHOOK_URL_TEST };
+  delete process.env.DISCORD_WEBHOOK_URL;
+  delete process.env.DISCORD_WEBHOOK_URL_TEST;
+  check("non configuré sans variable", canalDiscord.estConfigure() === false);
+  process.env.DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1/t";
+  check("configuré avec l'URL de prod", canalDiscord.estConfigure() === true);
+  check("les deux canaux ont des noms distincts", canalDiscord.nom === "discord" && canalTelegram.nom === "telegram");
+  if (avant.url === undefined) delete process.env.DISCORD_WEBHOOK_URL;
+  else process.env.DISCORD_WEBHOOK_URL = avant.url;
+  if (avant.test === undefined) delete process.env.DISCORD_WEBHOOK_URL_TEST;
+  else process.env.DISCORD_WEBHOOK_URL_TEST = avant.test;
 }
 
 void runAsyncChecks();

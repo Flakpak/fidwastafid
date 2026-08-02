@@ -86,7 +86,48 @@ const toutesLesMigrations = readdirSync(MIGRATIONS_DIR)
   .filter((f) => f.endsWith(".sql"))
   .map((f) => readFileSync(path.join(MIGRATIONS_DIR, f), "utf8"))
   .join("\n");
-check("aucun `rename column` détecté dans packages/db/migrations/", !/rename column/i.test(toutesLesMigrations));
+
+/**
+ * Renommages de colonnes, PAR TABLE.
+ *
+ * Cette garde protège le parseur naïf ci-dessus, qui ne sait lire QUE la
+ * table `deals` dans 0001_init.sql. Elle interdisait jusqu'au 02/08/2026
+ * tout `rename column` du dépôt, quelle que soit la table — plus large que
+ * son objet. La migration 0012 (`diffusions.telegram_message_id` →
+ * `external_message_id`) l'a fait échouer alors qu'elle ne touche pas une
+ * ligne de ce que le parseur lit.
+ *
+ * La règle est donc resserrée sur son intention réelle : un renommage sur
+ * `deals` reste interdit (il rendrait le parseur silencieusement faux) ;
+ * ailleurs, il est permis. Un renommage dont on n'arrive PAS à identifier la
+ * table échoue quand même — on ne présume pas de l'innocuité de ce qu'on ne
+ * sait pas lire.
+ */
+function tablesRenommant(sql) {
+  const tables = [];
+  // `[^;]*?` et non `[\s\S]*?` : le rattachement doit rester DANS la même
+  // instruction SQL. Une classe qui traverse les `;` relie n'importe quel
+  // `alter table deals` antérieur au `rename column` d'une autre table, et
+  // la garde accuse alors la mauvaise migration (constaté en écrivant 0012).
+  const re = /alter\s+table\s+(?:only\s+)?(?:public\.)?["']?(\w+)["']?[^;]*?rename\s+column/gi;
+  let m;
+  while ((m = re.exec(sql)) !== null) tables.push(m[1].toLowerCase());
+  // Occurrences de `rename column` non rattachables à un `alter table` :
+  // comptées comme inconnues, donc bloquantes.
+  const total = (sql.match(/rename\s+column/gi) ?? []).length;
+  const inconnues = total - tables.length;
+  return { tables, inconnues };
+}
+
+const renommages = tablesRenommant(toutesLesMigrations);
+check(
+  "aucun `rename column` sur `deals` (le parseur ci-dessus deviendrait faux)",
+  !renommages.tables.includes("deals")
+);
+check(
+  "tout `rename column` est rattaché à une table identifiable",
+  renommages.inconnues === 0
+);
 
 // Colonnes et valeurs de statut que expirer-auto-draft.mjs suppose exister
 // — tenues à la main, à jour avec sa vraie requête SQL. C'est précisément

@@ -10,6 +10,7 @@ import {
   type ImageFetchResult,
   type DiffusionResult,
   type AnnulationResult,
+  type CanalDiffusion,
 } from "./AdminDealItem.js";
 import { MotifRejet } from "./MotifRejet.js";
 import { Button } from "../../components/Button.js";
@@ -243,8 +244,8 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
    *  d'après la base plutôt que d'après un état local optimiste :
    *  l'anti-double-publication doit refléter ce qui est écrit, pas ce qu'on
    *  croit avoir écrit. */
-  async function diffuser(publicId: string): Promise<DiffusionResult> {
-    const res = await fetch(`/api/v1/admin/deals/${publicId}/diffuser`, { method: "POST" });
+  async function diffuser(publicId: string, canal: CanalDiffusion): Promise<DiffusionResult> {
+    const res = await fetch(`/api/v1/admin/deals/${publicId}/diffuser/${canal}`, { method: "POST" });
     if (!res.ok) {
       const body = (await res.json()) as ApiErrorBody;
       return { ok: false, message: body.error?.message ?? "Diffusion impossible." };
@@ -258,8 +259,8 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
    *  `diffusions`, rendant le deal rediffusable. Même relecture depuis la
    *  base au succès : l'état affiché doit venir de ce qui est écrit, jamais
    *  d'un optimisme local. */
-  async function annulerDiffusion(publicId: string): Promise<AnnulationResult> {
-    const res = await fetch(`/api/v1/admin/deals/${publicId}/diffuser`, { method: "DELETE" });
+  async function annulerDiffusion(publicId: string, canal: CanalDiffusion): Promise<AnnulationResult> {
+    const res = await fetch(`/api/v1/admin/deals/${publicId}/diffuser/${canal}`, { method: "DELETE" });
     if (!res.ok) {
       const body = (await res.json()) as ApiErrorBody;
       return { ok: false, message: body.error?.message ?? "Annulation impossible." };
@@ -373,8 +374,8 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
             onSaveFields={(fields) => saveDeal(deal.publicId, deal.statut, fields)}
             onFetchImageFromLink={() => fetchImageFromLink(deal.publicId)}
             onUploadImage={(file) => uploadImage(deal.publicId, file)}
-            onDiffuser={() => diffuser(deal.publicId)}
-            onAnnulerDiffusion={() => annulerDiffusion(deal.publicId)}
+            onDiffuser={(canal) => diffuser(deal.publicId, canal)}
+            onAnnulerDiffusion={(canal) => annulerDiffusion(deal.publicId, canal)}
           />
         ))}
       </ul>

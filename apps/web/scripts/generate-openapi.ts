@@ -345,7 +345,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/admin/deals/{publicId}/diffuser",
+  path: "/admin/deals/{publicId}/diffuser/telegram",
   summary:
     "Diffuse le deal sur le canal Telegram communautaire (curation manuelle, un deal à la fois) — " +
     "CONTRAT-V1 §4, amendement du 02/08/2026. La ligne `diffusions` n'est écrite qu'après un envoi réellement abouti.",
@@ -377,7 +377,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/admin/deals/{publicId}/diffuser",
+  path: "/admin/deals/{publicId}/diffuser/telegram",
   summary:
     "Annule la diffusion Telegram — supprime le message du canal (deleteMessage) puis la ligne `diffusions`. " +
     "Si Telegram refuse, la ligne reste : le message est toujours dans le canal.",
@@ -399,6 +399,65 @@ registry.registerPath({
     400: errorResponse("Diffusion non configurée, ou suppression refusée par Telegram (la diffusion reste enregistrée)"),
     403: errorResponse("Accès refusé (non-admin)"),
     404: errorResponse("Deal introuvable, ou aucune diffusion Telegram à annuler"),
+    409: errorResponse("Diffusion enregistrée sans identifiant de message"),
+  },
+  tags: ["admin"],
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/admin/deals/{publicId}/diffuser/discord",
+  summary:
+    "Diffuse le deal sur le canal Discord (webhook entrant, embed) — CONTRAT-V1 §4, amendement du 02/08/2026. " +
+    "Webhook appelé avec ?wait=true : sans lui Discord répond 204 sans identifiant, et le message serait indélébile.",
+  security: [{ [bearerAuth.name]: [] }],
+  request: { params: z.object({ publicId: z.string() }) },
+  responses: {
+    200: {
+      description: "OK — message publié",
+      content: {
+        "application/json": {
+          schema: z.object({
+            diffuse: z.literal(true),
+            canal: z.literal("discord"),
+            messageId: z.string().openapi({ description: "Snowflake Discord, transporté en chaîne" }),
+            canalTest: z.boolean(),
+          }),
+        },
+      },
+    },
+    400: errorResponse("Diffusion non configurée, ou envoi refusé par Discord"),
+    403: errorResponse("Accès refusé (non-admin)"),
+    404: errorResponse("Deal introuvable"),
+    409: errorResponse("Deal non publié, ou déjà diffusé sur Discord"),
+  },
+  tags: ["admin"],
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/admin/deals/{publicId}/diffuser/discord",
+  summary:
+    "Annule la diffusion Discord — supprime le message via /webhooks/{id}/{token}/messages/{message_id}, " +
+    "puis la ligne `diffusions`. Si Discord refuse, la ligne reste : le message est toujours dans le canal.",
+  security: [{ [bearerAuth.name]: [] }],
+  request: { params: z.object({ publicId: z.string() }) },
+  responses: {
+    200: {
+      description: "OK — message retiré et diffusion effacée",
+      content: {
+        "application/json": {
+          schema: z.object({
+            diffuse: z.literal(false),
+            canal: z.literal("discord"),
+            messageSupprime: z.string(),
+          }),
+        },
+      },
+    },
+    400: errorResponse("Diffusion non configurée, ou suppression refusée par Discord (la diffusion reste enregistrée)"),
+    403: errorResponse("Accès refusé (non-admin)"),
+    404: errorResponse("Deal introuvable, ou aucune diffusion Discord à annuler"),
     409: errorResponse("Diffusion enregistrée sans identifiant de message"),
   },
   tags: ["admin"],

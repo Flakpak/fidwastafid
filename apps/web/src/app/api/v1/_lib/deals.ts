@@ -107,12 +107,14 @@ export const PUBLIC_STATUTS = new Set(["publie", "expire"]);
  *  la table `diffusions` (migration 0011). Un booléen dupliqué sur le deal
  *  se désynchroniserait le jour où une diffusion est supprimée à la main. */
 export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.motif_rejet, d.turnstile_verifie,
-  exists (select 1 from diffusions df where df.deal_id = d.id and df.canal = 'telegram') as diffuse_telegram`;
+  exists (select 1 from diffusions df where df.deal_id = d.id and df.canal = 'telegram') as diffuse_telegram,
+  exists (select 1 from diffusions df where df.deal_id = d.id and df.canal = 'discord') as diffuse_discord`;
 
 export interface DealAdminRow extends DealRow {
   motif_rejet: string | null;
   turnstile_verifie: boolean;
   diffuse_telegram: boolean;
+  diffuse_discord: boolean;
 }
 
 export function toDealAdmin(row: DealAdminRow): DealAdmin {
@@ -123,6 +125,7 @@ export function toDealAdmin(row: DealAdminRow): DealAdmin {
     motifRejet: row.motif_rejet,
     turnstileVerifie: row.turnstile_verifie,
     diffuseTelegram: row.diffuse_telegram,
+    diffuseDiscord: row.diffuse_discord,
   });
 }
 
