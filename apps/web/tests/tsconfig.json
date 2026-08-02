@@ -1,0 +1,7 @@
+{
+  "//": "Next compile le JSX lui-même, d'où `jsx: preserve` dans le tsconfig de l'app. Les tests, eux, RENDENT les primitives hors de Next (`renderToStaticMarkup`) : il leur faut donc un runtime JSX réel. `react-jsx` (runtime automatique) plutôt que `react` (classique), qui exigerait un `React` global — un artefact de test qui ne prouverait rien sur le rendu réel.",
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  }
+}

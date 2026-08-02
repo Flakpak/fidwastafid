@@ -1,6 +1,29 @@
 import type { ComponentProps } from "react";
 
 /**
+ * ┌───────────────────────────────────────────────────────────────────────┐
+ * │ PRIMITIVE DE CHARTE — CONSERVÉE SANS APPELANT. NE PAS SUPPRIMER AU    │
+ * │ FIL D'UN NETTOYAGE.                                                   │
+ * └───────────────────────────────────────────────────────────────────────┘
+ *
+ * `Chip` n'a plus aucun appelant depuis le lot 7 (28/07/2026) : les puces de
+ * filtre du feed ont laissé place à la colonne latérale et à la feuille
+ * mobile. Elle est conservée sciemment — CONTRAT-V1 §8 définit une CHARTE,
+ * pas un inventaire d'usages : la forme « filtre en pilule » y est tranchée,
+ * et la retirer parce qu'aucun écran ne l'emploie ce mois-ci ferait
+ * redécouvrir la question au prochain qui en a besoin.
+ *
+ * Sa suppression est donc un AMENDEMENT DU CONTRAT, jamais un nettoyage
+ * (§8, règle 6).
+ *
+ * Le prix de cette conservation est payé : `apps/web/tests/primitives.ts`
+ * rend ses deux états et vérifie que chaque token qu'elle emploie existe
+ * toujours dans le `@theme` de globals.css. Sans appelant, rien d'autre ne la
+ * ferait échouer — elle compilerait en référençant des tokens supprimés, et
+ * rendrait du vide le jour où on la ressort.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ *
  * Chip primitif — charte Tadelakt (CONTRAT-V1 §8). Filtre/sélecteur en pilule.
  * Inactif : `surface` + contour `border-strong` + `ink-muted` (un cliquable
  * porte toujours un contour, jamais un gris d'inertie — §8, règle 2).

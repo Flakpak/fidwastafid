@@ -504,6 +504,26 @@ mesurés ≥ 4,5:1.
    chiffres d'audience **inventés**, écrits en dur, sans aucune source. Une refonte annoncée comme
    cosmétique avait ainsi modifié le discours du produit. Le contenu a été restauré à l'identique.
 
+6. **Une primitive de charte se conserve SANS APPELANT, mais doit porter un test la rattachant aux
+   tokens courants. Sa suppression est un amendement de ce contrat, jamais un nettoyage.**
+
+   Ce paragraphe définit une charte, pas un inventaire d'usages : qu'aucun écran n'emploie une
+   forme ce mois-ci ne dit rien sur sa justesse. La retirer ferait redécouvrir la question au
+   prochain qui en a besoin, et rouvrirait une décision déjà tranchée.
+
+   Le prix de cette conservation doit être payé, sans quoi la protection se retourne : **sans
+   appelant, plus rien ne fait échouer une primitive.** Elle continue de compiler en référençant des
+   tokens supprimés, et rend du vide le jour où on la ressort — une dérive d'autant plus coûteuse
+   qu'elle ne se découvre qu'à la remise en service. Toute primitive conservée porte donc un test de
+   rendu (`apps/web/tests/primitives.ts`) qui, pour chacun de ses états, vérifie **dans les deux
+   sens** : que chaque token employé existe encore dans le `@theme` de `globals.css`, et que la
+   primitive le référence toujours réellement.
+
+   *Fait générateur (28/07/2026)* : le lot 7 a retiré le dernier appelant de `Chip` (les puces de
+   filtre du feed, remplacées par la colonne latérale et la feuille mobile). La primitive est
+   conservée et gardée ; `Badge`, `Input`, `Textarea` et `Button` ont encore des appelants et sont
+   couverts par le même test, à titre préventif.
+
 Référence directe pour la config Tailwind (`@theme`, `apps/web/src/app/globals.css`) et les primitives
 UI (`apps/web/src/components`). La refonte est portée en trois lots : lot 1 = ce contrat + tokens +
 primitives ; lots 2 et 3 = migration de `DealCard`, des pages et du chrome.
