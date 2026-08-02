@@ -339,6 +339,41 @@ Favoris/bookmark sur les cartes (type Dealabs) — nécessite table + endpoints
 Enrichissements profil auteur (membre depuis, nombre de deals partagés) :
 dépend du futur `/membre/[pseudo]-[public_id]` réservé au contrat §2.
 
+## Seuil de remise minimum — cadran éditorial à surveiller (2026-08-02)
+
+**Constat d'audit** : aucun des quatre scrapers en production (bringo, inwi,
+universparadiscount, decathlon) n'appliquait de seuil de remise. La seule règle
+de prix était la **cohérence** (`prix_normal >= prix_promo`) et la **présence**
+des deux prix — jamais l'**ampleur**. Un produit à −2 % entrait dans la file
+exactement comme un produit à −70 %. Ce n'était donc pas un défaut d'une
+source, mais un manque générique : le pipeline savait dire « c'est bien une
+promotion », jamais « c'est bien une bonne affaire ».
+
+Corrigé le 02/08/2026 : `apps/pipeline/remise.mjs`, seuil unique appliqué dans
+`insert-deals.mjs` — le seul point de passage commun à toutes les sources.
+
+**Effet mesuré du seuil à 30 %** sur les extractions réelles du jour :
+
+| Source | Extraits | Retenus à 30 % | Rejetés | Médiane de remise |
+|---|---|---|---|---|
+| kiabi | 120 | **110** | 10 | 50 % |
+| decathlon | 118 | **66** | 52 | 30 % |
+| universparadiscount | 80 | **57** | 23 | 33 % |
+| inwi | 6 | **3** | 3 | 34 % |
+| bestmark | 1 | **0** | 1 | 16 % |
+
+**À surveiller, et c'est le motif de cette entrée** : 30 % n'est pas une valeur
+neutre. Decathlon perd ~44 % de son volume, inwi la moitié, et Bestmark tombe à
+zéro — la source ne produit alors plus rien du tout. Le chiffre se relit dans
+`remise.mjs` avant d'être bougé ; le bouger change ce que le site montre.
+
+**Ce que le seuil ne fait PAS** : il ne borne pas le volume. Sur le run Kiabi
+non capé, **505 des 556 deals passent les 30 %** (médiane 50 %) — les promotions
+de Kiabi sont profondes et permanentes. Le cap de 120/run du scraper reste donc
+nécessaire et n'est pas remplaçable par le seuil : l'un filtre la qualité,
+l'autre borne la file admin. Les confondre remettrait ~505 fiches par run à
+trancher à la main.
+
 ## Diversification des sources — exception assumée pour Kiabi et Bestmark (2026-08-02)
 
 Le séquencement posé ci-dessous (« un par un, post-Phase 7 ») **n'a pas été suivi**

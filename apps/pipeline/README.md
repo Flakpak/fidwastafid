@@ -85,7 +85,12 @@ que de les interpréter lui-même.
 - **extract-catalogue** — extrait les deals d'un catalogue (PDF/image) via
   l'API Claude. Écrit une archive dans `extractions/AAAA-MM-JJ_HH-mm_<enseigne>.json`.
 - **insert-deals** — valide (schémas partagés `packages/schemas`) puis insère
-  en base les deals d'un fichier d'extraction, statut `auto_draft`. Résout
+  en base les deals d'un fichier d'extraction, statut `auto_draft`. Applique
+  aussi le **seuil de remise minimum** (`remise.mjs`, 30 % par défaut) : c'est
+  le seul point de passage commun à toutes les sources, donc le seul endroit
+  où cette règle ne peut pas diverger. Un deal dont la remise n'est pas
+  mesurable (prix barré absent, cas de bringo) passe et est compté à part —
+  le rejeter reviendrait à lui prêter une remise faible non constatée. Résout
   l'enseigne texte contre la table `enseignes` réelle (aucune correspondance
   = deal rejeté). Traite l'image du deal si les variables de stockage sont
   présentes ; sinon `image_key` reste `NULL`, jamais bloquant.

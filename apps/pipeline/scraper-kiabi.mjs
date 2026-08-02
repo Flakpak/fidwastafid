@@ -46,6 +46,13 @@ const VILLE = "National"; // boutique en ligne, pas de ville précise
 // le nombre de deals retenus qui doit être borné, sinon un seul run ensevelit
 // la file admin `auto_draft` sous plusieurs centaines de fiches à trancher à
 // la main. MAX_DEALS est aligné sur le cap délibéré de Decathlon (120/run).
+//
+// CE CAP N'EST PAS REMPLAÇABLE PAR LE SEUIL DE REMISE (remise.mjs), et c'est
+// mesuré, pas supposé : sur les 556 deals du run non capé, **505 passent le
+// seuil de 30 %** (médiane de remise : 50 %). Les promotions de Kiabi sont
+// profondes et permanentes — le seuil filtre la QUALITÉ, le cap borne le
+// VOLUME, et ici la qualité ne borne rien. Retirer le cap en s'appuyant sur
+// le seuil remettrait ~505 fiches par run dans la file admin.
 const LIMITE_PAR_PAGE = 250;
 const MAX_PAGES = 5;
 const MAX_DEALS = 120;

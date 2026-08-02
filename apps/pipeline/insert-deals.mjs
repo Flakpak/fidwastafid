@@ -28,6 +28,7 @@ import pg from "pg";
 import { traiterImage, storageDisponible } from "./images.mjs";
 import { extraireDescription } from "./fiche-produit.mjs";
 import { validateDeal } from "./validation.mjs";
+import { estRemiseSuffisante, SEUIL_REMISE_MIN_PCT } from "./remise.mjs";
 import { resoudreFichierArgument } from "./argv.mjs";
 
 // ---------- Description depuis la fiche produit (Bringo uniquement) ----------
@@ -166,7 +167,9 @@ try {
   }
 
   let inseres = 0, doublons = 0, rejetes = 0, rejetesEnseigne = 0;
+  let rejetesRemise = 0, remisesNonMesurables = 0;
   let descriptionsObtenues = 0, descriptionsEchouees = 0;
+  console.log(`📉 Seuil de remise minimum : ${SEUIL_REMISE_MIN_PCT} % (règle partagée, remise.mjs).`);
 
   for (const raw of deals) {
     const d = mapDeal(raw);
@@ -180,6 +183,22 @@ try {
     if (!validation.ok) {
       rejetes++;
       console.log(`  ⤫ Rejeté (validation) : ${d.titre || raw.titre || "sans titre"} — ${validation.message}`);
+      continue;
+    }
+
+    // Seuil de remise (remise.mjs) — règle ÉDITORIALE, appliquée ici parce
+    // que c'est le seul point de passage commun à toutes les sources. Une
+    // promotion cohérente mais dérisoire n'a pas sa place dans un site de
+    // bons plans ; jusqu'au 02/08/2026, aucun scraper ne posait cette
+    // question. Le cas « remise non mesurable » (prix barré absent, cf.
+    // bringo) passe, mais se compte à part : un trou visible vaut mieux
+    // qu'un trou fondu dans les compteurs.
+    const remise = estRemiseSuffisante(d.prix_promo, d.prix_normal);
+    if (!remise.mesurable) {
+      remisesNonMesurables++;
+    } else if (!remise.ok) {
+      rejetesRemise++;
+      console.log(`  ⤫ Rejeté (remise ${remise.pct.toFixed(1)} % < ${SEUIL_REMISE_MIN_PCT} %) : ${d.titre}`);
       continue;
     }
 
@@ -257,8 +276,15 @@ try {
 
   console.log(
     `\n✅ Terminé : ${inseres} insérés | ${doublons} doublons ignorés | ` +
-      `${rejetes} rejetés (validation) | ${rejetesEnseigne} rejetés (enseigne inconnue)`
+      `${rejetes} rejetés (validation) | ${rejetesRemise} rejetés (remise < ${SEUIL_REMISE_MIN_PCT} %) | ` +
+      `${rejetesEnseigne} rejetés (enseigne inconnue)`
   );
+  if (remisesNonMesurables > 0) {
+    console.log(
+      `📉 ${remisesNonMesurables} deal(s) insérable(s) sans remise mesurable (prix barré absent) — ` +
+        `le seuil ne s'y applique pas, ils ne sont pas silencieusement écartés.`
+    );
+  }
   if (descriptionsObtenues + descriptionsEchouees > 0) {
     console.log(
       `📄 Fiches produit : ${descriptionsObtenues} description(s) extraite(s) | ` +
