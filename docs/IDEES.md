@@ -245,6 +245,39 @@ les 10 places étaient encore prises : la limite ne s'applique donc pas aux
 mises à jour de sécurité. Elle reste à 10 — la relever n'aurait rien débloqué.
 Ce qui manquait était le canal de sécurité, pas des places.
 
+## Magic link et changement d'e-mail — gabarits prêts, flux non câblés (2026-08-02)
+
+Les gabarits Supabase « Magic link or OTP » et « Change email address » pointent
+depuis le 2026-08-02 sur `/auth/confirm` avec `token_hash` (types `magiclink` et
+`email_change`), comme les deux gabarits réellement actifs — ils portaient
+jusque-là `{{ .ConfirmationURL }}`, qui suppose PKCE et ne peut pas fonctionner
+ici (`docs/SUIVI.md` §3.1).
+
+**Aucun des deux flux n'est déclenché par le code.** Vérifié : `signInWithOtp`
+n'apparaît nulle part dans le dépôt, et aucun parcours de changement d'e-mail
+n'est exposé — `PATCH /api/v1/me` ne couvre que `pseudo` et `couleurAvatar`
+(CONTRAT-V1 §4, liste fermée). Les deux gabarits sont donc **dormants** : alignés
+pour ne pas casser le jour où ils partiraient, pas pour être utilisés.
+
+**Décision différée : les câbler ou non.**
+
+- **Magic link** — ajouterait un second chemin d'authentification à maintenir
+  (et à documenter côté CNDP) pour un gain non mesuré : personne n'a demandé la
+  connexion sans mot de passe.
+- **Changement d'e-mail** — demande un amendement de la liste fermée §4
+  (`PATCH /api/v1/me` étendu à `email`), et l'e-mail est aujourd'hui la seule
+  clé d'identification du compte : le changer touche l'authentification, pas le
+  profil.
+
+**Réserve technique, si le jour vient.** `/auth/confirm` relaie le `type` reçu à
+`verifyOtp` sans le restreindre, et `EmailOtpType` inclut `magiclink` et
+`email_change` : les deux passent déjà, aucune route à écrire pour ça. Mais la
+route exige une session en retour (`data.session`) pour poser le cookie ; si
+Supabase n'en renvoie pas — cas plausible de la première des deux confirmations
+d'un changement d'e-mail sécurisé — l'utilisateur atterrit sur
+`/connexion?erreur=confirmation` sans explication. À traiter au câblage, pas
+avant : aujourd'hui aucun e-mail n'emprunte ce chemin.
+
 ## UX auth
 
 - Inscription avec un email déjà utilisé (non confirmé) : Supabase

@@ -102,17 +102,43 @@ Chaque entrée dit : le constat, où ça vit, et par quoi commencer.
 
 ### 3.1 — E-mails transactionnels *(priorité 1)*
 
-**Constat.** Deux e-mails seulement sont déclenchés par l'application — confirmation d'inscription
-et réinitialisation de mot de passe (`apps/web/src/lib/authActions.ts`). Leurs gabarits **ne
-vivent pas dans le dépôt** : ils sont dans le dashboard Supabase, et aucun déploiement ne les met
-à jour. Ils sont encore aux gabarits par défaut de Supabase, hors charte.
+**Constat, relevé au dashboard Supabase le 2026-08-02.** Deux e-mails seulement sont déclenchés
+par l'application — confirmation d'inscription et réinitialisation de mot de passe
+(`apps/web/src/lib/authActions.ts`). Leurs gabarits **ne vivent pas dans le dépôt** : ils sont
+dans le dashboard Supabase, et aucun déploiement ne les met à jour.
 
-**Où.** `docs/runbooks/emails-tadelakt.md` — le runbook est écrit, les gabarits en charte
-Tadelakt y sont prêts à coller, avec la contrainte technique à ne pas casser.
+| Gabarit | Déclenché par | Lien | État |
+|---|---|---|---|
+| Confirm sign up | `signUp()` | `/auth/confirm?token_hash={{ .TokenHash }}&type=email` | **actif**, personnalisé, français |
+| Reset password | `resetPasswordForEmail()` | `/auth/reset?token_hash={{ .TokenHash }}&type=recovery` | **actif**, personnalisé, français |
+| Magic link or OTP | rien | `/auth/confirm?…&type=magiclink` | dormant |
+| Change email address | rien | `/auth/confirm?…&type=email_change` | dormant |
 
-**Par quoi commencer.** C'est une **action de configuration externe**, pas du code : suivre le
-runbook, coller les deux gabarits dans Supabase, envoyer un e-mail de test sur chaque parcours.
-Aucune PR n'est nécessaire — d'où le risque que ça reste indéfiniment en attente.
+**Ce que cette section affirmait, et qui était faux** : « ils sont encore aux gabarits par défaut
+de Supabase ». Les deux gabarits actifs n'ont jamais été ceux par défaut — ils sont personnalisés,
+rédigés en français, et surtout ils utilisent déjà `token_hash`, le **seul** mécanisme compatible
+avec ce dépôt : le client ne fixe jamais `flowType`, qui vaut donc `implicit`
+(`@supabase/auth-js`, défaut vérifié dans le paquet installé). Un gabarit par défaut porterait
+`{{ .ConfirmationURL }}`, qui suppose PKCE, et casserait les deux parcours. Les deux gabarits
+dormants, eux, l'ont porté jusqu'au 2026-08-02 — alignés sur le motif `token_hash` ce jour-là pour
+qu'ils ne cassent pas le jour où un flux les déclencherait (voir `docs/IDEES.md`, aucun ne l'est
+aujourd'hui). Les quatre objets sont passés en français au même moment.
+
+**Ce qui reste vrai, et reste à faire** : les **corps** des quatre gabarits ne sont pas en charte
+Tadelakt — HTML nu (`<h2>`, `<p>`, lien brut), ni couleur, ni structure, ni sceau. C'est le seul
+écart de charte restant, et c'est ce qui justifie encore la priorité 1.
+
+**Où.** `docs/runbooks/emails-tadelakt.md` — le runbook est écrit, les gabarits en charte Tadelakt
+y sont prêts à coller. ⚠️ **Le runbook lui-même est à corriger avant d'être appliqué** : écrit au
+lot 3, il précède l'ajustement chromatique du 26/07/2026 (CONTRAT-V1 §8). Il emploie l'ancien
+accent `#2C5545` (désormais `#2F6B57`) et un bouton primaire en `ink` `#1A1815`, alors que le
+bouton primaire est repassé en `accent`. Le coller tel quel réintroduirait deux écarts que le
+contrat a explicitement tranchés. Il ne couvre par ailleurs que les deux gabarits actifs.
+
+**Par quoi commencer.** C'est une **action de configuration externe**, pas du code : corriger les
+deux couleurs du runbook, coller les corps dans Supabase, envoyer un e-mail de test sur chaque
+parcours. Aucune PR n'est nécessaire pour la partie Supabase — d'où le risque que ça reste
+indéfiniment en attente.
 
 ### 3.2 — `/concept` affirme des chiffres FAUX *(priorité 2)*
 
