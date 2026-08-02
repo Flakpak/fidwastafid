@@ -367,6 +367,31 @@ neutre. Decathlon perd ~44 % de son volume, inwi la moitié, et Bestmark tombe �
 zéro — la source ne produit alors plus rien du tout. Le chiffre se relit dans
 `remise.mjs` avant d'être bougé ; le bouger change ce que le site montre.
 
+**Décision du 02/08/2026 — le seuil est UNIFORME, et c'est délibéré.** La
+question posée était : fallait-il calibrer le seuil par enseigne, pour ne pas
+amputer Decathlon de 44 % de son volume ni tuer Bestmark ? Réponse : non.
+
+- **Un seul point de passage.** Un seuil par source, c'est six valeurs à
+  entretenir, six occasions de dériver, et la question « pourquoi 22 % ici et
+  30 % là ? » sans réponse écrite six mois plus tard. C'est le raisonnement qui
+  a déjà fait remonter la validation zod dans `packages/schemas` et l'alerte
+  d'échec dans une action partagée : une règle qui vit en plusieurs exemplaires
+  finit par ne plus être la même règle.
+- **Une promesse utilisateur cohérente.** Le seuil n'est pas un réglage
+  d'ingestion, c'est ce que « bon plan » veut dire sur ce site. Le calibrer par
+  enseigne reviendrait à dire au visiteur qu'une remise vaut d'être montrée
+  selon le vendeur, pas selon ce qu'elle lui fait économiser. Un deal Decathlon
+  à −22 % et un deal Kiabi à −22 % doivent recevoir la même réponse.
+- **Le volume n'est pas un argument de qualité.** Amputer Decathlon de 52 deals
+  est un effet, pas un dommage : ces 52 deals étaient sous la barre. Et la
+  chute de Bestmark à zéro n'est pas causée par le seuil — son unique remise du
+  catalogue vaut 16 %. Le seuil ne fait que rendre visible ce que la source
+  vaut réellement.
+
+Ce qui reste ouvert, et se décide sur le chiffre, jamais par enseigne : la
+valeur elle-même. La bouger de 30 à 25 ou à 40 est une décision produit ; la
+remplacer par six valeurs n'en est pas une.
+
 **Ce que le seuil ne fait PAS** : il ne borne pas le volume. Sur le run Kiabi
 non capé, **505 des 556 deals passent les 30 %** (médiane 50 %) — les promotions
 de Kiabi sont profondes et permanentes. Le cap de 120/run du scraper reste donc
