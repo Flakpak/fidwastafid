@@ -34,7 +34,7 @@ il y renvoie.
 
 Relevés en base, pas estimés : **93 deals publiés**, **7 enseignes curées**, **2 villes**
 distinctes portant des deals publiés, **4 comptes membres**. Ces nombres importent pour la suite
-(voir §3.5) : le site en affiche d'autres.
+(voir §3.2) : le site en affiche d'autres.
 
 ### Fonctionnel livré
 
@@ -102,19 +102,71 @@ Chaque entrée dit : le constat, où ça vit, et par quoi commencer.
 
 ### 3.1 — E-mails transactionnels *(priorité 1)*
 
-**Constat.** Deux e-mails seulement sont déclenchés par l'application — confirmation d'inscription
-et réinitialisation de mot de passe (`apps/web/src/lib/authActions.ts`). Leurs gabarits **ne
-vivent pas dans le dépôt** : ils sont dans le dashboard Supabase, et aucun déploiement ne les met
-à jour. Ils sont encore aux gabarits par défaut de Supabase, hors charte.
+**Constat, relevé au dashboard Supabase le 2026-08-02.** Deux e-mails seulement sont déclenchés
+par l'application — confirmation d'inscription et réinitialisation de mot de passe
+(`apps/web/src/lib/authActions.ts`). Leurs gabarits **ne vivent pas dans le dépôt** : ils sont
+dans le dashboard Supabase, et aucun déploiement ne les met à jour.
 
-**Où.** `docs/runbooks/emails-tadelakt.md` — le runbook est écrit, les gabarits en charte
-Tadelakt y sont prêts à coller, avec la contrainte technique à ne pas casser.
+| Gabarit | Déclenché par | Lien | État |
+|---|---|---|---|
+| Confirm sign up | `signUp()` | `/auth/confirm?token_hash={{ .TokenHash }}&type=email` | **actif**, personnalisé, français |
+| Reset password | `resetPasswordForEmail()` | `/auth/reset?token_hash={{ .TokenHash }}&type=recovery` | **actif**, personnalisé, français |
+| Magic link or OTP | rien | `/auth/confirm?…&type=magiclink` | dormant |
+| Change email address | rien | `/auth/confirm?…&type=email_change` | dormant |
 
-**Par quoi commencer.** C'est une **action de configuration externe**, pas du code : suivre le
-runbook, coller les deux gabarits dans Supabase, envoyer un e-mail de test sur chaque parcours.
-Aucune PR n'est nécessaire — d'où le risque que ça reste indéfiniment en attente.
+**Ce que cette section affirmait, et qui était faux** : « ils sont encore aux gabarits par défaut
+de Supabase ». Les deux gabarits actifs n'ont jamais été ceux par défaut — ils sont personnalisés,
+rédigés en français, et surtout ils utilisent déjà `token_hash`, le **seul** mécanisme compatible
+avec ce dépôt : le client ne fixe jamais `flowType`, qui vaut donc `implicit`
+(`@supabase/auth-js`, défaut vérifié dans le paquet installé). Un gabarit par défaut porterait
+`{{ .ConfirmationURL }}`, qui suppose PKCE, et casserait les deux parcours. Les deux gabarits
+dormants, eux, l'ont porté jusqu'au 2026-08-02 — alignés sur le motif `token_hash` ce jour-là pour
+qu'ils ne cassent pas le jour où un flux les déclencherait (voir `docs/IDEES.md`, aucun ne l'est
+aujourd'hui). Les quatre objets sont passés en français au même moment.
 
-### 3.2 — Diffusion Telegram / Discord *(priorité 2)*
+**Ce qui reste vrai, et reste à faire** : les **corps** des quatre gabarits ne sont pas en charte
+Tadelakt — HTML nu (`<h2>`, `<p>`, lien brut), ni couleur, ni structure, ni sceau. C'est le seul
+écart de charte restant, et c'est ce qui justifie encore la priorité 1.
+
+**Où.** `docs/runbooks/emails-tadelakt.md` — le runbook est écrit, les gabarits en charte Tadelakt
+y sont prêts à coller. ⚠️ **Le runbook lui-même est à corriger avant d'être appliqué** : écrit au
+lot 3, il précède l'ajustement chromatique du 26/07/2026 (CONTRAT-V1 §8). Il emploie l'ancien
+accent `#2C5545` (désormais `#2F6B57`) et un bouton primaire en `ink` `#1A1815`, alors que le
+bouton primaire est repassé en `accent`. Le coller tel quel réintroduirait deux écarts que le
+contrat a explicitement tranchés. Il ne couvre par ailleurs que les deux gabarits actifs.
+
+**Par quoi commencer.** C'est une **action de configuration externe**, pas du code : corriger les
+deux couleurs du runbook, coller les corps dans Supabase, envoyer un e-mail de test sur chaque
+parcours. Aucune PR n'est nécessaire pour la partie Supabase — d'où le risque que ça reste
+indéfiniment en attente.
+
+### 3.2 — `/concept` affirme des chiffres FAUX *(priorité 2)*
+
+**Constat, mesuré.** `apps/web/src/app/concept/page.tsx` affiche trois statistiques : « 100%
+Gratuit », « **+50** Enseignes », « **+20** Villes ». La base contient **7 enseignes curées** et
+**2 villes** portant des deals publiés — et l'enum `VILLES` n'en compte que **9 au total**, donc
+« +20 villes » est inatteignable par construction.
+
+**Pourquoi si haut dans la file.** C'est exactement la faute du lot 4, déjà consignée au
+CONTRAT-V1 §8 règle 5 : des chiffres d'audience inventés, écrits en dur, sans source. Le contenu
+avait alors été restauré à l'identique ; ces trois-là ont survécu. Et c'est **une affirmation
+fausse sur la page qui explique la plateforme** — celle vers laquelle pointent la colonne du feed,
+la ligne de clôture du hero et le pied de page. Une plateforme dont le discours repose sur
+« jamais de prix deviné » ne peut pas se présenter par un chiffre inventé.
+
+**Deux options, à trancher :**
+
+1. **Brancher sur des données réelles** — compteurs calculés en base, et accepter d'afficher 7 et
+   2 aujourd'hui. Honnête, et le nombre grandit tout seul. Coût : une requête de plus sur une page
+   statique, et il faut assumer de petits nombres au lancement.
+2. **Retirer les chiffres** — remplacer les trois statistiques par un discours qui ne chiffre
+   rien. Aucun coût technique, aucune donnée à tenir à jour, et rien à réexpliquer quand les
+   nombres bougent.
+
+Ne pas laisser un chiffre faux au motif qu'il est flatteur : c'est précisément ce qu'interdit la
+règle 5.
+
+### 3.3 — Diffusion Telegram / Discord *(priorité 3)*
 
 **Constat.** Le levier d'audience décidé : au Maroc, les réseaux sont le point d'entrée, le site
 la destination. Rien n'est encore construit.
@@ -130,14 +182,15 @@ refusé). Table `diffusions` pour l'anti-double-publication, UTM sur tout lien d
 ce ne sont pas des secrets), puis la migration `diffusions`, puis Telegram seul. Les jetons de bot
 et l'URL de webhook sont des variables d'environnement, jamais commités.
 
-### 3.3 — Recherche serveur : pertinence et robustesse *(priorité 3)*
+### 3.4 — Qualité de recherche : accents, index, pertinence *(priorité 4)*
 
-**Attention — la partie « serveur » est FAITE.** Le lot 7 a transformé la recherche en filtre
-serveur (`q` sur `GET /api/v1/deals`, `ilike` sur le titre et l'enseigne, jokers échappés).
-Avant, elle ne filtrait que les deals déjà téléchargés : au-delà de la première page, elle ne
-trouvait rien.
+**La recherche serveur est LIVRÉE — ne pas la remettre dans la file.** Le lot 7 l'a faite : `q`
+sur `GET /api/v1/deals`, `ilike` sur le titre et l'enseigne, jokers échappés, valeur portée par
+l'URL. Avant, la recherche ne filtrait que les deals déjà téléchargés — au-delà de la première
+page, elle ne trouvait rien. Ce chantier-ci est donc le SUIVANT, pas le même : il ne porte plus
+sur *où* filtre la recherche, mais sur ce qu'elle vaut.
 
-**Ce qui reste.** La qualité de cette recherche, mesurée :
+**Ce qui reste, mesuré :**
 
 - **Pas d'insensibilité aux accents.** Vérifié en base : `titre ilike '%electromenager%'` renvoie
   0, `'%électroménager%'` aussi — mais surtout, aucun de ces deux termes ne trouvera l'autre. Un
@@ -152,7 +205,7 @@ trouvait rien.
 trigramme sur `lower(unaccent(titre))`. Mesurer avant : à ce volume, la seule correction qui
 change quelque chose pour l'utilisateur est l'insensibilité aux accents.
 
-### 3.4 — Badge de `/compte` rendu à la main *(priorité 4)*
+### 3.5 — Badge de `/compte` rendu à la main *(priorité 5)*
 
 **Constat.** `apps/web/src/app/compte/page.tsx` rend le statut de chaque deal (« Publié »,
 « En attente », « Refusé », « Expiré », « Brouillon ») avec un `<span>` maison et sa propre table
@@ -167,22 +220,6 @@ mécanique.**
 **Par quoi commencer.** Trancher le rendu de ces deux états neutres, puis migrer. Le reste
 (`publie` → `accent`, `en_attente` → `warn`, `expire` → `cold`) correspond déjà, et `expire` →
 `cold` est même ce qu'impose §8 règle 3.
-
-### 3.5 — `/concept` et ses chiffres invérifiables *(priorité 5)*
-
-**Constat, mesuré.** `apps/web/src/app/concept/page.tsx` affiche trois statistiques : « 100%
-Gratuit », « **+50** Enseignes », « **+20** Villes ». La base contient **7 enseignes curées** et
-**2 villes** portant des deals publiés — et l'enum `VILLES` n'en compte que **9 au total**, donc
-« +20 villes » est inatteignable par construction.
-
-**Pourquoi ça compte.** C'est exactement la faute du lot 4, déjà consignée au CONTRAT-V1 §8
-règle 5 : des chiffres d'audience inventés, écrits en dur, sans source. Le contenu avait alors été
-restauré à l'identique. Ces trois-là ont survécu.
-
-**Par quoi commencer.** Deux voies, à trancher : soit les brancher sur des compteurs réels (et
-accepter d'afficher 7 et 2), soit remplacer ces statistiques par un discours qui ne chiffre rien.
-Ne pas laisser un chiffre faux au motif qu'il est flatteur — c'est précisément ce que la règle 5
-interdit.
 
 ### 3.6 — État voté persistant *(priorité 6)*
 
