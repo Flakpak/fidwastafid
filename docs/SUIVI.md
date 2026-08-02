@@ -187,7 +187,20 @@ règle 5.
 ### 3.3 — Diffusion Telegram / Discord *(priorité 3)*
 
 **Constat.** Le levier d'audience décidé : au Maroc, les réseaux sont le point d'entrée, le site
-la destination. Rien n'est encore construit.
+la destination.
+
+**Telegram est LIVRÉ (02/08/2026), mais PAS ENCORE ÉPROUVÉ EN ENVOI RÉEL.** Migration `0011`
+appliquée en prod, endpoint `POST /api/v1/admin/deals/:publicId/diffuser` (CONTRAT-V1 §4,
+huitième amendement), bouton « Diffuser » sur les deals publiés avec état « Diffusé ✓ » inerte.
+
+> ⚠️ **Ce qui bloque la recette, et c'est volontaire** : `TELEGRAM_CHAT_ID_TEST` **n'existe pas**
+> côté Vercel (vérifié le 02/08 — seules `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID` y sont).
+> Le code retombe donc sur le canal **public**, et un « test » y publierait devant les abonnés,
+> sans retour arrière possible. Aucun envoi réel n'a été fait. Pour débloquer : poser
+> `TELEGRAM_CHAT_ID_TEST` (canal privé jetable, le bot doit y être administrateur) et exposer les
+> trois variables à l'environnement **Preview**, puis diffuser un deal publié depuis la préversion.
+
+Discord et WhatsApp restent entiers.
 
 **Où.** `docs/IDEES.md`, section « Diffusion communautaire » — l'architecture est **déjà
 tranchée** : bouton « Diffuser » dans l'admin sur chaque deal publié (curation manuelle en v1,

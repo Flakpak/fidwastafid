@@ -359,6 +359,9 @@
           },
           "turnstileVerifie": {
             "type": "boolean"
+          },
+          "diffuseTelegram": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -378,7 +381,8 @@
           "updatedAt",
           "whatsappPublic",
           "motifRejet",
-          "turnstileVerifie"
+          "turnstileVerifie",
+          "diffuseTelegram"
         ]
       },
       "DealInput": {
@@ -819,7 +823,8 @@
                   "FORBIDDEN",
                   "NOT_FOUND",
                   "VALIDATION_ERROR",
-                  "RATE_LIMITED"
+                  "RATE_LIMITED",
+                  "CONFLICT"
                 ]
               },
               "message": {
@@ -1840,6 +1845,108 @@
           },
           "404": {
             "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/deals/{publicId}/diffuser": {
+      "post": {
+        "summary": "Diffuse le deal sur le canal Telegram communautaire (curation manuelle, un deal à la fois) — CONTRAT-V1 §4, amendement du 02/08/2026. La ligne `diffusions` n'est écrite qu'après un envoi réellement abouti.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK — message publié",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "diffuse": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "canal": {
+                      "type": "string",
+                      "enum": [
+                        "telegram"
+                      ]
+                    },
+                    "messageId": {
+                      "type": "integer"
+                    },
+                    "canalTest": {
+                      "type": "boolean",
+                      "description": "true si l'envoi est parti vers TELEGRAM_CHAT_ID_TEST plutôt que vers le canal public"
+                    }
+                  },
+                  "required": [
+                    "diffuse",
+                    "canal",
+                    "messageId",
+                    "canalTest"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Diffusion non configurée sur cet environnement, ou envoi refusé par Telegram",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Deal non publié, ou déjà diffusé sur ce canal",
             "content": {
               "application/json": {
                 "schema": {

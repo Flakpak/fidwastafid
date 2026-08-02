@@ -103,11 +103,16 @@ export const PUBLIC_STATUTS = new Set(["publie", "expire"]);
  * déjà dans DEAL_SELECT (lus pour la décision d'exposition publique) ; ici on
  * les rend TOUJOURS visibles, sans condition (CONTRAT-V1 §4).
  */
-export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.motif_rejet, d.turnstile_verifie`;
+/** `diffuse_telegram` est calculé, jamais stocké sur `deals` : la vérité est
+ *  la table `diffusions` (migration 0011). Un booléen dupliqué sur le deal
+ *  se désynchroniserait le jour où une diffusion est supprimée à la main. */
+export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.motif_rejet, d.turnstile_verifie,
+  exists (select 1 from diffusions df where df.deal_id = d.id and df.canal = 'telegram') as diffuse_telegram`;
 
 export interface DealAdminRow extends DealRow {
   motif_rejet: string | null;
   turnstile_verifie: boolean;
+  diffuse_telegram: boolean;
 }
 
 export function toDealAdmin(row: DealAdminRow): DealAdmin {
@@ -117,6 +122,7 @@ export function toDealAdmin(row: DealAdminRow): DealAdmin {
     whatsappPublic: row.whatsapp_public,
     motifRejet: row.motif_rejet,
     turnstileVerifie: row.turnstile_verifie,
+    diffuseTelegram: row.diffuse_telegram,
   });
 }
 

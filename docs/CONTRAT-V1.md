@@ -221,7 +221,37 @@ POST   /api/v1/admin/deals/:publicId/image-depuis-lien
 POST   /api/v1/admin/deals/:publicId/image  upload manuel (multipart/form-data, jpeg/png/webp,
                                              5 Mo max) — fallback si image-depuis-lien est
                                              bloqué par la source ; même amendement du 19/07/2026
+POST   /api/v1/admin/deals/:publicId/diffuser
+                                             publie le deal sur le canal Telegram communautaire
+                                             — ajouté le 02/08/2026, huitième amendement conscient
 ```
+
+**Amendement du 02/08/2026 — diffusion communautaire (huitième amendement conscient, lot Telegram)** :
+`POST /api/v1/admin/deals/:publicId/diffuser` publie un deal **déjà `publie`** sur le canal Telegram
+(architecture arrêtée dans `docs/IDEES.md` § « Diffusion communautaire »). Endpoint admin, **un deal
+à la fois** : aucune diffusion groupée n'est exposée, volontairement — en v1 la sélection est un
+geste de curation, pas un traitement de lot.
+
+- **Ordre non négociable** : gardes → envoi Telegram → écriture en base. La ligne `diffusions`
+  (migration 0011) n'est écrite **qu'après un envoi réellement abouti**. L'inverse laisserait la
+  trace d'une diffusion qui n'a pas eu lieu, et l'anti-double-envoi bloquerait alors le vrai envoi.
+- **Un échec Telegram remonte tel quel** (statut HTTP + description de l'API), jamais un succès de
+  politesse — même doctrine que le fallback silencieux, `docs/INCIDENTS.md`.
+- **Anti-double-publication en base**, pas seulement en applicatif : `unique (deal_id, canal)`. La
+  vérification applicative donne un message clair ; c'est la contrainte qui tient sous double clic.
+- **`utm_source=telegram&utm_medium=social&utm_campaign=diffusion`** sur le lien diffusé —
+  convention fixée dans `IDEES.md`, appliquée à l'identique. Constat au passage : aucun autre lien
+  du site ne porte d'UTM (le bouton Partager partage l'URL nue), il n'y avait donc aucune
+  convention de code à reprendre.
+- **Nouveau code d'erreur `CONFLICT` (409)** dans la liste du §4 ci-dessus : l'état de la ressource
+  interdit l'action alors que la requête est valide et les droits bons — diffuser un deal non
+  publié, ou déjà diffusé. `VALIDATION_ERROR` aurait envoyé le curateur corriger un corps de
+  requête sans faute ; `FORBIDDEN` lui aurait fait douter de ses droits.
+- **Destination pilotée par présence de variable** : `TELEGRAM_CHAT_ID_TEST`, si elle est définie,
+  prime sur `TELEGRAM_CHAT_ID` — quel que soit l'environnement, jamais sur un test de
+  `NODE_ENV`/`VERCEL_ENV`. Un envoi qui part par erreur dans le canal public est irrattrapable ;
+  une condition d'environnement se trompe en silence, une variable se lit dans le dashboard. La
+  réponse renvoie `canalTest` pour que l'admin sache lequel des deux vient de se produire.
 
 **Notes** :
 - **Amendement du 27/07/2026 — compte de résultats (septième amendement conscient, lot 7)** :

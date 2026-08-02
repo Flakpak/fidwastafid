@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DealAdmin, DealStatut, Enseigne } from "@fidwastafid/schemas";
 import type { DoublonInfo } from "../api/v1/_lib/deals.js";
-import { AdminDealItem, type DealEditFields, type SaveResult, type ImageFetchResult } from "./AdminDealItem.js";
+import {
+  AdminDealItem,
+  type DealEditFields,
+  type SaveResult,
+  type ImageFetchResult,
+  type DiffusionResult,
+} from "./AdminDealItem.js";
 import { MotifRejet } from "./MotifRejet.js";
 import { Button } from "../../components/Button.js";
 
@@ -231,6 +237,22 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     return { ok: true };
   }
 
+  /** Diffusion communautaire (docs/IDEES.md) — un deal à la fois, jamais en
+   *  masse. `fetchDeals()` au succès pour que la carte repasse en « Diffusé »
+   *  d'après la base plutôt que d'après un état local optimiste :
+   *  l'anti-double-publication doit refléter ce qui est écrit, pas ce qu'on
+   *  croit avoir écrit. */
+  async function diffuser(publicId: string): Promise<DiffusionResult> {
+    const res = await fetch(`/api/v1/admin/deals/${publicId}/diffuser`, { method: "POST" });
+    if (!res.ok) {
+      const body = (await res.json()) as ApiErrorBody;
+      return { ok: false, message: body.error?.message ?? "Diffusion impossible." };
+    }
+    const body = (await res.json()) as { canalTest?: boolean };
+    await fetchDeals();
+    return { ok: true, canalTest: Boolean(body.canalTest) };
+  }
+
   /**
    * `motifRejet` est exigé par l'API pour un rejet groupé (CONTRAT-V1 §3) —
    * l'endpoint bulk était sinon un contournement complet de l'obligation de
@@ -336,6 +358,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
             onSaveFields={(fields) => saveDeal(deal.publicId, deal.statut, fields)}
             onFetchImageFromLink={() => fetchImageFromLink(deal.publicId)}
             onUploadImage={(file) => uploadImage(deal.publicId, file)}
+            onDiffuser={() => diffuser(deal.publicId)}
           />
         ))}
       </ul>
