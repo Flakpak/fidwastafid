@@ -339,6 +339,37 @@ Favoris/bookmark sur les cartes (type Dealabs) — nécessite table + endpoints
 Enrichissements profil auteur (membre depuis, nombre de deals partagés) :
 dépend du futur `/membre/[pseudo]-[public_id]` réservé au contrat §2.
 
+## Diversification des sources — exception assumée pour Kiabi et Bestmark (2026-08-02)
+
+Le séquencement posé ci-dessous (« un par un, post-Phase 7 ») **n'a pas été suivi**
+pour `kiabi.ma` et `bestmark.ma`, traités ensemble dans un même lot. C'est une
+exception consciente, pas un oubli du cadre.
+
+**Motif** : ces deux sources sont une **extension pure du pattern existant** —
+un adaptateur `.mjs` de plus, la même sortie normalisée, la même validation zod
+partagée, la même étape de workflow copiée sur celle de Decathlon. Aucune
+architecture nouvelle, aucune dépendance ajoutée, aucun rendu JS, et surtout
+**aucun contournement d'anti-bot** : les deux exposent une API publique et
+documentée (Shopify `products.json` pour Kiabi, GraphQL Magento pour Bestmark).
+Ce que le séquencement « un par un » protège, c'est le coût de découverte d'une
+source inconnue ; ici ce coût est nul, il n'y avait rien à protéger.
+
+**Ce qui reste hors périmètre, inchangé** :
+- **Zara** — aucune action prise. Le pipeline n'a **aucune politique écrite sur
+  les sources à ToS restrictif** ; tant qu'elle n'existe pas, l'ajouter serait
+  trancher seul une question de gouvernance. Décision à prendre explicitement.
+- **Electroplanet** — exclu deux fois plutôt qu'une : mur Cloudflare sur le
+  domaine entier (spike du 22/07), et surtout `robots.txt` en
+  `User-agent: * / Disallow: /` (vérifié le 02/08/2026, après redirection vers
+  `www`). Interdiction totale : le sujet est clos, pas reporté.
+
+**Rendement mesuré au premier run**, à connaître avant d'en attendre quoi que ce soit :
+Kiabi ~45 % du catalogue remisé en permanence (556 deals sur 1250 produits — d'où
+un cap volontaire à 120/run) ; Bestmark **1 seul produit remisé sur 865**. La
+seconde ne se justifiera que si l'enseigne ouvre de vraies opérations
+commerciales — si elle reste à zéro sur la durée, la retirer est une décision à
+prendre, pas une panne à diagnostiquer.
+
 ## Diversification des sources (2026-07-18)
 
 Le pipeline ne scrape aujourd'hui que Bringo (`scraper-bringo.mjs`).

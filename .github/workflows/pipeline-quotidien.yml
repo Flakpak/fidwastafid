@@ -11,7 +11,9 @@
 # Automatisé uniquement : scraper-bringo (categories.txt auto-suffisant),
 # scraper-inwi (page unique auto-suffisante), scraper-universparadiscount
 # (homepage auto-suffisante), scraper-decathlon (catégorie /5080-promotions
-# auto-suffisante, pagination bornée) + insert-deals (qui fait lui-même
+# auto-suffisante, pagination bornée), scraper-kiabi (products.json Shopify,
+# pagination bornée + cap de 120 deals/run) et scraper-bestmark (GraphQL
+# Magento public, pagination bornée par total_count) + insert-deals (qui fait lui-même
 # l'extraction de description via fiche-produit.mjs, cf. README). PAS
 # extract-catalogue : ce script attend une URL/chemin de catalogue précis à
 # chaque appel (aucun mécanisme de découverte automatique) — il ne peut pas
@@ -278,6 +280,92 @@ jobs:
         env:
           FICHIER_EXTRACTION_DECA: ${{ steps.scraping_deca.outputs.fichier }}
         run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_DECA"
+
+      # Source secondaire kiabi (lot du 02/08/2026) — même pattern que les
+      # trois ci-dessus. Particularité de cette source : ~45 % du catalogue est
+      # remisé en permanence (mesuré : 556 deals sur 1250 produits au premier
+      # dry-run), donc le scraper se cape lui-même à 120 deals/run pour ne pas
+      # ensevelir la file admin auto_draft — un 0 deal ici serait donc anormal,
+      # contrairement à decathlon. Prérequis prod : enseigne `kiabi` en base
+      # (ajoutée le 02/08/2026, cf. docs/RUNBOOK-donnees.md).
+      - name: Scraping kiabi (catalogue Shopify products.json)
+        id: scraping_kiabi
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run scraper-kiabi | tee /dev/stderr)
+
+          fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
+          if [ -z "$fichier_relatif" ]; then
+            echo "::warning::scraper-kiabi n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            exit 1
+          fi
+
+          fichier="apps/pipeline/$fichier_relatif"
+          if [ ! -f "$fichier" ]; then
+            echo "::warning::Fichier annoncé par scraper-kiabi introuvable sur disque : $fichier — source sautée."
+            exit 1
+          fi
+
+          nb_deals=$(jq 'length' "$fichier")
+          echo "Deals kiabi extraits : $nb_deals"
+          if [ "$nb_deals" -eq 0 ]; then
+            echo "::warning::0 deal extrait par scraper-kiabi — rien à insérer pour cette source ce run."
+            exit 1
+          fi
+
+          echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
+
+      - name: Insertion kiabi en base (validation zod partagée)
+        if: steps.scraping_kiabi.outcome == 'success'
+        continue-on-error: true
+        env:
+          FICHIER_EXTRACTION_KIABI: ${{ steps.scraping_kiabi.outputs.fichier }}
+        run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_KIABI"
+
+      # Source secondaire bestmark (lot du 02/08/2026) — même pattern.
+      #
+      # ⚠️ RENDEMENT CONNU ET FAIBLE : balayage complet du catalogue le
+      # 02/08/2026 — 865 produits, **1 seul remisé**. Un run à 0 deal est donc
+      # le cas NORMAL ici, d'où le ::warning:: (jamais ::error::). Cette source
+      # n'a d'intérêt que si Bestmark ouvre de vraies opérations commerciales ;
+      # si elle reste à 0 sur la durée, la retirer est une décision à prendre,
+      # pas un incident à diagnostiquer. Prérequis prod : enseigne `bestmark`
+      # en base (ajoutée le 02/08/2026).
+      - name: Scraping bestmark (GraphQL Magento public)
+        id: scraping_bestmark
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run scraper-bestmark | tee /dev/stderr)
+
+          fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
+          if [ -z "$fichier_relatif" ]; then
+            echo "::warning::scraper-bestmark n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            exit 1
+          fi
+
+          fichier="apps/pipeline/$fichier_relatif"
+          if [ ! -f "$fichier" ]; then
+            echo "::warning::Fichier annoncé par scraper-bestmark introuvable sur disque : $fichier — source sautée."
+            exit 1
+          fi
+
+          nb_deals=$(jq 'length' "$fichier")
+          echo "Deals bestmark extraits : $nb_deals"
+          if [ "$nb_deals" -eq 0 ]; then
+            echo "::warning::0 deal extrait par scraper-bestmark — catalogue sans remise ce jour-là (cas courant sur cette source)."
+            exit 1
+          fi
+
+          echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
+
+      - name: Insertion bestmark en base (validation zod partagée)
+        if: steps.scraping_bestmark.outcome == 'success'
+        continue-on-error: true
+        env:
+          FICHIER_EXTRACTION_BESTMARK: ${{ steps.scraping_bestmark.outputs.fichier }}
+        run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_BESTMARK"
 
       - name: Revalidation Next.js (feed, enseignes, sitemap)
         run: |
