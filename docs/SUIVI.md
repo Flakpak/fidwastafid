@@ -82,6 +82,24 @@ Un délai de refroidissement de 2 jours est configuré (`.github/dependabot.yml`
 politique pnpm `minimumReleaseAge` de 24 h — les mises à jour de **sécurité** en sont exemptées et
 ne sont jamais retardées.
 
+### Phase 0 rouverte — le backup n'a qu'une seule copie *(02/08/2026)*
+
+La case « 0 — Protéger l'existant » de `docs/fidwastafid-plan-v2.md` était cochée **☑ fait**
+sur la foi de l'intention affichée par le workflow (« stocké hors Supabase »). Mesuré le
+2026-08-02 : l'étape d'envoi vers Cloudflare R2 de `db-backup.yml` est conditionnée à
+`R2_ACCOUNT_ID`/`R2_BUCKET`, **absents des secrets** — elle n'a jamais tourné, aucun objet
+n'a jamais été écrit. La seule copie existante est l'**artefact GitHub, 30 jours**, et le
+plan Supabase **Free** n'offre ni backup managé ni PITR : c'est une ligne de défense
+unique. `RUNBOOK-restauration.md` décrivait par ailleurs une récupération « depuis R2 »
+qui n'aurait rien trouvé — corrigée le même jour.
+
+Ce qui est fait : dump + test de restauration à chaque run + gzip, et **l'alerte d'échec
+notifie désormais réellement** (issue assignée + label `urgent` — une issue sans assigné
+ne déclenche aucune notification, défaut constaté le 27/07, cf. `INCIDENTS.md`).
+
+Ce qui reste : une copie hors GitHub. Le compte Cloudflare existe déjà (Turnstile, DNS du
+domaine) — il manque un bucket R2 et quatre secrets, pas un fournisseur.
+
 ### Dette assumée, consignée ailleurs
 
 - **Quatre montées majeures parquées** (`zod`, `typescript`, `eslint` + `@eslint/js`,

@@ -46,6 +46,50 @@ depuis le 2026-08-02, mais aucun code ne le déclenche.
 
 ---
 
+## 2026-07-27 — Rotation du mot de passe Postgres à 2 détenteurs sur 3 : le backup tombe, personne n'est prévenu
+
+*(Consigné ici le 2026-08-02. Le détail opératoire et la liste de contrôle de rotation
+vivent dans [`docs/RUNBOOK-securite.md:212`](RUNBOOK-securite.md) — cette entrée grave la
+contrainte permanente, pas la procédure.)*
+
+**Symptôme.** Le backup quotidien du 27/07 échoue : `password authentication failed`
+(`28P01`). **Aucune alerte.** L'échec est découvert le lendemain matin par un audit
+manuel — après une journée entière sans backup vérifié, sur une base dont c'est la seule
+protection.
+
+**Cause.** Le mot de passe du rôle `postgres` a été tourné dans la nuit du 26 au 27/07
+(~00:22 UTC), juste avant la migration 0010. **Deux détenteurs sur trois** ont été mis à
+jour ; le troisième est resté sur l'ancienne valeur.
+
+**Les trois détenteurs — l'inventaire est la contrainte.**
+
+| # | Détenteur | Consommateurs | Port | Ce que casse un oubli |
+|---|---|---|---|---|
+| 1 | **Vercel** → `fidwastafid-prod` → `DATABASE_URL` (Production **et** Preview) | l'app web | 6543 | site entier en 500 — la seule panne qu'un visiteur voit |
+| 2 | **GitHub** → secret Actions `SUPABASE_DB_URL` | `db-backup.yml` **et** `pipeline-quotidien.yml` | 5432 | backup **et** scraping/expiration — deux pannes, pas une |
+| 3 | **Local** → `packages/db/.env.migration.local` (jamais commité) | `migrate`, `seed`, `ajouter-enseigne` | 5432 | plus aucune migration ni script de données |
+
+Le détenteur oublié le 27/07 était le **n° 2**. Une variable Vercel ne prend effet qu'au
+déploiement suivant, et le secret GitHub n'est lu que par des crons : deux des trois
+détenteurs ne se manifestent donc pas au moment de la rotation. **`CI_MIGRATIONS_CHECK_URL`
+n'est pas dans cette liste** — il porte le mot de passe du rôle `ci_migrations_check`,
+pas celui de `postgres`.
+
+**Contraintes permanentes gravées par cet incident.**
+
+- **Une rotation n'est terminée que quand les trois détenteurs sont à jour ET vérifiés par
+  une exécution réelle.** Deux sur trois n'est pas une rotation, c'est une panne différée.
+- **Un secret partagé par deux workflows compte pour deux systèmes.** `SUPABASE_DB_URL`
+  alimente le backup et le pipeline ; les compter pour un est l'erreur exacte du 27/07.
+- **Un garde-fou muet n'est pas un garde-fou.** GitHub n'envoie d'e-mail d'échec qu'à
+  l'auteur du commit déclencheur — **un run de cron n'en a pas**, donc un cron qui casse
+  ne prévient personne par défaut. Correctif du jour : `db-backup.yml` ouvre une issue
+  (label `alerte-backup`). Complété le 2026-08-02 : l'issue est **assignée** et porte le
+  label `urgent`, parce qu'une issue ouverte sans assigné ne déclenche aucune
+  notification — elle attend d'être trouvée, ce qui est précisément ce qui a échoué ici.
+
+---
+
 ## 2026-07-27 — Plus aucun déploiement Vercel : deux installations qui ne résolvent pas les mêmes types
 
 **Symptôme.** À partir de `356edd7` (décommissionnement du scaffold v1),

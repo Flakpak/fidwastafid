@@ -218,6 +218,13 @@ jobs:
         with:
           label: alerte-backup
           depot: ${{ github.repository }}
+          # Assignation + label `urgent` : c'est l'assignation qui déclenche la
+          # notification GitHub par défaut du destinataire. Sans elle, l'issue
+          # existe mais personne n'est prévenu — le défaut exact du 27/07/2026,
+          # où l'échec a été découvert le lendemain par un audit manuel.
+          # Aucune dépendance nouvelle : même action locale que le pipeline.
+          assignes: Flakpak
+          labels-supplementaires: urgent
           titre: "Backup de la base en échec"
           corps: |
             Le workflow **Backup base de données (pg_dump quotidien)** a **échoué**.

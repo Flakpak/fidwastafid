@@ -17,6 +17,8 @@ pnpm --filter pipeline run scraper-bringo -- <url-listing-ou-fichier.txt> <ville
 pnpm --filter pipeline run scraper-inwi
 pnpm --filter pipeline run scraper-universparadiscount
 pnpm --filter pipeline run scraper-decathlon
+pnpm --filter pipeline run scraper-kiabi
+pnpm --filter pipeline run scraper-bestmark
 pnpm --filter pipeline run extract-catalogue -- <url-ou-chemin> <enseigne>
 pnpm --filter pipeline run insert-deals -- <fichier-deals-extraits.json>
 pnpm --filter pipeline run rattrapage-descriptions -- [--dry-run]
@@ -60,10 +62,35 @@ que de les interpréter lui-même.
   `extractions/AAAA-MM-JJ_HH-mm_decathlon.json`. Aucune variable
   d'environnement requise. Prérequis d'insertion : l'enseigne curée
   `decathlon` doit exister en base (`docs/RUNBOOK-donnees.md`).
+- **scraper-kiabi** — lit le catalogue Shopify public de kiabi.ma
+  (`products.json`, Mode). Pas de HTML : la donnée est déjà structurée, pas de
+  sélecteur CSS à maintenir. Ne retient qu'une variante **disponible ET
+  remisée** (`compare_at_price` > `price`) ; entre plusieurs tailles remisées,
+  la moins chère. Deux caps : `MAX_PAGES=5` et surtout **`MAX_DEALS=120`** —
+  ~45 % du catalogue est remisé en permanence (556 deals sur 1250 produits au
+  premier run), un cap par pages ne protégerait rien. La troncature est
+  annoncée dans les logs, le reste est repris au run suivant. Écrit
+  `extractions/AAAA-MM-JJ_HH-mm_kiabi.json`. Aucune variable d'environnement
+  requise. Prérequis d'insertion : l'enseigne curée `kiabi` en base.
+- **scraper-bestmark** — interroge l'API GraphQL Magento publique de
+  bestmark.ma (High-Tech). GraphQL **parce que** le `robots.txt` interdit toute
+  URL à paramètres (`Disallow: /*?*`) : en POST, la pagination vit dans le corps
+  de la requête, aucune URL à query string n'est demandée. Ne retient que les
+  produits dont `final_price < regular_price` et `IN_STOCK`. Pagination bornée
+  par `total_count` (jamais découverte en dépassant : Magento répond une erreur
+  au-delà de la dernière page). ⚠️ **Rendement mesuré : 1 produit remisé sur
+  865** — un run à 0 deal est le cas normal ici. Écrit
+  `extractions/AAAA-MM-JJ_HH-mm_bestmark.json`. Prérequis d'insertion :
+  l'enseigne curée `bestmark` en base.
 - **extract-catalogue** — extrait les deals d'un catalogue (PDF/image) via
   l'API Claude. Écrit une archive dans `extractions/AAAA-MM-JJ_HH-mm_<enseigne>.json`.
 - **insert-deals** — valide (schémas partagés `packages/schemas`) puis insère
-  en base les deals d'un fichier d'extraction, statut `auto_draft`. Résout
+  en base les deals d'un fichier d'extraction, statut `auto_draft`. Applique
+  aussi le **seuil de remise minimum** (`remise.mjs`, 30 % par défaut) : c'est
+  le seul point de passage commun à toutes les sources, donc le seul endroit
+  où cette règle ne peut pas diverger. Un deal dont la remise n'est pas
+  mesurable (prix barré absent, cas de bringo) passe et est compté à part —
+  le rejeter reviendrait à lui prêter une remise faible non constatée. Résout
   l'enseigne texte contre la table `enseignes` réelle (aucune correspondance
   = deal rejeté). Traite l'image du deal si les variables de stockage sont
   présentes ; sinon `image_key` reste `NULL`, jamais bloquant.

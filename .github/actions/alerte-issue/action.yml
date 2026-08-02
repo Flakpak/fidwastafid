@@ -32,6 +32,19 @@ inputs:
   depot:
     description: "Dépôt cible, au format owner/repo."
     required: true
+  assignes:
+    description: >-
+      Identifiants GitHub à assigner, séparés par des virgules. Une issue assignée
+      déclenche la notification GitHub par défaut du destinataire — c'est le seul
+      canal qui sonne pour un run de cron, qui n'a pas d'auteur de commit à prévenir.
+    required: false
+    default: ""
+  labels-supplementaires:
+    description: >-
+      Labels appliqués EN PLUS du label de dédoublonnage (virgules) — ex. `urgent`.
+      Ne servent jamais au dédoublonnage, seulement à la lecture et au filtrage.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -43,6 +56,8 @@ runs:
         TITRE: ${{ inputs.titre }}
         CORPS: ${{ inputs.corps }}
         DEPOT: ${{ inputs.depot }}
+        ASSIGNES: ${{ inputs.assignes }}
+        LABELS_SUPP: ${{ inputs.labels-supplementaires }}
       run: |
         set -euo pipefail
 
@@ -55,9 +70,44 @@ runs:
         OUVERTE=$(gh issue list -R "$DEPOT" --label "$LABEL" --state open \
           --limit 1 --json number --jq '.[0].number // empty')
 
+        # Le signal principal part EN PREMIER, avec le seul label de dédoublonnage.
+        # Assignation et labels de confort viennent après : si l'un d'eux échoue
+        # (identifiant invalide, droits insuffisants), l'alerte est déjà passée.
+        # L'inverse ferait perdre l'alerte pour un détail cosmétique.
         if [ -n "$OUVERTE" ]; then
           gh issue comment "$OUVERTE" -R "$DEPOT" --body-file alerte-corps.md
-          echo "Issue #$OUVERTE complétée (occurrence répétée)."
+          NUMERO="$OUVERTE"
+          echo "Issue #$NUMERO complétée (occurrence répétée)."
         else
-          gh issue create -R "$DEPOT" --title "$TITRE" --label "$LABEL" --body-file alerte-corps.md
+          URL=$(gh issue create -R "$DEPOT" --title "$TITRE" --label "$LABEL" --body-file alerte-corps.md | tail -n 1)
+          NUMERO="${URL##*/}"
+          echo "Issue #$NUMERO ouverte."
+        fi
+
+        # `gh issue edit` est idempotent : réassigner ou reposer un label déjà
+        # présent ne produit rien. Une occurrence répétée peut donc rappeler
+        # l'assignation si elle avait été retirée à la main.
+        # Listes non quotées volontairement : le découpage en mots de bash fait
+        # office de séparateur, et une valeur vide produit zéro itération. Pas de
+        # `[ -z … ] && continue` ici — sous `set -e`, un tel test qui échoue en
+        # fin de corps de boucle tue le script.
+        ARGS=()
+        for l in ${LABELS_SUPP//,/ }; do
+          gh label create "$l" -R "$DEPOT" --color "$COULEUR" \
+            --description "Alerte automatique — traiter en priorité" 2>/dev/null || true
+          ARGS+=(--add-label "$l")
+        done
+        for a in ${ASSIGNES//,/ }; do
+          ARGS+=(--add-assignee "$a")
+        done
+
+        if [ ${#ARGS[@]} -gt 0 ]; then
+          # Pas de repli silencieux : un échec d'assignation se dit DANS l'issue,
+          # pas seulement dans un log de run que personne n'ouvre — c'est
+          # exactement la leçon du 27/07/2026.
+          if ! gh issue edit "$NUMERO" -R "$DEPOT" "${ARGS[@]}"; then
+            echo "::warning::Assignation/labels non appliqués sur l'issue #$NUMERO."
+            gh issue comment "$NUMERO" -R "$DEPOT" --body \
+              "⚠️ Assignation automatique **échouée** (assignés: \`${ASSIGNES:-aucun}\`, labels: \`${LABELS_SUPP:-aucun}\`). L'alerte ci-dessus reste valide : personne n'a été notifié par e-mail, il faut la traiter à la main." || true
+          fi
         fi
