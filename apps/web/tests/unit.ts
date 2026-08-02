@@ -5,6 +5,13 @@ import { POST as postRevalidate } from "../src/app/api/revalidate/route.js";
 import { dealOgDescription, truncateOgTitle, dealJsonLd } from "../src/app/deal/[slugAndId]/seo.js";
 import { buildShareText } from "../src/components/shareText.js";
 import {
+  buildLegendeTelegram,
+  lienDiffusion,
+  UTM_MEDIUM,
+  UTM_CAMPAIGN,
+} from "../src/app/api/v1/_lib/diffusionMessage.js";
+import { lireChatId, diffusionConfiguree, TelegramConfigError } from "../src/app/api/v1/_lib/telegram.js";
+import {
   fetchAuthUserEmail,
   SupabaseAdminUnavailableError,
   SupabaseAdminConfigError,
@@ -991,5 +998,89 @@ for (const rejete of ["itgen1qa2a", "itgnat1qa2", "itgcas1qa2", "itgrab1qa2"]) {
   check(`témoin — ${rejete} (chiffre « 1 ») bien refusé`, !publicIdSchema.safeParse(rejete).success);
 }
 check("l'alphabet exclut 0, 1, l et o", !/[01lo]/.test(PUBLIC_ID_ALPHABET));
+
+// ---------------------------------------------------------------------------
+// Diffusion communautaire (docs/IDEES.md) — lien UTM, légende Telegram, et
+// résolution de la destination. Aucun réseau, aucun jeton réel.
+//
+// Le dernier bloc est le plus important : c'est le point où une erreur coûte
+// le plus cher. Un envoi de test qui part dans le canal public ne se rattrape
+// pas — on ne « dé-poste » pas devant des abonnés.
+// ---------------------------------------------------------------------------
+console.log("\nDiffusion — lien UTM (convention docs/IDEES.md)");
+{
+  const url = new URL(lienDiffusion("Chaise de bureau", "abcdefghij", "telegram", "https://fidwastafid.com"));
+  check("chemin canonique /deal/<slug>-<publicId>", url.pathname.startsWith("/deal/") && url.pathname.endsWith("-abcdefghij"));
+  check("utm_source = canal", url.searchParams.get("utm_source") === "telegram");
+  check("utm_medium = social", url.searchParams.get("utm_medium") === UTM_MEDIUM && UTM_MEDIUM === "social");
+  check("utm_campaign = diffusion", url.searchParams.get("utm_campaign") === UTM_CAMPAIGN && UTM_CAMPAIGN === "diffusion");
+  const discord = new URL(lienDiffusion("T", "abcdefghij", "discord", "https://x.io"));
+  check("un autre canal change utm_source, et lui seul", discord.searchParams.get("utm_source") === "discord");
+}
+
+console.log("\nDiffusion — légende Telegram : jamais de remise devinée");
+{
+  const avecRemise = buildLegendeTelegram({
+    titre: "Chaise",
+    prixPromo: 300,
+    prixNormal: 600,
+    enseigneNom: "Kiabi",
+    lien: "https://x.io/d",
+  });
+  check("titre en gras", avecRemise.includes("<b>Chaise</b>"));
+  check("enseigne présente", avecRemise.includes("Kiabi"));
+  check("prix barré et pourcentage réel", avecRemise.includes("<s>600 DH</s>") && avecRemise.includes("50%"));
+  check("lien présent", avecRemise.includes("https://x.io/d"));
+
+  const sansNormal = buildLegendeTelegram({ titre: "Chaise", prixPromo: 300, prixNormal: null, lien: "https://x.io/d" });
+  check("sans prix normal : aucun pourcentage inventé", !sansNormal.includes("%") && !sansNormal.includes("<s>"));
+
+  const incoherent = buildLegendeTelegram({ titre: "Chaise", prixPromo: 300, prixNormal: 200, lien: "https://x.io/d" });
+  check("prix normal sous le promo : aucune remise affichée", !incoherent.includes("%"));
+
+  const injection = buildLegendeTelegram({ titre: "Chaise <b>&</b>", prixPromo: 10, lien: "https://x.io/d" });
+  check("HTML du titre échappé (parse_mode HTML)", injection.includes("&lt;b&gt;&amp;&lt;/b&gt;"));
+}
+
+console.log("\nDiffusion — destination : le canal de test prime, par PRÉSENCE de variable");
+{
+  const avant = {
+    test: process.env.TELEGRAM_CHAT_ID_TEST,
+    prod: process.env.TELEGRAM_CHAT_ID,
+    token: process.env.TELEGRAM_BOT_TOKEN,
+  };
+
+  delete process.env.TELEGRAM_CHAT_ID_TEST;
+  process.env.TELEGRAM_CHAT_ID = "-100public";
+  check("sans variable de test : canal public", lireChatId().chatId === "-100public");
+  check("et l'envoi n'est PAS marqué test", lireChatId().test === false);
+
+  process.env.TELEGRAM_CHAT_ID_TEST = "-100test";
+  check("avec variable de test : elle prime sur le canal public", lireChatId().chatId === "-100test");
+  check("et l'envoi est marqué test", lireChatId().test === true);
+
+  delete process.env.TELEGRAM_CHAT_ID;
+  delete process.env.TELEGRAM_CHAT_ID_TEST;
+  let leve = false;
+  try {
+    lireChatId();
+  } catch (err) {
+    leve = err instanceof TelegramConfigError;
+  }
+  check("aucune destination : erreur de config, jamais un envoi au hasard", leve);
+
+  process.env.TELEGRAM_BOT_TOKEN = "jeton-de-test";
+  process.env.TELEGRAM_CHAT_ID = "-100public";
+  check("diffusionConfiguree() vraie avec jeton + destination", diffusionConfiguree() === true);
+  delete process.env.TELEGRAM_BOT_TOKEN;
+  check("diffusionConfiguree() fausse sans jeton", diffusionConfiguree() === false);
+
+  if (avant.test === undefined) delete process.env.TELEGRAM_CHAT_ID_TEST;
+  else process.env.TELEGRAM_CHAT_ID_TEST = avant.test;
+  if (avant.prod === undefined) delete process.env.TELEGRAM_CHAT_ID;
+  else process.env.TELEGRAM_CHAT_ID = avant.prod;
+  if (avant.token === undefined) delete process.env.TELEGRAM_BOT_TOKEN;
+  else process.env.TELEGRAM_BOT_TOKEN = avant.token;
+}
 
 void runAsyncChecks();

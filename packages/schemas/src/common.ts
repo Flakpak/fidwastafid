@@ -28,6 +28,15 @@ export const apiErrorCodeSchema = z.enum([
   "NOT_FOUND",
   "VALIDATION_ERROR",
   "RATE_LIMITED",
+  /**
+   * Ajouté le 2026-08-02 (amendement CONTRAT-V1 §4, diffusion Telegram) :
+   * l'état actuel de la ressource interdit l'action, alors que la requête
+   * elle-même est valide. Ni VALIDATION_ERROR (rien à corriger dans le
+   * corps), ni FORBIDDEN (les droits sont bons) — les deux auraient envoyé
+   * l'admin chercher un problème qui n'existe pas. Deux cas à ce jour :
+   * diffuser un deal non publié, diffuser un deal déjà diffusé.
+   */
+  "CONFLICT",
 ]);
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;
 

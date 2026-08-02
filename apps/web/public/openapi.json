@@ -359,6 +359,9 @@
           },
           "turnstileVerifie": {
             "type": "boolean"
+          },
+          "diffuseTelegram": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -378,7 +381,8 @@
           "updatedAt",
           "whatsappPublic",
           "motifRejet",
-          "turnstileVerifie"
+          "turnstileVerifie",
+          "diffuseTelegram"
         ]
       },
       "DealInput": {
@@ -819,7 +823,8 @@
                   "FORBIDDEN",
                   "NOT_FOUND",
                   "VALIDATION_ERROR",
-                  "RATE_LIMITED"
+                  "RATE_LIMITED",
+                  "CONFLICT"
                 ]
               },
               "message": {
@@ -1840,6 +1845,203 @@
           },
           "404": {
             "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/deals/{publicId}/diffuser": {
+      "post": {
+        "summary": "Diffuse le deal sur le canal Telegram communautaire (curation manuelle, un deal à la fois) — CONTRAT-V1 §4, amendement du 02/08/2026. La ligne `diffusions` n'est écrite qu'après un envoi réellement abouti.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK — message publié",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "diffuse": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "canal": {
+                      "type": "string",
+                      "enum": [
+                        "telegram"
+                      ]
+                    },
+                    "messageId": {
+                      "type": "integer"
+                    },
+                    "canalTest": {
+                      "type": "boolean",
+                      "description": "true si l'envoi est parti vers TELEGRAM_CHAT_ID_TEST plutôt que vers le canal public"
+                    }
+                  },
+                  "required": [
+                    "diffuse",
+                    "canal",
+                    "messageId",
+                    "canalTest"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Diffusion non configurée sur cet environnement, ou envoi refusé par Telegram",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Deal non publié, ou déjà diffusé sur ce canal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Annule la diffusion Telegram — supprime le message du canal (deleteMessage) puis la ligne `diffusions`. Si Telegram refuse, la ligne reste : le message est toujours dans le canal.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK — message retiré et diffusion effacée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "diffuse": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "canal": {
+                      "type": "string",
+                      "enum": [
+                        "telegram"
+                      ]
+                    },
+                    "messageSupprime": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "diffuse",
+                    "canal",
+                    "messageSupprime"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Diffusion non configurée, ou suppression refusée par Telegram (la diffusion reste enregistrée)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal introuvable, ou aucune diffusion Telegram à annuler",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Diffusion enregistrée sans identifiant de message",
             "content": {
               "application/json": {
                 "schema": {

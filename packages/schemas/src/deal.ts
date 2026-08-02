@@ -225,6 +225,12 @@ export const dealAdminSchema = dealSchema.extend({
    *  injoignable (panne 429/5xx/réseau, migration 0010). Admin uniquement :
    *  c'est une information de modération, jamais un fait public. */
   turnstileVerifie: z.boolean(),
+  /** `true` = ce deal a déjà été publié sur le canal Telegram (table
+   *  `diffusions`, migration 0011). Admin uniquement, et lecture seule :
+   *  l'état se constate, il ne se déclare pas — seule la route
+   *  `POST /api/v1/admin/deals/:publicId/diffuser` l'écrit, et seulement
+   *  après un envoi réellement abouti. */
+  diffuseTelegram: z.boolean(),
 });
 export type DealAdmin = z.infer<typeof dealAdminSchema>;
 

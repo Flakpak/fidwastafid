@@ -187,7 +187,30 @@ règle 5.
 ### 3.3 — Diffusion Telegram / Discord *(priorité 3)*
 
 **Constat.** Le levier d'audience décidé : au Maroc, les réseaux sont le point d'entrée, le site
-la destination. Rien n'est encore construit.
+la destination.
+
+**Telegram est LIVRÉ (02/08/2026), mais PAS ENCORE ÉPROUVÉ EN ENVOI RÉEL.** Migration `0011`
+appliquée en prod, endpoint `POST /api/v1/admin/deals/:publicId/diffuser` (CONTRAT-V1 §4,
+huitième amendement), bouton « Diffuser » sur les deals publiés avec état « Diffusé ✓ » inerte.
+
+> ⚠️ **Ce qui bloque la recette.** `TELEGRAM_CHAT_ID_TEST` **n'existe pas** côté Vercel (vérifié le
+> 02/08 — seules `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID` y sont, scopées **Production and
+> Preview** ; l'affirmation « production seule » d'une première lecture était fausse). Le code
+> retombe donc sur le canal **public**.
+>
+> **Second blocage, découvert en préparant le test réel : il n'existe aucun moyen de DÉFAIRE une
+> diffusion.** Supprimer un message demande un appel `deleteMessage` authentifié par
+> `TELEGRAM_BOT_TOKEN`, qui ne vit que côté Vercel — donc uniquement atteignable depuis du code
+> serveur déployé. Aucun endpoint ne le fait aujourd'hui. Conséquence : **tout envoi est
+> définitif par construction**, y compris un envoi de test.
+>
+> Deux voies pour débloquer, à trancher : (1) poser `TELEGRAM_CHAT_ID_TEST` sur un canal privé
+> jetable — le bot doit y être administrateur ; (2) ajouter `DELETE /api/v1/admin/deals/:publicId/diffuser`
+> qui appelle `deleteMessage` et retire la ligne `diffusions`, faisant de l'annulation une capacité
+> du produit plutôt qu'un geste manuel. La (2) est utile au-delà du test : une diffusion partie
+> avec une erreur de prix se rattrape aujourd'hui à la main dans Telegram.
+
+Discord et WhatsApp restent entiers.
 
 **Où.** `docs/IDEES.md`, section « Diffusion communautaire » — l'architecture est **déjà
 tranchée** : bouton « Diffuser » dans l'admin sur chaque deal publié (curation manuelle en v1,

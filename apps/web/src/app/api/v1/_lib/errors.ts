@@ -9,6 +9,9 @@ const STATUS_BY_CODE: Record<ApiErrorCode, number> = {
   NOT_FOUND: 404,
   VALIDATION_ERROR: 400,
   RATE_LIMITED: 429,
+  // 409 — l'état de la ressource interdit l'action, pas la requête ni les
+  // droits (amendement du 02/08/2026, cf. apiErrorCodeSchema).
+  CONFLICT: 409,
 };
 
 /**
