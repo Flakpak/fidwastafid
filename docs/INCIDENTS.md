@@ -10,6 +10,42 @@ en a appris. Une leçon gravée ici a vocation à être citée depuis le code ou
 
 ---
 
+## 2026-08-02 — Contrainte : `/auth/confirm` exige une session, un changement d'e-mail sécurisé n'en produit pas toujours
+
+*Entrée de **contrainte**, pas d'incident : rien n'a cassé en production. Le défaut est
+latent parce qu'aucun e-mail n'emprunte ce chemin aujourd'hui. Il est consigné ici pour
+être lu le jour où il cesserait de l'être — pas après.*
+
+**Le fait.** `apps/web/src/app/auth/confirm/route.ts` ne pose le cookie de session que si
+`verifyOtp` renvoie **à la fois** `!error` **et** `data.session`. À défaut, la route
+redirige vers `/connexion?erreur=confirmation` — exactement le même message que pour un
+jeton invalide, expiré ou déjà consommé.
+
+**Pourquoi c'est un piège pour `type=email_change`.** Un changement d'e-mail sécurisé se
+valide en **deux** confirmations chez Supabase (ancienne adresse, puis nouvelle). La
+première n'ouvre pas de session : le changement n'est pas encore effectif. La route la
+lirait donc comme un échec et enverrait l'utilisateur sur une page d'erreur alors que son
+clic a réussi — et il n'aurait aucune raison de cliquer sur le second lien.
+
+C'est la **troisième occurrence du même motif**, après le 19/07 et le 24/07 :
+
+> **Une valeur de retour ambiguë n'est pas un type de retour acceptable.**
+
+Ici, « pas de session » signifie tantôt « jeton refusé », tantôt « étape 1 sur 2
+franchie ». Le code ne peut pas les distinguer, donc il choisit le mauvais des deux.
+
+**Contrainte, à tenir avant tout câblage réel du changement d'e-mail.** `/auth/confirm`
+doit d'abord séparer les deux sorties : `error` (échec) et « succès sans session » (étape
+intermédiaire, qui appelle un message d'attente, pas une erreur). La décision de câbler ou
+non ce flux reste ouverte — voir `docs/IDEES.md`.
+
+**Portée — ce qui n'est PAS concerné.** Les deux flux actifs sont hors de cause :
+`type=email` (inscription) et `type=recovery` (réinitialisation) renvoient une session en
+cas de succès et tournent en production. Le gabarit `email_change` pointe sur cette route
+depuis le 2026-08-02, mais aucun code ne le déclenche.
+
+---
+
 ## 2026-07-27 — Plus aucun déploiement Vercel : deux installations qui ne résolvent pas les mêmes types
 
 **Symptôme.** À partir de `356edd7` (décommissionnement du scaffold v1),
