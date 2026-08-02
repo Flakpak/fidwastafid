@@ -339,6 +339,97 @@ Favoris/bookmark sur les cartes (type Dealabs) — nécessite table + endpoints
 Enrichissements profil auteur (membre depuis, nombre de deals partagés) :
 dépend du futur `/membre/[pseudo]-[public_id]` réservé au contrat §2.
 
+## Seuil de remise minimum — cadran éditorial à surveiller (2026-08-02)
+
+**Constat d'audit** : aucun des quatre scrapers en production (bringo, inwi,
+universparadiscount, decathlon) n'appliquait de seuil de remise. La seule règle
+de prix était la **cohérence** (`prix_normal >= prix_promo`) et la **présence**
+des deux prix — jamais l'**ampleur**. Un produit à −2 % entrait dans la file
+exactement comme un produit à −70 %. Ce n'était donc pas un défaut d'une
+source, mais un manque générique : le pipeline savait dire « c'est bien une
+promotion », jamais « c'est bien une bonne affaire ».
+
+Corrigé le 02/08/2026 : `apps/pipeline/remise.mjs`, seuil unique appliqué dans
+`insert-deals.mjs` — le seul point de passage commun à toutes les sources.
+
+**Effet mesuré du seuil à 30 %** sur les extractions réelles du jour :
+
+| Source | Extraits | Retenus à 30 % | Rejetés | Médiane de remise |
+|---|---|---|---|---|
+| kiabi | 120 | **110** | 10 | 50 % |
+| decathlon | 118 | **66** | 52 | 30 % |
+| universparadiscount | 80 | **57** | 23 | 33 % |
+| inwi | 6 | **3** | 3 | 34 % |
+| bestmark | 1 | **0** | 1 | 16 % |
+
+**À surveiller, et c'est le motif de cette entrée** : 30 % n'est pas une valeur
+neutre. Decathlon perd ~44 % de son volume, inwi la moitié, et Bestmark tombe à
+zéro — la source ne produit alors plus rien du tout. Le chiffre se relit dans
+`remise.mjs` avant d'être bougé ; le bouger change ce que le site montre.
+
+**Décision du 02/08/2026 — le seuil est UNIFORME, et c'est délibéré.** La
+question posée était : fallait-il calibrer le seuil par enseigne, pour ne pas
+amputer Decathlon de 44 % de son volume ni tuer Bestmark ? Réponse : non.
+
+- **Un seul point de passage.** Un seuil par source, c'est six valeurs à
+  entretenir, six occasions de dériver, et la question « pourquoi 22 % ici et
+  30 % là ? » sans réponse écrite six mois plus tard. C'est le raisonnement qui
+  a déjà fait remonter la validation zod dans `packages/schemas` et l'alerte
+  d'échec dans une action partagée : une règle qui vit en plusieurs exemplaires
+  finit par ne plus être la même règle.
+- **Une promesse utilisateur cohérente.** Le seuil n'est pas un réglage
+  d'ingestion, c'est ce que « bon plan » veut dire sur ce site. Le calibrer par
+  enseigne reviendrait à dire au visiteur qu'une remise vaut d'être montrée
+  selon le vendeur, pas selon ce qu'elle lui fait économiser. Un deal Decathlon
+  à −22 % et un deal Kiabi à −22 % doivent recevoir la même réponse.
+- **Le volume n'est pas un argument de qualité.** Amputer Decathlon de 52 deals
+  est un effet, pas un dommage : ces 52 deals étaient sous la barre. Et la
+  chute de Bestmark à zéro n'est pas causée par le seuil — son unique remise du
+  catalogue vaut 16 %. Le seuil ne fait que rendre visible ce que la source
+  vaut réellement.
+
+Ce qui reste ouvert, et se décide sur le chiffre, jamais par enseigne : la
+valeur elle-même. La bouger de 30 à 25 ou à 40 est une décision produit ; la
+remplacer par six valeurs n'en est pas une.
+
+**Ce que le seuil ne fait PAS** : il ne borne pas le volume. Sur le run Kiabi
+non capé, **505 des 556 deals passent les 30 %** (médiane 50 %) — les promotions
+de Kiabi sont profondes et permanentes. Le cap de 120/run du scraper reste donc
+nécessaire et n'est pas remplaçable par le seuil : l'un filtre la qualité,
+l'autre borne la file admin. Les confondre remettrait ~505 fiches par run à
+trancher à la main.
+
+## Diversification des sources — exception assumée pour Kiabi et Bestmark (2026-08-02)
+
+Le séquencement posé ci-dessous (« un par un, post-Phase 7 ») **n'a pas été suivi**
+pour `kiabi.ma` et `bestmark.ma`, traités ensemble dans un même lot. C'est une
+exception consciente, pas un oubli du cadre.
+
+**Motif** : ces deux sources sont une **extension pure du pattern existant** —
+un adaptateur `.mjs` de plus, la même sortie normalisée, la même validation zod
+partagée, la même étape de workflow copiée sur celle de Decathlon. Aucune
+architecture nouvelle, aucune dépendance ajoutée, aucun rendu JS, et surtout
+**aucun contournement d'anti-bot** : les deux exposent une API publique et
+documentée (Shopify `products.json` pour Kiabi, GraphQL Magento pour Bestmark).
+Ce que le séquencement « un par un » protège, c'est le coût de découverte d'une
+source inconnue ; ici ce coût est nul, il n'y avait rien à protéger.
+
+**Ce qui reste hors périmètre, inchangé** :
+- **Zara** — aucune action prise. Le pipeline n'a **aucune politique écrite sur
+  les sources à ToS restrictif** ; tant qu'elle n'existe pas, l'ajouter serait
+  trancher seul une question de gouvernance. Décision à prendre explicitement.
+- **Electroplanet** — exclu deux fois plutôt qu'une : mur Cloudflare sur le
+  domaine entier (spike du 22/07), et surtout `robots.txt` en
+  `User-agent: * / Disallow: /` (vérifié le 02/08/2026, après redirection vers
+  `www`). Interdiction totale : le sujet est clos, pas reporté.
+
+**Rendement mesuré au premier run**, à connaître avant d'en attendre quoi que ce soit :
+Kiabi ~45 % du catalogue remisé en permanence (556 deals sur 1250 produits — d'où
+un cap volontaire à 120/run) ; Bestmark **1 seul produit remisé sur 865**. La
+seconde ne se justifiera que si l'enseigne ouvre de vraies opérations
+commerciales — si elle reste à zéro sur la durée, la retirer est une décision à
+prendre, pas une panne à diagnostiquer.
+
 ## Diversification des sources (2026-07-18)
 
 Le pipeline ne scrape aujourd'hui que Bringo (`scraper-bringo.mjs`).
