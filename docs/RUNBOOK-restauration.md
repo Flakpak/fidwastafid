@@ -10,9 +10,22 @@
 - **Format** : dump `pg_dump` plain SQL, compressé `.sql.gz`.
 - **Options du dump** : `--no-owner --no-privileges` → restaurable dans n'importe quel
   Postgres (nouveau projet Supabase, Postgres local, futur VPS) sans dépendre des rôles Supabase.
-- **Où il est** :
-  - **GitHub** (toujours) : onglet *Actions* → un run *Backup base de données* → section **Artifacts** en haut → `db-backup-<date>`. Rétention 30 jours.
-  - **Cloudflare R2** (si configuré) : bucket, clé `fidwastafid/<date>.sql.gz`. Durable.
+- **Où il est — une seule source, et c'est tout** : **artefact GitHub Actions**. Onglet
+  *Actions* → un run *Backup base de données* → section **Artifacts** en haut →
+  `db-backup-<date>`. **Rétention 30 jours**, au-delà l'artefact est supprimé par GitHub.
+
+> ⚠️ **Il n'existe aucune copie hors GitHub.** `db-backup.yml` contient bien une étape
+> d'envoi vers Cloudflare R2, mais elle est conditionnée à `R2_ACCOUNT_ID` et `R2_BUCKET`,
+> **absents des secrets du dépôt** (vérifié le 2026-08-02) : elle a toujours été sautée,
+> aucun objet n'a jamais été écrit dans un bucket. Ce runbook a décrit pendant des
+> semaines une procédure de récupération « depuis R2 » qui n'aurait rien trouvé — au pire
+> moment possible, celui où on le lit. Elle est retirée.
+>
+> **Conséquences à connaître avant d'en avoir besoin** : au-delà de 30 jours, il n'y a
+> plus rien ; si le dépôt GitHub devient inaccessible, il n'y a plus rien non plus. Le
+> plan Supabase est **Free**, donc sans backup managé ni PITR — cet artefact est la
+> **ligne de défense unique**. Rétablir une seconde copie suppose de créer un bucket R2 et
+> de poser les quatre secrets ; tant que ce n'est pas fait, ce paragraphe reste vrai.
 
 ---
 
@@ -37,18 +50,19 @@ unzip db-backup-<date>.zip
 ls -lh *.sql.gz
 ```
 
-### Depuis R2 (si GitHub indisponible ou backup > 30 j)
-```bash
-export AWS_ACCESS_KEY_ID=...        # clés R2
-export AWS_SECRET_ACCESS_KEY=...
-export AWS_DEFAULT_REGION=auto
-# Lister les backups disponibles
-aws s3 ls s3://<bucket>/fidwastafid/ \
-  --endpoint-url "https://<account_id>.r2.cloudflarestorage.com"
-# Télécharger celui voulu
-aws s3 cp s3://<bucket>/fidwastafid/<date>.sql.gz . \
-  --endpoint-url "https://<account_id>.r2.cloudflarestorage.com"
-```
+### Si GitHub est indisponible, ou si le backup a plus de 30 jours
+
+**Il n'y a pas de seconde source.** Ce n'est pas un oubli de rédaction : aucun stockage
+externe n'a jamais reçu de dump (voir l'encadré plus haut). Dans ce cas :
+
+1. La base de production est **toujours là** — un artefact expiré ne veut pas dire des
+   données perdues. Vérifier d'abord que l'incident est bien une perte de données.
+2. Prendre immédiatement un dump manuel de l'état courant avant toute autre manœuvre :
+   `gh workflow run db-backup.yml`, ou `pg_dump` en local avec la chaîne Session pooler
+   (port 5432) si GitHub est inaccessible.
+3. Si les données sont réellement perdues **et** qu'aucun artefact n'est récupérable, il
+   n'existe aucun autre point de restauration. C'est le risque assumé aujourd'hui, et la
+   raison pour laquelle la copie externe reste au restant de la Phase 0.
 
 ---
 

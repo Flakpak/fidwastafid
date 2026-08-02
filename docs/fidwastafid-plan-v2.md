@@ -295,7 +295,7 @@ confirmés en base. Phase 7 close.
 
 | Phase | Statut | Notes |
 |---|---|---|
-| 0 — Protéger l'existant | ☑ fait | pg_dump quotidien GA, runbook 5 scénarios, tag v1-legacy, DNS → Cloudflare (Full Strict) ; DNSSEC : reliquat OVH levé, actif côté Cloudflare depuis la bascule du 16/07/2026 |
+| 0 — Protéger l'existant | ◐ **partiel** (rouvert le 02/08/2026) | **Fait** : pg_dump quotidien GA + test de restauration à chaque run + gzip, runbook 5 scénarios, alerte d'échec par issue **assignée et étiquetée `urgent`**, tag v1-legacy, DNS → Cloudflare (Full Strict), DNSSEC actif depuis le 16/07/2026. **Restant** : aucune copie hors GitHub — l'étape R2 de `db-backup.yml` n'a jamais tourné (secrets absents), la rétention d'artefact est de 30 jours, et le plan Supabase Free n'offre ni backup managé ni PITR. La case avait été cochée sur l'intention (« stocké hors Supabase »), pas sur une exécution constatée. |
 | 1 — Conception | ☑ fait | docs/CONTRAT-V1.md gravé |
 | 2 — Fondation | ☑ fait | monorepo pnpm, packages schemas/db/auth, Next 15, Docker, CSP nonce, CI verte, Dependabot |
 | 3 — API | ☑ fait | endpoints publics + écritures + rate limiting, CI verte |
