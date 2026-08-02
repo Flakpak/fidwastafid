@@ -129,6 +129,53 @@ check(
   renommages.inconnues === 0
 );
 
+// ---------------------------------------------------------------------------
+// Le détecteur ci-dessus est lui-même éprouvé, sur du SQL SYNTHÉTIQUE.
+//
+// Sans ces cas, la garde resserrée passerait au vert pour la pire des
+// raisons : ne plus rien détecter du tout. Le compte global de tests verts
+// ne dit rien là-dessus — il aurait été tout aussi vert avec une regex qui
+// ne matche jamais. C'est le contrôle positif qui fait la différence.
+// ---------------------------------------------------------------------------
+console.log("\ndétecteur de renommage — éprouvé sur du SQL synthétique");
+{
+  // POSITIF : ce qui doit encore déclencher la garde.
+  const surDeals = tablesRenommant("alter table deals rename column titre to nom;");
+  check("POSITIF — `alter table deals rename column` est détecté", surDeals.tables.includes("deals"));
+  check("POSITIF — et il ne compte aucun renommage non attribué", surDeals.inconnues === 0);
+
+  const surDealsQualifie = tablesRenommant("alter table public.deals rename column a to b;");
+  check("POSITIF — la forme `public.deals` est détectée aussi", surDealsQualifie.tables.includes("deals"));
+
+  // NÉGATIF : ce qui ne doit PLUS déclencher la garde (cas réel de 0012).
+  const surDiffusions = tablesRenommant("alter table diffusions rename column telegram_message_id to external_message_id;");
+  check(
+    "NÉGATIF — un renommage sur `diffusions` n'accuse pas `deals`",
+    !surDiffusions.tables.includes("deals") && surDiffusions.tables.includes("diffusions")
+  );
+
+  // NÉGATIF — l'amalgame entre instructions, cause du faux positif initial :
+  // un `alter table deals` ANTÉRIEUR ne doit pas être rattaché au
+  // `rename column` d'une autre table située après un `;`.
+  const deuxInstructions = tablesRenommant(
+    "alter table deals add column turnstile_verifie boolean not null default true;\n" +
+      "alter table diffusions rename column telegram_message_id to external_message_id;"
+  );
+  check(
+    "NÉGATIF — deux instructions séparées par `;` ne sont plus amalgamées",
+    !deuxInstructions.tables.includes("deals")
+  );
+  check(
+    "NÉGATIF — et la bonne table est bien celle retenue",
+    deuxInstructions.tables.length === 1 && deuxInstructions.tables[0] === "diffusions"
+  );
+
+  // Un `rename column` orphelin (aucun `alter table` rattachable) doit rester
+  // bloquant : on ne présume pas de l'innocuité de ce qu'on ne sait pas lire.
+  const orphelin = tablesRenommant("-- rename column a to b (hors instruction)\n");
+  check("un `rename column` non rattachable est compté comme inconnu", orphelin.inconnues === 1);
+}
+
 // Colonnes et valeurs de statut que expirer-auto-draft.mjs suppose exister
 // — tenues à la main, à jour avec sa vraie requête SQL. C'est précisément
 // ce qu'on confronte au schéma réel ci-dessus (et, plus bas, au texte réel
