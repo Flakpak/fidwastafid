@@ -1,6 +1,6 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-08-03, sur `main` à `61d29bb`.*
+*Dernière mise à jour : 2026-08-03, sur `main` à `3c44698`.*
 
 Ce document est le **point d'entrée pour reprendre le travail sans contexte préalable**. Il dit
 ce qui tourne, ce qui reste ouvert, et par quoi continuer. Il ne remplace aucun autre document :
@@ -11,6 +11,13 @@ il y renvoie.
 > entier — alors que deux PR l'avaient livré. Un état à date qui retarde fait arbitrer sur un
 > monde qui n'existe plus ; **la relecture de ce fichier fait partie de la fusion**, pas du
 > ménage d'après.
+>
+> **La règle ne s'était pas appliquée à elle-même.** La PR #75 a livré la priorité 2 de ce
+> document *sans le mettre à jour* : trois heures plus tard, il annonçait encore comme
+> chantier à trancher quelque chose qui tournait déjà en production. Une règle qui ne vit que
+> dans le fichier qu'elle protège n'est lue qu'après coup — elle est donc désormais **portée
+> par le gabarit de PR** (`.github/pull_request_template.md`), c'est-à-dire posée sous les
+> yeux au moment où le geste se fait, pas dans le document qu'on a oublié d'ouvrir.
 
 ---
 
@@ -27,6 +34,9 @@ il y renvoie.
 | `docs/SPIKE-SOURCES.md` | Étude des sources scrapables. |
 
 **Convention de travail** : une branche par lot, PR relue, jamais de push direct sur `main`.
+La liste de contrôle avant fusion vit dans `.github/pull_request_template.md` (créé le
+03/08/2026) — mise à jour de ce document, quatre checks bloquants, amendements du contrat,
+migrations, chiffres sourcés, absence de repli silencieux, et **ce que la PR n'a pas vérifié**.
 
 **Protection de branche — relevé le 2026-08-03 par l'API GitHub, pas de mémoire.** `main` exige
 une PR et **quatre** checks bloquants : `quality`, `docker`, `openapi-check`, **`Vercel`**.
@@ -42,7 +52,8 @@ consultatif reste un échec réel.
 ## 1 — Ce qui tourne en production
 
 **https://fidwastafid.com** — déployé depuis `main` par Vercel à chaque fusion. Dernier
-déploiement de production : `61d29bb`, `success`, 2026-08-02 20:05 UTC.
+déploiement de production : `3c44698`, check `Vercel` **`success`**, 2026-08-03 17:35 UTC
+(relevé par l'API GitHub, pas de mémoire). Le run CI du même SHA est vert.
 
 ### Chiffres réels au 2026-08-03
 
@@ -60,7 +71,11 @@ Relevés en base par le connecteur Supabase en lecture seule, pas estimés :
 | Lignes `diffusions` **vivantes** | **0** | — |
 | Diffusions **historiques** (`pg_stat_user_tables`) | **3 insérées, 3 supprimées** | — |
 
-Ces nombres importent pour la suite (voir §3.2) : le site en affiche d'autres.
+Ces nombres ne sont plus seulement un relevé : depuis #75, **`/concept` les relit en base à
+chaque affichage** au lieu d'afficher les « +50 enseignes / +20 villes » écrits en dur.
+Vérifié le 2026-08-03 : plus aucun chiffre d'audience en dur ne subsiste dans
+`apps/web/src` — les seules occurrences de `+50`/`+20` restantes sont dans le commentaire de
+`concept/page.tsx` qui consigne le fait générateur.
 
 **Migrations** : `packages/db/migrations/` va jusqu'à `0012_diffusions_canal_explicite.sql`,
 appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifié dans
@@ -79,14 +94,19 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
     les deals disponibles en ligne** — un deal en ligne est achetable de partout.
 - **Page deal** (`/deal/[slug]-[public_id]`) — résolution sur le `public_id` seul, 301 si le slug
   diverge, données structurées, partage, votes, commentaires.
-- **Pages enseigne** (`/enseigne/[slug]`), concept, charte, confidentialité, contact.
+- **Pages enseigne** (`/enseigne/[slug]`), charte, confidentialité, contact.
+- **Page concept** (`/concept`) — SSR par requête (`force-dynamic`). Ses deux statistiques
+  chiffrées viennent de `GET /api/v1/deals/compte` et `GET /api/v1/enseignes`, handlers
+  appelés directement comme le fait le feed. Un comptage en échec **masque sa tuile** et
+  journalise ; il n'affiche jamais `0`. La tuile « Villes » a été retirée plutôt que branchée
+  (une seule ville réelle porte des deals publiés — « 1 ville » n'est pas une statistique).
 - **Soumission communautaire** (`/soumettre`) — authentifiée, Turnstile, photo optionnelle,
   toujours créée en `en_attente`.
 - **Espace membre** (`/compte`) — identité, couleur d'avatar, compteurs, « mes deals » avec motif
   de rejet visible, export/suppression de compte (loi 09-08).
 - **Back-office** (`/admin`) — pipeline de curation, édition complète d'un deal, actions
   groupées, récupération et upload d'image, motif de rejet obligatoire, **boutons de diffusion
-  Telegram et Discord** (voir §3.3).
+  Telegram et Discord** (voir §3.2).
 - **Pipeline quotidien** (`apps/pipeline`) — **six sources** : bringo, inwi,
   universparadiscount, decathlon, **kiabi** et **bestmark** (ces deux dernières ajoutées le
   02/08 par leurs API publiques, #71). Insertion directe en base, expiration des `auto_draft`
@@ -103,6 +123,7 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| Chiffres de `/concept` | #75 | 03/08 | Les trois statistiques en dur remplacées par deux comptages réels (endpoints existants, **aucun amendement** de la liste fermée §4) et une constante assumée (« 100% Gratuit », qui est le modèle économique, pas une mesure). Aucun arrondi flatteur, aucun repli sur `0`. Au passage, `decrireErreur()` : `err.message` seul journalisait « indisponible — . » parce que `pg` remonte un `AggregateError` au message vide. |
 | Diffusion Discord | #73 | 02/08 | Second canal, **et le canal passe DANS le chemin** (`/diffuser/discord`, `/diffuser/telegram`). Gardes et ordre des opérations factorisés dans `_lib/diffusion.ts`. Migration `0012` : `telegram_message_id` → `external_message_id` (`text`, les snowflakes Discord ne survivent pas à un `Number` JS). |
 | Diffusion Telegram | #72 | 02/08 | Migration `0011` (`diffusions`, `unique (deal_id, canal)`), endpoints POST/DELETE, bouton dans l'admin, UTM sur le lien diffusé, code d'erreur `CONFLICT` (409). |
 | Alerte backup assignée | #70 | 02/08 | L'issue d'échec de backup est **assignée** et porte le label `urgent` — une issue sans assigné ne notifie personne. |
@@ -186,58 +207,36 @@ qu'ils ne cassent pas le jour où un flux les déclencherait.
 `apps/web/src/app/auth/reset/route.ts` n'accepte que `recovery` — les deux appellent `verifyOtp`
 puis posent le cookie de session.
 
-**⚠️ Divergence relevée le 2026-08-03, à corriger avant application.**
-`docs/runbooks/emails-tadelakt.md` prescrit `…/auth/confirm?token_hash=…&**type=signup**` pour la
-confirmation d'inscription, alors que le gabarit **en production** porte `type=email` — qui est
-aussi la valeur employée par la documentation Supabase (4 occurrences, aucune de `type=signup`).
-Les deux valeurs existent dans `EmailOtpType`, mais le runbook et la production ne peuvent pas
-diverger sur la ligne dont il dit lui-même qu'elle est « la seule erreur vraiment coûteuse ».
-**Aligner le runbook sur `type=email`.**
+**✅ Le runbook est corrigé — les trois divergences relevées le 2026-08-03 sont traitées** dans la
+PR de rattrapage du même jour, avant toute application :
+
+| Divergence | Ce qui était écrit | Ce qui est écrit maintenant |
+|---|---|---|
+| Accent | `#2C5545` (avant l'ajustement chromatique du 26/07) | `#2F6B57` (CONTRAT-V1 §8) |
+| Bouton primaire | aplat `ink` `#1A1815` | aplat `accent` `#2F6B57` |
+| Type de confirmation | `type=signup` | **`type=email`**, la valeur du gabarit en production |
+
+La troisième était la seule vraiment coûteuse : le runbook dit lui-même que la ligne d'URL est
+« la seule erreur vraiment coûteuse » de la procédure, et il divergeait de la production
+précisément là. Les deux valeurs existent dans `EmailOtpType`, mais la documentation Supabase
+n'emploie que `type=email` (4 occurrences, aucune de `signup`) — et surtout un runbook n'a pas le
+droit de prescrire autre chose que ce qui tourne.
 
 **Ce qui reste vrai, et reste à faire** : les **corps** des quatre gabarits ne sont pas en charte
 Tadelakt — HTML nu (`<h2>`, `<p>`, lien brut), ni couleur, ni structure, ni sceau. C'est le seul
 écart de charte restant, et c'est ce qui justifie encore la priorité 1. **C'est un défaut
 esthétique, pas une panne** : les deux parcours fonctionnent.
 
-**Où.** `docs/runbooks/emails-tadelakt.md` — le runbook est écrit, les gabarits en charte Tadelakt
-y sont prêts à coller. ⚠️ **Le runbook lui-même est à corriger avant d'être appliqué**, sur trois
-points : écrit au lot 3, il précède l'ajustement chromatique du 26/07/2026 (CONTRAT-V1 §8) et
-emploie l'ancien accent `#2C5545` (désormais `#2F6B57`) ainsi qu'un bouton primaire en `ink`
-`#1A1815` (le bouton primaire est repassé en `accent`) ; s'y ajoute le `type=signup` ci-dessus.
-Il ne couvre par ailleurs que les deux gabarits actifs.
+**Où.** `docs/runbooks/emails-tadelakt.md` — corrigé, applicable tel quel. Limite conservée : il
+ne couvre que les **deux gabarits actifs**, pas les deux dormants (`magiclink`, `email_change`).
 
-**Par quoi commencer.** C'est une **action de configuration externe**, pas du code : corriger les
-deux couleurs et le `type` du runbook, coller les corps dans Supabase, envoyer un e-mail de test
-sur chaque parcours. Aucune PR n'est nécessaire pour la partie Supabase — d'où le risque que ça
-reste indéfiniment en attente.
+**Par quoi commencer.** Il ne reste que du geste externe : **coller les corps dans le dashboard
+Supabase** (Authentication → Emails), puis envoyer un e-mail de test sur chaque parcours
+(§5 du runbook). Aucune PR ne peut porter cette partie — je n'ai pas d'accès en écriture au
+dashboard, le connecteur Supabase est en lecture seule (CONTRAT-V1 §7). C'est là qu'est le risque
+que ça reste indéfiniment en attente, et il n'est pas technique.
 
-### 3.2 — `/concept` affirme des chiffres FAUX *(priorité 2)*
-
-**Constat, mesuré le 2026-08-03.** `apps/web/src/app/concept/page.tsx` affiche trois
-statistiques : « 100% Gratuit », « **+50** Enseignes », « **+20** Villes ». La base contient
-**9 enseignes curées** et **2 villes** portant des deals publiés — et l'enum `VILLES` n'en compte
-que **9 au total**, donc « +20 villes » est inatteignable par construction.
-
-**Pourquoi si haut dans la file.** C'est exactement la faute du lot 4, déjà consignée au
-CONTRAT-V1 §8 règle 5 : des chiffres d'audience inventés, écrits en dur, sans source. Le contenu
-avait alors été restauré à l'identique ; ces trois-là ont survécu. Et c'est **une affirmation
-fausse sur la page qui explique la plateforme** — celle vers laquelle pointent la colonne du feed,
-la ligne de clôture du hero et le pied de page. Une plateforme dont le discours repose sur
-« jamais de prix deviné » ne peut pas se présenter par un chiffre inventé.
-
-**Deux options, à trancher :**
-
-1. **Brancher sur des données réelles** — compteurs calculés en base, et accepter d'afficher 9 et
-   2 aujourd'hui. Honnête, et le nombre grandit tout seul. Coût : une requête de plus sur une page
-   statique, et il faut assumer de petits nombres au lancement.
-2. **Retirer les chiffres** — remplacer les trois statistiques par un discours qui ne chiffre
-   rien. Aucun coût technique, aucune donnée à tenir à jour, et rien à réexpliquer quand les
-   nombres bougent.
-
-Ne pas laisser un chiffre faux au motif qu'il est flatteur : c'est précisément ce qu'interdit la
-règle 5.
-
-### 3.3 — Diffusion communautaire : Telegram et Discord *(priorité 3)*
+### 3.2 — Diffusion communautaire : Telegram et Discord *(priorité 2)*
 
 **Constat.** Le levier d'audience décidé : au Maroc, les réseaux sont le point d'entrée, le site
 la destination.
@@ -291,7 +290,7 @@ message formaté prêt à coller n'est pas écrit.
 **Où.** `docs/IDEES.md`, section « Diffusion communautaire » — liens d'invitation officiels et
 architecture. `config/community.ts` reste à créer (liens en clair, ce ne sont pas des secrets).
 
-### 3.4 — Qualité de recherche : accents, index, pertinence *(priorité 4)*
+### 3.3 — Qualité de recherche : accents, index, pertinence *(priorité 3)*
 
 **La recherche serveur est LIVRÉE — ne pas la remettre dans la file.** Le lot 7 l'a faite : `q`
 sur `GET /api/v1/deals`, `ilike` sur le titre et l'enseigne, jokers échappés, valeur portée par
@@ -315,7 +314,7 @@ sur *où* filtre la recherche, mais sur ce qu'elle vaut.
 trigramme sur `lower(unaccent(titre))`. Mesurer avant : à ce volume, la seule correction qui
 change quelque chose pour l'utilisateur est l'insensibilité aux accents.
 
-### 3.5 — Badge de `/compte` rendu à la main *(priorité 5)*
+### 3.4 — Badge de `/compte` rendu à la main *(priorité 4)*
 
 **Constat.** `apps/web/src/app/compte/page.tsx` rend le statut de chaque deal (« Publié »,
 « En attente », « Refusé », « Expiré », « Brouillon ») avec un `<span>` maison et sa propre table
@@ -331,7 +330,7 @@ mécanique.**
 (`publie` → `accent`, `en_attente` → `warn`, `expire` → `cold`) correspond déjà, et `expire` →
 `cold` est même ce qu'impose §8 règle 3.
 
-### 3.6 — État voté persistant *(priorité 6)*
+### 3.5 — État voté persistant *(priorité 5)*
 
 **Constat.** `CardVote` affiche un état « voté » (fond plein `hot`/`cold`) **optimiste côté
 client** : le composant ne reçoit que le score du deal, jamais le sens du vote de l'utilisateur
