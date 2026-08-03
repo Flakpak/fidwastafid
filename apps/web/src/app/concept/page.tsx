@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader } from "../../components/SiteHeader.js";
 import { SiteFooter } from "../../components/SiteFooter.js";
+import { GET as getCompteHandler } from "../api/v1/deals/compte/route.js";
+import { GET as getEnseignesHandler } from "../api/v1/enseignes/route.js";
 
 const DESCRIPTION =
   "Fidwastafid est une plateforme communautaire 100% marocaine de bons plans, promotions et bonnes affaires : chaque Marocain qui trouve une bonne promo la partage avec la communauté.";
@@ -13,11 +15,125 @@ export const metadata: Metadata = {
   openGraph: { title: "Le concept Fidwastafid", description: DESCRIPTION, url: "/concept" },
 };
 
-const STATS = [
-  { num: "100%", label: "Gratuit" },
-  { num: "+50", label: "Enseignes" },
-  { num: "+20", label: "Villes" },
-];
+/**
+ * SSR par requête : les chiffres de cette page sont relus en base à chaque
+ * affichage. Un pré-rendu statique les figerait au build, c'est-à-dire
+ * rendrait à nouveau faux un nombre écrit une fois — le défaut même que ce
+ * lot corrige.
+ */
+export const dynamic = "force-dynamic";
+
+const NOMBRE = new Intl.NumberFormat("fr-FR");
+
+/**
+ * Statistiques de /concept — CONTRAT-V1 §8, règle 5.
+ *
+ * FAIT GÉNÉRATEUR : cette page a affiché « +50 Enseignes » et « +20 Villes »
+ * pendant toute la v2, écrits en dur, sans source. La base portait 9 enseignes
+ * et une seule ville réelle, et l'enum `VILLES` plafonne à 9 valeurs : « +20 »
+ * était inatteignable par construction. Troisième occurrence du motif après le
+ * hero du lot 4 et ses « 184 deals actifs / 27 enseignes / 4 210 membres ».
+ *
+ * DEUX RÈGLES, gravées ici parce que c'est le fichier qui les a violées :
+ *
+ *  1. **Aucun arrondi flatteur.** On écrit « 9 enseignes », jamais « +5 » ni
+ *     « ~10 ». Un chiffre vrai qui grandit tout seul raconte mieux l'histoire
+ *     qu'un chiffre rond que personne ne peut vérifier.
+ *  2. **Un chiffre trop bas se RETIRE, il ne se gonfle pas.** C'est le sort de
+ *     la tuile « Villes » : les deals publiés ne portent aujourd'hui qu'une
+ *     seule ville réelle (Casablanca) — `National` n'est pas une ville
+ *     (`packages/schemas/src/enums.ts`) et les deals en ligne n'en ont pas.
+ *     « 1 ville » n'est pas une statistique, donc la tuile n'existe plus.
+ *
+ * Pas de repli silencieux (`docs/INCIDENTS.md`) : si un comptage échoue, la
+ * tuile DISPARAÎT et l'échec est journalisé. Elle n'affiche jamais `0` ni une
+ * valeur par défaut — un zéro affiché serait une nouvelle affirmation fausse,
+ * et c'est exactement ce que cette page a déjà fait une fois.
+ */
+interface Stat {
+  num: string;
+  label: string;
+}
+
+/**
+ * Un `Error.message` seul ne suffit pas ici : la panne la plus probable de ce
+ * chemin est une base injoignable, que `pg` remonte en `AggregateError` dont
+ * le `message` est la CHAÎNE VIDE. Journaliser `err.message` tel quel produit
+ * « indisponible — . », c'est-à-dire une trace qui ne dit pas pourquoi —
+ * la version « journal » du repli silencieux (`docs/INCIDENTS.md`). Constaté
+ * en vérification locale, sans Postgres démarré.
+ */
+function decrireErreur(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const code = (err as { code?: unknown }).code;
+  const causes =
+    err instanceof AggregateError
+      ? err.errors.map((e) => (e instanceof Error ? `${e.name}: ${e.message}` : String(e))).join(" | ")
+      : "";
+  return [err.name, code ? `code=${String(code)}` : "", err.message, causes].filter(Boolean).join(" ");
+}
+
+/**
+ * Appel direct des handlers de route, comme le feed (`app/page.tsx`) : pas de
+ * base URL à deviner selon l'environnement, et le chiffre annoncé sort de la
+ * même porte que celle du web et du mobile (CONTRAT-V1 §4).
+ *
+ * `GET /api/v1/deals/compte` sans paramètre renvoie le nombre de deals que
+ * `GET /api/v1/deals` renverrait, donc les `publie` (statut par défaut) — la
+ * définition la plus honnête de « ce que le site montre ».
+ */
+async function compterDealsPublies(): Promise<number | null> {
+  try {
+    const response = await getCompteHandler(new Request("http://localhost/api/v1/deals/compte"));
+    if (!response.ok) {
+      console.error(`[concept] comptage des deals indisponible — HTTP ${response.status}. Statistique masquée.`);
+      return null;
+    }
+    return ((await response.json()) as { total: number }).total;
+  } catch (err) {
+    console.error(
+      `[concept] comptage des deals indisponible — ${decrireErreur(err)}. Statistique masquée.`
+    );
+    return null;
+  }
+}
+
+/**
+ * « Enseignes suivies », pas « enseignes » tout court : `GET /api/v1/enseignes`
+ * renvoie la table curée à la main, dont trois entrées ne portent aucun deal
+ * publié à ce jour. Le libellé dit donc ce que le nombre compte réellement —
+ * ce que nous suivons — plutôt que de laisser croire à neuf enseignes
+ * approvisionnées.
+ */
+async function compterEnseignes(): Promise<number | null> {
+  try {
+    const response = await getEnseignesHandler();
+    if (!response.ok) {
+      console.error(`[concept] comptage des enseignes indisponible — HTTP ${response.status}. Statistique masquée.`);
+      return null;
+    }
+    return ((await response.json()) as { data: unknown[] }).data.length;
+  } catch (err) {
+    console.error(
+      `[concept] comptage des enseignes indisponible — ${decrireErreur(err)}. Statistique masquée.`
+    );
+    return null;
+  }
+}
+
+async function chargerStats(): Promise<Stat[]> {
+  const [deals, enseignes] = await Promise.all([compterDealsPublies(), compterEnseignes()]);
+
+  const stats: Stat[] = [];
+  if (deals !== null) stats.push({ num: NOMBRE.format(deals), label: deals === 1 ? "Deal publié" : "Deals publiés" });
+  if (enseignes !== null) {
+    stats.push({ num: NOMBRE.format(enseignes), label: enseignes === 1 ? "Enseigne suivie" : "Enseignes suivies" });
+  }
+  // Seule constante légitime du lot : ce n'est pas une mesure, c'est le
+  // modèle économique. Il ne peut pas se démentir en base.
+  stats.push({ num: "100%", label: "Gratuit" });
+  return stats;
+}
 
 const ETAPES = [
   {
@@ -81,7 +197,9 @@ function PAr({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function ConceptPage() {
+export default async function ConceptPage() {
+  const stats = await chargerStats();
+
   return (
     <div className="min-h-screen bg-surface-base text-ink">
       <SiteHeader />
@@ -118,9 +236,15 @@ export default function ConceptPage() {
           <PAr>سواء عند مرجان، بيم، كارفور، جوميا ولا فأي حانوت فحيك — إلا لقيتي لهميزة، شاركيها!</PAr>
         </Section>
 
-        <div className="grid grid-cols-3 gap-3.5 mb-11">
-          {STATS.map((s) => (
-            <div key={s.label} className="bg-surface border border-border rounded-2xl px-3.5 py-5 text-center">
+        {/* Rangée souple et non `grid-cols-3` : le nombre de tuiles dépend
+            désormais des comptages qui ont abouti. Une grille à trois colonnes
+            fixes laisserait un trou à la place d'une statistique masquée. */}
+        <div className="flex flex-wrap gap-3.5 mb-11">
+          {stats.map((s) => (
+            <div
+              key={s.label}
+              className="flex-1 basis-0 min-w-[132px] bg-surface border border-border rounded-2xl px-3.5 py-5 text-center"
+            >
               <p className="text-2xl font-black text-ink tabular-nums mb-1">{s.num}</p>
               <p className="text-[10px] font-extrabold text-ink-subtle uppercase tracking-wide">{s.label}</p>
             </div>
