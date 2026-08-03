@@ -1,10 +1,16 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-08-02, sur `main` à `1428ba9`.*
+*Dernière mise à jour : 2026-08-03, sur `main` à `61d29bb`.*
 
 Ce document est le **point d'entrée pour reprendre le travail sans contexte préalable**. Il dit
 ce qui tourne, ce qui reste ouvert, et par quoi continuer. Il ne remplace aucun autre document :
 il y renvoie.
+
+> **Ce document se périme à chaque fusion.** Sa version précédente datait de `1428ba9` et
+> affirmait encore, la veille, que Telegram n'était pas éprouvé et que Discord restait
+> entier — alors que deux PR l'avaient livré. Un état à date qui retarde fait arbitrer sur un
+> monde qui n'existe plus ; **la relecture de ce fichier fait partie de la fusion**, pas du
+> ménage d'après.
 
 ---
 
@@ -21,20 +27,43 @@ il y renvoie.
 | `docs/SPIKE-SOURCES.md` | Étude des sources scrapables. |
 
 **Convention de travail** : une branche par lot, PR relue, jamais de push direct sur `main`.
-`main` est protégée, cinq jobs CI bloquants (`quality`, `openapi-check`, `migrations-check`,
-`docker`, `integration`) plus le check Vercel.
+
+**Protection de branche — relevé le 2026-08-03 par l'API GitHub, pas de mémoire.** `main` exige
+une PR et **quatre** checks bloquants : `quality`, `docker`, `openapi-check`, **`Vercel`**.
+`enforce_admins` est actif. `integration` et `migrations-check` sont **consultatifs** — ils sont
+rouges sur toute PR Dependabot faute de secrets, les rendre bloquants paralyserait le dépôt
+(`docs/INCIDENTS.md`, 27/07/2026). *La version précédente de ce document annonçait « cinq jobs
+bloquants » en y comptant `integration` et `migrations-check` : c'était faux, et c'est
+exactement le genre d'erreur qui fait croire qu'un garde-fou existe.* Un échec réel sur un job
+consultatif reste un échec réel.
 
 ---
 
 ## 1 — Ce qui tourne en production
 
-**https://fidwastafid.com** — déployé depuis `main` par Vercel à chaque fusion.
+**https://fidwastafid.com** — déployé depuis `main` par Vercel à chaque fusion. Dernier
+déploiement de production : `61d29bb`, `success`, 2026-08-02 20:05 UTC.
 
-### Chiffres réels au 2026-08-02
+### Chiffres réels au 2026-08-03
 
-Relevés en base, pas estimés : **93 deals publiés**, **7 enseignes curées**, **2 villes**
-distinctes portant des deals publiés, **4 comptes membres**. Ces nombres importent pour la suite
-(voir §3.2) : le site en affiche d'autres.
+Relevés en base par le connecteur Supabase en lecture seule, pas estimés :
+
+| Mesure | Valeur | (au 2026-08-02) |
+|---|---|---|
+| Deals `publie` | **113** | 93 |
+| Deals toutes lignes confondues | **1 553** | — |
+| Deals `auto_draft` (file de curation) | **645** | — |
+| Deals `en_attente` (soumissions humaines) | **0** | — |
+| Enseignes curées | **9** | 7 |
+| Villes distinctes portant un deal publié | **2** | 2 |
+| Comptes membres (`users`) | **4** | 4 |
+| Lignes `diffusions` | **0** | — |
+
+Ces nombres importent pour la suite (voir §3.2) : le site en affiche d'autres.
+
+**Migrations** : `packages/db/migrations/` va jusqu'à `0012_diffusions_canal_explicite.sql`,
+appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifié dans
+`public.schema_migrations`).
 
 ### Fonctionnel livré
 
@@ -55,21 +84,29 @@ distinctes portant des deals publiés, **4 comptes membres**. Ces nombres import
 - **Espace membre** (`/compte`) — identité, couleur d'avatar, compteurs, « mes deals » avec motif
   de rejet visible, export/suppression de compte (loi 09-08).
 - **Back-office** (`/admin`) — pipeline de curation, édition complète d'un deal, actions
-  groupées, récupération et upload d'image, motif de rejet obligatoire.
-- **Pipeline quotidien** (`apps/pipeline`) — scraping multi-sources, insertion directe en base,
-  expiration des `auto_draft` de plus de 14 jours, revalidation du cache déclenchée par GitHub
-  Actions.
+  groupées, récupération et upload d'image, motif de rejet obligatoire, **boutons de diffusion
+  Telegram et Discord** (voir §3.3).
+- **Pipeline quotidien** (`apps/pipeline`) — **six sources** : bringo, inwi,
+  universparadiscount, decathlon, **kiabi** et **bestmark** (ces deux dernières ajoutées le
+  02/08 par leurs API publiques, #71). Insertion directe en base, expiration des `auto_draft`
+  de plus de 14 jours, revalidation du cache déclenchée par GitHub Actions.
+  - **Seuil de remise unique à 30 %** (`apps/pipeline/remise.mjs`, `SEUIL_REMISE_MIN_PCT`),
+    appliqué dans `insert-deals.mjs` — le seul point de passage commun à toutes les sources.
+    Avant le 02/08, aucun seuil n'existait : un produit à −2 % entrait comme un produit à
+    −70 %. Le chiffre est délibérément **uniforme**, jamais par enseigne — motif et effet
+    mesuré par source dans `docs/IDEES.md`.
 - **API** (`/api/v1/*`) — liste fermée, documentée au CONTRAT-V1 §4, spec générée
-  (`apps/web/public/openapi.json`) et vérifiée en CI.
+  (`apps/web/public/openapi.json`) et vérifiée en CI par `openapi-check`.
 
-### Dernier lot livré — lot 7, refonte des filtres du feed
+### Derniers lots livrés
 
-Fusionné le 2026-08-02. Trois défauts de production corrigés (pile collante laissant passer le
-feed, défilement horizontal en mobile, tri présenté comme un filtre) et trois défauts latents
-découverts en chemin : la recherche ne filtrait que les deals déjà téléchargés, le filtre `type`
-excluait les deals `les_deux` des deux côtés, et un curseur de pagination pouvait être rejoué
-d'un jeu de filtres à l'autre. Détail dans l'historique git et au CONTRAT-V1 §4 (septième
-amendement conscient : `GET /api/v1/deals/compte`).
+| Lot | PR | Fusionné | Contenu |
+|---|---|---|---|
+| Diffusion Discord | #73 | 02/08 | Second canal, **et le canal passe DANS le chemin** (`/diffuser/discord`, `/diffuser/telegram`). Gardes et ordre des opérations factorisés dans `_lib/diffusion.ts`. Migration `0012` : `telegram_message_id` → `external_message_id` (`text`, les snowflakes Discord ne survivent pas à un `Number` JS). |
+| Diffusion Telegram | #72 | 02/08 | Migration `0011` (`diffusions`, `unique (deal_id, canal)`), endpoints POST/DELETE, bouton dans l'admin, UTM sur le lien diffusé, code d'erreur `CONFLICT` (409). |
+| Alerte backup assignée | #70 | 02/08 | L'issue d'échec de backup est **assignée** et porte le label `urgent` — une issue sans assigné ne notifie personne. |
+| Kiabi et Bestmark | #71 | 02/08 | Deux sources de plus par API publique (Shopify `products.json`, GraphQL Magento), plus le seuil de remise ci-dessus. |
+| Lot 7 — filtres du feed | #59 | 02/08 | Recherche serveur, `type` lu en disponibilité, curseur signé par ses filtres, `GET /api/v1/deals/compte`. |
 
 ---
 
@@ -94,8 +131,8 @@ unique. `RUNBOOK-restauration.md` décrivait par ailleurs une récupération « 
 qui n'aurait rien trouvé — corrigée le même jour.
 
 Ce qui est fait : dump + test de restauration à chaque run + gzip, et **l'alerte d'échec
-notifie désormais réellement** (issue assignée + label `urgent` — une issue sans assigné
-ne déclenche aucune notification, défaut constaté le 27/07, cf. `INCIDENTS.md`).
+notifie désormais réellement** (issue assignée + label `urgent`, #70). Le run du 2026-08-03
+06:25 UTC est vert.
 
 Ce qui reste : une copie hors GitHub. Le compte Cloudflare existe déjà (Turnstile, DNS du
 domaine) — il manque un bucket R2 et quatre secrets, pas un fournisseur.
@@ -109,6 +146,9 @@ domaine) — il manque un bucket R2 et quatre secrets, pas un fournisseur.
 - **Cause du cache Vercel non élucidée** — `docs/INCIDENTS.md`. Le check Vercel est le seul
   garde-fou réel sur ce chemin ; il est bloquant.
 - **`leaked password protection`** différée au passage Supabase Pro — `docs/IDEES.md`.
+- **`/auth/confirm` ne distingue pas « jeton refusé » de « succès sans session »** — contrainte
+  consignée le 02/08 dans `docs/INCIDENTS.md`. Latente : aucun e-mail n'emprunte ce chemin
+  aujourd'hui. À traiter **avant** tout câblage du changement d'e-mail, pas après.
 - **Un avertissement eslint** préexistant dans `apps/web/src/app/soumettre/SoumettreForm.tsx:137`
   (directive `eslint-disable` devenue inutile). Sans conséquence, jamais traité.
 
@@ -132,38 +172,50 @@ dans le dashboard Supabase, et aucun déploiement ne les met à jour.
 | Magic link or OTP | rien | `/auth/confirm?…&type=magiclink` | dormant |
 | Change email address | rien | `/auth/confirm?…&type=email_change` | dormant |
 
-**Ce que cette section affirmait, et qui était faux** : « ils sont encore aux gabarits par défaut
-de Supabase ». Les deux gabarits actifs n'ont jamais été ceux par défaut — ils sont personnalisés,
+Les deux gabarits actifs n'ont jamais été ceux par défaut de Supabase : ils sont personnalisés,
 rédigés en français, et surtout ils utilisent déjà `token_hash`, le **seul** mécanisme compatible
-avec ce dépôt : le client ne fixe jamais `flowType`, qui vaut donc `implicit`
+avec ce dépôt — le client ne fixe jamais `flowType`, qui vaut donc `implicit`
 (`@supabase/auth-js`, défaut vérifié dans le paquet installé). Un gabarit par défaut porterait
 `{{ .ConfirmationURL }}`, qui suppose PKCE, et casserait les deux parcours. Les deux gabarits
-dormants, eux, l'ont porté jusqu'au 2026-08-02 — alignés sur le motif `token_hash` ce jour-là pour
-qu'ils ne cassent pas le jour où un flux les déclencherait (voir `docs/IDEES.md`, aucun ne l'est
-aujourd'hui). Les quatre objets sont passés en français au même moment.
+dormants l'ont porté jusqu'au 2026-08-02 — alignés sur le motif `token_hash` ce jour-là pour
+qu'ils ne cassent pas le jour où un flux les déclencherait.
+
+**Les routes du dépôt correspondent** (vérifié le 2026-08-03) :
+`apps/web/src/app/auth/confirm/route.ts` accepte tout `EmailOtpType` et
+`apps/web/src/app/auth/reset/route.ts` n'accepte que `recovery` — les deux appellent `verifyOtp`
+puis posent le cookie de session.
+
+**⚠️ Divergence relevée le 2026-08-03, à corriger avant application.**
+`docs/runbooks/emails-tadelakt.md` prescrit `…/auth/confirm?token_hash=…&**type=signup**` pour la
+confirmation d'inscription, alors que le gabarit **en production** porte `type=email` — qui est
+aussi la valeur employée par la documentation Supabase (4 occurrences, aucune de `type=signup`).
+Les deux valeurs existent dans `EmailOtpType`, mais le runbook et la production ne peuvent pas
+diverger sur la ligne dont il dit lui-même qu'elle est « la seule erreur vraiment coûteuse ».
+**Aligner le runbook sur `type=email`.**
 
 **Ce qui reste vrai, et reste à faire** : les **corps** des quatre gabarits ne sont pas en charte
 Tadelakt — HTML nu (`<h2>`, `<p>`, lien brut), ni couleur, ni structure, ni sceau. C'est le seul
-écart de charte restant, et c'est ce qui justifie encore la priorité 1.
+écart de charte restant, et c'est ce qui justifie encore la priorité 1. **C'est un défaut
+esthétique, pas une panne** : les deux parcours fonctionnent.
 
 **Où.** `docs/runbooks/emails-tadelakt.md` — le runbook est écrit, les gabarits en charte Tadelakt
-y sont prêts à coller. ⚠️ **Le runbook lui-même est à corriger avant d'être appliqué** : écrit au
-lot 3, il précède l'ajustement chromatique du 26/07/2026 (CONTRAT-V1 §8). Il emploie l'ancien
-accent `#2C5545` (désormais `#2F6B57`) et un bouton primaire en `ink` `#1A1815`, alors que le
-bouton primaire est repassé en `accent`. Le coller tel quel réintroduirait deux écarts que le
-contrat a explicitement tranchés. Il ne couvre par ailleurs que les deux gabarits actifs.
+y sont prêts à coller. ⚠️ **Le runbook lui-même est à corriger avant d'être appliqué**, sur trois
+points : écrit au lot 3, il précède l'ajustement chromatique du 26/07/2026 (CONTRAT-V1 §8) et
+emploie l'ancien accent `#2C5545` (désormais `#2F6B57`) ainsi qu'un bouton primaire en `ink`
+`#1A1815` (le bouton primaire est repassé en `accent`) ; s'y ajoute le `type=signup` ci-dessus.
+Il ne couvre par ailleurs que les deux gabarits actifs.
 
 **Par quoi commencer.** C'est une **action de configuration externe**, pas du code : corriger les
-deux couleurs du runbook, coller les corps dans Supabase, envoyer un e-mail de test sur chaque
-parcours. Aucune PR n'est nécessaire pour la partie Supabase — d'où le risque que ça reste
-indéfiniment en attente.
+deux couleurs et le `type` du runbook, coller les corps dans Supabase, envoyer un e-mail de test
+sur chaque parcours. Aucune PR n'est nécessaire pour la partie Supabase — d'où le risque que ça
+reste indéfiniment en attente.
 
 ### 3.2 — `/concept` affirme des chiffres FAUX *(priorité 2)*
 
-**Constat, mesuré.** `apps/web/src/app/concept/page.tsx` affiche trois statistiques : « 100%
-Gratuit », « **+50** Enseignes », « **+20** Villes ». La base contient **7 enseignes curées** et
-**2 villes** portant des deals publiés — et l'enum `VILLES` n'en compte que **9 au total**, donc
-« +20 villes » est inatteignable par construction.
+**Constat, mesuré le 2026-08-03.** `apps/web/src/app/concept/page.tsx` affiche trois
+statistiques : « 100% Gratuit », « **+50** Enseignes », « **+20** Villes ». La base contient
+**9 enseignes curées** et **2 villes** portant des deals publiés — et l'enum `VILLES` n'en compte
+que **9 au total**, donc « +20 villes » est inatteignable par construction.
 
 **Pourquoi si haut dans la file.** C'est exactement la faute du lot 4, déjà consignée au
 CONTRAT-V1 §8 règle 5 : des chiffres d'audience inventés, écrits en dur, sans source. Le contenu
@@ -174,7 +226,7 @@ la ligne de clôture du hero et le pied de page. Une plateforme dont le discours
 
 **Deux options, à trancher :**
 
-1. **Brancher sur des données réelles** — compteurs calculés en base, et accepter d'afficher 7 et
+1. **Brancher sur des données réelles** — compteurs calculés en base, et accepter d'afficher 9 et
    2 aujourd'hui. Honnête, et le nombre grandit tout seul. Coût : une requête de plus sur une page
    statique, et il faut assumer de petits nombres au lancement.
 2. **Retirer les chiffres** — remplacer les trois statistiques par un discours qui ne chiffre
@@ -184,44 +236,45 @@ la ligne de clôture du hero et le pied de page. Une plateforme dont le discours
 Ne pas laisser un chiffre faux au motif qu'il est flatteur : c'est précisément ce qu'interdit la
 règle 5.
 
-### 3.3 — Diffusion Telegram / Discord *(priorité 3)*
+### 3.3 — Diffusion communautaire : Telegram et Discord *(priorité 3)*
 
 **Constat.** Le levier d'audience décidé : au Maroc, les réseaux sont le point d'entrée, le site
 la destination.
 
-**Telegram est LIVRÉ (02/08/2026), mais PAS ENCORE ÉPROUVÉ EN ENVOI RÉEL.** Migration `0011`
-appliquée en prod, endpoint `POST /api/v1/admin/deals/:publicId/diffuser` (CONTRAT-V1 §4,
-huitième amendement), bouton « Diffuser » sur les deals publiés avec état « Diffusé ✓ » inerte.
+**Les deux canaux sont LIVRÉS** (#72 puis #73, fusionnés le 02/08/2026) — CONTRAT-V1 §4, huitième
+amendement conscient et sa révision du même jour :
 
-> ⚠️ **Ce qui bloque la recette.** `TELEGRAM_CHAT_ID_TEST` **n'existe pas** côté Vercel (vérifié le
-> 02/08 — seules `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID` y sont, scopées **Production and
-> Preview** ; l'affirmation « production seule » d'une première lecture était fausse). Le code
-> retombe donc sur le canal **public**.
+| Ce qui existe | Détail |
+|---|---|
+| Endpoints | `POST`/`DELETE /api/v1/admin/deals/:publicId/diffuser/telegram` et `…/discord` — **le canal est dans le chemin**, les deux canaux se diffusent et s'annulent indépendamment |
+| Base | `diffusions` (migration `0011`), `unique (deal_id, canal)` ; `external_message_id` en `text` (migration `0012`) |
+| Logique commune | `_lib/diffusion.ts` — gardes, ordre envoi→écriture, traduction des échecs, écrits **une** fois ; les routes ne font que nommer leur canal (`_lib/diffusionCanal.ts`) |
+| Back-office | Boutons de diffusion par canal sur les deals publiés |
+
+> ⚠️ **Ce qui reste : aucun envoi réel n'a jamais eu lieu.** Mesuré le 2026-08-03 —
+> `select count(*) from diffusions` renvoie **0**. Le code est en production et n'a jamais été
+> exercé une seule fois. Un chemin d'écriture non éprouvé n'est pas un chemin d'écriture qui
+> marche.
 >
-> **Second blocage, découvert en préparant le test réel : il n'existe aucun moyen de DÉFAIRE une
-> diffusion.** Supprimer un message demande un appel `deleteMessage` authentifié par
-> `TELEGRAM_BOT_TOKEN`, qui ne vit que côté Vercel — donc uniquement atteignable depuis du code
-> serveur déployé. Aucun endpoint ne le fait aujourd'hui. Conséquence : **tout envoi est
-> définitif par construction**, y compris un envoi de test.
+> **Le blocage « tout envoi est définitif » est levé** : `DELETE` existe désormais sur les deux
+> canaux (c'est la voie (2) évoquée le 02/08), et Discord est appelé avec `?wait=true`
+> précisément pour récupérer l'identifiant du message — sans lui la diffusion serait indélébile.
 >
-> Deux voies pour débloquer, à trancher : (1) poser `TELEGRAM_CHAT_ID_TEST` sur un canal privé
-> jetable — le bot doit y être administrateur ; (2) ajouter `DELETE /api/v1/admin/deals/:publicId/diffuser`
-> qui appelle `deleteMessage` et retire la ligne `diffusions`, faisant de l'annulation une capacité
-> du produit plutôt qu'un geste manuel. La (2) est utile au-delà du test : une diffusion partie
-> avec une erreur de prix se rattrape aujourd'hui à la main dans Telegram.
+> **Reste à vérifier avant le premier envoi** : la destination. Les deux canaux lisent une
+> variable de test qui prime sur la variable publique — `TELEGRAM_CHAT_ID_TEST` sur
+> `TELEGRAM_CHAT_ID`, `DISCORD_WEBHOOK_URL_TEST` sur `DISCORD_WEBHOOK_URL` — jamais un test de
+> `NODE_ENV`. Au 02/08, `TELEGRAM_CHAT_ID_TEST` **n'existait pas** côté Vercel : le code
+> retombait donc sur le canal **public**. L'état actuel des quatre variables n'a pas été
+> revérifié depuis, et il ne se lit que dans le dashboard Vercel. **À faire avant de cliquer :
+> poser les deux variables `_TEST` sur un canal jetable, et confirmer par le champ `canalTest`
+> de la réponse lequel des deux vient de se produire.**
 
-Discord et WhatsApp restent entiers.
+**WhatsApp reste entier**, et reste semi-manuel par décision : l'API officielle Meta ne poste pas
+dans les groupes, les bibliothèques non officielles risquent le ban du numéro (refusé). Le
+message formaté prêt à coller n'est pas écrit.
 
-**Où.** `docs/IDEES.md`, section « Diffusion communautaire » — l'architecture est **déjà
-tranchée** : bouton « Diffuser » dans l'admin sur chaque deal publié (curation manuelle en v1,
-pas de seuil automatique — la diffusion crée le volume de votes, pas l'inverse) ; Telegram par
-Bot API (`sendPhoto` + légende) ; Discord par webhook entrant ; WhatsApp semi-manuel assumé
-(l'API Meta ne poste pas dans les groupes, les libs non officielles risquent le ban du numéro —
-refusé). Table `diffusions` pour l'anti-double-publication, UTM sur tout lien diffusé.
-
-**Par quoi commencer.** Créer `config/community.ts` (liens d'invitation, constantes en clair —
-ce ne sont pas des secrets), puis la migration `diffusions`, puis Telegram seul. Les jetons de bot
-et l'URL de webhook sont des variables d'environnement, jamais commités.
+**Où.** `docs/IDEES.md`, section « Diffusion communautaire » — liens d'invitation officiels et
+architecture. `config/community.ts` reste à créer (liens en clair, ce ne sont pas des secrets).
 
 ### 3.4 — Qualité de recherche : accents, index, pertinence *(priorité 4)*
 
@@ -237,8 +290,9 @@ sur *où* filtre la recherche, mais sur ce qu'elle vaut.
   0, `'%électroménager%'` aussi — mais surtout, aucun de ces deux termes ne trouvera l'autre. Un
   utilisateur qui tape sans accent ne trouve rien.
 - **Aucun index sur `titre`** (vérifié : 0 index le mentionnant), et `ilike '%…%'` ne peut de
-  toute façon pas utiliser un btree classique. À 93 deals c'est sans effet ; ça se dégrade
-  linéairement.
+  toute façon pas utiliser un btree classique. À 113 deals publiés c'est sans effet ; ça se
+  dégrade linéairement, et la table porte déjà 1 553 lignes toutes catégories de statut
+  confondues.
 - **Aucun classement par pertinence** : un deal dont le titre commence par le terme ne remonte pas
   avant un autre où il apparaît en fin.
 
@@ -294,3 +348,6 @@ apparaître que pour une requête authentifiée, et son absence ne doit pas se d
 - **Les tests unitaires sont hors ligne** : ni réseau ni base. Ce qui exige un vrai Postgres vit
   dans `apps/web/tests/integration.ts`, job CI séparé — non bloquant parce que Dependabot n'a pas
   les secrets, **pas** pour laisser passer une régression.
+- **Les migrations s'exécutent sur le port 5432** (Session pooler) exclusivement, sur confirmation
+  explicite et par opération (CONTRAT-V1 §7). Le 6543 est réservé à l'app serverless : il n'a pas
+  d'advisory lock, une migration y échoue ou s'applique à moitié.
