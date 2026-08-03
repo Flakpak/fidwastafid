@@ -290,15 +290,14 @@ depuis `61d29bb` — le commit même qui a créé le fichier. Chaque entrée por
 `public_id` du deal, l'identifiant du message distant et le champ `canalTest`. *La version
 précédente de ce document affirmait l'inverse ; c'était faux, et corrigé ici sur relevé en base.*
 
-> ⚠️ **Ce qui reste réellement en écart : la trace n'est pas transactionnelle.** Les entrées de
-> modération (`update_deal`, `bulk_update_statut`) passent le `client` de `withTransaction()` à
-> `logAudit()` — la mutation et sa trace sont atomiques, exactement ce que recommande l'en-tête
-> de `_lib/audit.ts` (« on ne veut pas d'action admin sans sa trace, ni l'inverse »). La
-> diffusion, elle, enchaîne **deux requêtes autocommit** : `insert into diffusions` puis
-> `logAudit`, et pour l'annulation `delete` puis `logAudit`. Une coupure entre les deux laisse une
-> diffusion sans trace — et côté annulation, la ligne partie **et** aucune trace, c'est-à-dire le
-> scénario que le paragraphe erroné ci-dessus décrivait comme permanent. Fenêtre étroite, écart
-> réel : c'est le seul point à corriger, et il se corrige à l'identique de la modération.
+✅ **La trace est désormais transactionnelle** (#77). Les deux chemins passent le `client` de
+`withTransaction()` à `logAudit()`, comme la modération (`update_deal`, `bulk_update_statut`) et
+comme le demande l'en-tête de `_lib/audit.ts` : « on ne veut pas d'action admin sans sa trace, ni
+l'inverse ». Ils enchaînaient auparavant deux requêtes autocommit — une coupure entre les deux
+laissait une diffusion sans auteur, et côté annulation ne laissait **rien du tout** (c'est le seul
+chemin admin du dépôt où l'action efface sa propre preuve). Ajouté au passage : un envoi abouti
+dont l'écriture en base échoue journalise `diffusion_<canal>_orpheline` avec l'identifiant du
+message, parce qu'il reste alors **vivant dans le canal** sans que l'API puisse l'annuler.
 
 > ⚠️ **La destination : les trois envois réels sont partis sur le canal PUBLIC.** Les six entrées
 > d'audit portent toutes `canalTest: false`. Ce n'est plus une hypothèse — le code lit une
