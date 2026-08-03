@@ -57,7 +57,8 @@ Relevés en base par le connecteur Supabase en lecture seule, pas estimés :
 | Enseignes curées | **9** | 7 |
 | Villes distinctes portant un deal publié | **2** | 2 |
 | Comptes membres (`users`) | **4** | 4 |
-| Lignes `diffusions` | **0** | — |
+| Lignes `diffusions` **vivantes** | **0** | — |
+| Diffusions **historiques** (`pg_stat_user_tables`) | **3 insérées, 3 supprimées** | — |
 
 Ces nombres importent pour la suite (voir §3.2) : le site en affiche d'autres.
 
@@ -251,14 +252,28 @@ amendement conscient et sa révision du même jour :
 | Logique commune | `_lib/diffusion.ts` — gardes, ordre envoi→écriture, traduction des échecs, écrits **une** fois ; les routes ne font que nommer leur canal (`_lib/diffusionCanal.ts`) |
 | Back-office | Boutons de diffusion par canal sur les deals publiés |
 
-> ⚠️ **Ce qui reste : aucun envoi réel n'a jamais eu lieu.** Mesuré le 2026-08-03 —
-> `select count(*) from diffusions` renvoie **0**. Le code est en production et n'a jamais été
-> exercé une seule fois. Un chemin d'écriture non éprouvé n'est pas un chemin d'écriture qui
-> marche.
->
-> **Le blocage « tout envoi est définitif » est levé** : `DELETE` existe désormais sur les deux
-> canaux (c'est la voie (2) évoquée le 02/08), et Discord est appelé avec `?wait=true`
-> précisément pour récupérer l'identifiant du message — sans lui la diffusion serait indélébile.
+**Le chemin complet a été éprouvé en envoi réel — mesuré le 2026-08-03.** La table est vide
+(`count(*)` = 0), mais `pg_stat_user_tables` compte **3 insertions et 3 suppressions**, et
+`diffusions_id_seq` est à **3**. Trois diffusions ont donc bien été écrites en base, puis
+annulées. L'écriture fonctionne, et l'anti-double-envoi `unique (deal_id, canal)` a eu de vraies
+lignes à protéger.
+
+> ⚠️ **Un `count(*)` à zéro mesure un ÉTAT, jamais une HISTOIRE.** Une première lecture de ce
+> même chiffre avait conclu « jamais exercé une seule fois » — faux : les compteurs cumulatifs
+> disent l'inverse. Sur une table où l'annulation est une fonctionnalité du produit, le nombre de
+> lignes vivantes ne peut pas servir de preuve d'absence. Même famille d'erreur que la valeur de
+> repli ambiguë (`docs/INCIDENTS.md`) : une seule observation à qui l'on fait dire deux choses.
+
+**Le blocage « tout envoi est définitif » est levé** : `DELETE` existe sur les deux canaux (voie
+(2) évoquée le 02/08), et Discord est appelé avec `?wait=true` précisément pour récupérer
+l'identifiant du message — sans lui la diffusion serait indélébile. Les trois annulations
+ci-dessus le démontrent en production, pas sur le papier.
+
+> ⚠️ **Ce qui n'est pas tracé.** `_lib/diffusion.ts` n'écrit rien dans `journal_audit` :
+> une diffusion et son annulation ne laissent aucune trace nominative, seulement une ligne qui
+> apparaît puis disparaît. Après suppression, il ne reste **rien** — ni qui a diffusé, ni quand,
+> ni sur quel canal. C'est la raison pour laquelle il a fallu passer par les compteurs internes
+> de Postgres pour établir ce paragraphe.
 >
 > **Reste à vérifier avant le premier envoi** : la destination. Les deux canaux lisent une
 > variable de test qui prime sur la variable publique — `TELEGRAM_CHAT_ID_TEST` sur
