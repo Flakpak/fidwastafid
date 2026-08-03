@@ -251,37 +251,63 @@ amendement conscient et sa révision du même jour :
 | Logique commune | `_lib/diffusion.ts` — gardes, ordre envoi→écriture, traduction des échecs, écrits **une** fois ; les routes ne font que nommer leur canal (`_lib/diffusionCanal.ts`) |
 | Back-office | Boutons de diffusion par canal sur les deals publiés |
 
-**Le chemin complet a été éprouvé en envoi réel — mesuré le 2026-08-03.** La table est vide
-(`count(*)` = 0), mais `pg_stat_user_tables` compte **3 insertions et 3 suppressions**, et
-`diffusions_id_seq` est à **3**. Trois diffusions ont donc bien été écrites en base, puis
-annulées. L'écriture fonctionne, et l'anti-double-envoi `unique (deal_id, canal)` a eu de vraies
-lignes à protéger.
+**Le chemin complet a été éprouvé en envoi réel — six lignes de `journal_audit`, relevées le
+2026-08-03.** La table `diffusions` est vide (`count(*)` = 0), mais le journal d'audit garde la
+trace complète et nominative des trois allers-retours :
+
+| # | Action | Deal | `canalTest` | Horodatage (UTC) |
+|---|---|---|---|---|
+| 250 / 251 | `diffuser_telegram` → `annuler_diffusion_telegram` | `wiepwspe2e` | **`false`** | 02/08 19:25 → 19:26 |
+| 252 / 253 | `diffuser_telegram` → `annuler_diffusion_telegram` | `stdie4jkhr` | **`false`** | 02/08 19:26 → 19:27 |
+| 254 / 255 | `diffuser_discord` → `annuler_diffusion_discord` | `kwm8x4chk9` | **`false`** | 02/08 20:00 → 20:01 |
+
+L'écriture fonctionne, l'anti-double-envoi `unique (deal_id, canal)` a eu de vraies lignes à
+protéger, et le `DELETE` a réellement supprimé les messages distants.
 
 > ⚠️ **Un `count(*)` à zéro mesure un ÉTAT, jamais une HISTOIRE.** Une première lecture de ce
-> même chiffre avait conclu « jamais exercé une seule fois » — faux : les compteurs cumulatifs
-> disent l'inverse. Sur une table où l'annulation est une fonctionnalité du produit, le nombre de
-> lignes vivantes ne peut pas servir de preuve d'absence. Même famille d'erreur que la valeur de
-> repli ambiguë (`docs/INCIDENTS.md`) : une seule observation à qui l'on fait dire deux choses.
+> même chiffre avait conclu « jamais exercé une seule fois » — faux. Sur une table où
+> l'annulation est une fonctionnalité du produit, le nombre de lignes vivantes ne peut pas servir
+> de preuve d'absence. Même famille d'erreur que la valeur de repli ambiguë
+> (`docs/INCIDENTS.md`) : une seule observation à qui l'on fait dire deux choses.
+>
+> **Et la deuxième lecture a reproduit l'erreur d'un cran.** Pour établir le paragraphe
+> ci-dessus, la version précédente de ce document est passée par `pg_stat_user_tables` et
+> `diffusions_id_seq` — des compteurs qui donnent « 3 insertions, 3 suppressions » sans dire
+> **qui**, **quand**, ni **sur quel canal**. Elle en a conclu que rien n'était tracé. Or
+> `journal_audit` contenait déjà les six lignes ci-dessus, avec l'admin, l'horodatage,
+> l'identifiant du message et la destination. *Chercher la preuve dans une source pauvre puis
+> conclure de sa pauvreté à l'absence de preuve : c'est la même faute, commise sur l'outil de
+> mesure au lieu de la donnée.*
 
 **Le blocage « tout envoi est définitif » est levé** : `DELETE` existe sur les deux canaux (voie
 (2) évoquée le 02/08), et Discord est appelé avec `?wait=true` précisément pour récupérer
 l'identifiant du message — sans lui la diffusion serait indélébile. Les trois annulations
 ci-dessus le démontrent en production, pas sur le papier.
 
-> ⚠️ **Ce qui n'est pas tracé.** `_lib/diffusion.ts` n'écrit rien dans `journal_audit` :
-> une diffusion et son annulation ne laissent aucune trace nominative, seulement une ligne qui
-> apparaît puis disparaît. Après suppression, il ne reste **rien** — ni qui a diffusé, ni quand,
-> ni sur quel canal. C'est la raison pour laquelle il a fallu passer par les compteurs internes
-> de Postgres pour établir ce paragraphe.
->
-> **Reste à vérifier avant le premier envoi** : la destination. Les deux canaux lisent une
-> variable de test qui prime sur la variable publique — `TELEGRAM_CHAT_ID_TEST` sur
-> `TELEGRAM_CHAT_ID`, `DISCORD_WEBHOOK_URL_TEST` sur `DISCORD_WEBHOOK_URL` — jamais un test de
-> `NODE_ENV`. Au 02/08, `TELEGRAM_CHAT_ID_TEST` **n'existait pas** côté Vercel : le code
-> retombait donc sur le canal **public**. L'état actuel des quatre variables n'a pas été
-> revérifié depuis, et il ne se lit que dans le dashboard Vercel. **À faire avant de cliquer :
-> poser les deux variables `_TEST` sur un canal jetable, et confirmer par le champ `canalTest`
-> de la réponse lequel des deux vient de se produire.**
+✅ **La diffusion EST tracée, sur les deux chemins.** `_lib/diffusion.ts` appelle `logAudit()`
+après l'envoi (`diffuser_<canal>`) **et** après l'annulation (`annuler_diffusion_<canal>`),
+depuis `61d29bb` — le commit même qui a créé le fichier. Chaque entrée porte l'`admin_id`, le
+`public_id` du deal, l'identifiant du message distant et le champ `canalTest`. *La version
+précédente de ce document affirmait l'inverse ; c'était faux, et corrigé ici sur relevé en base.*
+
+> ⚠️ **Ce qui reste réellement en écart : la trace n'est pas transactionnelle.** Les entrées de
+> modération (`update_deal`, `bulk_update_statut`) passent le `client` de `withTransaction()` à
+> `logAudit()` — la mutation et sa trace sont atomiques, exactement ce que recommande l'en-tête
+> de `_lib/audit.ts` (« on ne veut pas d'action admin sans sa trace, ni l'inverse »). La
+> diffusion, elle, enchaîne **deux requêtes autocommit** : `insert into diffusions` puis
+> `logAudit`, et pour l'annulation `delete` puis `logAudit`. Une coupure entre les deux laisse une
+> diffusion sans trace — et côté annulation, la ligne partie **et** aucune trace, c'est-à-dire le
+> scénario que le paragraphe erroné ci-dessus décrivait comme permanent. Fenêtre étroite, écart
+> réel : c'est le seul point à corriger, et il se corrige à l'identique de la modération.
+
+> ⚠️ **La destination : les trois envois réels sont partis sur le canal PUBLIC.** Les six entrées
+> d'audit portent toutes `canalTest: false`. Ce n'est plus une hypothèse — le code lit une
+> variable de test qui prime sur la variable publique (`TELEGRAM_CHAT_ID_TEST` sur
+> `TELEGRAM_CHAT_ID`, `DISCORD_WEBHOOK_URL_TEST` sur `DISCORD_WEBHOOK_URL`, jamais un test de
+> `NODE_ENV`), et le 02/08 aucune des deux `_TEST` n'était posée. L'état actuel des quatre
+> variables **n'a pas été revérifié** et ne se lit que dans le dashboard Vercel, hors de ma
+> portée. **À faire avant de cliquer : poser les deux `_TEST` sur un canal jetable, et confirmer
+> par le champ `canalTest` de la réponse lequel des deux vient de se produire.**
 
 **WhatsApp reste entier**, et reste semi-manuel par décision : l'API officielle Meta ne poste pas
 dans les groupes, les bibliothèques non officielles risquent le ban du numéro (refusé). Le
