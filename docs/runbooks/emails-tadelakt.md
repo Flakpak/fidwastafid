@@ -4,6 +4,20 @@
 gabarits ne vivent pas dans le dépôt, ils se collent dans le dashboard Supabase. Rien
 n'est appliqué automatiquement par un déploiement.*
 
+> **Corrigé le 03/08/2026, avant toute application — trois divergences.** Ce runbook a été
+> écrit au lot 3, donc **avant** l'ajustement chromatique du 26/07/2026 (CONTRAT-V1 §8) : il
+> prescrivait l'ancien accent `#2F6B57` et un bouton primaire en aplat `ink`. Il prescrivait
+> par ailleurs `type=email` là où le gabarit **en production** porte `type=email`.
+>
+> Cette troisième était la seule vraiment coûteuse, et elle portait sur la ligne dont le §1
+> ci-dessous dit lui-même qu'elle est « la seule erreur vraiment coûteuse » de la procédure.
+> Un runbook qui prescrit autre chose que ce qui tourne est pire qu'un runbook absent : il
+> fait appliquer une régression avec la confiance d'une procédure écrite.
+>
+> **Leçon, du même ordre que celle du SUIVI** (`docs/SUIVI.md`) : un document d'exécution se
+> périme silencieusement quand la décision qu'il applique bouge ailleurs. Une correction de
+> charte doit balayer les procédures écrites, pas seulement le code.
+
 ---
 
 ## 0 — Ce que couvre ce runbook
@@ -36,8 +50,14 @@ Les URL doivent donc être **construites à la main** :
 
 | Gabarit | URL à utiliser |
 |---|---|
-| Confirmation d'inscription | `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup` |
+| Confirmation d'inscription | `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email` |
 | Réinitialisation | `{{ .SiteURL }}/auth/reset?token_hash={{ .TokenHash }}&type=recovery` |
+
+> **`type=email`, pas `type=email`.** Les deux valeurs existent dans `EmailOtpType` et
+> `apps/web/src/app/auth/confirm/route.ts` relaie sans restreindre — les deux passeraient donc
+> techniquement. Ce n'est pas la question : `type=email` est la valeur du gabarit **réellement en
+> production** et la seule employée par la documentation Supabase. On aligne le runbook sur ce
+> qui tourne, jamais l'inverse.
 
 > Coller un gabarit par défaut contenant `{{ .ConfirmationURL }}` **casse l'inscription et
 > la réinitialisation en production** (l'utilisateur atterrit sur
@@ -53,15 +73,25 @@ hexadécimal littéral. Correspondance avec les tokens Tadelakt (`CONTRAT-V1 §8
 | `#F4F1EC` | `surface-base` | fond de l'e-mail (plâtre) |
 | `#FFFFFF` | `surface` | panneau central |
 | `#E3DED4` | `border` | filets |
-| `#1A1815` | `ink` | titres, texte principal, **fond du bouton** |
+| `#1A1815` | `ink` | titres, texte principal |
 | `#5C554B` | `ink-muted` | texte secondaire |
 | `#736B61` | `ink-subtle` | mentions légales, pied |
-| `#2C5545` | `accent` | liens, filet de marque |
+| `#2F6B57` | `accent` | liens, filet de marque, **aplat du bouton primaire** |
 
-Règles conservées : **une seule action pleine** par e-mail (le bouton `ink`) ; aucun
+Règles conservées : **une seule action pleine** par e-mail (le bouton `accent`) ; aucun
 dégradé ; ni rouge ni or. Pas de police web — Scheherazade New ne se charge pas dans un
 client mail, l'arabe retombe sur `Georgia, 'Times New Roman', serif`, ce qui reste
 acceptable pour un simple wordmark.
+
+> **Le bouton primaire est en `accent`, plus en `ink`.** L'ajustement du 26/07/2026
+> (CONTRAT-V1 §8) a fait exactement ce chemin sur le site : les boutons primaires en `ink`
+> avaient supprimé le dernier porteur d'identité, et la préversion paraissait terne. Un
+> e-mail transactionnel est le seul écran de la marque qui s'affiche hors du site — il n'y a
+> aucune raison qu'il applique la charte que le site a abandonnée.
+>
+> Contraste vérifié : `#F4F1EC` sur `#2F6B57` = **5,5:1**, AA en texte courant (l'ancien
+> couple `#F4F1EC` sur `#1A1815` valait davantage, mais le seuil est tenu — la lisibilité
+> n'est pas la variable d'ajustement de cette décision).
 
 ## 3 — Gabarit : confirmation d'inscription
 
@@ -82,7 +112,7 @@ acceptable pour un simple wordmark.
         </tr>
         <tr>
           <td align="center" style="padding-bottom:22px;">
-            <div style="width:96px;height:2px;background-color:#2C5545;line-height:2px;font-size:0;">&nbsp;</div>
+            <div style="width:96px;height:2px;background-color:#2F6B57;line-height:2px;font-size:0;">&nbsp;</div>
           </td>
         </tr>
 
@@ -101,8 +131,8 @@ acceptable pour un simple wordmark.
         <!-- Action pleine unique -->
         <tr>
           <td align="center" style="padding-bottom:24px;">
-            <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=signup"
-               style="display:inline-block;background-color:#1A1815;color:#F4F1EC;text-decoration:none;font-size:14.5px;font-weight:500;padding:13px 26px;border-radius:9px;">
+            <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email"
+               style="display:inline-block;background-color:#2F6B57;color:#F4F1EC;text-decoration:none;font-size:14.5px;font-weight:500;padding:13px 26px;border-radius:9px;">
               Confirmer mon adresse
             </a>
           </td>
@@ -111,8 +141,8 @@ acceptable pour un simple wordmark.
         <tr>
           <td style="font-size:12px;line-height:1.6;color:#736B61;border-top:1px solid #E3DED4;padding-top:18px;">
             Si le bouton ne fonctionne pas, copie ce lien dans ton navigateur :<br>
-            <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=signup"
-               style="color:#2C5545;word-break:break-all;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=signup</a>
+            <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email"
+               style="color:#2F6B57;word-break:break-all;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email</a>
           </td>
         </tr>
         <tr>
@@ -153,7 +183,7 @@ acceptable pour un simple wordmark.
         </tr>
         <tr>
           <td align="center" style="padding-bottom:22px;">
-            <div style="width:96px;height:2px;background-color:#2C5545;line-height:2px;font-size:0;">&nbsp;</div>
+            <div style="width:96px;height:2px;background-color:#2F6B57;line-height:2px;font-size:0;">&nbsp;</div>
           </td>
         </tr>
 
@@ -172,7 +202,7 @@ acceptable pour un simple wordmark.
         <tr>
           <td align="center" style="padding-bottom:24px;">
             <a href="{{ .SiteURL }}/auth/reset?token_hash={{ .TokenHash }}&amp;type=recovery"
-               style="display:inline-block;background-color:#1A1815;color:#F4F1EC;text-decoration:none;font-size:14.5px;font-weight:500;padding:13px 26px;border-radius:9px;">
+               style="display:inline-block;background-color:#2F6B57;color:#F4F1EC;text-decoration:none;font-size:14.5px;font-weight:500;padding:13px 26px;border-radius:9px;">
               Choisir un nouveau mot de passe
             </a>
           </td>
@@ -182,7 +212,7 @@ acceptable pour un simple wordmark.
           <td style="font-size:12px;line-height:1.6;color:#736B61;border-top:1px solid #E3DED4;padding-top:18px;">
             Si le bouton ne fonctionne pas, copie ce lien dans ton navigateur :<br>
             <a href="{{ .SiteURL }}/auth/reset?token_hash={{ .TokenHash }}&amp;type=recovery"
-               style="color:#2C5545;word-break:break-all;">{{ .SiteURL }}/auth/reset?token_hash={{ .TokenHash }}&amp;type=recovery</a>
+               style="color:#2F6B57;word-break:break-all;">{{ .SiteURL }}/auth/reset?token_hash={{ .TokenHash }}&amp;type=recovery</a>
           </td>
         </tr>
         <tr>
