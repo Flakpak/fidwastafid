@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { query } from "@fidwastafid/db";
+import { query, withTransaction } from "@fidwastafid/db";
 import type { AuthUser } from "@fidwastafid/auth";
 import { apiError } from "./errors.js";
 import { logAudit } from "./audit.js";
@@ -37,10 +37,15 @@ interface DealRow {
  * ORDRE NON NÉGOCIABLE :
  *   1. gardes (deal publié, pas déjà diffusé sur CE canal) ;
  *   2. envoi ;
- *   3. INSERT `diffusions` uniquement si l'envoi a abouti.
+ *   3. INSERT `diffusions` + trace d'audit, dans UNE SEULE transaction, et
+ *      uniquement si l'envoi a abouti.
  *
  * L'inverse laisserait en base la trace d'une diffusion qui n'a pas eu lieu,
  * et l'anti-double-envoi bloquerait ensuite le vrai envoi.
+ *
+ * L'étape 3 est atomique depuis le 03/08/2026. Elle enchaînait auparavant deux
+ * requêtes autocommit : une coupure entre les deux produisait une diffusion
+ * enregistrée sans trace nominative de son auteur.
  */
 export async function diffuser(
   admin: AuthUser,
@@ -94,19 +99,49 @@ export async function diffuser(
     throw err;
   }
 
-  await query(`insert into diffusions (deal_id, canal, external_message_id) values ($1, $2, $3)`, [
-    deal.id,
-    canal.nom,
-    envoi.messageId,
-  ]);
-
-  await logAudit({
-    adminId: admin.id,
-    action: `diffuser_${canal.nom}`,
-    cibleType: "deal",
-    cibleId: publicId,
-    details: { messageId: envoi.messageId, canalTest: envoi.test, avecPhoto: Boolean(photoUrl) },
-  });
+  // La ligne `diffusions` et sa trace d'audit s'écrivent dans la MÊME
+  // transaction — même forme que la modération (`update_deal`,
+  // `bulk_update_statut`), et ce que demande l'en-tête de `_lib/audit.ts` :
+  // « on ne veut pas d'action admin sans sa trace, ni l'inverse ». Enchaînées
+  // en autocommit, une coupure entre les deux laissait une diffusion sans
+  // trace nominative.
+  try {
+    await withTransaction(async (client) => {
+      await client.query(`insert into diffusions (deal_id, canal, external_message_id) values ($1, $2, $3)`, [
+        deal.id,
+        canal.nom,
+        envoi.messageId,
+      ]);
+      await logAudit(
+        {
+          adminId: admin.id,
+          action: `diffuser_${canal.nom}`,
+          cibleType: "deal",
+          cibleId: publicId,
+          details: { messageId: envoi.messageId, canalTest: envoi.test, avecPhoto: Boolean(photoUrl) },
+        },
+        client
+      );
+    });
+  } catch (err) {
+    // Le message est DÉJÀ parti (ordre non négociable ci-dessus) et la base
+    // n'en garde rien : il est vivant dans le canal, et l'API n'a plus son
+    // identifiant pour l'annuler. Sans cette ligne, l'admin reçoit un 500 muet
+    // et ne sait pas qu'une publication est en ligne — la version « message
+    // orphelin » du repli silencieux (`docs/INCIDENTS.md`). On journalise de
+    // quoi le retrouver à la main, puis on relance : jamais un succès de
+    // politesse.
+    console.error(
+      JSON.stringify({
+        evenement: `diffusion_${canal.nom}_orpheline`,
+        publicId,
+        messageId: envoi.messageId,
+        canalTest: envoi.test,
+        detail: "Envoi abouti mais écriture en base échouée — message à supprimer à la main.",
+      })
+    );
+    throw err;
+  }
 
   return NextResponse.json({
     diffuse: true,
@@ -126,6 +161,10 @@ export async function diffuser(
  * à la main), la ligne RESTE : elle décrit la réalité, le message est
  * toujours là. L'effacer rendrait le deal rediffusable et produirait le
  * doublon que cette table existe pour empêcher.
+ *
+ * Le DELETE et sa trace d'audit sont atomiques (03/08/2026) : c'est le seul
+ * chemin admin du dépôt où l'action efface sa propre preuve, donc le seul où
+ * perdre la trace ne laisse RIEN derrière.
  */
 export async function annuler(
   admin: AuthUser,
@@ -159,14 +198,22 @@ export async function annuler(
     throw err;
   }
 
-  await query("delete from diffusions where id = $1", [ligne.diffusion_id]);
-
-  await logAudit({
-    adminId: admin.id,
-    action: `annuler_diffusion_${canal.nom}`,
-    cibleType: "deal",
-    cibleId: publicId,
-    details: { messageId: ligne.external_message_id },
+  // Même transaction, et c'est ici que ça compte le plus : la ligne
+  // `diffusions` DISPARAÎT. Si la trace ne s'écrivait pas, il ne resterait
+  // rien du tout de la diffusion — ni la ligne, ni qui l'a annulée. C'est le
+  // seul chemin du dépôt où une action admin efface sa propre preuve.
+  await withTransaction(async (client) => {
+    await client.query("delete from diffusions where id = $1", [ligne.diffusion_id]);
+    await logAudit(
+      {
+        adminId: admin.id,
+        action: `annuler_diffusion_${canal.nom}`,
+        cibleType: "deal",
+        cibleId: publicId,
+        details: { messageId: ligne.external_message_id },
+      },
+      client
+    );
   });
 
   return NextResponse.json({
