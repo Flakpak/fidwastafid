@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { DealAdmin, DealStatut, Enseigne } from "@fidwastafid/schemas";
 import type { DoublonInfo } from "../api/v1/_lib/deals.js";
 import {
@@ -24,15 +24,6 @@ interface ApiErrorBody {
   error?: { code?: string; message?: string; fields?: Record<string, string> };
 }
 
-function remise(deal: DealAdmin): number {
-  if (!deal.prixNormal || deal.prixNormal <= deal.prixPromo) return 0;
-  return Math.round((1 - deal.prixPromo / deal.prixNormal) * 100);
-}
-
-function compareRemise(a: DealAdmin, b: DealAdmin): number {
-  return remise(b) - remise(a);
-}
-
 const ONGLETS: DealStatut[] = ["auto_draft", "en_attente", "publie", "rejete", "expire"];
 
 const ONGLET_LABELS: Record<DealStatut, string> = {
@@ -41,6 +32,14 @@ const ONGLET_LABELS: Record<DealStatut, string> = {
   publie: "Publiés",
   rejete: "Rejetés",
   expire: "Expirés",
+};
+
+const COMPTES_INITIAUX: Record<DealStatut, number> = {
+  auto_draft: 0,
+  en_attente: 0,
+  publie: 0,
+  rejete: 0,
+  expire: 0,
 };
 
 interface Action {
@@ -74,12 +73,18 @@ const ONGLET_ACTIONS: Record<DealStatut, Action[]> = {
 const BULK_ONGLETS = new Set<DealStatut>(["auto_draft", "en_attente"]);
 
 export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
+  // La liste chargée est déjà celle de L'ONGLET COURANT SEUL — filtrée en
+  // base (`GET /api/v1/admin/deals?statut=…`), jamais la table entière
+  // triée/filtrée côté client (docs/INCIDENTS.md, 04/08/2026 : une
+  // soumission `en_attente` restait invisible derrière un `LIMIT` global).
   const [deals, setDeals] = useState<DealAdminAvecDoublon[] | null>(null);
-  // Total réel renvoyé par l'API (count(*) over(), toutes statuts confondus
-  // — l'appel n'est pas filtré par statut). Sert uniquement à détecter une
-  // troncature par LIMIT ; ce n'est pas un total par onglet (l'API ne le
-  // renvoie pas dans ce mode non filtré).
-  const [total, setTotal] = useState(0);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [chargementPage, setChargementPage] = useState(false);
+  // Comptes par onglet — TOUJOURS un count(*) en base
+  // (`GET /api/v1/admin/deals/compte`), jamais la longueur de `deals` : cette
+  // liste est paginée, elle ne peut pas se compter elle-même sans mentir sur
+  // ce qu'elle n'a pas encore chargé.
+  const [comptes, setComptes] = useState<Record<DealStatut, number>>(COMPTES_INITIAUX);
   const [onglet, setOnglet] = useState<DealStatut>("en_attente");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   /** Le rejet groupé passe par le panneau de motif, jamais par le bouton seul. */
@@ -87,9 +92,10 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const fetchDeals = useCallback(async () => {
+  /** Charge la PREMIÈRE page d'un onglet — remplace la liste affichée. */
+  const fetchOnglet = useCallback(async (statut: DealStatut) => {
     setError(null);
-    const res = await fetch("/api/v1/admin/deals");
+    const res = await fetch(`/api/v1/admin/deals?statut=${statut}`);
     if (!res.ok) {
       const body = (await res.json()) as ApiErrorBody;
       if (body.error?.code === "UNAUTHENTICATED" || body.error?.code === "FORBIDDEN") {
@@ -98,35 +104,58 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         setError(body.error?.message ?? "Impossible de charger le pipeline.");
       }
       setDeals(null);
+      setCursor(null);
       return;
     }
-    const body = (await res.json()) as { data: DealAdminAvecDoublon[]; total: number };
+    const body = (await res.json()) as { data: DealAdminAvecDoublon[]; nextCursor: string | null };
     setDeals(body.data);
-    setTotal(body.total);
+    setCursor(body.nextCursor);
   }, []);
+
+  const fetchComptes = useCallback(async () => {
+    const res = await fetch("/api/v1/admin/deals/compte");
+    if (!res.ok) return;
+    const body = (await res.json()) as { comptes: Record<DealStatut, number> };
+    setComptes(body.comptes);
+  }, []);
+
+  /** Après toute mutation : reprend l'onglet courant depuis sa première page
+   *  (un item peut en être sorti — statut changé — ou avoir bougé de rang)
+   *  et rafraîchit les comptes, qu'elle que soit la mutation. */
+  const rafraichir = useCallback(async () => {
+    await Promise.all([fetchOnglet(onglet), fetchComptes()]);
+  }, [onglet, fetchOnglet, fetchComptes]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- chargement initial au montage, pattern standard (https://react.dev/reference/react/useEffect#fetching-data-with-effects), pas de state dérivable du render
-    void fetchDeals();
-  }, [fetchDeals]);
+    void fetchOnglet(onglet);
+    void fetchComptes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- montage seul (deps volontairement vides) : l'onglet initial est figé, changerOnglet() gère explicitement les changements d'onglet
+  }, []);
+
+  const chargerPlus = useCallback(async () => {
+    if (!cursor || chargementPage) return;
+    setChargementPage(true);
+    try {
+      const res = await fetch(`/api/v1/admin/deals?statut=${onglet}&cursor=${encodeURIComponent(cursor)}`);
+      if (!res.ok) return;
+      const body = (await res.json()) as { data: DealAdminAvecDoublon[]; nextCursor: string | null };
+      setDeals((prev) => [...(prev ?? []), ...body.data]);
+      setCursor(body.nextCursor);
+    } finally {
+      setChargementPage(false);
+    }
+  }, [cursor, chargementPage, onglet]);
 
   function changerOnglet(t: DealStatut) {
     setOnglet(t);
+    setDeals(null);
+    setCursor(null);
     setSelected(new Set());
     // Sinon le panneau de motif reste ouvert au-dessus d'une sélection vidée.
     setDemandeMotifLot(false);
+    void fetchOnglet(t);
   }
-
-  const comptes = useMemo(() => {
-    const c: Record<DealStatut, number> = { auto_draft: 0, en_attente: 0, publie: 0, rejete: 0, expire: 0 };
-    for (const d of deals ?? []) c[d.statut] += 1;
-    return c;
-  }, [deals]);
-
-  const parOnglet = useMemo(() => {
-    if (!deals) return [];
-    return deals.filter((d) => d.statut === onglet).sort(compareRemise);
-  }, [deals, onglet]);
 
   function toggle(publicId: string) {
     setSelected((prev) => {
@@ -151,7 +180,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         setError(body.error?.message ?? "Action impossible.");
         return;
       }
-      await fetchDeals();
+      await rafraichir();
     } finally {
       setPending(false);
     }
@@ -202,7 +231,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         const body = (await res.json()) as ApiErrorBody;
         return { ok: false, message: body.error?.message ?? "Mise à jour impossible.", fields: body.error?.fields };
       }
-      await fetchDeals();
+      await rafraichir();
       return { ok: true };
     } finally {
       setPending(false);
@@ -219,7 +248,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       const body = (await res.json()) as ApiErrorBody;
       return { ok: false, message: body.error?.message ?? "Récupération de l'image impossible." };
     }
-    await fetchDeals();
+    await rafraichir();
     return { ok: true };
   }
 
@@ -235,12 +264,12 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       const body = (await res.json()) as ApiErrorBody;
       return { ok: false, message: body.error?.message ?? "Téléversement impossible." };
     }
-    await fetchDeals();
+    await rafraichir();
     return { ok: true };
   }
 
   /** Diffusion communautaire (docs/IDEES.md) — un deal à la fois, jamais en
-   *  masse. `fetchDeals()` au succès pour que la carte repasse en « Diffusé »
+   *  masse. Rafraîchit au succès pour que la carte repasse en « Diffusé »
    *  d'après la base plutôt que d'après un état local optimiste :
    *  l'anti-double-publication doit refléter ce qui est écrit, pas ce qu'on
    *  croit avoir écrit. */
@@ -251,7 +280,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       return { ok: false, message: body.error?.message ?? "Diffusion impossible." };
     }
     const body = (await res.json()) as { canalTest?: boolean };
-    await fetchDeals();
+    await rafraichir();
     return { ok: true, canalTest: Boolean(body.canalTest) };
   }
 
@@ -265,7 +294,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       const body = (await res.json()) as ApiErrorBody;
       return { ok: false, message: body.error?.message ?? "Annulation impossible." };
     }
-    await fetchDeals();
+    await rafraichir();
     return { ok: true };
   }
 
@@ -292,7 +321,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       }
       setSelected(new Set());
       setDemandeMotifLot(false);
-      await fetchDeals();
+      await rafraichir();
     } finally {
       setPending(false);
     }
@@ -323,14 +352,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         ))}
       </div>
 
-      {deals.length < total && (
-        <p className="text-xs text-ink-subtle">
-          {deals.length} deals chargés sur {total} au total (tous statuts) — la limite serveur a tronqué le
-          résultat, augmente LIMIT côté API si ça se reproduit.
-        </p>
-      )}
-
-      {BULK_ONGLETS.has(onglet) && parOnglet.length > 0 && (
+      {BULK_ONGLETS.has(onglet) && deals.length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <Button variant="primary" size="sm" onClick={() => void bulk("publie")} disabled={pending || selected.size === 0}>
@@ -356,10 +378,10 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         </div>
       )}
 
-      {parOnglet.length === 0 && <p className="text-center text-ink-muted py-16">Rien dans cet onglet.</p>}
+      {deals.length === 0 && <p className="text-center text-ink-muted py-16">Rien dans cet onglet.</p>}
 
       <ul className="flex flex-col gap-2">
-        {parOnglet.map((deal) => (
+        {deals.map((deal) => (
           <AdminDealItem
             key={deal.publicId}
             deal={deal}
@@ -379,6 +401,19 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
           />
         ))}
       </ul>
+
+      {cursor && (
+        <div className="flex justify-center py-4">
+          <button
+            type="button"
+            onClick={() => void chargerPlus()}
+            disabled={chargementPage}
+            className="min-h-11 rounded-full border border-border-strong bg-surface px-6 py-2 text-sm font-bold text-ink hover:bg-surface-subtle disabled:cursor-default disabled:opacity-50"
+          >
+            {chargementPage ? "Chargement…" : "Charger plus"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

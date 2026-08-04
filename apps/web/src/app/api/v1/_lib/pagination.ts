@@ -45,11 +45,7 @@ export interface DealsCursor {
   filtres: string;
 }
 
-export function encodeCursor(cursor: DealsCursor): string {
-  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
-}
-
-function isDealsCursor(value: unknown): value is DealsCursor {
+export function isDealsCursor(value: unknown): value is DealsCursor {
   if (typeof value !== "object" || value === null) return false;
   const { tri, value: v, publicId, asOf, filtres } = value as Record<string, unknown>;
   return (
@@ -61,10 +57,22 @@ function isDealsCursor(value: unknown): value is DealsCursor {
   );
 }
 
-export function decodeCursor(raw: string): DealsCursor | null {
+/**
+ * Codec générique (base64url d'un JSON) — extrait du feed public pour être
+ * réutilisé tel quel par la file admin (`_lib/adminDealsCursor.ts`), qui a
+ * sa propre forme de curseur (pas de tri tendance/score, un statut au lieu
+ * d'une signature de filtres). Le validateur de forme (`isValid`) reste à
+ * la charge de l'appelant : c'est lui qui sait ce qu'un curseur légitime
+ * contient pour son propre endpoint.
+ */
+export function encodeCursor(value: unknown): string {
+  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+}
+
+export function decodeCursor<T>(raw: string, isValid: (value: unknown) => value is T): T | null {
   try {
     const parsed: unknown = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
-    return isDealsCursor(parsed) ? parsed : null;
+    return isValid(parsed) ? parsed : null;
   } catch {
     return null;
   }
