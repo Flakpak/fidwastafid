@@ -156,7 +156,7 @@ acceptable pour un simple wordmark.
       <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;padding-top:16px;">
         <tr>
           <td align="center" style="font-size:11px;color:#736B61;">
-            Fidwastafid — Les bons plans du Maroc · Traitement déclaré auprès de la CNDP (loi 09-08)
+            Fidwastafid — Les bons plans du Maroc
           </td>
         </tr>
       </table>
@@ -226,7 +226,7 @@ acceptable pour un simple wordmark.
       <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;padding-top:16px;">
         <tr>
           <td align="center" style="font-size:11px;color:#736B61;">
-            Fidwastafid — Les bons plans du Maroc · Traitement déclaré auprès de la CNDP (loi 09-08)
+            Fidwastafid — Les bons plans du Maroc
           </td>
         </tr>
       </table>
