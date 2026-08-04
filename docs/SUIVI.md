@@ -1,6 +1,6 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-08-03, sur `main` à `3c44698`.*
+*Dernière mise à jour : 2026-08-04, sur `main` à `4877252`.*
 
 Ce document est le **point d'entrée pour reprendre le travail sans contexte préalable**. Il dit
 ce qui tourne, ce qui reste ouvert, et par quoi continuer. Il ne remplace aucun autre document :
@@ -52,7 +52,7 @@ consultatif reste un échec réel.
 ## 1 — Ce qui tourne en production
 
 **https://fidwastafid.com** — déployé depuis `main` par Vercel à chaque fusion. Dernier
-déploiement de production : `3c44698`, check `Vercel` **`success`**, 2026-08-03 17:35 UTC
+déploiement de production : `4877252`, check `Vercel` **`success`**, 2026-08-04 21:37 UTC
 (relevé par l'API GitHub, pas de mémoire). Le run CI du même SHA est vert.
 
 ### Chiffres réels au 2026-08-03
@@ -123,6 +123,9 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| Consentement — Analytics gaté | #80 | 04/08 | Vercel Analytics ne se monte plus inconditionnellement dans `layout.tsx` : socle minimal de consentement (`localStorage` versionné, deux catégories — `mesureAudience` active, `personnalisation` déclarée pour le futur feed, inactive), gate par lecture paresseuse (`useState(lireConsentement)`, jamais un effet après coup). Vérifié en conditions réelles sur `fidwastafid.com` après déploiement : 0 requête vers le script analytics avant le choix, 1 après acceptation, persistance au rechargement. Accès permanent (« Cookies », pied de page) pour révoquer. |
+| `/confidentialite` — réalité mesurée | #79 | 04/08 | Page réécrite : cookie de session et brouillon local explicités, Vercel Analytics et Turnstile décrits d'après leurs politiques publiques respectives, hébergement Supabase+Vercel (Irlande, UE) précisé, droits étendus au RGPD pour les résidents UE. Repère explicite (non rempli) pour l'identité juridique du responsable de traitement — voir « Ce qui reste ouvert ». |
+| Retrait mention CNDP non attestée | #78 | 04/08 | « Déclaré auprès de la CNDP » retiré sans remplacement de deux gabarits e-mail et deux maquettes — aucune preuve d'une déclaration réelle nulle part dans le dépôt (`git grep -i cndp`). Consigné dans `docs/INCIDENTS.md` : ne se rétablit que sur numéro et date. |
 | Chiffres de `/concept` | #75 | 03/08 | Les trois statistiques en dur remplacées par deux comptages réels (endpoints existants, **aucun amendement** de la liste fermée §4) et une constante assumée (« 100% Gratuit », qui est le modèle économique, pas une mesure). Aucun arrondi flatteur, aucun repli sur `0`. Au passage, `decrireErreur()` : `err.message` seul journalisait « indisponible — . » parce que `pg` remonte un `AggregateError` au message vide. |
 | Diffusion Discord | #73 | 02/08 | Second canal, **et le canal passe DANS le chemin** (`/diffuser/discord`, `/diffuser/telegram`). Gardes et ordre des opérations factorisés dans `_lib/diffusion.ts`. Migration `0012` : `telegram_message_id` → `external_message_id` (`text`, les snowflakes Discord ne survivent pas à un `Number` JS). |
 | Diffusion Telegram | #72 | 02/08 | Migration `0011` (`diffusions`, `unique (deal_id, canal)`), endpoints POST/DELETE, bouton dans l'admin, UTM sur le lien diffusé, code d'erreur `CONFLICT` (409). |
@@ -158,6 +161,30 @@ notifie désormais réellement** (issue assignée + label `urgent`, #70). Le run
 
 Ce qui reste : une copie hors GitHub. Le compte Cloudflare existe déjà (Turnstile, DNS du
 domaine) — il manque un bucket R2 et quatre secrets, pas un fournisseur.
+
+### Conformité de la collecte — diagnostic mené, trois lots livrés *(04/08/2026)*
+
+**Constat de départ** (audience marocaine, loi 09-08 + déclaration CNDP ; MRE résidant en
+UE, RGPD ; objectif ultérieur non construit — personnalisation du feed par les deals
+consultés) : inventaire exhaustif des dépôts navigateur, des tiers, et de la page
+`/confidentialite` en regard du réel mesuré. Trois PR livrées le jour même : retrait de la
+mention CNDP non attestée (#78), réécriture de `/confidentialite` (#79), consentement
+gatant Vercel Analytics (#80) — voir table ci-dessus.
+
+**Ce qui reste ouvert :**
+
+- **Identité juridique du responsable de traitement absente de `/confidentialite`**
+  (raison sociale, forme, adresse) — obligatoire en 09-08 comme en RGPD. Un repère
+  explicite marque l'emplacement dans le code (section Contact) ; **bloqué sur Kamel**,
+  volontairement non inventé.
+- **Lieu de traitement exact des serveurs Vercel Analytics** et **durée de conservation
+  des signaux Turnstile côté Cloudflare** — non précisés par les politiques publiques des
+  deux fournisseurs. Limite acceptée, pas un blocage : rien n'est affirmé sur la page à ce
+  sujet.
+- **La personnalisation du feed reste une catégorie déclarée, pas construite** —
+  `personnalisation: false` figé dans `apps/web/src/lib/consentement.ts`, prête à
+  s'activer le jour où ce chantier démarre, sans redemander un consentement sur une
+  structure à refaire (juste une bascule de version).
 
 ### Dette assumée, consignée ailleurs
 
