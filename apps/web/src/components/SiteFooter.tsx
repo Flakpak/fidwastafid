@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Brand } from "./Brand.js";
+import { GererConsentement } from "./GererConsentement.js";
 
 /** Chrome minimal — CONTRAT-V1 §8. Exception consciente (espace membre,
  *  amendement 16/07/2026) : les liens vers /confidentialite et /contact sont
@@ -13,9 +14,13 @@ import { Brand } from "./Brand.js";
  *  vit ici en SIGNATURE SECONDAIRE, et nulle part ailleurs dans le chrome
  *  (§8 : elle reste non négociable à ce titre).
  *  Les quatre colonnes de la maquette ne sont PAS reprises : elles pointeraient
- *  vers des routes inexistantes (villes/catégories/cookies…) — c'est une
- *  décision d'architecture d'information, pas un swap de tokens. Le footer
- *  reste volontairement minimal. */
+ *  vers des routes inexistantes (villes/catégories…) — c'est une décision
+ *  d'architecture d'information, pas un swap de tokens. Le footer reste
+ *  volontairement minimal.
+ *
+ *  « Cookies » (lot consentement) fait exception à dessein : ce n'est pas une
+ *  route, c'est l'unique accès permanent pour revenir sur son choix de
+ *  mesure d'audience — sans lui, un refus initial serait définitif. */
 export function SiteFooter() {
   return (
     <footer className="bg-surface border-t border-border py-8 px-4 flex flex-col items-center gap-2">
@@ -44,6 +49,8 @@ export function SiteFooter() {
         <Link href="/contact" className="hover:text-ink">
           Contact
         </Link>
+        <span aria-hidden="true">·</span>
+        <GererConsentement />
       </div>
     </footer>
   );

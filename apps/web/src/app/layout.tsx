@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Scheherazade_New } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { SITE_URL } from "../lib/siteUrl.js";
+import { Consentement } from "../components/Consentement.js";
 
 const scheherazade = Scheherazade_New({
   subsets: ["arabic"],
@@ -35,17 +35,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr" className={scheherazade.variable}>
       <body>
         {children}
-        {/*
-         * Script (/_vercel/insights/script.js) et endpoint de collecte
-         * (/_vercel/insights/*) tous deux même origine — déjà couverts par
-         * le CSP existant (script-src 'strict-dynamic' pour l'injection
-         * dynamique via document.createElement depuis notre propre bundle
-         * nonce'd ; connect-src 'self' pour la collecte). Le composant
-         * n'expose pas de prop nonce (cf. github.com/vercel/analytics#122,
-         * toujours ouvert) — non nécessaire ici puisque rien n'est
-         * cross-origin. Aucun ajustement CSP requis.
-         */}
-        <Analytics />
+        {/* Analytics ne se monte que sur consentement — voir Consentement.tsx. */}
+        <Consentement />
       </body>
     </html>
   );
