@@ -10,6 +10,34 @@ en a appris. Une leçon gravée ici a vocation à être citée depuis le code ou
 
 ---
 
+## 2026-08-04 — Mention CNDP retirée : aucune déclaration n'est attestée dans le dépôt
+
+*Entrée de **constat**, pas d'incident : rien n'a cassé en production. Consignée pour
+que la mention ne revienne pas sans preuve — même logique que l'entrée du 2026-08-02
+ci-dessous, qui grave une contrainte plutôt qu'une panne.*
+
+**Le fait.** Le pied des deux gabarits e-mail actifs (`docs/runbooks/emails-tadelakt.md`)
+et deux maquettes de référence (`docs/maquettes/tadelakt-site-complet.html`,
+`docs/maquettes/fidwastafid-planche-marque.html`) affirmaient « Traitement déclaré
+auprès de la CNDP (loi 09-08) » / « Déclaré auprès de la CNDP ». Recherche exhaustive du
+dépôt (`git grep -i cndp`) : aucun numéro, aucune date, aucune preuve d'une déclaration
+réelle n'existe nulle part — seule la mention elle-même, recopiée d'un fichier à
+l'autre. `docs/CONTRAT-V1.md` §3 dit l'inverse depuis Phase 1 : la collecte à fin de
+revente « nécessite généralement consentement explicite + déclaration, à vérifier avant
+la bascule prod » — jamais vérifiée, jamais faite. Le site en production
+(`/confidentialite`, pied de page) ne portait déjà aucune mention CNDP ; le risque
+tenait aux gabarits e-mail, non encore collés dans Supabase, et aux maquettes de
+référence.
+
+**Correctif.** La mention est retirée des trois fichiers, sans remplacement : une page
+qui n'affirme rien n'est pas fausse ; une page qui affirme une déclaration inexistante
+l'est.
+
+**Règle.** Cette mention ne se rétablit que sur présentation d'un numéro de déclaration
+CNDP et d'une date — jamais recopiée par confiance depuis un fichier existant.
+
+---
+
 ## 2026-08-02 — Contrainte : `/auth/confirm` exige une session, un changement d'e-mail sécurisé n'en produit pas toujours
 
 *Entrée de **contrainte**, pas d'incident : rien n'a cassé en production. Le défaut est
