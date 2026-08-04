@@ -1,10 +1,16 @@
 /**
  * Consentement de collecte — socle minimal (pas de bandeau générique à
- * l'usine). Deux catégories fermées : `mesureAudience` (Vercel Analytics,
- * seul appelant aujourd'hui) et `personnalisation` (feed personnalisé par
- * les deals consultés, déclarée pour plus tard — aucune collecte ne s'y
- * adosse encore). Le strict nécessaire (session, brouillon local) n'entre
- * pas ici : ce n'est pas un choix, cf. /confidentialite.
+ * l'usine). Une seule finalité affichée aujourd'hui : `mesureAudience`
+ * (pilote l'audience du site). Le strict nécessaire (session, brouillon
+ * local) n'entre pas ici : ce n'est pas un choix, cf. /confidentialite.
+ *
+ * L'enregistrement stocke un objet `finalites` OUVERT (`Record<string,
+ * boolean>`), pas un couple de booléens nommés : ajouter une finalité
+ * future (ex. personnalisation du feed, quand elle existera) est une
+ * clé de plus à écrire dans `ecrireConsentement`, jamais une refonte de
+ * cette forme ni du composant qui la lit. L'interface, elle, ne montre
+ * que ce qui existe réellement — annoncer une case pour une collecte
+ * qui n'a pas lieu n'informe personne.
  *
  * Stocké en `localStorage`, jamais un cookie : ce n'est pas une donnée que
  * le serveur a besoin de lire à chaque requête. La `version` existe pour
@@ -12,14 +18,15 @@
  * changent, sans avoir à deviner ce qu'un ancien enregistrement couvrait.
  */
 
-export const CONSENTEMENT_VERSION = 1;
+export const CONSENTEMENT_VERSION = 2;
 export const CONSENTEMENT_STORAGE_KEY = "fid_consentement";
 export const EVENEMENT_OUVRIR_CONSENTEMENT = "fid:ouvrir-consentement";
 
+export type Finalites = Record<string, boolean>;
+
 export interface Consentement {
   version: number;
-  mesureAudience: boolean;
-  personnalisation: boolean;
+  finalites: Finalites;
   horodatage: string;
 }
 
@@ -32,18 +39,17 @@ export function lireConsentement(): Consentement | null {
     if (!brut) return null;
     const valeur = JSON.parse(brut) as Partial<Consentement>;
     if (valeur.version !== CONSENTEMENT_VERSION) return null;
-    if (typeof valeur.mesureAudience !== "boolean" || typeof valeur.personnalisation !== "boolean") return null;
+    if (typeof valeur.finalites !== "object" || valeur.finalites === null) return null;
     return valeur as Consentement;
   } catch {
     return null;
   }
 }
 
-export function ecrireConsentement(choix: { mesureAudience: boolean; personnalisation: boolean }): Consentement {
+export function ecrireConsentement(finalites: Finalites): Consentement {
   const consentement: Consentement = {
     version: CONSENTEMENT_VERSION,
-    mesureAudience: choix.mesureAudience,
-    personnalisation: choix.personnalisation,
+    finalites,
     horodatage: new Date().toISOString(),
   };
   window.localStorage.setItem(CONSENTEMENT_STORAGE_KEY, JSON.stringify(consentement));
