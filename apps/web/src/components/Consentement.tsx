@@ -21,10 +21,14 @@ import {
  * `<Analytics />` serait monté — et donc aucune requête envoyée — avant que
  * ce composant ait lu un consentement déjà donné.
  *
- * Script (`/_vercel/insights/script.js`) et endpoint de collecte
- * (`/_vercel/insights/*`) sont même origine — déjà couverts par le CSP
- * existant (`script-src 'strict-dynamic'`, `connect-src 'self'`,
- * `middleware.ts`). Aucun ajustement CSP requis par ce composant.
+ * Script (même origine, cf. `/confidentialite` pour le détail technique) et
+ * endpoint de collecte — déjà couverts par le CSP existant
+ * (`script-src 'strict-dynamic'`, `connect-src 'self'`, `middleware.ts`).
+ * Aucun ajustement CSP requis par ce composant.
+ *
+ * Le bandeau ne nomme aucun prestataire ni aucune finalité inactive : c'est
+ * le rôle de `/confidentialite` d'être exhaustive, pas celui d'un bandeau
+ * qu'on lit en une seconde.
  */
 export function Consentement() {
   const [consentement, setConsentement] = useState<ConsentementRecord | null>(lireConsentement);
@@ -37,13 +41,13 @@ export function Consentement() {
   }, []);
 
   function choisir(mesureAudience: boolean) {
-    setConsentement(ecrireConsentement({ mesureAudience, personnalisation: false }));
+    setConsentement(ecrireConsentement({ mesureAudience }));
     setOuvert(false);
   }
 
   return (
     <>
-      {consentement?.mesureAudience && <Analytics />}
+      {consentement?.finalites.mesureAudience && <Analytics />}
       {ouvert && (
         <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center p-4">
           <div
@@ -52,15 +56,18 @@ export function Consentement() {
             aria-labelledby="consentement-titre"
             className="w-full max-w-2xl rounded-2xl border border-border bg-surface p-5 shadow-[0_4px_16px_rgba(26,24,21,0.12)] flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
           >
-            <p id="consentement-titre" className="text-sm text-ink-muted leading-relaxed">
-              On mesure l&apos;audience du site (Vercel Analytics) pour savoir ce qui est utile.
-              Une deuxième catégorie, la personnalisation du feed, est prévue mais inactive : rien
-              n&apos;y est collecté aujourd&apos;hui.{" "}
-              <Link href="/confidentialite" className="text-accent font-bold hover:underline">
-                En savoir plus
-              </Link>
-              .
-            </p>
+            <div className="flex flex-col gap-1">
+              <p id="consentement-titre" className="text-sm font-black text-ink">
+                Cookies
+              </p>
+              <p className="text-sm text-ink-muted leading-relaxed">
+                Nous mesurons l&apos;audience du site pour l&apos;améliorer. Vous pouvez refuser, ça ne change
+                rien à votre navigation.{" "}
+                <Link href="/confidentialite" className="text-ink-subtle underline hover:text-ink">
+                  En savoir plus
+                </Link>
+              </p>
+            </div>
             {/* Deux actions du même poids visuel (`secondary` pour les deux) —
                 refuser ne doit pas se lire comme le choix par défaut ni comme
                 le moins engageant des deux. §8 règle 1 (une seule action
