@@ -209,6 +209,32 @@ export function toDoublon(row: DoublonColumns): DoublonInfo | null {
 }
 
 /**
+ * Tri par défaut de la file admin (`GET /api/v1/admin/deals`), PAR STATUT —
+ * jamais choisi par l'appelant (docs/INCIDENTS.md, 04/08/2026 : un tri par
+ * score départagé par `public_id`, arbitraire, laissait une soumission
+ * `en_attente` invisible derrière des centaines de lignes à égalité).
+ *
+ * `en_attente` EST une file d'attente : un modérateur la traite dans
+ * l'ordre d'arrivée, pas par classement — plus ancien d'abord. Les autres
+ * onglets conservent le tri déjà en vigueur (remise décroissante).
+ */
+export function triPourStatut(statut: string): "recent_asc" | "remise_desc" {
+  return statut === "en_attente" ? "recent_asc" : "remise_desc";
+}
+
+/**
+ * Remise en pourcentage, calculée en SQL pour porter le tri ET le curseur
+ * de pagination de la file admin (même mécanique que `tendanceExpr`,
+ * `deals/route.ts`) — reproduit exactement `remise()` côté client
+ * (`AdminDealItem.tsx`) : 0 sans prix normal, ou si le prix normal
+ * n'excède pas le prix promo. Arrondie en SQL (`round(...)::int`) : un
+ * entier ne pose aucun problème de précision au retour du driver pg,
+ * contrairement au rang `tendance` (`numeric` non arrondi).
+ */
+export const REMISE_EXPR = `case when d.prix_normal is not null and d.prix_normal > d.prix_promo
+  then round((1 - d.prix_promo / d.prix_normal) * 100)::int else 0 end`;
+
+/**
  * `deals.id` (bigint) revient en string via pg (évite la perte de précision
  * JS) — jamais renvoyé au client, uniquement pour les requêtes internes de
  * la même transaction (vote, recalcul de score).

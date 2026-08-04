@@ -882,6 +882,62 @@
         "required": [
           "total"
         ]
+      },
+      "DealAdminPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DealAdmin"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "CompteAdminDeals": {
+        "type": "object",
+        "properties": {
+          "comptes": {
+            "type": "object",
+            "properties": {
+              "auto_draft": {
+                "type": "integer"
+              },
+              "en_attente": {
+                "type": "integer"
+              },
+              "publie": {
+                "type": "integer"
+              },
+              "rejete": {
+                "type": "integer"
+              },
+              "expire": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "auto_draft",
+              "en_attente",
+              "publie",
+              "rejete",
+              "expire"
+            ]
+          }
+        },
+        "required": [
+          "comptes"
+        ]
       }
     },
     "parameters": {}
@@ -1580,7 +1636,8 @@
     },
     "/admin/deals": {
       "get": {
-        "summary": "Pipeline complet — auto_draft toujours en tête. Inclut whatsappContact.",
+        "summary": "File admin d'UN statut, pagination par curseur (CONTRAT-V1 §4, neuvième amendement conscient)",
+        "description": "statut est obligatoire : un onglet interroge son statut, jamais la table entière (avant ce lot, GET /admin/deals chargeait tous statuts confondus sous un LIMIT global, filtrés/triés côté client — une soumission en_attente récente pouvait rester hors de la fenêtre du LIMIT, invisible sans qu'aucun filtre ne l'exclue réellement, docs/INCIDENTS.md 04/08/2026). Les comptes par onglet viennent de GET /admin/deals/compte, jamais de la longueur de cette liste.",
         "security": [
           {
             "bearerAuth": []
@@ -1592,10 +1649,27 @@
         "parameters": [
           {
             "schema": {
+              "type": "string",
+              "description": "auto_draft|en_attente|publie|rejete|expire — requis"
+            },
+            "required": true,
+            "name": "statut",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "string"
             },
             "required": false,
-            "name": "statut",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "limit",
             "in": "query"
           }
         ],
@@ -1605,22 +1679,53 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/DealAdmin"
-                      }
-                    },
-                    "total": {
-                      "type": "number"
-                    }
-                  },
-                  "required": [
-                    "data",
-                    "total"
-                  ]
+                  "$ref": "#/components/schemas/DealAdminPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Statut manquant ou inconnu, ou curseur invalide pour cet onglet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/deals/compte": {
+      "get": {
+        "summary": "Compte par statut (CONTRAT-V1 §4, neuvième amendement conscient)",
+        "description": "count(*) en base, groupé par statut — les cinq clés sont toujours présentes, à 0 s'il n'y a aucune ligne. Jamais déduit de la longueur d'une liste paginée (docs/INCIDENTS.md, 04/08/2026).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompteAdminDeals"
                 }
               }
             }

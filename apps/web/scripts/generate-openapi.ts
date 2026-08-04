@@ -265,16 +265,52 @@ registry.registerPath({
 registry.registerPath({
   method: "get",
   path: "/admin/deals",
-  summary: "Pipeline complet — auto_draft toujours en tête. Inclut whatsappContact.",
+  summary: "File admin d'UN statut, pagination par curseur (CONTRAT-V1 §4, neuvième amendement conscient)",
+  description:
+    "statut est obligatoire : un onglet interroge son statut, jamais la table entière (avant ce lot, " +
+    "GET /admin/deals chargeait tous statuts confondus sous un LIMIT global, filtrés/triés côté client — " +
+    "une soumission en_attente récente pouvait rester hors de la fenêtre du LIMIT, invisible sans qu'aucun " +
+    "filtre ne l'exclue réellement, docs/INCIDENTS.md 04/08/2026). Les comptes par onglet viennent de " +
+    "GET /admin/deals/compte, jamais de la longueur de cette liste.",
   security: [{ [bearerAuth.name]: [] }],
-  request: { query: z.object({ statut: z.string().optional() }) },
+  request: {
+    query: z.object({
+      statut: z.string().openapi({ description: "auto_draft|en_attente|publie|rejete|expire — requis" }),
+      cursor: z.string().optional(),
+      limit: z.string().optional(),
+    }),
+  },
   responses: {
-    200: {
-      description: "OK",
-      content: {
-        "application/json": { schema: z.object({ data: z.array(DealAdmin), total: z.number() }) },
-      },
-    },
+    200: { description: "OK", content: { "application/json": { schema: paginated(DealAdmin, "DealAdminPage") } } },
+    400: errorResponse("Statut manquant ou inconnu, ou curseur invalide pour cet onglet"),
+    403: errorResponse("Accès refusé (non-admin)"),
+  },
+  tags: ["admin"],
+});
+
+const CompteAdminDeals = registry.register(
+  "CompteAdminDeals",
+  z.object({
+    comptes: z.object({
+      auto_draft: z.number().int(),
+      en_attente: z.number().int(),
+      publie: z.number().int(),
+      rejete: z.number().int(),
+      expire: z.number().int(),
+    }),
+  })
+);
+
+registry.registerPath({
+  method: "get",
+  path: "/admin/deals/compte",
+  summary: "Compte par statut (CONTRAT-V1 §4, neuvième amendement conscient)",
+  description:
+    "count(*) en base, groupé par statut — les cinq clés sont toujours présentes, à 0 s'il n'y a aucune " +
+    "ligne. Jamais déduit de la longueur d'une liste paginée (docs/INCIDENTS.md, 04/08/2026).",
+  security: [{ [bearerAuth.name]: [] }],
+  responses: {
+    200: { description: "OK", content: { "application/json": { schema: CompteAdminDeals } } },
     403: errorResponse("Accès refusé (non-admin)"),
   },
   tags: ["admin"],

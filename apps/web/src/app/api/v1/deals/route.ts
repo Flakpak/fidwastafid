@@ -6,7 +6,7 @@ import { apiError, withAuthErrors } from "../_lib/errors.js";
 import { parseJsonBody, parseCandidate } from "../_lib/validation.js";
 import { isRateLimited, getClientIp } from "../_lib/rateLimit.js";
 import { verifierTurnstile, TurnstileIndisponibleError } from "../_lib/turnstile.js";
-import { decodeCursor, encodeCursor, type TriDeals } from "../_lib/pagination.js";
+import { decodeCursor, encodeCursor, isDealsCursor, type TriDeals } from "../_lib/pagination.js";
 import {
   conditionCategorie,
   conditionType,
@@ -129,7 +129,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const cursorParam = searchParams.get("cursor");
   let cursor = null;
   if (cursorParam) {
-    cursor = decodeCursor(cursorParam);
+    cursor = decodeCursor(cursorParam, isDealsCursor);
     if (!cursor || cursor.tri !== tri) {
       return apiError("VALIDATION_ERROR", "Curseur invalide pour ce tri.");
     }

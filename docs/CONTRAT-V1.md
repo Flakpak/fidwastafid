@@ -211,7 +211,10 @@ DELETE /api/v1/me                           suppression de compte (anonymisation
                                              compte auth)
 
 # Admin (requireAdmin)
-GET    /api/v1/admin/deals                  pipeline complet (auto_draft en premier)
+GET    /api/v1/admin/deals                  file d'UN statut (paramètre requis), pagination par
+                                             curseur — ajouté le 05/08/2026, neuvième amendement
+                                             conscient (voir ci-dessous)
+GET    /api/v1/admin/deals/compte           compte par statut, même amendement
 PATCH  /api/v1/admin/deals/:publicId        édition complète du deal + statut (voir §3, amendement du 19/07/2026)
 POST   /api/v1/admin/deals/bulk             actions groupées
 POST   /api/v1/admin/deals/:publicId/image-depuis-lien
@@ -228,6 +231,32 @@ DELETE /api/v1/admin/deals/:publicId/diffuser/discord
                                              diffusion communautaire, un canal par chemin —
                                              ajouté le 02/08/2026, huitième amendement conscient
 ```
+
+**Amendement du 05/08/2026 — la file admin filtre en base, pas côté client (neuvième
+amendement conscient de la liste fermée).** `GET /api/v1/admin/deals` chargeait tous
+statuts confondus (`LIMIT 1000` global, tri `auto_draft` d'abord puis `score desc,
+public_id desc`) ; chaque onglet du back-office filtrait et triait ensuite ce même tableau
+côté client. Fait générateur : une soumission `en_attente` restait invisible dans le
+back-office bien qu'existant en base avec le bon statut — la table comptait 1592 lignes,
+938 à égalité de score `0` parmi les non-`auto_draft`, départagées par `public_id`
+(arbitraire, pas `created_at`) ; la soumission tombait hors des 354 places restantes après
+les 646 `auto_draft`, silencieusement (docs/INCIDENTS.md, 04/08/2026).
+
+- `statut` devient un paramètre **requis** de `GET /api/v1/admin/deals` : un onglet
+  interroge son statut, jamais l'ensemble. Pagination par curseur (`_lib/adminDealsCursor.ts`),
+  même mécanique que le feed public — jamais d'offset, jamais de `LIMIT` global.
+- Tri par statut (`triPourStatut`, `_lib/deals.ts`) : `en_attente` trie par `created_at`
+  croissant (plus ancien d'abord — une file d'attente se traite dans l'ordre d'arrivée, pas
+  par classement) ; les autres onglets conservent le tri par remise décroissante déjà en
+  vigueur.
+- `GET /api/v1/admin/deals/compte` — nouvel endpoint, un `count(*)` par statut, toujours les
+  cinq clés présentes. Les compteurs par onglet du back-office en dépendent désormais,
+  jamais de la longueur d'une liste paginée : un onglet qui n'a chargé que sa première page
+  ne peut pas se compter lui-même sans mentir sur ce qu'il n'a pas encore chargé — c'est le
+  même motif de repli silencieux que `docs/INCIDENTS.md` consigne déjà trois fois ailleurs.
+- L'avertissement de troncature (« la limite serveur a tronqué le résultat ») est retiré du
+  back-office : sans `LIMIT` global, il n'a plus d'objet, et un avertissement permanent
+  qu'on apprend à ignorer est pire qu'aucun avertissement.
 
 **Révision du 02/08/2026 (même journée) — le canal passe DANS le chemin.** La première
 rédaction exposait `/diffuser` sans canal, Telegram étant le seul. Dès le second canal

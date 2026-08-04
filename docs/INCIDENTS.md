@@ -10,6 +10,48 @@ en a appris. Une leçon gravée ici a vocation à être citée depuis le code ou
 
 ---
 
+## 2026-08-04 — Une soumission `en_attente` existait en base, invisible dans le back-office
+
+*(Consigné ici le 2026-08-05, après diagnostic.)*
+
+**Symptôme.** Un deal soumis via `/soumettre` (lien `marwa.com`) affiche le message de
+succès, mais n'apparaît nulle part dans la file de modération admin.
+
+**Diagnostic — la ligne existe, correctement.** Deux soumissions en base (l'utilisateur a
+réessayé) : `statut=en_attente`, `type=en_ligne`, `enseigne_id` `NULL` (marwa.com non
+curée — légitime), `submitter_id` résout sur le bon compte, `turnstile_verifie=true`.
+L'écriture (`POST /api/v1/deals`) a fonctionné du premier coup ; aucun `catch` n'avale
+d'erreur, aucune transaction n'est restée en suspens.
+
+**Cause.** `GET /api/v1/admin/deals` n'avait pas de filtre par défaut mais un `LIMIT 1000`
+sur TOUS statuts confondus, trié `auto_draft` d'abord puis `score desc, public_id desc` —
+le filtrage et le tri PAR ONGLET se faisaient ensuite côté client, sur ce tableau déjà
+tronqué. La table comptait 1592 lignes (646 `auto_draft` + 946 autres). Parmi les 946,
+938 étaient à égalité de score `0`, départagées par `public_id` — une chaîne aléatoire,
+pas `created_at`. Seules 354 places restaient après les `auto_draft` : les deux nouvelles
+soumissions, à égalité avec 627 et 478 autres lignes respectivement selon ce critère
+arbitraire, tombaient hors du `LIMIT`, silencieusement. Ni un filtre, ni une jointure
+(toutes en `LEFT JOIN`) n'étaient en cause — hypothèses initiales écartées par la mesure.
+
+**Aggravant.** Les compteurs par onglet du back-office (« En attente (0) ») étaient
+calculés sur ce même tableau tronqué : l'interface affirmait activement une absence
+FAUSSE plutôt que de ne rien afficher — la même famille de défaut que le repli silencieux
+déjà consigné trois fois ici (19/07, 24/07, 02/08).
+
+**Correctif (CONTRAT-V1 §4, neuvième amendement conscient, 05/08/2026).**
+`GET /api/v1/admin/deals` filtre désormais PAR STATUT en base (paramètre requis),
+paginé par curseur comme le feed public — jamais de `LIMIT` global. `en_attente` trie par
+`created_at` croissant (plus ancien d'abord : une file d'attente se traite dans l'ordre
+d'arrivée, pas par classement). Les comptes par onglet viennent d'un nouvel endpoint,
+`GET /api/v1/admin/deals/compte` — un `count(*)` en base par statut, jamais la longueur
+d'une liste paginée.
+
+**Leçon.** Un filtre appliqué APRÈS avoir chargé une liste tronquée n'est pas un filtre :
+c'est un tri sur ce qui a survécu au hasard de la troncature. Une file de modération doit
+filtrer avant de trier, et compter en base.
+
+---
+
 ## 2026-08-04 — Mention CNDP retirée : aucune déclaration n'est attestée dans le dépôt
 
 *Entrée de **constat**, pas d'incident : rien n'a cassé en production. Consignée pour

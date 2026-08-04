@@ -1,4 +1,5 @@
 import { withTransaction, closePool, query } from "@fidwastafid/db";
+import { generatePublicId } from "@fidwastafid/schemas";
 import { PUBLIC_IDS_FIXTURES, PUBLIC_ID_INEXISTANT } from "./fixtures.js";
 import { POST as postDeal, GET as getDealsList } from "../src/app/api/v1/deals/route.js";
 import { GET as getCompte } from "../src/app/api/v1/deals/compte/route.js";
@@ -10,6 +11,8 @@ import {
 } from "../src/app/api/v1/deals/[publicId]/commentaires/route.js";
 import { GET as getMe, PATCH as patchMe } from "../src/app/api/v1/me/route.js";
 import { PATCH as patchAdminDeal } from "../src/app/api/v1/admin/deals/[publicId]/route.js";
+import { GET as getAdminDeals } from "../src/app/api/v1/admin/deals/route.js";
+import { GET as getAdminDealsCompte } from "../src/app/api/v1/admin/deals/compte/route.js";
 import { POST as postBulk } from "../src/app/api/v1/admin/deals/bulk/route.js";
 import { POST as postImageDepuisLien } from "../src/app/api/v1/admin/deals/[publicId]/image-depuis-lien/route.js";
 import { POST as postDealImage } from "../src/app/api/v1/admin/deals/[publicId]/image/route.js";
@@ -1135,6 +1138,75 @@ async function main() {
     check("curseur d'un autre jeu de filtres -> 400, jamais une page silencieusement fausse", rejoue.status === 400);
   } else {
     check("curseur d'un autre jeu de filtres -> 400 (non exercé : une seule page)", true);
+  }
+
+  // -------------------------------------------------------------------------
+  // File admin — filtre serveur, compte exact, dernière ligne atteignable
+  // (docs/INCIDENTS.md, 04/08/2026 : une soumission en_attente restait
+  // invisible derrière un LIMIT global partagé par tous les statuts).
+  //
+  // `expire` est un statut qu'aucun autre test de ce fichier ne touche —
+  // isolé exprès, pour que ce bloc ne dépende ni n'interfère avec le reste
+  // de la suite. Auto-nettoyé en fin de bloc (DELETE), la base d'intégration
+  // étant un projet persistant, pas un conteneur jetable.
+  // -------------------------------------------------------------------------
+  console.log("\nfile admin — filtre par statut, compte exact, dernière ligne atteignable");
+
+  const PAGE_TEST_LIMIT = 30; // DEFAULT_LIMIT, admin/deals/route.ts
+  const N_SYNTHETIQUES = PAGE_TEST_LIMIT + 5; // > une page, sans dépendre d'un ordre précis
+  const idsSynthetiques = Array.from({ length: N_SYNTHETIQUES }, () => generatePublicId());
+
+  async function compteAdmin(statut: string): Promise<number> {
+    const res = await getAdminDealsCompte(authedRequest("http://localhost/api/v1/admin/deals/compte", token), noParams);
+    const body = (await res.json()) as { comptes: Record<string, number> };
+    if (res.status !== 200) throw new Error(`GET /admin/deals/compte -> ${res.status}`);
+    return body.comptes[statut] ?? 0;
+  }
+
+  async function listerToutAdmin(statut: string): Promise<{ ids: string[]; pages: number }> {
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    let pages = 0;
+    for (let page = 0; page < 50; page++) {
+      const url = `http://localhost/api/v1/admin/deals?statut=${statut}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+      const res = await getAdminDeals(authedRequest(url, token), noParams);
+      if (res.status !== 200) throw new Error(`GET /admin/deals?statut=${statut} -> ${res.status}`);
+      pages++;
+      const body = (await res.json()) as { data: { publicId: string }[]; nextCursor: string | null };
+      ids.push(...body.data.map((d) => d.publicId));
+      cursor = body.nextCursor;
+      if (!cursor) break;
+    }
+    return { ids, pages };
+  }
+
+  try {
+    for (const publicId of idsSynthetiques) {
+      await query(
+        `insert into deals (public_id, titre, categorie, type, prix_promo, statut, submitter_id, score)
+         values ($1, 'Deal test pagination admin', 'Autre', 'physique', 1, 'expire', $2, 0)
+         on conflict (public_id) do nothing`,
+        [publicId, userId]
+      );
+    }
+
+    const verite = await query<{ total: number }>("select count(*)::int as total from deals where statut = 'expire'");
+    const compteAttendu = verite[0]?.total ?? -1;
+    const compteApi = await compteAdmin("expire");
+    check(
+      "GET /admin/deals/compte — compte exact (identique à un count(*) direct), pas la taille d'une liste tronquée",
+      compteApi === compteAttendu
+    );
+
+    const { ids: idsServis, pages } = await listerToutAdmin("expire");
+    check("file admin — plus d'une page réellement parcourue", pages > 1);
+    check(
+      "file admin — toutes les lignes synthétiques sont atteignables par pagination, y compris la dernière insérée",
+      idsSynthetiques.every((id) => idsServis.includes(id))
+    );
+    check("file admin — la pagination ne sert aucune ligne en double", new Set(idsServis).size === idsServis.length);
+  } finally {
+    await query("delete from deals where statut = 'expire' and public_id = any($1::text[])", [idsSynthetiques]);
   }
 
   console.log(
