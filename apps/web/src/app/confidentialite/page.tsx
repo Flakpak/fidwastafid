@@ -81,11 +81,17 @@ export default function ConfidentialitePage() {
 
           <Section titre="Mesure d'audience">
             <p>
-              Le site utilise Vercel Web Analytics pour savoir combien de pages sont vues, sans savoir par qui.
+              Le site propose de mesurer son audience avec Vercel Web Analytics, pour savoir combien de pages
+              sont vues sans savoir par qui — ce script ne se charge que si tu l&apos;acceptes, jamais avant.
               D&apos;après la documentation publique de Vercel : aucun cookie tiers, les visiteurs sont
               identifiés par un hachage recalculé à chaque visite et jamais conservé plus de 24 h, et les
               données enregistrées sont agrégées — horodatage, page vue, provenance, localisation approximative
               (pays/région/ville) et type d&apos;appareil, jamais un nom, un email ou une adresse IP en clair.
+            </p>
+            <p>
+              Ton choix (accepter ou refuser) est mémorisé sur cet appareil, jamais transmis à nos serveurs, et
+              révocable à tout moment depuis le lien <strong className="text-ink">« Cookies »</strong> en pied
+              de page.
             </p>
           </Section>
 
@@ -154,6 +160,15 @@ export default function ConfidentialitePage() {
           </Section>
 
           <Section titre="Contact">
+            {/*
+             * REPÈRE — identité juridique du responsable de traitement.
+             * Obligatoire tant au Maroc (loi 09-08) que dans l'UE (RGPD,
+             * art. 13) : raison sociale, forme juridique, adresse du siège.
+             * À fournir par Kamel — volontairement NON inventée ici (aucune
+             * forme sociale, aucune adresse plausible écrite à sa place).
+             * Une fois fournie, l'ajouter en premier paragraphe de cette
+             * section, avant la phrase de contact ci-dessous.
+             */}
             <p>
               Une question sur tes données ? Le responsable du traitement est Fidwastafid, joignable à{" "}
               <Link href="/contact" className="text-accent font-bold hover:underline">
