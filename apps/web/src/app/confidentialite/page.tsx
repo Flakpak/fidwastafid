@@ -4,7 +4,7 @@ import { SiteHeader } from "../../components/SiteHeader.js";
 import { SiteFooter } from "../../components/SiteFooter.js";
 
 const DESCRIPTION =
-  "Quelles données Fidwastafid conserve, pourquoi, et comment exercer tes droits d'accès, de rectification et d'effacement (loi 09-08).";
+  "Quelles données Fidwastafid conserve, ce que ton navigateur reçoit, où elles sont hébergées, et comment exercer tes droits (loi 09-08 et RGPD).";
 
 export const metadata: Metadata = {
   title: "Confidentialité",
@@ -31,12 +31,12 @@ export default function ConfidentialitePage() {
           <div>
             <h1 className="text-2xl font-black mb-1">Confidentialité</h1>
             <p className="text-sm text-ink-muted">
-              Cette page explique simplement quelles données Fidwastafid conserve à ton sujet, pourquoi, et
-              comment garder la main dessus.
+              Cette page explique simplement quelles données Fidwastafid conserve à ton sujet, ce que ton
+              navigateur reçoit techniquement, où tout ça est hébergé, et comment garder la main dessus.
             </p>
           </div>
 
-          <Section titre="Données collectées">
+          <Section titre="Ce que tu nous confies">
             <p>Uniquement ce qui est nécessaire au fonctionnement du compte et de la communauté :</p>
             <ul className="list-disc pl-5 flex flex-col gap-1">
               <li>ton email, utilisé pour te connecter — jamais affiché publiquement ;</li>
@@ -60,12 +60,57 @@ export default function ConfidentialitePage() {
             </ul>
           </Section>
 
-          <Section titre="Pourquoi">
+          <Section titre="Ce que ton navigateur reçoit">
+            <p>Deux choses seulement, toutes deux strictement nécessaires au fonctionnement du site :</p>
             <ul className="list-disc pl-5 flex flex-col gap-1">
-              <li>faire fonctionner ton compte (connexion, préférences) ;</li>
-              <li>afficher tes contributions à la communauté (pseudo et avatar sur tes deals et commentaires) ;</li>
-              <li>protéger le site contre les abus (spam, votes truqués).</li>
+              <li>
+                <strong className="text-ink">un cookie de session</strong> (<code>fid_session</code>) une fois
+                connecté — il porte ta connexion, rien d&apos;autre. Illisible en JavaScript, transmis
+                uniquement en HTTPS, et supprimé quand ta session expire ;
+              </li>
+              <li>
+                <strong className="text-ink">un brouillon de soumission</strong>, uniquement sur la page{" "}
+                <Link href="/soumettre" className="text-accent font-bold hover:underline">
+                  Soumettre un deal
+                </Link>{" "}
+                — gardé le temps de l&apos;onglet ouvert (stockage local du navigateur, jamais transmis à nos
+                serveurs), effacé à la fermeture de l&apos;onglet ou une fois la soumission envoyée.
+              </li>
             </ul>
+          </Section>
+
+          <Section titre="Mesure d'audience">
+            <p>
+              Le site utilise Vercel Web Analytics pour savoir combien de pages sont vues, sans savoir par qui.
+              D&apos;après la documentation publique de Vercel : aucun cookie tiers, les visiteurs sont
+              identifiés par un hachage recalculé à chaque visite et jamais conservé plus de 24 h, et les
+              données enregistrées sont agrégées — horodatage, page vue, provenance, localisation approximative
+              (pays/région/ville) et type d&apos;appareil, jamais un nom, un email ou une adresse IP en clair.
+            </p>
+          </Section>
+
+          <Section titre="Vérification anti-robot">
+            <p>
+              Sur la page{" "}
+              <Link href="/soumettre" className="text-accent font-bold hover:underline">
+                Soumettre un deal
+              </Link>{" "}
+              uniquement, un widget Cloudflare Turnstile vérifie que ta soumission vient bien d&apos;une
+              personne avant de l&apos;accepter. Cloudflare qualifie les signaux qu&apos;il recueille à cette
+              fin (adresse IP, empreinte technique du navigateur) de « strictement nécessaires » à la détection
+              de robots, et affirme ne pas pouvoir identifier directement une personne à partir d&apos;eux. Ce
+              widget est un service tiers : ce qu&apos;il dépose exactement dans ton navigateur (cookie ou
+              état technique) est régi par la politique de Cloudflare, pas par nous.
+            </p>
+          </Section>
+
+          <Section titre="Où sont hébergées tes données">
+            <p>
+              La base de données (Supabase) et les serveurs qui font tourner le site (Vercel) sont configurés
+              dans la même région, en Irlande — Union européenne. Pour un visiteur au Maroc, cela veut dire que
+              tes données quittent le territoire marocain pour être traitées dans l&apos;UE ; pour un visiteur
+              résidant dans l&apos;UE, cela veut dire qu&apos;elles n&apos;en sortent pas.
+            </p>
           </Section>
 
           <Section titre="Ce qui n'est pas fait">
@@ -85,15 +130,22 @@ export default function ConfidentialitePage() {
             </p>
           </Section>
 
-          <Section titre="Tes droits (loi 09-08)">
+          <Section titre="Tes droits">
             <p>
-              La loi marocaine 09-08 te donne le droit d&apos;accéder à tes données, de les rectifier, et de les
-              faire effacer. Tu peux exercer ces trois droits directement, à tout moment, depuis{" "}
+              La loi marocaine 09-08 te donne le droit d&apos;accéder à tes données, de les rectifier, et de
+              les faire effacer. Si tu résides dans l&apos;Union européenne, le RGPD s&apos;applique en plus et
+              ajoute un droit d&apos;opposition, ainsi que le droit d&apos;introduire une réclamation auprès de
+              l&apos;autorité de protection des données de ton pays de résidence.
+            </p>
+            <p>
+              Tu peux exercer l&apos;accès, la rectification et l&apos;effacement directement, à tout moment,
+              depuis{" "}
               <Link href="/compte" className="text-accent font-bold hover:underline">
                 ton compte
               </Link>{" "}
-              : consulter ton profil et tes contributions (accès), modifier ton pseudo ou ta couleur d&apos;avatar
-              (rectification), ou supprimer ton compte (effacement). Pour toute autre question, tu peux{" "}
+              : consulter ton profil et tes contributions (accès), modifier ton pseudo ou ta couleur
+              d&apos;avatar (rectification), ou supprimer ton compte (effacement). Pour l&apos;opposition ou
+              toute autre question, tu peux{" "}
               <Link href="/contact" className="text-accent font-bold hover:underline">
                 nous contacter directement
               </Link>
@@ -103,9 +155,9 @@ export default function ConfidentialitePage() {
 
           <Section titre="Contact">
             <p>
-              Une question sur tes données ?{" "}
+              Une question sur tes données ? Le responsable du traitement est Fidwastafid, joignable à{" "}
               <Link href="/contact" className="text-accent font-bold hover:underline">
-                Contacte-nous
+                contact@fidwastafid.com
               </Link>
               .
             </p>
