@@ -4,25 +4,39 @@
 # des deals ») — le seul geste irréversible de tout le dispositif, construit
 # désarmé.
 #
-# PAS DE `schedule:` ICI, volontairement, contrairement à db-backup.yml et
-# pipeline-quotidien.yml : ce job ne doit jamais tourner tout seul tant que
-# l'activation n'a pas été une décision EXPLICITE et NOMMÉE (consigne de
-# conception du lot). `workflow_dispatch` uniquement — chaque exécution, y
-# compris en mode à blanc, est un geste volontaire.
+# `schedule:` AJOUTÉ le 05/08/2026 (armement du mode à blanc, PAS de la
+# purge) : hebdomadaire, rapporte sans jamais écrire — objectif que l'écart
+# entre 0 et un nombre non nul candidat soit VISIBLE avant toute décision
+# d'armement, pas découvert le jour où on active. `actif` reste
+# structurellement impossible sur ce déclenchement : la condition ci-dessous
+# (`PURGE_IMAGES_ACTIF`) exige `github.event_name == 'workflow_dispatch'`,
+# jamais vrai sur `schedule` — pas seulement parce que `inputs.actif` serait
+# absent (implicite), mais explicitement, pour que ce garde-fou se lise sans
+# connaître cette nuance du contexte GitHub Actions.
 #
-# `actif` reste FAUX par défaut sur ce déclenchement manuel lui-même : lancer
+# `workflow_dispatch` reste la SEULE façon d'armer réellement (`actif` coché
+# à la main) : cocher le mode réel est encore et toujours un geste manuel
+# volontaire, jamais automatique — seul le RAPPORT est désormais automatique.
+#
+# `actif` reste FAUX par défaut sur le déclenchement manuel lui-même : lancer
 # le workflow sans le cocher rapporte ce qui serait supprimé, n'écrit rien
 # (apps/pipeline/purger-images.mjs). C'est aussi le moyen de produire le
-# rapport « qu'est-ce qui serait supprimé aujourd'hui » demandé à la
-# conception : Run workflow avec delai_jours=0, actif décoché.
+# rapport « qu'est-ce qui serait supprimé aujourd'hui » : Run workflow avec
+# delai_jours=0, actif décoché.
 
 name: Purge des images de deals supprimés
 
 on:
+  schedule:
+    # Dimanche 04:00 UTC — hebdomadaire, hors des fenêtres du backup (03:00)
+    # et du pipeline quotidien (05:00). Toujours à blanc (délai réel, 90
+    # jours par défaut — jamais 0 ici : le but est de voir le compte réel
+    # évoluer semaine après semaine, pas de revoir le total éventuel figé).
+    - cron: "0 4 * * 0"
   workflow_dispatch:
     inputs:
       actif:
-        description: "Active réellement la purge (Storage + journal_audit). Décoché = mode à blanc, ne fait que rapporter."
+        description: "Active réellement la purge (Storage + journal_audit). Décoché = mode à blanc, ne fait que rapporter. Sans effet hors workflow_dispatch."
         type: boolean
         default: false
       delai_jours:
@@ -42,7 +56,10 @@ jobs:
       DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-      PURGE_IMAGES_ACTIF: ${{ inputs.actif && 'true' || 'false' }}
+      # Explicitement conditionné à workflow_dispatch — jamais vrai sur
+      # schedule, quelle que soit la valeur (toujours absente) de inputs.actif
+      # sur ce déclencheur. Ceinture ET bretelles, volontairement redondant.
+      PURGE_IMAGES_ACTIF: ${{ github.event_name == 'workflow_dispatch' && inputs.actif && 'true' || 'false' }}
       PURGE_IMAGES_DELAI_JOURS: ${{ inputs.delai_jours }}
     steps:
       - uses: actions/checkout@v7
@@ -56,15 +73,24 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # `tee` double le rapport dans le résumé du run (visible directement
+      # dans la liste des runs, sans ouvrir les logs) — c'est la visibilité
+      # demandée pour le passage à blanc hebdomadaire, pas un nouveau canal
+      # d'alerte : le mécanisme d'alerte existant reste réservé à l'échec du
+      # rapport lui-même (étape suivante), jamais à un compte non nul, qui
+      # n'est pas un échec.
       - name: Purge des images (ou simulation)
-        run: pnpm --filter pipeline run purger-images
+        run: pnpm --filter pipeline run purger-images | tee -a "$GITHUB_STEP_SUMMARY"
 
       # Même raison que db-backup.yml/pipeline-quotidien.yml : un run de cron
       # (ou ici, de déclenchement manuel non surveillé) n'a pas d'auteur de
       # commit à qui GitHub enverrait un e-mail d'échec. Un job de purge muet
       # qui échoue laisserait croire au nettoyage — mécanique d'alerte
-      # réutilisée telle quelle, jamais dupliquée.
-      - name: Alerte — échec de la purge d'images
+      # réutilisée telle quelle, jamais dupliquée. Un rapport à blanc qui
+      # plante (connexion base, Storage injoignable) est traité EXACTEMENT
+      # comme l'échec d'une purge réelle : un job muet qui échoue ne prouve
+      # rien, qu'il soit armé ou non.
+      - name: Alerte — échec de la purge d'images (ou de son rapport à blanc)
         if: failure()
         uses: ./.github/actions/alerte-issue
         env:
@@ -74,23 +100,25 @@ jobs:
           depot: ${{ github.repository }}
           assignes: Flakpak
           labels-supplementaires: urgent
-          titre: "Purge d'images en échec"
+          titre: "Purge d'images (ou son rapport à blanc) en échec"
           corps: |
             Le workflow **Purge des images de deals supprimés** a **échoué**.
 
             | | |
             |---|---|
             | Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
-            | Mode | `actif=${{ inputs.actif }}`, `delai_jours=${{ inputs.delai_jours || '90 (défaut)' }}` |
+            | Déclencheur | `${{ github.event_name }}` |
+            | Mode | `actif=${{ env.PURGE_IMAGES_ACTIF }}`, `delai_jours=${{ inputs.delai_jours || '90 (défaut)' }}` |
 
-            Si `actif` était vrai : des fichiers ont pu être effacés du Storage AVANT
-            l'échec — `apps/pipeline/purger-images.mjs` traite les candidats un par un et
-            pose `image_purgee_le` immédiatement après chaque suppression réussie ; un run
-            interrompu ne laisse donc jamais un `image_purgee_le` posé sans suppression
-            réelle correspondante, mais peut laisser un lot partiellement traité. Relancer
-            le workflow reprend là où il s'est arrêté (la requête de candidats exclut déjà
-            `image_purgee_le is not null`).
+            Si `actif` était vrai (uniquement possible sur `workflow_dispatch`) : des fichiers
+            ont pu être effacés du Storage AVANT l'échec — `apps/pipeline/purger-images.mjs`
+            traite les candidats un par un et pose `image_purgee_le` immédiatement après chaque
+            suppression réussie ; un run interrompu ne laisse donc jamais un `image_purgee_le`
+            posé sans suppression réelle correspondante, mais peut laisser un lot partiellement
+            traité. Relancer le workflow reprend là où il s'est arrêté (la requête de candidats
+            exclut déjà `image_purgee_le is not null`).
 
-            Si `actif` était faux (mode à blanc) : aucune écriture n'a pu avoir eu lieu,
-            l'échec porte uniquement sur le rapport lui-même (connexion base, Storage
-            injoignable pour la taille des fichiers, etc.).
+            Si `actif` était faux (mode à blanc, y compris le passage hebdomadaire automatique) :
+            aucune écriture n'a pu avoir eu lieu, l'échec porte uniquement sur le rapport
+            lui-même (connexion base, Storage injoignable pour la taille des fichiers, etc.) —
+            un rapport à blanc muet qui plante ne prouve rien sur ce qu'il aurait dû annoncer.

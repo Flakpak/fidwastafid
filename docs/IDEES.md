@@ -590,3 +590,29 @@ logique de bascule que le reste de l'infra managée, cf.
 d'ici là dans l'advisor Supabase — état nominal documenté au CONTRAT-V1 §9
 (constat du 22/07/2026, revue sécurité mensuelle,
 `docs/RUNBOOK-securite.md`), pas un oubli.
+
+## Purge automatique des `expire` jamais publiés — différée, faute de mesure (2026-08-05)
+
+Le lot 5 du plan « suppression administrative des deals » (`apps/pipeline/purger-lignes.mjs`,
+CONTRAT-V1 §1/§3, quatorzième amendement) exclut explicitement les deals `expire` de son périmètre
+automatique — CONTRAT-V1 **§1** grave « URL vivante à vie, jamais de suppression » pour un deal
+expiré, un actif SEO. Cette exclusion couvre aujourd'hui les 430 `expire` jamais publiés (« purgeables »
+au sens du lot 3, `deals_protection.protege = false`) sans distinction : traités comme un bloc protégé,
+qu'ils aient ou non une valeur SEO réelle.
+
+**Ce n'est pas tranché, c'est différé faute de mesure.** L'argument SEO suppose que ces pages sont
+effectivement indexées et rapportent du trafic — rien ne le vérifie aujourd'hui. Avant d'envisager une
+purge automatique de ce sous-ensemble (jamais publié, donc jamais mis en avant, contrairement à un
+`publie` rétrogradé) :
+
+- Mesurer leur présence réelle dans l'index Google (Search Console : pages indexées, impressions,
+  clics) — un `expire` jamais publié n'a peut-être jamais été crawlé ni indexé du tout, auquel cas
+  l'argument SEO ne s'applique pas à lui et l'exclusion serait plus prudente que nécessaire.
+- Si la mesure montre une part significative sans trafic ni indexation : rouvrir la question d'un
+  périmètre lot 5 élargi, avec un seuil de dormance propre, pas une simple suppression de
+  l'exclusion actuelle.
+- Si la mesure montre une indexation/un trafic réels même sur du jamais-publié : l'exclusion actuelle
+  reste la bonne décision, sans plus de débat.
+
+Déblocage : uniquement piloté par la mesure Search Console, jamais spéculativement — même principe que
+la taxonomie v3 et les facettes croisées ci-dessus.
