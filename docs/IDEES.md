@@ -616,3 +616,37 @@ purge automatique de ce sous-ensemble (jamais publié, donc jamais mis en avant,
 
 Déblocage : uniquement piloté par la mesure Search Console, jamais spéculativement — même principe que
 la taxonomie v3 et les facettes croisées ci-dessus.
+
+## Identité juridique du responsable de traitement — en pause, structure prête (2026-08-05)
+
+`/confidentialite` porte toujours un repère explicite : l'identité juridique du responsable de
+traitement (raison sociale, forme juridique, adresse, contact dédié à l'exercice des droits) n'est
+pas publiée. **En pause** — Kamel n'a pas ces informations à fournir à court terme, ce n'est pas
+oublié, c'est délibérément différé.
+
+**Ne pas repartir de zéro le jour venu** : une structure d'accueil existe déjà, construite et
+vérifiée (typecheck, lint), sur la branche `feat/identite-responsable-traitement` (PR #96, fermée
+sans fusion). `apps/web/src/app/confidentialite/page.tsx` y porte une constante
+`RESPONSABLE_TRAITEMENT` avec cinq champs, chacun documenté :
+
+1. **Raison sociale** — nom légal exact (entité ou personne physique si nom propre/auto-entrepreneur).
+2. **Forme juridique** — SARL, SARL AU, auto-entrepreneur, personne physique…
+3. **Adresse** — adresse postale complète du siège ou de l'exploitant.
+4. **Contact dédié à l'exercice des droits** — un e-mail (`contact@fidwastafid.com` suffit-il, ou un
+   canal distinct ?).
+5. **RC/ICE, si applicable** — registre de commerce (numéro + ville) et Identifiant Commun de
+   l'Entreprise, usuels dans une mention légale marocaine complète mais pas obligatoires en soi ;
+   champ optionnel, n'affiche rien tant qu'il n'est pas confirmé applicable.
+
+Tant qu'un champ obligatoire n'est pas fourni, la page l'affiche littéralement `à compléter` —
+visible, jamais masqué ni inventé. Fournir les valeurs et rouvrir la branche (ou en recréer une à
+partir d'elle) suffit à publier ; aucune autre partie du fichier n'a besoin de changer.
+
+**Distinction à ne pas perdre** : cette mention est **indépendante d'une éventuelle déclaration
+CNDP** (retirée du dépôt le 04/08/2026 faute de preuve qu'elle ait eu lieu, `docs/INCIDENTS.md`).
+L'identité du responsable de traitement est due dès lors que des données sont collectées — ce qui
+est déjà le cas aujourd'hui (compte, votes, commentaires) — que le site soit ou non déclaré à la
+CNDP par ailleurs. Retarder l'une ne retarde pas l'obligation de l'autre.
+
+Déblocage : Kamel fournit les cinq informations ci-dessus, quand il le décide — aucune mesure ni
+condition technique à remplir avant.
