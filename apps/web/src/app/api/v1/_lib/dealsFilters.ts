@@ -130,8 +130,14 @@ export function conditionsBase(f: FiltresDeals, l: Lieur, alias = "d"): string[]
   const conditions = [`${alias}.statut = ${lier(l, f.statut)}`, `${alias}.supprime_le is null`];
   if (f.enseigne) conditions.push(`e.slug = ${lier(l, f.enseigne)}`);
   if (f.q) {
+    // unaccent() des DEUX côtés (motif ET colonnes) — symétrique par
+    // construction : peu importe lequel, de la requête ou du contenu, porte
+    // les accents (extension `unaccent`, migration 0017). ILIKE reste seul
+    // responsable de l'insensibilité à la casse, inchangé.
     const motif = lier(l, motifLike(f.q));
-    conditions.push(`(${alias}.titre ilike ${motif} escape '\\' or e.nom ilike ${motif} escape '\\' or e.slug ilike ${motif} escape '\\')`);
+    conditions.push(
+      `(unaccent(${alias}.titre) ilike unaccent(${motif}) escape '\\' or unaccent(e.nom) ilike unaccent(${motif}) escape '\\' or unaccent(e.slug) ilike unaccent(${motif}) escape '\\')`
+    );
   }
   return conditions;
 }

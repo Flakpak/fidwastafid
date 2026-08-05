@@ -1870,6 +1870,70 @@ async function main() {
     await query("delete from deals where public_id = any($1::text[])", [ids]);
   }
 
+  // -------------------------------------------------------------------------
+  // Recherche insensible aux accents (migration 0017, extension `unaccent`).
+  // Deux fixtures délibérément construites CHACUNE dans un seul sens, pour
+  // que le test ne puisse pas réussir par coïncidence : ACCENTUE porte les
+  // accents dans le TITRE (requête sans accent doit quand même le trouver) ;
+  // NON_ACCENTUE porte les accents dans la REQUÊTE (contenu sans accent doit
+  // quand même être trouvé). Un seul mot testé dans un seul sens ne
+  // prouverait que la moitié de la symétrie.
+  // -------------------------------------------------------------------------
+  console.log("\nrecherche sans accents — symétrie dans les deux sens, cas réels (café, crêpière)");
+
+  const ACCENT_ACCENTUE = generatePublicId();
+  const ACCENT_NON_ACCENTUE = generatePublicId();
+
+  try {
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score)
+       values ($1, 'Réfrigérateur Électroménager Premium', $2, 'Électroménager', 'physique', 10, 'publie', 0)`,
+      [ACCENT_ACCENTUE, enseigneIdSuppr]
+    );
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score)
+       values ($1, 'Crepiere electrique et machine a cafe', $2, 'Autre', 'physique', 10, 'publie', 0)`,
+      [ACCENT_NON_ACCENTUE, enseigneIdSuppr]
+    );
+
+    async function chercher(q: string): Promise<string[]> {
+      const res = await getDealsList(new Request(`http://localhost/api/v1/deals?q=${encodeURIComponent(q)}&limit=50`));
+      const body = (await res.json()) as { data: { publicId: string }[] };
+      return body.data.map((d) => d.publicId);
+    }
+
+    const avantElectromenager = await chercher("electromenager");
+    check(
+      "AVANT le sens attendu : « electromenager » (sans accent) trouve le titre accentué « Électroménager »",
+      avantElectromenager.includes(ACCENT_ACCENTUE)
+    );
+    check(
+      "sens inverse : « Électroménager » (avec accent) trouve aussi le même titre",
+      (await chercher("Électroménager")).includes(ACCENT_ACCENTUE)
+    );
+
+    const parCafeAccentue = await chercher("café");
+    check(
+      "« café » (avec accent) trouve un titre écrit SANS accent (« cafe »)",
+      parCafeAccentue.includes(ACCENT_NON_ACCENTUE)
+    );
+    check(
+      "« crêpière » (avec accent) trouve un titre écrit SANS accent (« crepiere »)",
+      (await chercher("crêpière")).includes(ACCENT_NON_ACCENTUE)
+    );
+    check(
+      "« cafe »/« crepiere » (sans accent) trouvent aussi le même titre non accentué",
+      (await chercher("cafe")).includes(ACCENT_NON_ACCENTUE) && (await chercher("crepiere")).includes(ACCENT_NON_ACCENTUE)
+    );
+
+    check(
+      "un mot absent des deux titres ne matche ni l'un ni l'autre (pas devenu trop permissif)",
+      !(await chercher("téléphonie")).includes(ACCENT_ACCENTUE) && !(await chercher("téléphonie")).includes(ACCENT_NON_ACCENTUE)
+    );
+  } finally {
+    await query("delete from deals where public_id = any($1::text[])", [[ACCENT_ACCENTUE, ACCENT_NON_ACCENTUE]]);
+  }
+
   console.log(
     "\n(DELETE /api/v1/me non testé automatiquement — suppression réelle du compte de test, à valider manuellement.)"
   );

@@ -439,29 +439,20 @@ message formaté prêt à coller n'est pas écrit.
 **Où.** `docs/IDEES.md`, section « Diffusion communautaire » — liens d'invitation officiels et
 architecture. `config/community.ts` reste à créer (liens en clair, ce ne sont pas des secrets).
 
-### 3.3 — Qualité de recherche : accents, index, pertinence *(priorité 3)*
+### 3.3 — Qualité de recherche : accents — LIVRÉ le 05/08/2026, PR non fusionnée
 
-**La recherche serveur est LIVRÉE — ne pas la remettre dans la file.** Le lot 7 l'a faite : `q`
-sur `GET /api/v1/deals`, `ilike` sur le titre et l'enseigne, jokers échappés, valeur portée par
-l'URL. Avant, la recherche ne filtrait que les deals déjà téléchargés — au-delà de la première
-page, elle ne trouvait rien. Ce chantier-ci est donc le SUIVANT, pas le même : il ne porte plus
-sur *où* filtre la recherche, mais sur ce qu'elle vaut.
+**Insensibilité aux accents livrée** (extension `unaccent`, migration 0017, quinzième amendement
+conscient) : `unaccent()` appliqué aux deux côtés de la comparaison `ilike` (motif ET
+titre/enseigne.nom/enseigne.slug) — symétrique par construction. Vérifié sur cas réels de
+production : « crêpière » (3 deals `publie`) introuvable en tapant « crepiere » avant le correctif,
+trouvé après. **Ne pas remettre ce point dans la file.**
 
-**Ce qui reste, mesuré :**
-
-- **Pas d'insensibilité aux accents.** Vérifié en base : `titre ilike '%electromenager%'` renvoie
-  0, `'%électroménager%'` aussi — mais surtout, aucun de ces deux termes ne trouvera l'autre. Un
-  utilisateur qui tape sans accent ne trouve rien.
-- **Aucun index sur `titre`** (vérifié : 0 index le mentionnant), et `ilike '%…%'` ne peut de
-  toute façon pas utiliser un btree classique. À 113 deals publiés c'est sans effet ; ça se
-  dégrade linéairement, et la table porte déjà 1 592 lignes toutes catégories de statut
-  confondues.
-- **Aucun classement par pertinence** : un deal dont le titre commence par le terme ne remonte pas
-  avant un autre où il apparaît en fin.
-
-**Par quoi commencer.** `unaccent` + `pg_trgm` (extensions Supabase disponibles), index GIN
-trigramme sur `lower(unaccent(titre))`. Mesurer avant : à ce volume, la seule correction qui
-change quelque chose pour l'utilisateur est l'insensibilité aux accents.
+**`pg_trgm` et le classement par pertinence restent explicitement HORS PÉRIMÈTRE — décision produit,
+pas un oubli.** À 113 deals publiés, le gain n'est pas mesurable et complexifierait le curseur de
+pagination signé par ses filtres (CONTRAT-V1 §4). Constat technique au passage : un index expression
+btree sur `unaccent(titre)` n'aurait de toute façon PAS accéléré `ilike '%motif%'` (joker en tête ET
+en queue) — seul un index trigramme (`pg_trgm`) le ferait. Aucun index n'a donc été créé par ce lot :
+coût d'écriture nul pour le pipeline, vérifié (`\d deals` : jeu d'index inchangé).
 
 ### 3.4 — Badge de `/compte` rendu à la main *(priorité 4)*
 

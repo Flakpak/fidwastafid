@@ -1,0 +1,29 @@
+-- Recherche insensible aux accents (paramètre `q`, feed public — CONTRAT-V1
+-- §4). Fait générateur : « electromenager » ne trouvait jamais un deal dont
+-- le titre contient « Électroménager » — ILIKE est déjà insensible à la
+-- casse, jamais aux accents. À 113 deals, c'est le seul défaut de recherche
+-- qui coûte vraiment.
+--
+-- unaccent() est appliqué aux DEUX côtés de la comparaison (le motif ET les
+-- colonnes interrogées, apps/web/src/app/api/v1/_lib/dealsFilters.ts) —
+-- symétrique par construction : peu importe lequel, de la requête ou du
+-- contenu, porte les accents. ILIKE reste seul responsable de
+-- l'insensibilité à la casse, inchangé.
+--
+-- Schéma `public` par défaut, PAS `extensions` (convention Supabase pour
+-- pgcrypto/uuid-ossp, relevé par le connecteur en lecture seule) : cette
+-- migration doit s'appliquer identiquement sur Supabase ET sur un Postgres
+-- nu (local, CI, VPS cible — CONTRAT-V1 §7, « porte de sortie pg_dump »),
+-- qui n'a pas de schéma `extensions`. `public` existe partout, aucune
+-- qualification requise pour appeler `unaccent()` ensuite.
+create extension if not exists unaccent;
+
+-- AUCUN INDEX ici — décision délibérée, pas un oubli. Un index expression
+-- btree sur unaccent(titre) n'accélérerait PAS `ilike '%motif%'` (joker en
+-- tête ET en queue, jamais un préfixe) : seul un index trigramme (pg_trgm)
+-- le ferait, explicitement hors périmètre de ce lot (113 deals, gain non
+-- mesurable, complexifierait le curseur de pagination sans bénéfice
+-- observable). Un index qui ne sert à rien en lecture coûterait quand même
+-- à chaque écriture du pipeline (insertion en volume, quotidienne) — la
+-- décision retenue est donc un coût d'écriture nul : zéro index créé par
+-- cette migration.
