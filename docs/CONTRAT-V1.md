@@ -411,6 +411,46 @@ Postgres nu (local, CI, VPS cible, CONTRAT-V1 §7), qui n'a pas de schéma `exte
   uniquement) ; « téléphonie » n'apparaît que sur des deals non publiés — deux constats honnêtes,
   pas des échecs du correctif.
 
+**Amendement du 05/08/2026 — état voté persistant (seizième amendement conscient).** `CardVote`
+affichait un état « voté » optimiste, côté client uniquement (score reçu, jamais le vote courant de
+l'utilisateur) : au rechargement, un vote déjà émis redevenait invisible. Dette tracée dans
+`docs/IDEES.md` depuis la refonte Tadelakt.
+
+**Chemin retenu : endpoint dédié, PAS un enrichissement de `dealSchema`.** Trois chemins évalués —
+rendu serveur de la page, endpoint dédié, enrichissement de la charge utile du deal. **`dealSchema`
+et `dealAdminSchema` restent inchangés** : le vote courant de l'appelant n'est structurellement pas
+une propriété du deal (il dépend de QUI regarde), l'ajouter à `Deal` aurait rendu CE payload
+dépendant de l'identité de l'appelant. Concrètement, deux mécanismes distincts, choisis par contexte :
+
+- **Fiche d'un deal seul** (`deal/[slugAndId]/page.tsx`) : résolu **en SSR direct**, une requête
+  serveur supplémentaire (le vote de CET utilisateur pour CE deal), zéro appel client, zéro flash.
+  `resolveCurrentUser()` est déjà appelé sur cette page pour `SiteHeader` — dédupliqué par requête
+  (`cache()`, React) — cette résolution ne coûte donc rien de plus qu'une requête SQL supplémentaire,
+  triviale (un seul deal).
+- **Feed** (`GET /api/v1/deals`, paginé, servi à des visiteurs anonymes) : **`GET
+  /api/v1/deals/mes-votes?ids=...`**, endpoint séparé, appelé côté client, UNIQUEMENT si un
+  utilisateur est connecté (`estConnecte`, calculé serveur via `resolveCurrentUser()` et transmis en
+  prop — jamais déduit côté client). **Un visiteur anonyme n'émet AUCUNE requête vers ce endpoint** :
+  coût strictement nul, `GET /api/v1/deals` reste identique, byte pour byte, à avant ce lot — aucun
+  risque pour une éventuelle mise en cache future de ce endpoint (il n'en a pas aujourd'hui : la page
+  qui l'appelle est déjà `force-dynamic`, jamais mise en cache par le CDN — vérifié, aucune régression
+  possible sur ce point précis).
+- Appelé une fois à l'affichage initial ET après chaque « Charger plus » (nouveaux `publicId`
+  uniquement) — jamais pour un `publicId` déjà connu.
+
+**Coût mesuré, pas supposé** : `votes` porte aujourd'hui 8 lignes en production (2 utilisateurs) — la
+jointure `deals.public_id = any($ids)` (indexée, contrainte `unique`) + filtre `user_id` (non indexé
+seul, mais `votes` reste de taille négligeable à l'échelle du projet) est instantanée. Aucun index
+nouveau créé — même principe que le lot recherche ci-dessus : pas d'infrastructure sans bénéfice
+mesurable. Si `votes` grossit significativement, un index sur `user_id` seul serait le premier geste,
+documenté ici pour ne pas le redécouvrir.
+
+**L'état optimiste reste inchangé** : `CardVote` applique le vote reçu du serveur **une seule fois**,
+à la première valeur connue (`useRef`) — un clic qui suit n'est jamais écrasé par une réponse serveur
+arrivée en retard. **Couvre le vote retiré** : la table `votes` ne garde que l'état courant (pas un
+historique) — un vote retiré (`DELETE .../votes`) n'apparaît simplement plus dans la réponse de
+`mes-votes`, sans cas particulier à coder.
+
 ## 4 — Contrat API v1
 
 **Erreurs** — format unique partout :
@@ -444,6 +484,10 @@ GET  /api/v1/deals/:publicId/commentaires   liste, pagination par curseur — aj
 POST   /api/v1/deals                        soumission → statut=en_attente
 POST   /api/v1/deals/:publicId/votes        body: { sens: "chaud"|"froid" } — upsert
 DELETE /api/v1/deals/:publicId/votes        retirer son vote
+GET    /api/v1/deals/mes-votes?ids=a,b,c    vote courant de l'appelant pour les deals demandés
+                                             (50 max) — { votes: { [publicId]: "chaud"|"froid" } },
+                                             absent = pas de vote — ajouté le 05/08/2026, seizième
+                                             amendement conscient (voir §3, état voté persistant)
 POST   /api/v1/deals/:publicId/commentaires
 GET    /api/v1/me                           profil courant (pseudo, email, couleurAvatar, publicId, compteurs)
 PATCH  /api/v1/me                           body: { pseudo?, couleurAvatar? }
