@@ -492,12 +492,14 @@ après un clic local. Couvre le vote retiré : `votes` ne garde que l'état cour
 n'appelle simplement plus de clé dans la réponse — testé explicitement (vote, retrait, revote,
 retrait à nouveau).
 
-**Bug découvert par ce lot, correctif en PR séparée** *(#98, non fusionnée, en test par Kamel)* :
-recliquer une flèche déjà active laissait l'état rempli — recliquer n'a **jamais** retiré un vote,
-sur `main` comme sur ce lot (`DELETE /api/v1/deals/:publicId/votes` existait déjà et fonctionne,
-jamais appelé côté client — fonctionnalité absente, pas une régression de ce lot). `CardVote` gagne
-`onClicVote`/`retirer()` : reclic sur la flèche déjà active -> `DELETE`, sinon -> `POST` (upsert,
-couvre aussi voté -> sens opposé, déjà fonctionnel, non cassé).
+**Bug découvert par ce lot, corrigé séparément** *(#98, fusionnée — retrait vérifié en préversion
+par Kamel, trois transitions conformes)* : recliquer une flèche déjà active laissait l'état
+rempli — recliquer n'a **jamais** retiré un vote, sur `main` comme sur ce lot (diagnostic :
+`DELETE /api/v1/deals/:publicId/votes` existait déjà et fonctionne, jamais appelé côté client —
+fonctionnalité absente, pas une régression de ce lot). `CardVote` gagne `onClicVote`/`retirer()` :
+reclic sur la flèche déjà active -> `DELETE`, sinon -> `POST` (upsert, couvre aussi voté -> sens
+opposé, déjà fonctionnel, non cassé). Retrait redondant (vote déjà inexistant) testé
+explicitement : `200`, jamais une erreur visible, aucune ligne fantôme.
 
 ---
 

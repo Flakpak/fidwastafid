@@ -36,6 +36,10 @@ const CHEVRON_DOWN = "M6 9l6 6 6-6";
  * `"chaud"`/`"froid"` = connu et voté. Appliqué UNE SEULE fois (`appliqueRef`) :
  * un clic qui suit n'est jamais écrasé par une réponse serveur arrivée en
  * retard — c'est ce qui garde l'état optimiste intact après cette persistance.
+ *
+ * Reclic sur la flèche déjà active -> retrait (`onClicVote`, `retirer()`) :
+ * absent jusqu'ici, `DELETE .../votes` existait déjà côté API sans jamais
+ * être appelé côté client — fonctionnalité manquante, pas une régression.
  */
 export function CardVote({
   publicId,
@@ -62,31 +66,67 @@ export function CardVote({
     }
   }, [monVote]);
 
-  async function vote(sens: VoteSens) {
+  /**
+   * Appel réseau partagé par vote() et retirer() — gardes, décodage et
+   * traduction d'erreur écrits UNE fois (même motif que `_lib/diffusion.ts`
+   * côté serveur) : deux copies de ce bloc auraient dérivé. Retourne le
+   * score à jour en cas de succès, `null` sinon (l'appelant décide alors de
+   * ne RIEN changer à l'état local — jamais un état optimiste qui avance
+   * sur un échec réseau).
+   */
+  async function appelVote(init: RequestInit): Promise<number | null> {
     setPending(true);
     setError(null);
     try {
-      const res = await fetch(`/api/v1/deals/${publicId}/votes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sens }),
-      });
+      const res = await fetch(`/api/v1/deals/${publicId}/votes`, init);
       const body = (await res.json()) as ApiErrorBody & { score?: number };
       if (!res.ok) {
         if (body.error?.code === "UNAUTHENTICATED") {
           router.push(`/connexion?next=${encodeURIComponent(pathname)}`);
-          return;
+          return null;
         }
         setError(body.error?.code === "RATE_LIMITED" ? "Trop de votes, réessaie plus tard." : "Vote impossible.");
-        return;
+        return null;
       }
-      if (typeof body.score === "number") setScore(body.score);
-      setVoted(sens);
+      return typeof body.score === "number" ? body.score : null;
     } catch {
       setError("Vote impossible, réessaie.");
+      return null;
     } finally {
       setPending(false);
     }
+  }
+
+  async function vote(sens: VoteSens) {
+    const nouveauScore = await appelVote({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sens }),
+    });
+    if (nouveauScore === null) return;
+    setScore(nouveauScore);
+    setVoted(sens);
+  }
+
+  /**
+   * Retirer son vote — reclic sur la flèche déjà active. `DELETE
+   * .../votes` existait déjà côté API (lot 1, jamais exposé côté client
+   * jusqu'ici) : rien à ajouter au contrat, seul ce chemin client manquait.
+   * Idempotent côté serveur (`delete ... where deal_id = $1 and user_id =
+   * $2`, 0 ligne affectée si déjà retiré ne lève jamais) — un double retrait
+   * (ex. deux onglets) reste silencieux, jamais une erreur visible.
+   */
+  async function retirer() {
+    const nouveauScore = await appelVote({ method: "DELETE" });
+    if (nouveauScore === null) return;
+    setScore(nouveauScore);
+    setVoted(null);
+  }
+
+  /** Reclic sur la flèche déjà active -> retrait. Sinon -> vote (couvre
+   *  aussi voté -> sens opposé, déjà fonctionnel : simple upsert). */
+  function onClicVote(sens: VoteSens) {
+    return voted === sens ? retirer() : vote(sens);
   }
 
   const temp = temperature(score);
@@ -131,7 +171,7 @@ export function CardVote({
           type="button"
           onClick={(e) => {
             e.preventDefault();
-            void vote("froid");
+            void onClicVote("froid");
           }}
           disabled={pending}
           aria-label="Voter خسارة (froid)"
@@ -157,7 +197,7 @@ export function CardVote({
           type="button"
           onClick={(e) => {
             e.preventDefault();
-            void vote("chaud");
+            void onClicVote("chaud");
           }}
           disabled={pending}
           aria-label="Voter ربح (chaud)"
