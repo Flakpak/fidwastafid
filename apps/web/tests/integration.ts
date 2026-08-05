@@ -12,6 +12,8 @@ import {
 import { GET as getMe, PATCH as patchMe } from "../src/app/api/v1/me/route.js";
 import { PATCH as patchAdminDeal, DELETE as deleteAdminDeal } from "../src/app/api/v1/admin/deals/[publicId]/route.js";
 import { POST as postRestaurer } from "../src/app/api/v1/admin/deals/[publicId]/restaurer/route.js";
+import { GET as getMemoireCuration } from "../src/app/api/v1/admin/memoire-curation/route.js";
+import { POST as postLeverMemoire } from "../src/app/api/v1/admin/memoire-curation/[id]/lever/route.js";
 import { GET as getAdminDeals } from "../src/app/api/v1/admin/deals/route.js";
 import { GET as getAdminDealsCompte } from "../src/app/api/v1/admin/deals/compte/route.js";
 import { POST as postBulk } from "../src/app/api/v1/admin/deals/bulk/route.js";
@@ -1383,6 +1385,161 @@ async function main() {
     await query("delete from votes where deal_id = (select id from deals where public_id = $1)", [SUPPR_PUBLIC_ID]);
     await query("delete from journal_audit where cible_type = 'deal' and cible_id = $1", [SUPPR_PUBLIC_ID]);
     await query("delete from deals where public_id = $1", [SUPPR_PUBLIC_ID]);
+  }
+
+  // -------------------------------------------------------------------------
+  // Mémoire de curation (lot 2) — corrige un bug actif : l'ancien
+  // dédoublonnage du pipeline (titre+enseigne+prix_promo) laissait revenir
+  // un deal rejeté dès que le prix changeait. L'empreinte ne regarde jamais
+  // le prix ; le pipeline la consulte avant d'insérer ; une décision se
+  // lève, elle ne se supprime jamais.
+  // -------------------------------------------------------------------------
+  console.log("\nmémoire de curation — empreinte sans prix, blocage pipeline, levée d'une décision");
+
+  const MEM_PUBLIC_ID = generatePublicId();
+  const MEM_LIEN = `https://exemple-test.invalid/produit/${MEM_PUBLIC_ID}`;
+
+  try {
+    const inserted = await query<{ id: string }>(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, lien, statut, score)
+       values ($1, 'Deal test mémoire curation', $2, 'Autre', 'en_ligne', 50, $3, 'auto_draft', 0)
+       returning id`,
+      [MEM_PUBLIC_ID, enseigneIdSuppr, MEM_LIEN]
+    );
+    if (!inserted[0]) throw new Error("Deal de test (mémoire curation) non inséré.");
+
+    // --- Rejet -> écrit la mémoire ---
+    const rejetRes = await patchAdminDeal(
+      authedRequest(`http://localhost/api/v1/admin/deals/${MEM_PUBLIC_ID}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ statut: "rejete", motifRejet: "Test mémoire de curation" }),
+      }),
+      { params: Promise.resolve({ publicId: MEM_PUBLIC_ID }) }
+    );
+    check("rejet -> 200", rejetRes.status === 200);
+
+    const empreinteAttendue = await query<{ empreinte: string }>(
+      "select empreinte_curation($1, $2, $3) as empreinte",
+      [MEM_LIEN, "Deal test mémoire curation", Number(enseigneIdSuppr)]
+    );
+    const empreinte = empreinteAttendue[0]?.empreinte;
+    if (!empreinte) throw new Error("empreinte_curation n'a rien renvoyé.");
+
+    const memRow = await query<{ id: string; empreinte: string; decision: string; levee_le: string | null }>(
+      "select id, empreinte, decision, levee_le from memoire_curation where deal_origine_public_id = $1",
+      [MEM_PUBLIC_ID]
+    );
+    check("rejet -> une entrée de mémoire écrite", memRow.length === 1);
+    check("mémoire -> empreinte basée sur le lien (jamais le prix)", memRow[0]?.empreinte === empreinte);
+    check("mémoire -> décision active (non levée)", memRow[0]?.levee_le === null);
+    const memId = memRow[0]?.id;
+    if (!memId) throw new Error("id de l'entrée de mémoire introuvable.");
+
+    // --- Ré-éditer un deal déjà rejeté ne duplique PAS la mémoire ---
+    await patchAdminDeal(
+      authedRequest(`http://localhost/api/v1/admin/deals/${MEM_PUBLIC_ID}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ statut: "rejete", motifRejet: "Motif corrigé, même décision" }),
+      }),
+      { params: Promise.resolve({ publicId: MEM_PUBLIC_ID }) }
+    );
+    const memApresReedit = await query<{ id: string }>(
+      "select id from memoire_curation where deal_origine_public_id = $1",
+      [MEM_PUBLIC_ID]
+    );
+    check("réédition d'un deal déjà rejeté -> aucune entrée dupliquée", memApresReedit.length === 1);
+
+    // --- Le pipeline bloquerait un re-scrape au MÊME lien, prix DIFFÉRENT ---
+    const bloqueAutrePrix = await query<{ bloque: boolean }>(
+      `select exists(
+         select 1 from memoire_curation
+         where empreinte = empreinte_curation($1, $2, $3)
+           and decision = 'rejete' and levee_le is null
+       ) as bloque`,
+      [MEM_LIEN, "Deal test mémoire curation", Number(enseigneIdSuppr)]
+    );
+    check(
+      "empreinte insensible au prix -> un re-scrape à prix différent resterait bloqué",
+      bloqueAutrePrix[0]?.bloque === true
+    );
+
+    // --- Visible dans la liste admin des décisions actives ---
+    const listeRes = await getMemoireCuration(authedRequest("http://localhost/api/v1/admin/memoire-curation", token), noParams);
+    const listeBody = (await listeRes.json()) as { data: { id: string; dealOriginePublicId: string | null }[] };
+    check(
+      "GET /admin/memoire-curation -> présent parmi les décisions actives",
+      listeBody.data.some((e) => e.dealOriginePublicId === MEM_PUBLIC_ID)
+    );
+
+    // --- Lever un id inconnu -> 404 ---
+    const leverInconnuRes = await postLeverMemoire(
+      authedRequest("http://localhost/api/v1/admin/memoire-curation/999999999/lever", token, {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+      { params: Promise.resolve({ id: "999999999" }) }
+    );
+    check("lever un id inconnu -> 404", leverInconnuRes.status === 404);
+
+    // --- Lever la décision : le deal rejeté a été légitimement republié ---
+    const leverRes = await postLeverMemoire(
+      authedRequest(`http://localhost/api/v1/admin/memoire-curation/${memId}/lever`, token, {
+        method: "POST",
+        body: JSON.stringify({ motif: "Republié légitimement par l'enseigne, prix à jour." }),
+      }),
+      { params: Promise.resolve({ id: memId }) }
+    );
+    check("lever -> 200", leverRes.status === 200);
+
+    const leverRejoueRes = await postLeverMemoire(
+      authedRequest(`http://localhost/api/v1/admin/memoire-curation/${memId}/lever`, token, {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+      { params: Promise.resolve({ id: memId }) }
+    );
+    check("lever une décision déjà levée -> 409 CONFLICT", leverRejoueRes.status === 409);
+
+    const bloqueApresLevee = await query<{ bloque: boolean }>(
+      `select exists(
+         select 1 from memoire_curation
+         where empreinte = $1 and decision = 'rejete' and levee_le is null
+       ) as bloque`,
+      [empreinte]
+    );
+    check("après levée -> le pipeline ne serait plus bloqué (levee_le renseigné)", bloqueApresLevee[0]?.bloque === false);
+
+    const listeApresLevee = await getMemoireCuration(
+      authedRequest("http://localhost/api/v1/admin/memoire-curation", token),
+      noParams
+    );
+    const listeApresLeveeBody = (await listeApresLevee.json()) as { data: { dealOriginePublicId: string | null }[] };
+    check(
+      "après levée -> disparu des décisions actives",
+      !listeApresLeveeBody.data.some((e) => e.dealOriginePublicId === MEM_PUBLIC_ID)
+    );
+
+    // --- empreinte_curation() : lien prioritaire, jamais le prix ---
+    const empreintesLien = await query<{ e1: string; e2: string }>(
+      `select empreinte_curation('https://x.test/p', 'Titre A', 1) as e1,
+              empreinte_curation('https://x.test/p', 'Titre B', 2) as e2`
+    );
+    check(
+      "empreinte_curation -> même lien = même empreinte, même si titre/enseigne diffèrent",
+      empreintesLien[0]?.e1 === empreintesLien[0]?.e2
+    );
+    const empreintesReplis = await query<{ e1: string; e2: string }>(
+      `select empreinte_curation(null, 'Même Titre', 7) as e1,
+              empreinte_curation(null, '  même titre  ', 7) as e2`
+    );
+    check(
+      "empreinte_curation -> repli titre+enseigne insensible à la casse/aux espaces",
+      empreintesReplis[0]?.e1 === empreintesReplis[0]?.e2
+    );
+  } finally {
+    await query("delete from memoire_curation where deal_origine_public_id = $1", [MEM_PUBLIC_ID]);
+    await query("delete from journal_audit where cible_type = 'deal' and cible_id = $1", [MEM_PUBLIC_ID]);
+    await query("delete from deals where public_id = $1", [MEM_PUBLIC_ID]);
   }
 
   console.log(

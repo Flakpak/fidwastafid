@@ -965,6 +965,63 @@
         "required": [
           "ok"
         ]
+      },
+      "MemoireCurationEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "empreinte": {
+            "type": "string"
+          },
+          "motif": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dealOriginePublicId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decideLe": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deciderPseudo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "origineTitre": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Titre actuel du deal d'origine, s'il existe encore"
+          },
+          "origineStatut": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Statut actuel du deal d'origine, s'il existe encore"
+          }
+        },
+        "required": [
+          "id",
+          "empreinte",
+          "motif",
+          "dealOriginePublicId",
+          "decideLe",
+          "deciderPseudo",
+          "origineTitre",
+          "origineStatut"
+        ]
       }
     },
     "parameters": {}
@@ -2603,6 +2660,169 @@
           },
           "403": {
             "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/memoire-curation": {
+      "get": {
+        "summary": "Décisions de curation actives (onzième amendement conscient, lot 2, 05/08/2026)",
+        "description": "Liste les décisions 'rejete' non levées (levee_le is null), plus récentes d'abord — celles que le pipeline consulte avant d'insérer un deal scrapé, via empreinte_curation(lien, titre, enseigne_id) (jamais le prix). Jointure souple sur le deal d'origine (pas une FK) : renseigne son état actuel quand il existe encore, pour décider s'il faut lever.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MemoireCurationEntry"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/memoire-curation/{id}/lever": {
+      "post": {
+        "summary": "Lève une décision de curation (onzième amendement conscient, lot 2, 05/08/2026)",
+        "description": "Répond à : un deal rejeté puis légitimement republié par l'enseigne, que devient-il ? Sans ce geste la mémoire serait une liste noire définitive. Ne supprime rien (même principe que deals.supprime_le) : pose levee_le/levee_par/levee_motif, l'entrée reste lisible, seul le pipeline cesse de la consulter.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "motif": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "leveeLe": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "leveeLe"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Identifiant invalide",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entrée introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Décision déjà levée",
             "content": {
               "application/json": {
                 "schema": {

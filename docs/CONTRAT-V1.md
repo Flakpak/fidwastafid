@@ -192,6 +192,34 @@ irréversible en pratique ; `supprime_le` transforme le geste en `UPDATE`, défa
   choisit protégé, systématiquement — un faux positif coûte une ligne de plus en base, un faux négatif
   coûte un actif SEO ou une preuve.
 
+**Amendement du 05/08/2026 — mémoire de curation (onzième amendement conscient, lot 2).** Bug actif
+corrigé, pas seulement une préparation : le dédoublonnage du pipeline (`insert-deals.mjs`) matchait
+sur titre+enseigne+**prix_promo** — un deal rejeté par l'admin revenait dès que le vendeur changeait
+son prix de quelques dirhams, la décision ne survivant pas à la ligne rejetée.
+
+Nouvelle table **`memoire_curation`** (migration 0014) : `empreinte` + `decision` (`'rejete'` seule
+valeur possible aujourd'hui) + `deal_origine_public_id` (référence **souple**, jamais une FK — la
+mémoire doit survivre à ce qu'il advient de la ligne d'origine, y compris sa suppression douce) +
+`motif` + `decide_le`/`decide_par`. **Jamais le prix** dans l'empreinte — fonction SQL
+`empreinte_curation(lien, titre, enseigne_id)`, **partagée** entre le pipeline (JS) et l'admin web
+(TS) : lien produit en priorité (fort, même principe que `DEAL_DOUBLON_JOIN`/`par_lien`), repli sur
+titre+enseigne sinon.
+
+- Le pipeline consulte la mémoire **avant** le dédoublonnage titre+enseigne+prix : un produit dont
+  l'empreinte porte une décision `rejete` active n'est jamais réinséré.
+- L'admin (PATCH unitaire et `bulk`) écrit une entrée à chaque **vraie transition** vers `rejete`
+  (jamais sur l'édition d'un deal déjà rejeté, qui écrirait une entrée par correction de motif sans
+  nouvelle décision).
+- **Rétroactif** : la migration alimente la table depuis les 417 `rejete` déjà en base au moment du
+  lot — sans ce rattrapage, la mémoire démarre vide et le bug continue de s'appliquer à tout
+  l'historique déjà rejeté. `decide_par` vient de `journal_audit` (entrée la plus récente pour le
+  deal) quand elle existe, laissé `NULL` sinon plutôt que deviné.
+- **Lever une décision** — `POST /api/v1/admin/memoire-curation/:id/lever` (§4) : répond à la
+  question « un deal rejeté puis légitimement republié par l'enseigne à un autre moment, que
+  devient-il ? ». Sans ce geste, la mémoire serait une liste noire définitive. Lever ne supprime
+  rien (même principe que `supprime_le`) : pose `levee_le`/`levee_par`/`levee_motif`, l'entrée reste
+  lisible dans l'historique, seul le pipeline cesse de la consulter.
+
 ## 4 — Contrat API v1
 
 **Erreurs** — format unique partout :
@@ -249,6 +277,10 @@ POST   /api/v1/admin/deals/:publicId/restaurer
                                              d'origine, jamais touché par la suppression — même
                                              amendement
 POST   /api/v1/admin/deals/bulk             actions groupées
+GET    /api/v1/admin/memoire-curation       décisions actives (rejete, non levées), plus récentes
+                                             d'abord — onzième amendement conscient, voir §3
+POST   /api/v1/admin/memoire-curation/:id/lever
+                                             lève une décision (jamais un DELETE) — même amendement
 POST   /api/v1/admin/deals/:publicId/image-depuis-lien
                                              récupère l'image produit depuis le lien du deal
                                              (og:image/twitter:image/image_src) — ajouté le
