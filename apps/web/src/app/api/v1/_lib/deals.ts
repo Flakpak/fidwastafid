@@ -12,6 +12,7 @@ export const DEAL_SELECT = `
   d.public_id, d.titre, e.slug as enseigne_slug, e.nom as enseigne_nom,
   d.nom_vendeur, d.adresse, d.lien_maps, d.ville, d.categorie, d.type,
   d.prix_promo, d.prix_normal, d.date_fin, d.description, d.lien, d.image_key,
+  d.image_purgee_le,
   d.whatsapp_contact, d.whatsapp_public,
   d.statut, d.score, u.public_id as submitter_public_id, u.pseudo as submitter_pseudo,
   u.couleur_avatar as submitter_couleur_avatar,
@@ -47,6 +48,12 @@ export interface DealRow {
   description: string | null;
   lien: string | null;
   image_key: string | null;
+  /** Purge d'image (lot 4, plan « suppression administrative ») — `null` =
+   *  image_key (si non nul) sert toujours l'image réelle. Une date = le
+   *  fichier Storage a été effacé pour de bon ; image_key reste en base
+   *  comme trace historique mais ne doit plus jamais être exposé
+   *  (toDeal() ci-dessous). */
+  image_purgee_le: string | null;
   whatsapp_contact: string | null;
   whatsapp_public: boolean;
   statut: string;
@@ -83,7 +90,11 @@ export function toDeal(row: DealRow): Deal {
     // Exposition conditionnelle (CONTRAT-V1 §4, amendement du 18/07/2026) :
     // absent (jamais null) tant que le soumetteur n'a pas consenti.
     whatsappContact: row.whatsapp_public && row.whatsapp_contact ? row.whatsapp_contact : undefined,
-    imageKey: row.image_key ?? undefined,
+    // Purgée (lot 4) : jamais exposé, quelle que soit la valeur de
+    // image_key — une ligne restaurée après purge de son image revient
+    // donc SANS image, jamais avec un lien mort servi comme si le fichier
+    // existait encore (image_key reste en base comme trace historique).
+    imageKey: row.image_purgee_le ? undefined : row.image_key ?? undefined,
     statut: row.statut,
     score: row.score,
     submitterPublicId: row.submitter_public_id,
@@ -130,6 +141,7 @@ export function toDealAdmin(row: DealAdminRow): DealAdmin {
     motifRejet: row.motif_rejet,
     turnstileVerifie: row.turnstile_verifie,
     supprimeLe: row.supprime_le ? new Date(row.supprime_le).toISOString() : null,
+    imagePurgeeLe: row.image_purgee_le ? new Date(row.image_purgee_le).toISOString() : null,
     diffuseTelegram: row.diffuse_telegram,
     diffuseDiscord: row.diffuse_discord,
   });

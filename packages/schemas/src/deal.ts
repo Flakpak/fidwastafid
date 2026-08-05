@@ -240,6 +240,13 @@ export const dealAdminSchema = dealSchema.extend({
    *  sans PITR, la ligne reste restaurable. Admin uniquement — un deal
    *  supprimé n'apparaît jamais ailleurs qu'ici et dans l'onglet Supprimés. */
   supprimeLe: z.string().datetime().nullable(),
+  /** Purge d'image (lot 4, plan « suppression administrative ») — `null` =
+   *  image intacte (ou jamais eue). Une date = le fichier Storage a été
+   *  effacé pour de bon par `apps/pipeline/purger-images.mjs` ; `imageKey`
+   *  reste en base comme trace historique mais n'apparaît plus jamais dans
+   *  la représentation exposée (toDeal(), apps/web) une fois cette date
+   *  posée — y compris si le deal est restauré ensuite. */
+  imagePurgeeLe: z.string().datetime().nullable(),
 });
 export type DealAdmin = z.infer<typeof dealAdminSchema>;
 
