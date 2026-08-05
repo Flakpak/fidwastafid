@@ -974,6 +974,35 @@ async function main() {
   check("delete vote -> score = 0", voteDeleteBody.score === 0);
 
   // ---------------------------------------------------------------------
+  // Retrait de vote — reclic sur la flèche déjà active (lot dédié,
+  // CardVote.onClicVote/retirer()). L'API le supportait déjà (DELETE
+  // ci-dessus, jamais appelé côté client jusqu'ici) : ce qui manquait était
+  // le chemin client, pas l'endpoint. Ici : le cas "vote inexistant" ne doit
+  // produire ni erreur visible ni ligne fantôme.
+  // ---------------------------------------------------------------------
+  console.log("\nretrait de vote — sur un vote déjà inexistant, aucune erreur, aucune ligne fantôme");
+
+  const ligneAvant = await query<{ id: string }>(
+    "select id from votes where deal_id = (select id from deals where public_id = $1) and user_id = $2",
+    [DEAL_PUBLIC_ID, userId]
+  );
+  check("avant retrait redondant -> aucune ligne votes pour ce deal/utilisateur", ligneAvant.length === 0);
+
+  const voteDeleteRedondant = await deleteVote(
+    authedRequest(`http://localhost/api/v1/deals/${DEAL_PUBLIC_ID}/votes`, token),
+    context
+  );
+  const voteDeleteRedondantBody = (await voteDeleteRedondant.json()) as { score?: number };
+  check("retrait sur un vote inexistant -> 200, jamais une erreur visible", voteDeleteRedondant.status === 200);
+  check("retrait redondant -> score reste 0, pas de décrément fantôme", voteDeleteRedondantBody.score === 0);
+
+  const ligneApres = await query<{ id: string }>(
+    "select id from votes where deal_id = (select id from deals where public_id = $1) and user_id = $2",
+    [DEAL_PUBLIC_ID, userId]
+  );
+  check("retrait redondant -> toujours aucune ligne votes (pas de ligne fantôme créée)", ligneApres.length === 0);
+
+  // ---------------------------------------------------------------------
   // État voté persistant (CONTRAT-V1 §4, seizième amendement conscient) —
   // GET /api/v1/deals/mes-votes. Couvre explicitement le vote RETIRÉ, pas
   // seulement émis : le deal ci-dessus vient d'être dévoté (ligne
