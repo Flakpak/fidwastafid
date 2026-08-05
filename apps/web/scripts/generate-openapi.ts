@@ -571,6 +571,68 @@ registry.registerPath({
   tags: ["admin"],
 });
 
+const MemoireCurationEntry = registry.register(
+  "MemoireCurationEntry",
+  z.object({
+    id: z.string(),
+    empreinte: z.string(),
+    motif: z.string().nullable(),
+    dealOriginePublicId: z.string().nullable(),
+    decideLe: z.string().datetime(),
+    deciderPseudo: z.string().nullable(),
+    origineTitre: z.string().nullable().openapi({ description: "Titre actuel du deal d'origine, s'il existe encore" }),
+    origineStatut: z.string().nullable().openapi({ description: "Statut actuel du deal d'origine, s'il existe encore" }),
+  })
+);
+
+registry.registerPath({
+  method: "get",
+  path: "/admin/memoire-curation",
+  summary: "Décisions de curation actives (onzième amendement conscient, lot 2, 05/08/2026)",
+  description:
+    "Liste les décisions 'rejete' non levées (levee_le is null), plus récentes d'abord — celles que " +
+    "le pipeline consulte avant d'insérer un deal scrapé, via empreinte_curation(lien, titre, " +
+    "enseigne_id) (jamais le prix). Jointure souple sur le deal d'origine (pas une FK) : renseigne " +
+    "son état actuel quand il existe encore, pour décider s'il faut lever.",
+  security: [{ [bearerAuth.name]: [] }],
+  request: { query: z.object({ limit: z.string().optional() }) },
+  responses: {
+    200: {
+      description: "OK",
+      content: { "application/json": { schema: z.object({ data: z.array(MemoireCurationEntry) }) } },
+    },
+    403: errorResponse("Accès refusé (non-admin)"),
+  },
+  tags: ["admin"],
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/admin/memoire-curation/{id}/lever",
+  summary: "Lève une décision de curation (onzième amendement conscient, lot 2, 05/08/2026)",
+  description:
+    "Répond à : un deal rejeté puis légitimement republié par l'enseigne, que devient-il ? Sans ce " +
+    "geste la mémoire serait une liste noire définitive. Ne supprime rien (même principe que " +
+    "deals.supprime_le) : pose levee_le/levee_par/levee_motif, l'entrée reste lisible, seul le " +
+    "pipeline cesse de la consulter.",
+  security: [{ [bearerAuth.name]: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { "application/json": { schema: z.object({ motif: z.string().optional() }) } } },
+  },
+  responses: {
+    200: {
+      description: "OK",
+      content: { "application/json": { schema: z.object({ ok: z.literal(true), leveeLe: z.string().datetime() }) } },
+    },
+    400: errorResponse("Identifiant invalide"),
+    403: errorResponse("Accès refusé (non-admin)"),
+    404: errorResponse("Entrée introuvable"),
+    409: errorResponse("Décision déjà levée"),
+  },
+  tags: ["admin"],
+});
+
 const generator = new OpenApiGeneratorV31(registry.definitions);
 const document = generator.generateDocument({
   openapi: "3.1.0",

@@ -175,6 +175,29 @@ export const PATCH = withAuthErrors<Context>(async (request, { params }) => {
       ]
     );
 
+    // Mémoire de curation (lot 2) — seulement sur une VRAIE transition vers
+    // rejete (jamais sur l'édition d'un deal déjà rejeté, qui écrirait une
+    // entrée à chaque correction de motif sans nouvelle décision). Empreinte
+    // calculée sur l'état RÉSULTANT (titre/lien/enseigne peuvent être
+    // édités dans le même geste que le rejet) — jamais le prix, voir
+    // migration 0014.
+    if (deal.statut !== "rejete" && patch.statut === "rejete") {
+      const enseigneIdResultant = patch.enseigneSlug !== undefined ? enseigne.value ?? null : deal.enseigne_id;
+      const titreResultant = patch.titre ?? deal.titre;
+      const lienResultant = mergedLien ?? null;
+      const empreinteRow = await client.query<{ empreinte: string }>(
+        `select empreinte_curation($1, $2, $3) as empreinte`,
+        [lienResultant, titreResultant, enseigneIdResultant]
+      );
+      const empreinte = empreinteRow.rows[0]?.empreinte;
+      if (!empreinte) throw new Error("empreinte_curation n'a renvoyé aucune ligne — ne devrait pas arriver.");
+      await client.query(
+        `insert into memoire_curation (empreinte, decision, deal_origine_public_id, motif, decide_par)
+         values ($1, 'rejete', $2, $3, $4)`,
+        [empreinte, publicId, motifResultant, admin.id]
+      );
+    }
+
     // Diff pour le journal d'audit — candidats : les champs présents dans le
     // corps de la requête (les autres n'ont pas bougé, coalesce oblige). Le
     // filtrage final ne garde que ceux dont la valeur a RÉELLEMENT changé, et

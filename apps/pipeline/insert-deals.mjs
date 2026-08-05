@@ -167,7 +167,7 @@ try {
   }
 
   let inseres = 0, doublons = 0, rejetes = 0, rejetesEnseigne = 0;
-  let rejetesRemise = 0, remisesNonMesurables = 0;
+  let rejetesRemise = 0, remisesNonMesurables = 0, rejetesMemoire = 0;
   let descriptionsObtenues = 0, descriptionsEchouees = 0;
   console.log(`📉 Seuil de remise minimum : ${SEUIL_REMISE_MIN_PCT} % (règle partagée, remise.mjs).`);
 
@@ -208,6 +208,29 @@ try {
     if (!enseigneId) {
       rejetesEnseigne++;
       console.log(`  ⤫ Rejeté (enseigne "${d.enseigneRaw || "?"}" inconnue en base) : ${d.titre}`);
+      continue;
+    }
+
+    // Mémoire de curation (lot 2) — AVANT le dédoublonnage titre+enseigne+
+    // prix : un deal déjà rejeté par l'admin ne doit jamais revenir, y
+    // compris quand le vendeur change son prix (fait générateur : l'ancien
+    // dédoublonnage incluait prix_promo, donc une variation de deux dirhams
+    // suffisait à recontourner un rejet explicite). L'empreinte ne regarde
+    // jamais le prix — lien produit si connu, sinon titre+enseigne
+    // (empreinte_curation, migration 0014, partagée avec l'admin web).
+    const empreinte = await client.query(
+      `select empreinte_curation($1, $2, $3) as empreinte`,
+      [d.lien || null, d.titre, enseigneId]
+    );
+    const bloque = await client.query(
+      `select 1 from memoire_curation
+       where empreinte = $1 and decision = 'rejete' and levee_le is null
+       limit 1`,
+      [empreinte.rows[0].empreinte]
+    );
+    if (bloque.rowCount > 0) {
+      rejetesMemoire++;
+      console.log(`  ⤫ Rejeté (déjà rejeté par l'admin — mémoire de curation) : ${d.titre}`);
       continue;
     }
 
@@ -282,7 +305,7 @@ try {
   console.log(
     `\n✅ Terminé : ${inseres} insérés | ${doublons} doublons ignorés | ` +
       `${rejetes} rejetés (validation) | ${rejetesRemise} rejetés (remise < ${SEUIL_REMISE_MIN_PCT} %) | ` +
-      `${rejetesEnseigne} rejetés (enseigne inconnue)`
+      `${rejetesEnseigne} rejetés (enseigne inconnue) | ${rejetesMemoire} rejetés (mémoire de curation)`
   );
   if (remisesNonMesurables > 0) {
     console.log(
