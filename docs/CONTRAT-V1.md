@@ -170,6 +170,28 @@ l'interdiction totale d'affichage empêchait un usage commercial de base que le 
 souhaite. **Deuxième amendement conscient** à la liste fermée du contrat (le premier était l'espace
 membre du 16/07/2026, §4 ci-dessous) — décision produit, pas une dérive.
 
+**Amendement du 05/08/2026 — suppression douce (dixième amendement conscient, plan « suppression
+administrative des deals », lot 1).** `deals` gagne **`supprime_le`** (`timestamptz`, nullable, sans
+défaut) : `null` = visible, une date = supprimé à cet instant. **Jamais de `DELETE` réel sur
+`deals`** — sans PITR (une seule sauvegarde, artefact GitHub 30 jours), une suppression dure serait
+irréversible en pratique ; `supprime_le` transforme le geste en `UPDATE`, défait par un autre
+`UPDATE`. Neutralise au passage le `ON DELETE CASCADE` de `votes`/`commentaires`/`diffusions` sur
+`deals` : la ligne n'étant jamais réellement supprimée, ces tables ne perdent jamais rien.
+
+- **Exclusion exhaustive.** Toute lecture, publique ou admin, exclut `supprime_le is not null` :
+  feed, fiche, page enseigne, sitemap, proxy d'image, commentaires, compteurs (`/deals/compte`,
+  `/admin/deals/compte`), file de modération, doublons admin, verrou de vote, `/me`. Le seul endroit
+  qui lit délibérément l'inverse est `GET /api/v1/admin/deals?supprime=true` (§4) — l'onglet dédié.
+  Le pipeline (dédoublonnage, expiration auto des `auto_draft`) exclut aussi les lignes supprimées :
+  une ligne masquée ne doit ni bloquer une réinsertion, ni changer de statut pendant qu'elle est
+  invisible (sinon une restauration ultérieure mentirait sur le statut d'origine).
+- **Règle de repli, gravée ici pour de bon** (préparatoire au lot 3 — le critère de protection
+  contre la purge à venir n'est PAS le statut, mais l'existence d'une trace de publication dans
+  `journal_audit`) : **en cas de doute ou d'absence de trace d'audit, un deal est toujours considéré
+  comme protégé. Jamais l'inverse.** Une classification qui hésite entre « protégé » et « supprimable »
+  choisit protégé, systématiquement — un faux positif coûte une ligne de plus en base, un faux négatif
+  coûte un actif SEO ou une preuve.
+
 ## 4 — Contrat API v1
 
 **Erreurs** — format unique partout :
@@ -213,9 +235,19 @@ DELETE /api/v1/me                           suppression de compte (anonymisation
 # Admin (requireAdmin)
 GET    /api/v1/admin/deals                  file d'UN statut (paramètre requis), pagination par
                                              curseur — ajouté le 05/08/2026, neuvième amendement
-                                             conscient (voir ci-dessous)
-GET    /api/v1/admin/deals/compte           compte par statut, même amendement
+                                             conscient (voir ci-dessous). `?supprime=true` bascule
+                                             sur l'onglet Supprimés (dixième amendement, voir §3) —
+                                             exclusif du paramètre statut, tri par date de
+                                             suppression décroissante
+GET    /api/v1/admin/deals/compte           compte par statut (neuvième amendement) + `supprimes`,
+                                             compte des lignes supprimées (dixième amendement)
 PATCH  /api/v1/admin/deals/:publicId        édition complète du deal + statut (voir §3, amendement du 19/07/2026)
+DELETE /api/v1/admin/deals/:publicId        suppression DOUCE (pose `supprime_le`, jamais de DELETE
+                                             SQL) — dixième amendement conscient, voir §3
+POST   /api/v1/admin/deals/:publicId/restaurer
+                                             efface `supprime_le` ; renvoie le deal dans son statut
+                                             d'origine, jamais touché par la suppression — même
+                                             amendement
 POST   /api/v1/admin/deals/bulk             actions groupées
 POST   /api/v1/admin/deals/:publicId/image-depuis-lien
                                              récupère l'image produit depuis le lien du deal

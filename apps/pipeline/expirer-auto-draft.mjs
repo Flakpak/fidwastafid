@@ -34,10 +34,16 @@ try {
 
   // make_interval(days => $1) plutôt qu'une chaîne SQL interpolée : même
   // résultat, sans jamais concaténer de valeur dans le texte de la requête.
+  // supprime_le IS NULL (lot 1) : un auto_draft soft-supprimé ne doit pas
+  // changer de statut pendant qu'il est invisible — sinon une restauration
+  // ultérieure le rendrait 'expire' au lieu de son vrai statut d'origine
+  // 'auto_draft', et la garantie « la restauration renvoie au statut
+  // d'origine » (POST .../restaurer) cesserait d'être vraie pour ce cas.
   const { rows } = await client.query(
     `update deals
        set statut = 'expire', updated_at = now()
      where statut = 'auto_draft'
+       and supprime_le is null
        and created_at < now() - make_interval(days => $1)
      returning public_id`,
     [SEUIL_JOURS_AUTO_DRAFT]

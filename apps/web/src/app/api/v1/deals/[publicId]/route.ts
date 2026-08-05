@@ -22,7 +22,7 @@ export async function GET(
 
   const statuts = Array.from(PUBLIC_STATUTS);
   const rows = await query<DealRow>(
-    `select ${DEAL_SELECT} ${DEAL_FROM} where d.public_id = $1 and d.statut = any($2)`,
+    `select ${DEAL_SELECT} ${DEAL_FROM} where d.public_id = $1 and d.statut = any($2) and d.supprime_le is null`,
     [publicId, statuts]
   );
 

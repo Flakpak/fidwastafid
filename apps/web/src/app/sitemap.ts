@@ -25,7 +25,7 @@ interface EnseigneRow {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [deals, enseignes] = await Promise.all([
     query<DealRow>(
-      "select public_id, titre, updated_at from deals where statut = any($1) order by updated_at desc",
+      "select public_id, titre, updated_at from deals where statut = any($1) and supprime_le is null order by updated_at desc",
       [["publie", "expire"]]
     ),
     query<EnseigneRow>("select slug from enseignes"),

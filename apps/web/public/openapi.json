@@ -365,6 +365,13 @@
           },
           "diffuseDiscord": {
             "type": "boolean"
+          },
+          "supprimeLe": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         },
         "required": [
@@ -386,7 +393,8 @@
           "motifRejet",
           "turnstileVerifie",
           "diffuseTelegram",
-          "diffuseDiscord"
+          "diffuseDiscord",
+          "supprimeLe"
         ]
       },
       "DealInput": {
@@ -933,10 +941,29 @@
               "rejete",
               "expire"
             ]
+          },
+          "supprimes": {
+            "type": "integer",
+            "description": "Lignes supprime_le is not null (lot 1)"
           }
         },
         "required": [
-          "comptes"
+          "comptes",
+          "supprimes"
+        ]
+      },
+      "SuppressionOk": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "ok"
         ]
       }
     },
@@ -1650,10 +1677,19 @@
           {
             "schema": {
               "type": "string",
-              "description": "auto_draft|en_attente|publie|rejete|expire — requis"
+              "description": "auto_draft|en_attente|publie|rejete|expire — requis sauf si supprime=true"
             },
-            "required": true,
+            "required": false,
             "name": "statut",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "true = onglet Supprimés (lot 1) — exclusif de statut, ignore ce paramètre"
+            },
+            "required": false,
+            "name": "supprime",
             "in": "query"
           },
           {
@@ -1710,7 +1746,7 @@
     "/admin/deals/compte": {
       "get": {
         "summary": "Compte par statut (CONTRAT-V1 §4, neuvième amendement conscient)",
-        "description": "count(*) en base, groupé par statut — les cinq clés sont toujours présentes, à 0 s'il n'y a aucune ligne. Jamais déduit de la longueur d'une liste paginée (docs/INCIDENTS.md, 04/08/2026).",
+        "description": "count(*) en base, groupé par statut — les cinq clés sont toujours présentes, à 0 s'il n'y a aucune ligne. Jamais déduit de la longueur d'une liste paginée (docs/INCIDENTS.md, 04/08/2026). `supprimes` (dixième amendement, lot 1) compte séparément les lignes supprime_le is not null.",
         "security": [
           {
             "bearerAuth": []
@@ -1806,6 +1842,136 @@
           },
           "404": {
             "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Suppression DOUCE d'un deal (CONTRAT-V1 §3, dixième amendement conscient, 05/08/2026)",
+        "description": "Pose supprime_le, ne supprime JAMAIS la ligne SQL — sans PITR, un DELETE réel serait irréversible en pratique. `statut` n'est pas touché : POST .../restaurer renvoie le deal dans son statut d'origine.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuppressionOk"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ce deal est déjà supprimé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/deals/{publicId}/restaurer": {
+      "post": {
+        "summary": "Restaure un deal supprimé (CONTRAT-V1 §3, dixième amendement conscient, 05/08/2026)",
+        "description": "Efface supprime_le. Le deal revient dans son statut D'ORIGINE, jamais touché par la suppression.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealAdmin"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Accès refusé (non-admin)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ce deal n'est pas supprimé",
             "content": {
               "application/json": {
                 "schema": {

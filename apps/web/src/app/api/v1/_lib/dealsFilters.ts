@@ -122,7 +122,12 @@ export function lier(l: Lieur, valeur: unknown): string {
  * client, donc elle ne trouvait jamais rien au-delà de la première page).
  */
 export function conditionsBase(f: FiltresDeals, l: Lieur, alias = "d"): string[] {
-  const conditions = [`${alias}.statut = ${lier(l, f.statut)}`];
+  // Suppression douce (lot 1) : jamais servi côté public, quel que soit le
+  // statut — un deal supprimé n'existe pour personne hors de l'onglet admin
+  // dédié. Ici plutôt que dispersé : liste ET compteur (`dealsTotal.ts`)
+  // partagent ces conditions, donc ne peuvent pas diverger sur ce point non
+  // plus que sur les autres (règle du lot 7).
+  const conditions = [`${alias}.statut = ${lier(l, f.statut)}`, `${alias}.supprime_le is null`];
   if (f.enseigne) conditions.push(`e.slug = ${lier(l, f.enseigne)}`);
   if (f.q) {
     const motif = lier(l, motifLike(f.q));

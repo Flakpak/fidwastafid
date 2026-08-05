@@ -230,3 +230,50 @@ export const PATCH = withAuthErrors<Context>(async (request, { params }) => {
   if (!result.row) return apiError("NOT_FOUND", "Deal introuvable.");
   return NextResponse.json(toDealAdmin(result.row));
 });
+
+/**
+ * DELETE /api/v1/admin/deals/:publicId — requireAdmin. Suppression DOUCE
+ * uniquement (lot 1, plan « suppression administrative ») : pose
+ * `supprime_le`, ne supprime JAMAIS la ligne. Sans PITR (une seule
+ * sauvegarde, artefact 30 jours), un DELETE réel serait irréversible en
+ * pratique ; un UPDATE se défait par un autre UPDATE (POST .../restaurer).
+ * Neutralise au passage le `ON DELETE CASCADE` de votes/commentaires/
+ * diffusions sur `deals` : la ligne n'étant jamais réellement supprimée,
+ * ces tables ne perdent jamais rien.
+ *
+ * `statut` n'est PAS touché : c'est ce qui garantit qu'une restauration
+ * renvoie le deal dans son statut d'origine, jamais un statut par défaut.
+ */
+export const DELETE = withAuthErrors<Context>(async (request, { params }) => {
+  const admin = await requireAdmin(request);
+  const { publicId } = await params;
+
+  const result = await withTransaction(async (client) => {
+    const before = await client.query<{ id: string; statut: string; titre: string; supprime_le: string | null }>(
+      "select id, statut, titre, supprime_le from deals where public_id = $1 for update",
+      [publicId]
+    );
+    const deal = before.rows[0];
+    if (!deal) return { kind: "not_found" as const };
+    if (deal.supprime_le) return { kind: "already" as const };
+
+    await client.query("update deals set supprime_le = now() where id = $1", [deal.id]);
+
+    await logAudit(
+      {
+        adminId: admin.id,
+        action: "supprimer_deal",
+        cibleType: "deal",
+        cibleId: publicId,
+        details: { titre: deal.titre, statutAvant: deal.statut },
+      },
+      client
+    );
+
+    return { kind: "ok" as const };
+  });
+
+  if (result.kind === "not_found") return apiError("NOT_FOUND", "Deal introuvable.");
+  if (result.kind === "already") return apiError("CONFLICT", "Ce deal est déjà supprimé.");
+  return NextResponse.json({ ok: true });
+});

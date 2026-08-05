@@ -9,7 +9,7 @@ import { MotifRejet } from "./MotifRejet.js";
 /** Libellés courts de statut pour le badge de doublon (l'onglet où retrouver
  *  l'existant). Le deal page public ne résout que publie/expire — pour les
  *  autres statuts, pas de fiche publique (cf. rendu du badge). */
-const STATUT_LABEL: Record<DealStatut, string> = {
+export const STATUT_LABEL: Record<DealStatut, string> = {
   auto_draft: "pipeline",
   en_attente: "en attente",
   publie: "publié",
@@ -57,6 +57,10 @@ export type DiffusionResult = { ok: true; canalTest: boolean } | { ok: false; me
 /** Annulation : retire le message du canal ET la ligne `diffusions`. Un échec
  *  laisse les deux en place — l'étiquette « Diffusé ✓ » reste alors vraie. */
 export type AnnulationResult = { ok: true } | { ok: false; message: string };
+
+/** Suppression DOUCE (lot 1) — jamais un DELETE réel, voir DELETE
+ *  /api/v1/admin/deals/:publicId. Réversible depuis l'onglet Supprimés. */
+export type SuppressionResult = { ok: true } | { ok: false; message: string };
 
 /** Canaux de diffusion exposés par l'admin (docs/IDEES.md). WhatsApp n'y
  *  figure pas : semi-manuel assumé, l'API Meta ne poste pas dans les groupes. */
@@ -146,6 +150,78 @@ function BoutonDiffusion({
       {erreur && <p className="text-warn text-xs font-bold max-w-[14rem]">{erreur}</p>}
       {info && <p className="text-accent text-xs font-bold max-w-[14rem]">{info}</p>}
     </>
+  );
+}
+
+/**
+ * Suppression douce (lot 1) — deux temps, comme l'annulation de diffusion :
+ * un geste qui rend un deal invisible partout mérite de nommer ce qu'il
+ * touche, pas un clic sec. « Supprimer » reste discret (texte, pas un
+ * bouton plein) — §8 règle 1, une seule action pleine par écran, déjà
+ * occupée par l'action de modération principale de la carte.
+ */
+function BoutonSupprimer({
+  titre,
+  pending,
+  onSupprimer,
+}: {
+  titre: string;
+  pending: boolean;
+  onSupprimer: () => Promise<SuppressionResult>;
+}) {
+  const [confirme, setConfirme] = useState(false);
+  const [etat, setEtat] = useState<"idle" | "pending">("idle");
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  async function supprimer() {
+    setEtat("pending");
+    setErreur(null);
+    const r = await onSupprimer();
+    setEtat("idle");
+    if (!r.ok) {
+      setErreur(r.message);
+      setConfirme(false);
+    }
+  }
+
+  if (confirme) {
+    return (
+      <div className="flex flex-col gap-1 items-end">
+        <p className="text-xs font-bold text-ink text-right max-w-[12rem]">
+          Supprimer « {titre} » ? Réversible depuis l&apos;onglet Supprimés.
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirme(false)}
+            disabled={pending || etat === "pending"}
+            className="text-xs font-bold text-ink-muted hover:text-ink cursor-pointer disabled:opacity-50"
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={() => void supprimer()}
+            disabled={pending || etat === "pending"}
+            className="rounded-lg px-3 py-1.5 text-xs font-bold cursor-pointer border border-hot-line bg-surface text-hot hover:bg-hot-soft disabled:opacity-50 transition-colors duration-[130ms] motion-reduce:transition-none"
+          >
+            {etat === "pending" ? "Suppression..." : "Confirmer"}
+          </button>
+        </div>
+        {erreur && <p className="text-warn text-xs font-bold max-w-[12rem] text-right">{erreur}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setConfirme(true)}
+      disabled={pending}
+      className="text-xs font-bold text-ink-subtle hover:text-hot cursor-pointer disabled:opacity-50 self-end"
+    >
+      Supprimer
+    </button>
   );
 }
 
@@ -248,6 +324,7 @@ export function AdminDealItem({
   onUploadImage,
   onDiffuser,
   onAnnulerDiffusion,
+  onSupprimer,
 }: {
   deal: DealAdmin;
   /** Autre deal du même produit s'il en existe un (visibilité seule, lot du
@@ -265,6 +342,7 @@ export function AdminDealItem({
   onUploadImage: (file: File) => Promise<ImageFetchResult>;
   onDiffuser: (canal: CanalDiffusion) => Promise<DiffusionResult>;
   onAnnulerDiffusion: (canal: CanalDiffusion) => Promise<AnnulationResult>;
+  onSupprimer: () => Promise<SuppressionResult>;
 }) {
   const [fields, setFields] = useState<DealEditFields>(() => toEditFields(deal));
   /** Le rejet passe par le panneau de motif — jamais directement par le bouton. */
@@ -457,6 +535,8 @@ export function AdminDealItem({
               />
             </>
           )}
+
+          <BoutonSupprimer titre={deal.titre} pending={pending} onSupprimer={onSupprimer} />
         </div>
       </div>
 

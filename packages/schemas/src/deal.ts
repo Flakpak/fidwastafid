@@ -235,6 +235,11 @@ export const dealAdminSchema = dealSchema.extend({
    *  « diffuse » : les canaux se diffusent et s'annulent indépendamment, et
    *  l'anti-double-envoi est lui-même par canal. */
   diffuseDiscord: z.boolean(),
+  /** Suppression douce (lot 1, plan « suppression administrative ») — `null`
+   *  = visible, une date = supprimé à cet instant. Jamais un DELETE réel :
+   *  sans PITR, la ligne reste restaurable. Admin uniquement — un deal
+   *  supprimé n'apparaît jamais ailleurs qu'ici et dans l'onglet Supprimés. */
+  supprimeLe: z.string().datetime().nullable(),
 });
 export type DealAdmin = z.infer<typeof dealAdminSchema>;
 

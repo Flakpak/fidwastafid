@@ -217,11 +217,16 @@ try {
     // logique qu'avant l'adaptation v2, magasin texte remplacé par
     // enseigne_id). Sans rapport avec la dédup par URL de scraper-bringo.mjs
     // (quirk pagination Sylius), qui reste inchangée dans ce fichier-là.
+    // supprime_le IS NULL (lot 1, suppression douce) : une ligne supprimée
+    // ne doit pas bloquer une réinsertion — la mémoire de ce qui a déjà été
+    // vu/rejeté est un chantier séparé (lot 2, empreinte de dédoublonnage
+    // indépendante de la ligne), pas le rôle de cette table.
     const dup = await client.query(
       `SELECT id FROM deals
        WHERE lower(titre) = lower($1) AND enseigne_id = $2
          AND prix_promo = $3
          AND (date_fin IS NULL OR date_fin >= CURRENT_DATE)
+         AND supprime_le IS NULL
        LIMIT 1`,
       [d.titre, enseigneId, d.prix_promo]
     );
