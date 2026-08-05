@@ -11,7 +11,9 @@ import {
   type DiffusionResult,
   type AnnulationResult,
   type CanalDiffusion,
+  type SuppressionResult,
 } from "./AdminDealItem.js";
+import { AdminDealSupprime, type RestaurationResult } from "./AdminDealSupprime.js";
 import { MotifRejet } from "./MotifRejet.js";
 import { Button } from "../../components/Button.js";
 
@@ -24,7 +26,13 @@ interface ApiErrorBody {
   error?: { code?: string; message?: string; fields?: Record<string, string> };
 }
 
-const ONGLETS: DealStatut[] = ["auto_draft", "en_attente", "publie", "rejete", "expire"];
+/** `"supprime"` (lot 1) n'est PAS une valeur de `deals.statut` — c'est
+ *  l'onglet dédié aux lignes `supprime_le is not null`, tous statuts
+ *  d'origine confondus. Distinct du type `DealStatut` partout où la
+ *  distinction compte (actions de modération, bulk). */
+type Onglet = DealStatut | "supprime";
+
+const ONGLETS_STATUT: DealStatut[] = ["auto_draft", "en_attente", "publie", "rejete", "expire"];
 
 const ONGLET_LABELS: Record<DealStatut, string> = {
   auto_draft: "Pipeline",
@@ -74,9 +82,10 @@ const BULK_ONGLETS = new Set<DealStatut>(["auto_draft", "en_attente"]);
 
 export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   // La liste chargée est déjà celle de L'ONGLET COURANT SEUL — filtrée en
-  // base (`GET /api/v1/admin/deals?statut=…`), jamais la table entière
-  // triée/filtrée côté client (docs/INCIDENTS.md, 04/08/2026 : une
-  // soumission `en_attente` restait invisible derrière un `LIMIT` global).
+  // base (`GET /api/v1/admin/deals?statut=…` ou `?supprime=true`), jamais
+  // la table entière triée/filtrée côté client (docs/INCIDENTS.md,
+  // 04/08/2026 : une soumission `en_attente` restait invisible derrière un
+  // `LIMIT` global).
   const [deals, setDeals] = useState<DealAdminAvecDoublon[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [chargementPage, setChargementPage] = useState(false);
@@ -85,17 +94,23 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   // liste est paginée, elle ne peut pas se compter elle-même sans mentir sur
   // ce qu'elle n'a pas encore chargé.
   const [comptes, setComptes] = useState<Record<DealStatut, number>>(COMPTES_INITIAUX);
-  const [onglet, setOnglet] = useState<DealStatut>("en_attente");
+  const [comptesSupprimes, setComptesSupprimes] = useState(0);
+  const [onglet, setOnglet] = useState<Onglet>("en_attente");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   /** Le rejet groupé passe par le panneau de motif, jamais par le bouton seul. */
   const [demandeMotifLot, setDemandeMotifLot] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  /** Charge la PREMIÈRE page d'un onglet — remplace la liste affichée. */
-  const fetchOnglet = useCallback(async (statut: DealStatut) => {
+  function urlOnglet(o: Onglet): string {
+    return o === "supprime" ? "/api/v1/admin/deals?supprime=true" : `/api/v1/admin/deals?statut=${o}`;
+  }
+
+  /** Charge la PREMIÈRE page d'un onglet (ou de l'onglet Supprimés) —
+   *  remplace la liste affichée. */
+  const fetchOnglet = useCallback(async (o: Onglet) => {
     setError(null);
-    const res = await fetch(`/api/v1/admin/deals?statut=${statut}`);
+    const res = await fetch(urlOnglet(o));
     if (!res.ok) {
       const body = (await res.json()) as ApiErrorBody;
       if (body.error?.code === "UNAUTHENTICATED" || body.error?.code === "FORBIDDEN") {
@@ -115,13 +130,15 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   const fetchComptes = useCallback(async () => {
     const res = await fetch("/api/v1/admin/deals/compte");
     if (!res.ok) return;
-    const body = (await res.json()) as { comptes: Record<DealStatut, number> };
+    const body = (await res.json()) as { comptes: Record<DealStatut, number>; supprimes: number };
     setComptes(body.comptes);
+    setComptesSupprimes(body.supprimes);
   }, []);
 
   /** Après toute mutation : reprend l'onglet courant depuis sa première page
-   *  (un item peut en être sorti — statut changé — ou avoir bougé de rang)
-   *  et rafraîchit les comptes, qu'elle que soit la mutation. */
+   *  (un item peut en être sorti — statut changé, supprimé ou restauré — ou
+   *  avoir bougé de rang) et rafraîchit les comptes, qu'elle que soit la
+   *  mutation. */
   const rafraichir = useCallback(async () => {
     await Promise.all([fetchOnglet(onglet), fetchComptes()]);
   }, [onglet, fetchOnglet, fetchComptes]);
@@ -137,7 +154,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     if (!cursor || chargementPage) return;
     setChargementPage(true);
     try {
-      const res = await fetch(`/api/v1/admin/deals?statut=${onglet}&cursor=${encodeURIComponent(cursor)}`);
+      const res = await fetch(`${urlOnglet(onglet)}&cursor=${encodeURIComponent(cursor)}`);
       if (!res.ok) return;
       const body = (await res.json()) as { data: DealAdminAvecDoublon[]; nextCursor: string | null };
       setDeals((prev) => [...(prev ?? []), ...body.data]);
@@ -147,7 +164,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     }
   }, [cursor, chargementPage, onglet]);
 
-  function changerOnglet(t: DealStatut) {
+  function changerOnglet(t: Onglet) {
     setOnglet(t);
     setDeals(null);
     setCursor(null);
@@ -298,6 +315,45 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     return { ok: true };
   }
 
+  /** Suppression DOUCE (lot 1) — pose `supprime_le`, jamais un DELETE réel
+   *  (voir DELETE /api/v1/admin/deals/:publicId). Rafraîchit l'onglet
+   *  courant (la ligne en sort) et les comptes (elle quitte son badge,
+   *  rejoint celui de l'onglet Supprimés). */
+  async function supprimer(publicId: string): Promise<SuppressionResult> {
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/admin/deals/${publicId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const body = (await res.json()) as ApiErrorBody;
+        return { ok: false, message: body.error?.message ?? "Suppression impossible." };
+      }
+      await rafraichir();
+      return { ok: true };
+    } finally {
+      setPending(false);
+    }
+  }
+
+  /** Restauration — efface `supprime_le`, renvoie le deal dans son statut
+   *  D'ORIGINE (jamais touché par la suppression). Rafraîchit l'onglet
+   *  Supprimés (la ligne en sort) et les comptes. */
+  async function restaurer(publicId: string): Promise<RestaurationResult> {
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/admin/deals/${publicId}/restaurer`, { method: "POST" });
+      if (!res.ok) {
+        const body = (await res.json()) as ApiErrorBody;
+        return { ok: false, message: body.error?.message ?? "Restauration impossible." };
+      }
+      await rafraichir();
+      return { ok: true };
+    } finally {
+      setPending(false);
+    }
+  }
+
   /**
    * `motifRejet` est exigé par l'API pour un rejet groupé (CONTRAT-V1 §3) —
    * l'endpoint bulk était sinon un contournement complet de l'obligation de
@@ -335,10 +391,12 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     return <p className="text-center text-ink-muted py-16">Chargement…</p>;
   }
 
+  const modeSupprimes = onglet === "supprime";
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex border-b border-border overflow-x-auto">
-        {ONGLETS.map((t) => (
+        {ONGLETS_STATUT.map((t) => (
           <button
             key={t}
             type="button"
@@ -350,9 +408,20 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
             {ONGLET_LABELS[t]} ({comptes[t]})
           </button>
         ))}
+        {/* Onglet Supprimés (lot 1) — séparé des cinq statuts par un filet :
+            ce n'est pas un statut de plus, c'est une vue transversale. */}
+        <button
+          type="button"
+          onClick={() => changerOnglet("supprime")}
+          className={`ml-2 pl-4 border-l border-border px-4 py-2 text-sm font-bold whitespace-nowrap border-b-2 -mb-px ${
+            modeSupprimes ? "border-accent text-accent" : "border-transparent text-ink-muted"
+          }`}
+        >
+          Supprimés ({comptesSupprimes})
+        </button>
       </div>
 
-      {BULK_ONGLETS.has(onglet) && deals.length > 0 && (
+      {!modeSupprimes && BULK_ONGLETS.has(onglet) && deals.length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <Button variant="primary" size="sm" onClick={() => void bulk("publie")} disabled={pending || selected.size === 0}>
@@ -378,28 +447,42 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         </div>
       )}
 
-      {deals.length === 0 && <p className="text-center text-ink-muted py-16">Rien dans cet onglet.</p>}
+      {deals.length === 0 && (
+        <p className="text-center text-ink-muted py-16">
+          {modeSupprimes ? "Aucun deal supprimé." : "Rien dans cet onglet."}
+        </p>
+      )}
 
       <ul className="flex flex-col gap-2">
-        {deals.map((deal) => (
-          <AdminDealItem
-            key={deal.publicId}
-            deal={deal}
-            doublon={deal.doublon}
-            actions={ONGLET_ACTIONS[onglet]}
-            enseignes={enseignes}
-            showCheckbox={BULK_ONGLETS.has(onglet)}
-            checked={selected.has(deal.publicId)}
-            onToggle={() => toggle(deal.publicId)}
-            pending={pending}
-            onAction={(statut, motifRejet) => updateStatut(deal.publicId, statut, motifRejet)}
-            onSaveFields={(fields) => saveDeal(deal.publicId, deal.statut, fields)}
-            onFetchImageFromLink={() => fetchImageFromLink(deal.publicId)}
-            onUploadImage={(file) => uploadImage(deal.publicId, file)}
-            onDiffuser={(canal) => diffuser(deal.publicId, canal)}
-            onAnnulerDiffusion={(canal) => annulerDiffusion(deal.publicId, canal)}
-          />
-        ))}
+        {modeSupprimes
+          ? deals.map((deal) => (
+              <AdminDealSupprime
+                key={deal.publicId}
+                deal={deal}
+                pending={pending}
+                onRestaurer={() => restaurer(deal.publicId)}
+              />
+            ))
+          : deals.map((deal) => (
+              <AdminDealItem
+                key={deal.publicId}
+                deal={deal}
+                doublon={deal.doublon}
+                actions={ONGLET_ACTIONS[onglet as DealStatut]}
+                enseignes={enseignes}
+                showCheckbox={BULK_ONGLETS.has(onglet as DealStatut)}
+                checked={selected.has(deal.publicId)}
+                onToggle={() => toggle(deal.publicId)}
+                pending={pending}
+                onAction={(statut, motifRejet) => updateStatut(deal.publicId, statut, motifRejet)}
+                onSaveFields={(fields) => saveDeal(deal.publicId, deal.statut, fields)}
+                onFetchImageFromLink={() => fetchImageFromLink(deal.publicId)}
+                onUploadImage={(file) => uploadImage(deal.publicId, file)}
+                onDiffuser={(canal) => diffuser(deal.publicId, canal)}
+                onAnnulerDiffusion={(canal) => annulerDiffusion(deal.publicId, canal)}
+                onSupprimer={() => supprimer(deal.publicId)}
+              />
+            ))}
       </ul>
 
       {cursor && (

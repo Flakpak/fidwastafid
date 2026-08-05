@@ -106,13 +106,18 @@ export const PUBLIC_STATUTS = new Set(["publie", "expire"]);
 /** `diffuse_telegram` est calculé, jamais stocké sur `deals` : la vérité est
  *  la table `diffusions` (migration 0011). Un booléen dupliqué sur le deal
  *  se désynchroniserait le jour où une diffusion est supprimée à la main. */
-export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.motif_rejet, d.turnstile_verifie,
+export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.motif_rejet, d.turnstile_verifie, d.supprime_le,
   exists (select 1 from diffusions df where df.deal_id = d.id and df.canal = 'telegram') as diffuse_telegram,
   exists (select 1 from diffusions df where df.deal_id = d.id and df.canal = 'discord') as diffuse_discord`;
 
 export interface DealAdminRow extends DealRow {
   motif_rejet: string | null;
   turnstile_verifie: boolean;
+  /** Suppression douce (lot 1, plan « suppression administrative ») — `null`
+   *  = visible. Jamais un DELETE réel : sans PITR, c'est ce qui transforme
+   *  l'irréversible en UPDATE annulable, et neutralise au passage le
+   *  `ON DELETE CASCADE` de votes/commentaires/diffusions. */
+  supprime_le: string | null;
   diffuse_telegram: boolean;
   diffuse_discord: boolean;
 }
@@ -124,6 +129,7 @@ export function toDealAdmin(row: DealAdminRow): DealAdmin {
     whatsappPublic: row.whatsapp_public,
     motifRejet: row.motif_rejet,
     turnstileVerifie: row.turnstile_verifie,
+    supprimeLe: row.supprime_le ? new Date(row.supprime_le).toISOString() : null,
     diffuseTelegram: row.diffuse_telegram,
     diffuseDiscord: row.diffuse_discord,
   });
@@ -157,6 +163,7 @@ export const DEAL_DOUBLON_JOIN = `
            (count(*) over())::int as nb
     from deals o
     where o.id <> d.id
+      and o.supprime_le is null
       and o.enseigne_id = d.enseigne_id
       and (
         (d.lien is not null and o.lien = d.lien)
@@ -240,9 +247,10 @@ export const REMISE_EXPR = `case when d.prix_normal is not null and d.prix_norma
  * la même transaction (vote, recalcul de score).
  */
 export async function lockDealIdByPublicId(client: PoolClient, publicId: string): Promise<string | null> {
-  const result = await client.query<{ id: string }>("select id from deals where public_id = $1 for update", [
-    publicId,
-  ]);
+  const result = await client.query<{ id: string }>(
+    "select id from deals where public_id = $1 and supprime_le is null for update",
+    [publicId]
+  );
   return result.rows[0]?.id ?? null;
 }
 

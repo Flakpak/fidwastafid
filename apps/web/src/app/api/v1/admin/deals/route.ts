@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { query } from "@fidwastafid/db";
 import { requireAdmin } from "@fidwastafid/auth";
-import { dealStatutSchema } from "@fidwastafid/schemas";
+import { dealStatutSchema, type DealStatut } from "@fidwastafid/schemas";
 import { apiError, withAuthErrors } from "../../_lib/errors.js";
 import {
   DEAL_ADMIN_SELECT,
@@ -15,7 +15,7 @@ import {
   type DealAdminRow,
   type DoublonColumns,
 } from "../../_lib/deals.js";
-import { decodeAdminCursor, encodeAdminCursor } from "../../_lib/adminDealsCursor.js";
+import { decodeAdminCursor, encodeAdminCursor, type AdminDealsCursor } from "../../_lib/adminDealsCursor.js";
 
 export const runtime = "nodejs";
 
@@ -23,9 +23,10 @@ const DEFAULT_LIMIT = 30;
 const MAX_LIMIT = 100;
 
 /**
- * GET /api/v1/admin/deals — requireAdmin. `statut` est OBLIGATOIRE : un
- * onglet interroge SON statut, jamais la table entière (neuvième amendement
- * conscient de la liste fermée, CONTRAT-V1 §4, 04/08/2026).
+ * GET /api/v1/admin/deals — requireAdmin. `statut` est OBLIGATOIRE (sauf
+ * mode `supprime`, voir plus bas) : un onglet interroge SON statut, jamais
+ * la table entière (neuvième amendement conscient de la liste fermée,
+ * CONTRAT-V1 §4, 04/08/2026).
  *
  * Avant ce lot, l'endpoint chargeait tous statuts confondus (`LIMIT 1000`)
  * et le tri/filtre par onglet se faisait côté client sur ce tableau déjà
@@ -42,44 +43,65 @@ const MAX_LIMIT = 100;
  * viennent de `GET /api/v1/admin/deals/compte` (`count(*)` en base), pas
  * de la longueur de cette liste — un onglet paginé ne peut pas se compter
  * lui-même sans mentir sur ce qu'il ne charge pas encore.
+ *
+ * `?supprime=true` (lot 1, suppression douce) — mode exclusif, ignore
+ * `statut` : renvoie les lignes `supprime_le is not null`, tous statuts
+ * d'origine confondus, plus récemment supprimées d'abord. C'est le SEUL
+ * endroit du dépôt où une ligne supprimée redevient lisible — l'onglet
+ * admin « Supprimés », pour voir et restaurer. Toute autre lecture (tabs
+ * de statut, feed public, fiche, sitemap, etc.) exclut `supprime_le is not
+ * null` sans exception.
  */
 export const GET = withAuthErrors(async (request: Request): Promise<NextResponse> => {
   await requireAdmin(request);
 
   const { searchParams } = new URL(request.url);
-  const statutParsed = dealStatutSchema.safeParse(searchParams.get("statut"));
-  if (!statutParsed.success) {
-    return apiError("VALIDATION_ERROR", "Paramètre statut requis, parmi les statuts connus.");
+  const modeSupprime = searchParams.get("supprime") === "true";
+
+  let statut: DealStatut | "supprime";
+  if (modeSupprime) {
+    statut = "supprime";
+  } else {
+    const statutParsed = dealStatutSchema.safeParse(searchParams.get("statut"));
+    if (!statutParsed.success) {
+      return apiError("VALIDATION_ERROR", "Paramètre statut requis, parmi les statuts connus.");
+    }
+    statut = statutParsed.data;
   }
-  const statut = statutParsed.data;
-  const tri = triPourStatut(statut);
+  const tri = modeSupprime ? ("supprime_desc" as const) : triPourStatut(statut);
 
   const limitParam = Number(searchParams.get("limit"));
   const limit =
     Number.isFinite(limitParam) && limitParam > 0 ? Math.min(Math.trunc(limitParam), MAX_LIMIT) : DEFAULT_LIMIT;
 
   const cursorParam = searchParams.get("cursor");
-  let cursor = null;
+  let cursor: AdminDealsCursor | null = null;
   if (cursorParam) {
     cursor = decodeAdminCursor(cursorParam);
-    // Un curseur d'un AUTRE onglet (statut) ou d'un autre tri pointerait une
-    // position dans une file qui n'est pas celle-ci — même garde que le
-    // feed public sur sa signature de filtres.
+    // Un curseur d'un AUTRE onglet (statut, ou le mode Supprimés) ou d'un
+    // autre tri pointerait une position dans une file qui n'est pas
+    // celle-ci — même garde que le feed public sur sa signature de filtres.
     if (!cursor || cursor.statut !== statut || cursor.tri !== tri) {
       return apiError("VALIDATION_ERROR", "Curseur invalide pour cet onglet.");
     }
   }
 
-  const values: unknown[] = [statut];
-  const conditions = ["d.statut = $1"];
+  const values: unknown[] = [];
+  const conditions: string[] = [];
+  if (modeSupprime) {
+    conditions.push("d.supprime_le is not null");
+  } else {
+    values.push(statut);
+    conditions.push("d.statut = $1", "d.supprime_le is null");
+  }
 
-  const sortColumn = tri === "recent_asc" ? "d.created_at" : REMISE_EXPR;
+  const sortColumn = tri === "recent_asc" ? "d.created_at" : tri === "supprime_desc" ? "d.supprime_le" : REMISE_EXPR;
   const direction = tri === "recent_asc" ? "asc" : "desc";
   const compare = tri === "recent_asc" ? ">" : "<";
 
   if (cursor) {
-    const cast = tri === "recent_asc" ? "::timestamptz" : "";
-    const cursorValue = tri === "recent_asc" ? cursor.value : Number(cursor.value);
+    const cast = tri === "recent_asc" || tri === "supprime_desc" ? "::timestamptz" : "";
+    const cursorValue = tri === "remise_desc" ? Number(cursor.value) : cursor.value;
     values.push(cursorValue);
     const valueIdx = values.length;
     values.push(cursor.publicId);
@@ -98,7 +120,9 @@ export const GET = withAuthErrors(async (request: Request): Promise<NextResponse
   // `tri_valeur` sélectionné explicitement uniquement pour `remise_desc` —
   // nécessaire pour réencoder le curseur de la page suivante avec la même
   // expression que le ORDER BY/WHERE ci-dessus (comme `tendance_rang`,
-  // feed public).
+  // feed public). `recent_asc`/`supprime_desc` trient sur une vraie colonne
+  // déjà présente dans DEAL_ADMIN_SELECT (`created_at`/`supprime_le`),
+  // aucun alias supplémentaire requis.
   const selectExtra = tri === "remise_desc" ? `, ${sortColumn} as tri_valeur` : "";
 
   const rows = await query<DealAdminRow & DoublonColumns & { tri_valeur?: number }>(
@@ -117,7 +141,12 @@ export const GET = withAuthErrors(async (request: Request): Promise<NextResponse
   let nextCursor: string | null = null;
   const last = pageRows[pageRows.length - 1];
   if (hasMore && last) {
-    const value = tri === "recent_asc" ? new Date(last.created_at).toISOString() : String(last.tri_valeur);
+    const value =
+      tri === "recent_asc"
+        ? new Date(last.created_at).toISOString()
+        : tri === "supprime_desc"
+          ? new Date(last.supprime_le as string).toISOString()
+          : String(last.tri_valeur);
     nextCursor = encodeAdminCursor({ statut, tri, value, publicId: last.public_id });
   }
 

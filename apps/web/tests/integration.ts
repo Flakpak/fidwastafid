@@ -10,7 +10,8 @@ import {
   GET as getComments,
 } from "../src/app/api/v1/deals/[publicId]/commentaires/route.js";
 import { GET as getMe, PATCH as patchMe } from "../src/app/api/v1/me/route.js";
-import { PATCH as patchAdminDeal } from "../src/app/api/v1/admin/deals/[publicId]/route.js";
+import { PATCH as patchAdminDeal, DELETE as deleteAdminDeal } from "../src/app/api/v1/admin/deals/[publicId]/route.js";
+import { POST as postRestaurer } from "../src/app/api/v1/admin/deals/[publicId]/restaurer/route.js";
 import { GET as getAdminDeals } from "../src/app/api/v1/admin/deals/route.js";
 import { GET as getAdminDealsCompte } from "../src/app/api/v1/admin/deals/compte/route.js";
 import { POST as postBulk } from "../src/app/api/v1/admin/deals/bulk/route.js";
@@ -1207,6 +1208,181 @@ async function main() {
     check("file admin — la pagination ne sert aucune ligne en double", new Set(idsServis).size === idsServis.length);
   } finally {
     await query("delete from deals where statut = 'expire' and public_id = any($1::text[])", [idsSynthetiques]);
+  }
+
+  // -------------------------------------------------------------------------
+  // Suppression douce (lot 1, plan « suppression administrative des deals »).
+  // Un deal supprimé n'apparaît dans AUCUNE lecture ; restauré, il revient à
+  // l'identique — dans son statut D'ORIGINE, jamais un statut par défaut.
+  // Deal synthétique dédié (statut publie, soumis par le compte de test, un
+  // vote réel dessus) : isolé du reste de la suite, auto-nettoyé.
+  // -------------------------------------------------------------------------
+  console.log("\nsuppression douce — invisible partout, restauration à l'identique");
+
+  const SUPPR_PUBLIC_ID = generatePublicId();
+  const enseigneRow = await query<{ id: string }>("select id from enseignes where slug = $1", [ENSEIGNE_SLUG]);
+  const enseigneIdSuppr = enseigneRow[0]?.id;
+  if (!enseigneIdSuppr) throw new Error("Fixture enseigne introuvable pour le test de suppression douce.");
+
+  try {
+    const inserted = await query<{ id: string }>(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, submitter_id, score)
+       values ($1, 'Deal test suppression douce', $2, 'Autre', 'physique', 20, 'publie', $3, 0)
+       returning id`,
+      [SUPPR_PUBLIC_ID, enseigneIdSuppr, userId]
+    );
+    const dealIdSuppr = inserted[0]?.id;
+    if (!dealIdSuppr) throw new Error("Deal de test (suppression douce) non inséré.");
+
+    const voteRes = await postVote(
+      authedRequest(`http://localhost/api/v1/deals/${SUPPR_PUBLIC_ID}/votes`, token, {
+        method: "POST",
+        body: JSON.stringify({ sens: "chaud" }),
+      }),
+      { params: Promise.resolve({ publicId: SUPPR_PUBLIC_ID }) }
+    );
+    check("suppression douce — vote de départ posé -> 200/201", voteRes.status === 200 || voteRes.status === 201);
+
+    // --- Avant suppression : visible partout ---
+    const detailAvant = await getDeal(new Request(`http://localhost/api/v1/deals/${SUPPR_PUBLIC_ID}`), {
+      params: Promise.resolve({ publicId: SUPPR_PUBLIC_ID }),
+    });
+    check("avant suppression -> fiche publique 200", detailAvant.status === 200);
+
+    const meAvant = await getMe(authedRequest("http://localhost/api/v1/me", token), noParams);
+    const meAvantBody = (await meAvant.json()) as { mesDeals?: { publicId?: string }[] };
+    check(
+      "avant suppression -> présent dans /me mesDeals",
+      (meAvantBody.mesDeals ?? []).some((d) => d.publicId === SUPPR_PUBLIC_ID)
+    );
+
+    const adminAvant = await getAdminDeals(authedRequest("http://localhost/api/v1/admin/deals?statut=publie&limit=200", token), noParams);
+    const adminAvantBody = (await adminAvant.json()) as { data: { publicId: string }[] };
+    check(
+      "avant suppression -> présent dans l'onglet admin publie",
+      adminAvantBody.data.some((d) => d.publicId === SUPPR_PUBLIC_ID)
+    );
+
+    // --- Suppression ---
+    const suppRes = await deleteAdminDeal(authedRequest(`http://localhost/api/v1/admin/deals/${SUPPR_PUBLIC_ID}`, token, { method: "DELETE" }), {
+      params: Promise.resolve({ publicId: SUPPR_PUBLIC_ID }),
+    });
+    check("DELETE admin -> 200", suppRes.status === 200);
+
+    const suppRejoueRes = await deleteAdminDeal(
+      authedRequest(`http://localhost/api/v1/admin/deals/${SUPPR_PUBLIC_ID}`, token, { method: "DELETE" }),
+      { params: Promise.resolve({ publicId: SUPPR_PUBLIC_ID }) }
+    );
+    check("DELETE sur un deal déjà supprimé -> 409 CONFLICT", suppRejoueRes.status === 409);
+
+    // --- Après suppression : invisible PARTOUT, sauf l'onglet dédié ---
+    const detailApres = await getDeal(new Request(`http://localhost/api/v1/deals/${SUPPR_PUBLIC_ID}`), {
+      params: Promise.resolve({ publicId: SUPPR_PUBLIC_ID }),
+    });
+    check("après suppression -> fiche publique 404", detailApres.status === 404);
+
+    const meApres = await getMe(authedRequest("http://localhost/api/v1/me", token), noParams);
+    const meApresBody = (await meApres.json()) as { mesDeals?: { publicId?: string }[] };
+    check(
+      "après suppression -> absent de /me mesDeals",
+      !(meApresBody.mesDeals ?? []).some((d) => d.publicId === SUPPR_PUBLIC_ID)
+    );
+
+    const adminApres = await getAdminDeals(authedRequest("http://localhost/api/v1/admin/deals?statut=publie&limit=200", token), noParams);
+    const adminApresBody = (await adminApres.json()) as { data: { publicId: string }[] };
+    check(
+      "après suppression -> absent de l'onglet admin publie",
+      !adminApresBody.data.some((d) => d.publicId === SUPPR_PUBLIC_ID)
+    );
+
+    const compteApres = await getAdminDealsCompte(authedRequest("http://localhost/api/v1/admin/deals/compte", token), noParams);
+    const compteApresBody = (await compteApres.json()) as { supprimes: number };
+    check("après suppression -> compte « supprimes » >= 1", compteApresBody.supprimes >= 1);
+
+    const trashRes = await getAdminDeals(authedRequest("http://localhost/api/v1/admin/deals?supprime=true&limit=200", token), noParams);
+    const trashBody = (await trashRes.json()) as {
+      data: { publicId: string; statut: string; supprimeLe: string | null }[];
+    };
+    const enCorbeille = trashBody.data.find((d) => d.publicId === SUPPR_PUBLIC_ID);
+    check("après suppression -> présent dans l'onglet Supprimés", Boolean(enCorbeille));
+    check("onglet Supprimés -> conserve le statut d'origine (publie)", enCorbeille?.statut === "publie");
+    check("onglet Supprimés -> supprimeLe renseigné", typeof enCorbeille?.supprimeLe === "string");
+
+    const auditSuppr = await query<{ action: string }>(
+      "select action from journal_audit where cible_type = 'deal' and cible_id = $1 and action = 'supprimer_deal'",
+      [SUPPR_PUBLIC_ID]
+    );
+    check("suppression tracée dans journal_audit", auditSuppr.length === 1);
+
+    const votesApresSuppr = await query<{ total: string }>("select count(*)::int as total from votes where deal_id = $1", [
+      dealIdSuppr,
+    ]);
+    check(
+      "le vote réel survit à la suppression douce (CASCADE neutralisé)",
+      Number(votesApresSuppr[0]?.total ?? 0) === 1
+    );
+
+    // --- Restauration : revient à l'identique ---
+    const restRejoueRes = await postRestaurer(
+      authedRequest(`http://localhost/api/v1/admin/deals/${SUPPR_PUBLIC_ID}/restaurer`, token, { method: "POST" }),
+      { params: Promise.resolve({ publicId: "zzzzzzzzzz" }) }
+    );
+    check(
+      "restauration d'un deal jamais supprimé -> 404 (public_id inexistant)",
+      restRejoueRes.status === 404
+    );
+
+    const restRes = await postRestaurer(
+      authedRequest(`http://localhost/api/v1/admin/deals/${SUPPR_PUBLIC_ID}/restaurer`, token, { method: "POST" }),
+      { params: Promise.resolve({ publicId: SUPPR_PUBLIC_ID }) }
+    );
+    const restBody = (await restRes.json()) as { statut?: string; supprimeLe?: string | null };
+    check("POST restaurer -> 200", restRes.status === 200);
+    check("restauré -> statut d'ORIGINE (publie), pas un statut par défaut", restBody.statut === "publie");
+    check("restauré -> supprimeLe redevenu null", restBody.supprimeLe === null || restBody.supprimeLe === undefined);
+
+    const restRejoue2Res = await postRestaurer(
+      authedRequest(`http://localhost/api/v1/admin/deals/${SUPPR_PUBLIC_ID}/restaurer`, token, { method: "POST" }),
+      { params: Promise.resolve({ publicId: SUPPR_PUBLIC_ID }) }
+    );
+    check("restaurer un deal déjà restauré -> 409 CONFLICT", restRejoue2Res.status === 409);
+
+    const detailRestaure = await getDeal(new Request(`http://localhost/api/v1/deals/${SUPPR_PUBLIC_ID}`), {
+      params: Promise.resolve({ publicId: SUPPR_PUBLIC_ID }),
+    });
+    const detailRestaureBody = (await detailRestaure.json()) as { titre?: string; prixPromo?: number };
+    check("restauré -> fiche publique 200 de nouveau", detailRestaure.status === 200);
+    check(
+      "restauré -> identique à l'original (titre, prix)",
+      detailRestaureBody.titre === "Deal test suppression douce" && detailRestaureBody.prixPromo === 20
+    );
+
+    const meRestaure = await getMe(authedRequest("http://localhost/api/v1/me", token), noParams);
+    const meRestaureBody = (await meRestaure.json()) as { mesDeals?: { publicId?: string }[] };
+    check(
+      "restauré -> de nouveau présent dans /me mesDeals",
+      (meRestaureBody.mesDeals ?? []).some((d) => d.publicId === SUPPR_PUBLIC_ID)
+    );
+
+    const trashApresRestore = await getAdminDeals(
+      authedRequest("http://localhost/api/v1/admin/deals?supprime=true&limit=200", token),
+      noParams
+    );
+    const trashApresRestoreBody = (await trashApresRestore.json()) as { data: { publicId: string }[] };
+    check(
+      "restauré -> disparu de l'onglet Supprimés",
+      !trashApresRestoreBody.data.some((d) => d.publicId === SUPPR_PUBLIC_ID)
+    );
+
+    const auditRest = await query<{ action: string }>(
+      "select action from journal_audit where cible_type = 'deal' and cible_id = $1 and action = 'restaurer_deal'",
+      [SUPPR_PUBLIC_ID]
+    );
+    check("restauration tracée dans journal_audit", auditRest.length === 1);
+  } finally {
+    await query("delete from votes where deal_id = (select id from deals where public_id = $1)", [SUPPR_PUBLIC_ID]);
+    await query("delete from journal_audit where cible_type = 'deal' and cible_id = $1", [SUPPR_PUBLIC_ID]);
+    await query("delete from deals where public_id = $1", [SUPPR_PUBLIC_ID]);
   }
 
   console.log(

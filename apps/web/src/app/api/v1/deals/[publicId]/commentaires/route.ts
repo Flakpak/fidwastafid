@@ -43,10 +43,10 @@ interface CommentaireRow {
 export async function GET(request: Request, { params }: Context): Promise<NextResponse> {
   const { publicId } = await params;
 
-  const dealRows = await query<{ id: string }>("select id from deals where public_id = $1 and statut = any($2)", [
-    publicId,
-    Array.from(PUBLIC_STATUTS),
-  ]);
+  const dealRows = await query<{ id: string }>(
+    "select id from deals where public_id = $1 and statut = any($2) and supprime_le is null",
+    [publicId, Array.from(PUBLIC_STATUTS)]
+  );
   const deal = dealRows[0];
   if (!deal) return apiError("NOT_FOUND", "Deal introuvable.");
 
@@ -125,10 +125,10 @@ export const POST = withAuthErrors<Context>(async (request, { params }) => {
   const parsed = await parseJsonBody(request, commentaireInputSchema);
   if (!parsed.success) return parsed.response;
 
-  const dealRows = await query<{ id: string }>("select id from deals where public_id = $1 and statut = any($2)", [
-    publicId,
-    Array.from(PUBLIC_STATUTS),
-  ]);
+  const dealRows = await query<{ id: string }>(
+    "select id from deals where public_id = $1 and statut = any($2) and supprime_le is null",
+    [publicId, Array.from(PUBLIC_STATUTS)]
+  );
   const deal = dealRows[0];
   if (!deal) return apiError("NOT_FOUND", "Deal introuvable.");
 

@@ -275,7 +275,13 @@ registry.registerPath({
   security: [{ [bearerAuth.name]: [] }],
   request: {
     query: z.object({
-      statut: z.string().openapi({ description: "auto_draft|en_attente|publie|rejete|expire — requis" }),
+      statut: z.string().optional().openapi({
+        description: "auto_draft|en_attente|publie|rejete|expire — requis sauf si supprime=true",
+      }),
+      supprime: z
+        .string()
+        .optional()
+        .openapi({ description: "true = onglet Supprimés (lot 1) — exclusif de statut, ignore ce paramètre" }),
       cursor: z.string().optional(),
       limit: z.string().optional(),
     }),
@@ -298,6 +304,7 @@ const CompteAdminDeals = registry.register(
       rejete: z.number().int(),
       expire: z.number().int(),
     }),
+    supprimes: z.number().int().openapi({ description: "Lignes supprime_le is not null (lot 1)" }),
   })
 );
 
@@ -307,7 +314,8 @@ registry.registerPath({
   summary: "Compte par statut (CONTRAT-V1 §4, neuvième amendement conscient)",
   description:
     "count(*) en base, groupé par statut — les cinq clés sont toujours présentes, à 0 s'il n'y a aucune " +
-    "ligne. Jamais déduit de la longueur d'une liste paginée (docs/INCIDENTS.md, 04/08/2026).",
+    "ligne. Jamais déduit de la longueur d'une liste paginée (docs/INCIDENTS.md, 04/08/2026). " +
+    "`supprimes` (dixième amendement, lot 1) compte séparément les lignes supprime_le is not null.",
   security: [{ [bearerAuth.name]: [] }],
   responses: {
     200: { description: "OK", content: { "application/json": { schema: CompteAdminDeals } } },
@@ -332,6 +340,42 @@ registry.registerPath({
     400: errorResponse("Corps invalide (statut/champ métier incohérent, enseigneSlug inconnu...)"),
     403: errorResponse("Accès refusé (non-admin)"),
     404: errorResponse("Deal introuvable"),
+  },
+  tags: ["admin"],
+});
+
+const SuppressionOk = registry.register("SuppressionOk", z.object({ ok: z.literal(true) }));
+
+registry.registerPath({
+  method: "delete",
+  path: "/admin/deals/{publicId}",
+  summary: "Suppression DOUCE d'un deal (CONTRAT-V1 §3, dixième amendement conscient, 05/08/2026)",
+  description:
+    "Pose supprime_le, ne supprime JAMAIS la ligne SQL — sans PITR, un DELETE réel serait irréversible " +
+    "en pratique. `statut` n'est pas touché : POST .../restaurer renvoie le deal dans son statut d'origine.",
+  security: [{ [bearerAuth.name]: [] }],
+  request: { params: z.object({ publicId: z.string() }) },
+  responses: {
+    200: { description: "OK", content: { "application/json": { schema: SuppressionOk } } },
+    403: errorResponse("Accès refusé (non-admin)"),
+    404: errorResponse("Deal introuvable"),
+    409: errorResponse("Ce deal est déjà supprimé"),
+  },
+  tags: ["admin"],
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/admin/deals/{publicId}/restaurer",
+  summary: "Restaure un deal supprimé (CONTRAT-V1 §3, dixième amendement conscient, 05/08/2026)",
+  description: "Efface supprime_le. Le deal revient dans son statut D'ORIGINE, jamais touché par la suppression.",
+  security: [{ [bearerAuth.name]: [] }],
+  request: { params: z.object({ publicId: z.string() }) },
+  responses: {
+    200: { description: "OK", content: { "application/json": { schema: DealAdmin } } },
+    403: errorResponse("Accès refusé (non-admin)"),
+    404: errorResponse("Deal introuvable"),
+    409: errorResponse("Ce deal n'est pas supprimé"),
   },
   tags: ["admin"],
 });

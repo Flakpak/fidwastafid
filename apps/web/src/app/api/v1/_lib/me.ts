@@ -72,7 +72,7 @@ export async function resolveMeEmail(
 export async function buildMe(user: AuthUser): Promise<Me> {
   const rows = await query<MeRow>(
     `select u.pseudo, u.couleur_avatar,
-       (select count(*) from deals d where d.submitter_id = u.id)::int as deals_count,
+       (select count(*) from deals d where d.submitter_id = u.id and d.supprime_le is null)::int as deals_count,
        (select count(*) from votes v where v.user_id = u.id)::int as votes_count,
        (select count(*) from commentaires c where c.auteur_id = u.id)::int as commentaires_count
      from users u
@@ -84,8 +84,12 @@ export async function buildMe(user: AuthUser): Promise<Me> {
 
   const { email, emailIndisponible } = await resolveMeEmail(user.id);
 
+  // supprime_le is null (lot 1) : un deal supprimé par la modération ne
+  // doit pas réapparaître dans « mes deals », y compris pour son propre
+  // soumetteur — invisible partout hors de l'onglet admin dédié.
   const dealRows = await query<MeDealRow>(
-    `select public_id, titre, statut, motif_rejet, created_at from deals where submitter_id = $1 order by created_at desc`,
+    `select public_id, titre, statut, motif_rejet, created_at from deals
+     where submitter_id = $1 and supprime_le is null order by created_at desc`,
     [user.id]
   );
 

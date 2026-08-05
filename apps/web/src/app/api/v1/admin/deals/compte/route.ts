@@ -30,20 +30,28 @@ const STATUTS = dealStatutSchema.options;
  * routeur Next, comme `/deals/compte` sur son propre `[publicId]` — un
  * `public_id` (nanoid 10 caractères, CONTRAT-V1 §1) ne peut pas valoir
  * littéralement `compte`.
+ *
+ * Suppression douce (lot 1) : `comptes` exclut `supprime_le is not null` —
+ * une ligne supprimée ne doit plus peser sur le badge de son ancien onglet.
+ * `supprimes` compte séparément ces lignes, pour le badge du nouvel onglet
+ * dédié — même `count(*)` en base, jamais la longueur d'une liste.
  */
 export const GET = withAuthErrors(async (request: Request): Promise<NextResponse> => {
   await requireAdmin(request);
 
-  const rows = await query<{ statut: string; total: number }>(
-    "select statut, count(*)::int as total from deals group by statut"
-  );
+  const [parStatut, supprimesRows] = await Promise.all([
+    query<{ statut: string; total: number }>(
+      "select statut, count(*)::int as total from deals where supprime_le is null group by statut"
+    ),
+    query<{ total: number }>("select count(*)::int as total from deals where supprime_le is not null"),
+  ]);
 
   const comptes = Object.fromEntries(STATUTS.map((s) => [s, 0])) as Record<DealStatut, number>;
-  for (const row of rows) {
+  for (const row of parStatut) {
     if ((STATUTS as readonly string[]).includes(row.statut)) {
       comptes[row.statut as DealStatut] = row.total;
     }
   }
 
-  return NextResponse.json({ comptes });
+  return NextResponse.json({ comptes, supprimes: supprimesRows[0]?.total ?? 0 });
 });

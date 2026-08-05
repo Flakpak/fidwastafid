@@ -1,0 +1,15 @@
+-- Suppression douce des deals (lot 1, plan « suppression administrative »).
+--
+-- Sans PITR (une seule sauvegarde, artefact GitHub 30 jours), une suppression
+-- dure est irréversible EN PRATIQUE : le seul recours est une restauration
+-- complète de la base, qui écrase tout ce qui s'est passé depuis. `supprime_le`
+-- transforme le geste en simple UPDATE, annulable en un autre UPDATE — et
+-- neutralise au passage le `ON DELETE CASCADE` de `votes`/`commentaires`/
+-- `diffusions` sur `deals` (CONTRAT-V1 : la ligne n'est jamais réellement
+-- supprimée, ces tables ne perdent donc jamais rien).
+--
+-- Nullable, sans valeur par défaut explicite (NULL est déjà le défaut d'une
+-- colonne nullable sans DEFAULT) : rétrocompatible, le code courant qui ignore
+-- cette colonne continue de fonctionner à l'identique tant qu'il n'est pas
+-- mis à jour pour la lire.
+alter table deals add column supprime_le timestamptz;
