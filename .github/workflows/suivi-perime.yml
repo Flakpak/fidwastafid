@@ -1,0 +1,109 @@
+# .github/workflows/suivi-perime.yml
+#
+# Fait générateur (05/08/2026, docs/SUIVI.md) : cinq fusions consécutives
+# (#78, #79, #80, #82, #83) sans mise à jour de docs/SUIVI.md, sans qu'aucun
+# garde-fou ne s'en émeuve — la seule protection existante était la case à
+# cocher du gabarit de PR (non bloquante, honnêtement décochée cinq fois).
+# Recommandé en juillet, jamais construit avant ce jour.
+#
+# Ce workflow compare le SHA d'en-tête de docs/SUIVI.md
+# (« *Dernière mise à jour : …, sur `main` à `<sha>`.* ») au HEAD réel de
+# `main`, hebdomadairement. Au-delà d'un seuil de commits d'écart : ouvre
+# une issue (ou commente celle déjà ouverte) via l'action locale partagée
+# avec le backup et le pipeline — aucune logique d'alerte réécrite ici.
+#
+# Ce garde-fou n'auto-ferme rien : comme `alerte-backup` et `alerte-pipeline`,
+# l'issue reste ouverte jusqu'à ce qu'un humain la referme après avoir
+# rattrapé docs/SUIVI.md.
+
+name: Fraîcheur de docs/SUIVI.md
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'   # lundi 08:00 UTC, hebdomadaire
+  workflow_dispatch:
+    inputs:
+      seuil_commits:
+        description: >-
+          Écart (en commits) au-delà duquel l'alerte part (5 par défaut).
+          Mettre 0 pour éprouver le chemin d'alerte à la main.
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  fraicheur:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # fetch-depth: 0 — historique complet requis : `git rev-list --count`
+      # doit remonter jusqu'au SHA enregistré dans docs/SUIVI.md, qui peut
+      # être arbitrairement ancien.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Écart entre le SHA d'en-tête du SUIVI et main
+        id: ecart
+        env:
+          SEUIL: ${{ inputs.seuil_commits || 5 }}
+        run: |
+          set -euo pipefail
+
+          SHA_SUIVI=$(sed -n 's/.*sur `main` à `\([0-9a-f]\{6,\}\)`.*/\1/p' docs/SUIVI.md | head -n1)
+          if [ -z "$SHA_SUIVI" ]; then
+            echo "::error::SHA introuvable dans l'en-tête de docs/SUIVI.md — format de la première ligne changé ?"
+            exit 1
+          fi
+
+          if ! git cat-file -e "${SHA_SUIVI}^{commit}" 2>/dev/null; then
+            echo "::error::SHA $SHA_SUIVI (en-tête de docs/SUIVI.md) absent de l'historique de main — abrégé trop court, ou rebase/squash ayant fait disparaître ce commit ?"
+            exit 1
+          fi
+
+          ECART=$(git rev-list --count "${SHA_SUIVI}..HEAD")
+          echo "SHA d'en-tête du SUIVI : $SHA_SUIVI — écart avec main : $ECART commit(s) (seuil $SEUIL)."
+          echo "ecart=$ECART" >> "$GITHUB_OUTPUT"
+          echo "sha_suivi=$SHA_SUIVI" >> "$GITHUB_OUTPUT"
+
+          if [ "$ECART" -gt "$SEUIL" ]; then
+            echo "alerte=oui" >> "$GITHUB_OUTPUT"
+          else
+            echo "alerte=non" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Alerte — docs/SUIVI.md périmé
+        if: steps.ecart.outputs.alerte == 'oui'
+        uses: ./.github/actions/alerte-issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          label: alerte-suivi-perime
+          depot: ${{ github.repository }}
+          # Assignation : c'est elle qui déclenche la notification GitHub par
+          # défaut du destinataire — un run de cron n'a pas d'auteur de commit
+          # à prévenir (même raison que alerte-backup).
+          assignes: Flakpak
+          titre: "docs/SUIVI.md est périmé"
+          corps: |
+            **`docs/SUIVI.md`** annonce être à jour sur `${{ steps.ecart.outputs.sha_suivi }}`,
+            mais `main` compte désormais **${{ steps.ecart.outputs.ecart }} commit(s)** de plus
+            (seuil : ${{ inputs.seuil_commits || 5 }}).
+
+            | | |
+            |---|---|
+            | Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
+            | SHA en-tête du SUIVI | `${{ steps.ecart.outputs.sha_suivi }}` |
+            | `main` actuel | `${{ github.sha }}` |
+
+            **Tant que cette issue est ouverte, `docs/SUIVI.md` retarde sur `main`** — le point
+            d'entrée du dépôt pour reprendre le travail sans contexte préalable ne décrit plus
+            l'état réel.
+
+            Une fois `docs/SUIVI.md` rattrapé (SHA d'en-tête, chiffres, lots livrés), **referme
+            cette issue à la main** — ce garde-fou n'auto-ferme rien, comme `alerte-backup` et
+            `alerte-pipeline`.

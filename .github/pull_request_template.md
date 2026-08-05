@@ -28,6 +28,12 @@ pas une : ce gabarit sert à rendre une omission visible, pas à faire cocher.
       travail. Si cette PR livre une entrée de la file, elle **sort** de la file et **entre**
       dans « derniers lots livrés » ; les priorités se renumérotent. *Ce document se périme à
       chaque fusion : sa mise à jour fait partie de la fusion, pas du ménage d'après.*
+      **Rappel non contraignant, pas une garantie** — rien ici n'empêche techniquement de
+      fusionner la case décochée (#78, #79, #80, #82, #83 l'ont fait, 04-05/08/2026, sans
+      qu'aucun garde-fou ne s'en émeuve). Le vrai garde-fou est le cron hebdomadaire
+      `.github/workflows/suivi-perime.yml`, qui ouvre une issue au-delà d'un écart de
+      commits — cette case reste utile pour rattraper le retard tout de suite, avant qu'il
+      ne s'accumule jusqu'au seuil.
 - [ ] **Les quatre checks bloquants sont verts** : `quality`, `docker`, `openapi-check`,
       **`Vercel`**. Le check `Vercel` est le seul garde-fou réel sur le chemin de build
       (`docs/INCIDENTS.md`, 27/07/2026) — **un check imprimé mais non lu est un check
