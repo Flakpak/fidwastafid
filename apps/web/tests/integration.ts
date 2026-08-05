@@ -1542,6 +1542,103 @@ async function main() {
     await query("delete from deals where public_id = $1", [MEM_PUBLIC_ID]);
   }
 
+  // -------------------------------------------------------------------------
+  // Critère de protection contre la purge (lot 3) — lecture seule côté
+  // production, mais éprouvé ici en écriture sur des deals synthétiques :
+  // protégé si trace de publication (ou diffusion) au journal d'audit ;
+  // repli protecteur sur toute action d'un type non reconnu (doute).
+  // -------------------------------------------------------------------------
+  console.log("\ncritère de protection — trace de publication, résistance au contournement, repli protecteur");
+
+  const PROT_JAMAIS_PUBLIE = generatePublicId();
+  const PROT_PUBLIE_PUIS_AUTO_DRAFT = generatePublicId();
+  const PROT_REJETE_SEUL = generatePublicId();
+  const PROT_ACTION_INCONNUE = generatePublicId();
+
+  try {
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score)
+       values ($1, 'Protection — jamais publié', $2, 'Autre', 'physique', 10, 'auto_draft', 0)`,
+      [PROT_JAMAIS_PUBLIE, enseigneIdSuppr]
+    );
+
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score)
+       values ($1, 'Protection — publié puis rétrogradé', $2, 'Autre', 'physique', 10, 'auto_draft', 0)`,
+      [PROT_PUBLIE_PUIS_AUTO_DRAFT, enseigneIdSuppr]
+    );
+    // Publie, PUIS rétrograde en auto_draft — tentative de contournement :
+    // si le critère regardait le statut COURANT plutôt que l'historique,
+    // ce deal redeviendrait purgeable après le second PATCH.
+    await patchAdminDeal(
+      authedRequest(`http://localhost/api/v1/admin/deals/${PROT_PUBLIE_PUIS_AUTO_DRAFT}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ statut: "publie" }),
+      }),
+      { params: Promise.resolve({ publicId: PROT_PUBLIE_PUIS_AUTO_DRAFT }) }
+    );
+    await patchAdminDeal(
+      authedRequest(`http://localhost/api/v1/admin/deals/${PROT_PUBLIE_PUIS_AUTO_DRAFT}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ statut: "auto_draft" }),
+      }),
+      { params: Promise.resolve({ publicId: PROT_PUBLIE_PUIS_AUTO_DRAFT }) }
+    );
+
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score)
+       values ($1, 'Protection — rejeté seulement', $2, 'Autre', 'physique', 10, 'en_attente', 0)`,
+      [PROT_REJETE_SEUL, enseigneIdSuppr]
+    );
+    await patchAdminDeal(
+      authedRequest(`http://localhost/api/v1/admin/deals/${PROT_REJETE_SEUL}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ statut: "rejete", motifRejet: "Test critère de protection" }),
+      }),
+      { params: Promise.resolve({ publicId: PROT_REJETE_SEUL }) }
+    );
+
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score)
+       values ($1, 'Protection — action future inconnue', $2, 'Autre', 'physique', 10, 'auto_draft', 0)`,
+      [PROT_ACTION_INCONNUE, enseigneIdSuppr]
+    );
+    // Simule une action journal_audit d'un type que cette classification
+    // ne connaît pas encore (ex. une fonctionnalité future non anticipée
+    // par la vue deals_protection) — le repli protecteur doit s'appliquer.
+    await query(
+      `insert into journal_audit (admin_id, action, cible_type, cible_id, details)
+       values ($1, 'action_future_inconnue', 'deal', $2, '{}')`,
+      [userId, PROT_ACTION_INCONNUE]
+    );
+
+    const classification = await query<{ public_id: string; protege: boolean; statut: string }>(
+      `select public_id, protege, statut from deals_protection
+       where public_id = any($1::text[])`,
+      [[PROT_JAMAIS_PUBLIE, PROT_PUBLIE_PUIS_AUTO_DRAFT, PROT_REJETE_SEUL, PROT_ACTION_INCONNUE]]
+    );
+    const par_id = Object.fromEntries(classification.map((r) => [r.public_id, r]));
+
+    check("jamais publié -> PURGEABLE (protege = false)", par_id[PROT_JAMAIS_PUBLIE]?.protege === false);
+    check(
+      "publié puis rétrogradé en auto_draft -> reste PROTÉGÉ (contournement résisté)",
+      par_id[PROT_PUBLIE_PUIS_AUTO_DRAFT]?.protege === true
+    );
+    check(
+      "rétrogradé -> statut COURANT bien auto_draft (le critère ignore le statut, pas l'historique)",
+      par_id[PROT_PUBLIE_PUIS_AUTO_DRAFT]?.statut === "auto_draft"
+    );
+    check("rejeté seulement, jamais publié -> PURGEABLE", par_id[PROT_REJETE_SEUL]?.protege === false);
+    check(
+      "action journal_audit d'un type inconnu -> repli protecteur, PROTÉGÉ",
+      par_id[PROT_ACTION_INCONNUE]?.protege === true
+    );
+  } finally {
+    const ids = [PROT_JAMAIS_PUBLIE, PROT_PUBLIE_PUIS_AUTO_DRAFT, PROT_REJETE_SEUL, PROT_ACTION_INCONNUE];
+    await query("delete from journal_audit where cible_type = 'deal' and cible_id = any($1::text[])", [ids]);
+    await query("delete from deals where public_id = any($1::text[])", [ids]);
+  }
+
   console.log(
     "\n(DELETE /api/v1/me non testé automatiquement — suppression réelle du compte de test, à valider manuellement.)"
   );

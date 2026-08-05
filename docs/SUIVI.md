@@ -209,6 +209,23 @@ précisés par les politiques publiques des deux fournisseurs — rien n'est aff
 page à ce sujet. La personnalisation du feed reste une finalité déclarée
 (`apps/web/src/lib/consentement.ts`), pas construite.
 
+### Suppression administrative des deals — lots 1 à 3 livrés *(05/08/2026)*
+
+Plan en 5 lots (conception validée le 05/08/2026). Livrés : suppression douce (`deals.supprime_le`,
+#87), mémoire de curation (`memoire_curation`, empreinte sans prix, #88), critère de protection
+(`deals_protection`, trace de publication au journal d'audit — PR ouverte, non fusionnée). Classification
+réelle mesurée sur la production : **115 lignes protégées** (113 `publie` + 2 `rejete` ayant été
+publiées puis retirées — le critère les protège malgré leur statut courant), **1490 purgeables**
+(643 `auto_draft`, 430 `expire`, 415 `rejete` jamais publiés, 2 `en_attente`). Ce chiffre dimensionnera
+les lots 4 (purge d'image) et 5 (purge automatique).
+
+**⚠️ Suppression douce — vérifiée en base et en test, pas par le chemin applicatif réel.** Les 142+
+tests d'intégration appellent les handlers de route directement (même pattern que le reste de la
+suite) ; la vérification « en production » du 05/08 a écrit directement via la connexion de
+migration, faute de session admin HTTP authentifiée disponible ici (seul compte admin : Flakpak).
+**Le bouton Supprimer/Restaurer du back-office (`/admin`, onglet Supprimés) n'a jamais été cliqué
+réellement** — à vérifier depuis l'interface avant de considérer le lot 1 pleinement éprouvé.
+
 ### Phase 0 rouverte — le backup n'a qu'une seule copie *(02/08/2026)*
 
 La case « 0 — Protéger l'existant » de `docs/fidwastafid-plan-v2.md` était cochée **☑ fait**
