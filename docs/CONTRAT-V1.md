@@ -220,6 +220,40 @@ titre+enseigne sinon.
   rien (même principe que `supprime_le`) : pose `levee_le`/`levee_par`/`levee_motif`, l'entrée reste
   lisible dans l'historique, seul le pipeline cesse de la consulter.
 
+**Amendement du 05/08/2026 — critère de protection contre la purge (douzième amendement conscient,
+lot 3).** Vue **`deals_protection`** (migration 0015, lecture seule — aucune ligne de donnée
+modifiée) : `protege` (booléen) par `public_id`, calculé, jamais stocké.
+
+Le critère n'est **pas le statut courant** — mesuré : 0 des 430 `expire` de production n'a jamais
+été `publie` (le pipeline expire directement un `auto_draft` trop ancien sans passer par `publie`).
+Le critère est l'**existence d'une trace de publication dans `journal_audit`**, qui survit à tout
+changement de statut ultérieur. Trois voies, dans l'ordre :
+
+1. transition vers `publie` dans `journal_audit`, sous l'une des **deux formes JSON réellement
+   rencontrées** (`update_deal` imbrique sous `statut.apres` ; `update_statut` — action historique,
+   plus émise par le code actuel mais présente dans l'historique réel — et `bulk_update_statut`
+   sont plates, `apres` à la racine) ;
+2. une diffusion communautaire (`diffuser_telegram`/`diffuser_discord`), preuve indépendante — ne
+   peut arriver que sur un deal `publie` (garde côté API) ;
+3. **repli protecteur** : toute action `journal_audit` d'un type **non énuméré** par les deux voies
+   ci-dessus est un doute, pas une absence — protégée. La liste des actions non probantes (édition
+   hors statut, diffusion annulée, image, suppression douce, restauration) est fermée ; une action
+   future non listée y bascule automatiquement, sans modification de cette vue.
+
+**Résistance au contournement vérifiée** (test d'intégration) : un deal publié puis rétrogradé en
+`auto_draft` reste protégé — l'historique ne s'efface jamais, seul le statut courant change.
+
+**Classification mesurée sur la production (05/08/2026)** — chiffre qui dimensionne les lots 4 et 5 :
+
+| Statut | Protégées | Purgeables |
+|---|---|---|
+| `publie` | 113 | 0 |
+| `rejete` | 2 (ont été publiées, puis retirées) | 415 |
+| `auto_draft` | 0 | 643 |
+| `expire` | 0 | 430 |
+| `en_attente` | 0 | 2 |
+| **Total** | **115** | **1490** |
+
 ## 4 — Contrat API v1
 
 **Erreurs** — format unique partout :
