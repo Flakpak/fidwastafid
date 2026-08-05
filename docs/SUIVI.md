@@ -209,27 +209,36 @@ précisés par les politiques publiques des deux fournisseurs — rien n'est aff
 page à ce sujet. La personnalisation du feed reste une finalité déclarée
 (`apps/web/src/lib/consentement.ts`), pas construite.
 
-### Suppression administrative des deals — lots 1 à 3 fusionnés, lot 4 en PR *(05/08/2026)*
+### Suppression administrative des deals — lots 1 à 4 fusionnés, lot 5 en PR *(05/08/2026)*
 
 Plan en 5 lots (conception validée le 05/08/2026). Fusionnés et appliqués en production : suppression
 douce (`deals.supprime_le`, #87, migration 0013), mémoire de curation (`memoire_curation`, empreinte
 sans prix, #88, migration 0014), critère de protection (`deals_protection`, trace de publication au
-journal d'audit, #89, migration 0015). Classification réelle mesurée sur la production : **115 lignes
-protégées** (113 `publie` + 2 `rejete` ayant été publiées puis retirées — le critère les protège
-malgré leur statut courant), **1490 purgeables** (643 `auto_draft`, 430 `expire`, 415 `rejete` jamais
-publiés, 2 `en_attente`).
+journal d'audit, #89, migration 0015), **purge d'images** (`deals.image_purgee_le`, #90, migration
+0016). Classification réelle mesurée sur la production : **115 lignes protégées** (113 `publie` + 2
+`rejete` ayant été publiées puis retirées), **1490 purgeables** (643 `auto_draft`, 430 `expire`, 415
+`rejete` jamais publiés, 2 `en_attente`).
 
-**Lot 4 — purge d'images, PR ouverte, non fusionnée, construite désarmée.** `deals.image_purgee_le`
-(migration 0016, pas encore appliquée en production) + `apps/pipeline/purger-images.mjs` (délai 90
-jours, double condition `supprime_le`/`deals_protection.protege = false`, mode à blanc par défaut) +
-`.github/workflows/purge-images.yml` (déclenchement manuel uniquement, aucun `schedule:` — l'activation
-reste une décision séparée). Vérifié en lecture seule sur la production le 05/08/2026 : **0 fichier
-candidat, y compris à délai simulé nul** — aucune ligne n'est actuellement en suppression douce, pas
-seulement à cause du délai. Le mécanisme de sélection lui-même est éprouvé par 14 assertions
-d'intégration sur des lignes synthétiques vieillies artificiellement (`apps/web/tests/integration.ts`,
-section « purge d'images ») ; **le vrai DELETE Storage n'est exercé par aucun test automatisé** —
-risque assumé, jamais de suppression réelle déclenchée sans un geste manuel explicite
-(`workflow_dispatch`, `actif` coché).
+**Lot 4 — purge d'images, désarmée, DELETE Storage désormais éprouvé pour de vrai.**
+`apps/pipeline/purger-images.mjs` (délai 90 jours, double condition, mode à blanc par défaut),
+`.github/workflows/purge-images.yml` (déclenchement manuel uniquement, aucun `schedule:`). Le vrai
+`DELETE` Storage — seul geste irréversible du dispositif, seul chemin qu'aucun test n'exerçait à la
+fusion de #90 — est maintenant vérifié sur un préfixe de test isolé (`test-purge/`, jamais un fichier
+réel) : nominal, fichier déjà absent, erreur Storage réelle, et **le pire cas** (suppression réussie,
+écriture du marqueur qui échoue) — ce dernier est désormais **impossible à masquer** (le run s'arrête
+bruyamment, jamais un succès silencieux) et **converge** au run suivant (`apps/pipeline/verifier-purge-storage.mjs`).
+Vérifié en lecture seule sur la production le 05/08/2026 : **0 fichier candidat, y compris à délai
+simulé nul** — aucune ligne n'est actuellement en suppression douce.
+
+**Lot 5 — purge automatique des lignes (suppression douce), PR ouverte, non fusionnée, désarmée.**
+`apps/pipeline/purger-lignes.mjs` pose `supprime_le` automatiquement — réversible, jamais un `DELETE`.
+Périmètre restreint aux `rejete`/`auto_draft` jamais publiés, dormants 60 jours : **`expire` et
+`en_attente` sont exclus par décision explicite**, pas par omission — `expire` est un actif SEO
+(« URL vivante à vie », CONTRAT-V1 §1) qu'une purge automatique et massive dégraderait à chaque run ;
+`en_attente` est une file de modération humaine active (2 lignes). Mesuré en lecture seule le
+05/08/2026 : **0 ligne au délai réel (60j)** — rien n'a encore cette dormance (projet créé le
+12/07/2026) — mais **1057 lignes (642 `auto_draft` + 415 `rejete`) au délai simulé 0 jour**, le
+chiffre qui doit guider une décision d'armement, pas le 0 d'aujourd'hui.
 
 **⚠️ Suppression douce — vérifiée en base et en test, pas par le chemin applicatif réel.** Les tests
 d'intégration appellent les handlers de route directement (même pattern que le reste de la suite) ; la

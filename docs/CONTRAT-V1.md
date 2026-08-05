@@ -301,6 +301,84 @@ compte de fichiers, le volume et la liste des `public_id` traités.
 mécanisme que le backup et le pipeline quotidien) — un job de purge muet qui échoue laisserait croire
 au nettoyage.
 
+**Durcissement du 05/08/2026 — le DELETE Storage éprouvé pour de vrai.** Le seul geste irréversible
+de tout le dispositif était aussi le seul qu'aucun test n'exerçait — comblé avant le lot 5, sur un
+préfixe Storage de test isolé (`test-purge/`, hors du motif `deals/{publicId}.webp` : ne peut jamais
+être l'image réelle d'un deal), jamais un fichier de production (`apps/pipeline/verifier-purge-storage.mjs`,
+script de vérification manuelle, pas un test CI — il déclenche de vrais appels contre le vrai projet
+Supabase, volontairement, faute d'émulateur Storage).
+
+- **Constat empirique** : Supabase Storage encapsule un `DELETE` sur une clé absente sous un **HTTP
+  400 générique**, jamais un 404 — le vrai statut sémantique vit dans le corps JSON
+  (`code: "NoSuchKey"`). Un fichier déjà absent est désormais traité comme un **succès** (l'état
+  visé est atteint), jamais une erreur — sinon un candidat dont le fichier a disparu pour toute
+  autre raison (run précédent interrompu, suppression manuelle) resterait bloqué à l'identique à
+  chaque tentative.
+- **Le pire cas nommé par la conception — DELETE Storage abouti, écriture du marqueur qui échoue ou
+  n'affecte aucune ligne (« image détruite, base croit qu'elle existe »)** — est désormais
+  **impossible à masquer** : `purgerImages()` vérifie que l'`UPDATE` de `image_purgee_le` affecte
+  exactement une ligne et lève immédiatement sinon, sans écrire au `journal_audit`. Le run s'arrête
+  bruyamment, l'alerte part. Combiné au point précédent, le système **converge** au run suivant : le
+  candidat reste sélectionné (marqueur toujours `null`), le nouveau `DELETE` retrouve le fichier déjà
+  absent (`NoSuchKey` = succès), la pose du marqueur est retentée — jamais une nouvelle tentative de
+  suppression sur un fichier déjà détruit.
+- **Ordre non négociable, jamais l'inverse** : taille (best effort) → `DELETE` Storage → `UPDATE`
+  marqueur. Marquer avant d'avoir confirmé la suppression risquerait l'erreur symétrique (marqué
+  purgé alors que le fichier existe encore) — écartée par construction.
+- **Quatre scénarios vérifiés pour de vrai**, pas seulement raisonnés : suppression nominale
+  (fichier réel détruit, marqueur posé), fichier déjà absent au départ (aucune exception, marqueur
+  posé quand même), Storage en erreur réelle (clé API invalide — lève, marqueur jamais posé, fichier
+  intact), et le pire cas ci-dessus (client-façade pour forcer l'échec du seul `UPDATE`, tout le
+  reste — le `DELETE` Storage — passe par le vrai réseau).
+
+**Amendement du 05/08/2026 — purge automatique des lignes (quatorzième amendement conscient, lot 5).**
+Automatise ce que le lot 1 permet à la main : `apps/pipeline/purger-lignes.mjs` pose `supprime_le`
+(EN SUPPRESSION DOUCE, jamais un `DELETE`) sur les lignes dormantes jamais publiées. Réversible par
+construction — contrairement au lot 4, aucun geste irréversible ici : une ligne auto-supprimée se
+restaure exactement comme une ligne supprimée à la main.
+
+**Périmètre restreint, PAS les 1490 lignes purgeables de la classification lot 3 — deux exclusions
+volontaires :**
+
+- **`expire` exclu.** CONTRAT-V1 §1 grave « URL vivante à vie, jamais de suppression » pour un deal
+  expiré — un actif SEO indexé. Un admin peut déjà le supprimer à la main (lot 1) ; l'automatiser à
+  l'échelle contredirait l'esprit de cette règle gravée. **Question tranchée explicitement** avant
+  toute construction, pas une omission découverte après coup.
+- **`en_attente` exclu.** File de modération humaine active — le supprimer automatiquement ferait
+  disparaître une soumission jamais jugée par un admin, sans qu'aucun humain ne l'ait vue. Ne
+  concerne que 2 lignes aujourd'hui ; exclu par principe, pas par volume.
+
+Périmètre retenu : `rejete` et `auto_draft`, jamais publiés (`deals_protection.protege = false`,
+double condition, jamais une seule), dormants depuis `DELAI_JOURS_PURGE_LIGNES` (**60 jours** depuis
+`created_at` — valeur choisie, pas imposée : nettement en dessous des 90 jours du lot 4 puisque
+c'est une décision réversible, nettement au-dessus d'un cycle de curation normal). En pratique,
+`auto_draft` s'auto-expire déjà en `expire` après 14 jours (`expirer-auto-draft.mjs`) — un
+`auto_draft` encore présent après 60 jours de dormance est donc rarissime, sans être structurellement
+exclu ici.
+
+**`journal_audit` réutilise l'action `supprimer_deal`** (déjà classée non-probante par
+`deals_protection`, migration 0015) plutôt qu'un nouveau type d'action — `details.automatise: true`
+fait la différence avec le geste manuel. Inventer une action distincte aurait exigé une nouvelle
+migration pour l'ajouter à la liste fermée (repli protecteur sinon, lot 3), sans bénéfice : c'est le
+même fait côté domaine, qu'un humain ait cliqué ou qu'un cron ait tourné.
+
+**Désarmé par défaut**, mêmes conventions que le lot 4 : `PURGE_LIGNES_ACTIF` absent/faux → rapporte
+(nombre de lignes, par statut) sans écrire. `.github/workflows/purge-lignes.yml`, `workflow_dispatch`
+uniquement, aucun `schedule:`. Alerte réutilisée (`.github/actions/alerte-issue`).
+
+**Chiffres mesurés en lecture seule sur la production le 05/08/2026** — c'est ce qui décide de
+l'armement :
+
+| | Délai simulé 0 jour (aucune dormance exigée) | Délai réel 60 jours |
+|---|---|---|
+| `auto_draft` | 642 | 0 |
+| `rejete` | 415 | 0 |
+| **Total** | **1057** | **0** |
+
+**0 ligne au délai réel** : rien n'a encore 60 jours de dormance (projet Supabase créé le
+12/07/2026) — attendu, pas un bug. Le chiffre à 1057 dit la taille du bassin qui s'accumulera
+progressivement ; c'est lui qui doit être regardé avant toute décision d'armer, pas le 0 d'aujourd'hui.
+
 ## 4 — Contrat API v1
 
 **Erreurs** — format unique partout :

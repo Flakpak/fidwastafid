@@ -1,0 +1,75 @@
+# .github/workflows/purge-lignes.yml
+#
+# Purge automatique des lignes (lot 5, plan « suppression administrative des
+# deals ») — EN SUPPRESSION DOUCE, jamais un DELETE réel. Réversible par
+# construction (POST .../restaurer, lot 1), contrairement à purge-images.yml.
+#
+# Même doctrine que purge-images.yml : PAS de `schedule:` ici. L'activation
+# reste une décision explicite et nommée, jamais un cron qui tournerait déjà
+# quand la décision est prise. `workflow_dispatch` uniquement.
+
+name: Purge automatique des lignes (suppression douce)
+
+on:
+  workflow_dispatch:
+    inputs:
+      actif:
+        description: "Active réellement la suppression douce (+ journal_audit). Décoché = mode à blanc, ne fait que rapporter."
+        type: boolean
+        default: false
+      delai_jours:
+        description: "Dormance minimale en jours depuis created_at (60 par défaut). Mettre 0 pour simuler « aujourd'hui »."
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+      PURGE_LIGNES_ACTIF: ${{ inputs.actif && 'true' || 'false' }}
+      PURGE_LIGNES_DELAI_JOURS: ${{ inputs.delai_jours }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Purge des lignes (ou simulation)
+        run: pnpm --filter pipeline run purger-lignes
+
+      - name: Alerte — échec de la purge de lignes
+        if: failure()
+        uses: ./.github/actions/alerte-issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          label: alerte-purge-lignes
+          depot: ${{ github.repository }}
+          assignes: Flakpak
+          labels-supplementaires: urgent
+          titre: "Purge automatique des lignes en échec"
+          corps: |
+            Le workflow **Purge automatique des lignes (suppression douce)** a **échoué**.
+
+            | | |
+            |---|---|
+            | Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
+            | Mode | `actif=${{ inputs.actif }}`, `delai_jours=${{ inputs.delai_jours || '60 (défaut)' }}` |
+
+            Action réversible (suppression DOUCE, `deals.supprime_le`) : contrairement à la purge
+            d'images, un run interrompu ici ne perd rien — chaque ligne déjà marquée reste
+            restaurable (`POST .../restaurer`). L'UPDATE porte sa propre garde
+            (`supprime_le is null`) : relancer le workflow ne re-traite jamais une ligne déjà
+            marquée.
