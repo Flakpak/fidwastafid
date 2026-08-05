@@ -1,6 +1,6 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-08-03, sur `main` à `3c44698`.*
+*Dernière mise à jour : 2026-08-05, sur `main` à `f453c07`.*
 
 Ce document est le **point d'entrée pour reprendre le travail sans contexte préalable**. Il dit
 ce qui tourne, ce qui reste ouvert, et par quoi continuer. Il ne remplace aucun autre document :
@@ -52,24 +52,32 @@ consultatif reste un échec réel.
 ## 1 — Ce qui tourne en production
 
 **https://fidwastafid.com** — déployé depuis `main` par Vercel à chaque fusion. Dernier
-déploiement de production : `3c44698`, check `Vercel` **`success`**, 2026-08-03 17:35 UTC
+déploiement de production : `f453c07`, check `Vercel` **`success`**, 2026-08-05 06:51 UTC
 (relevé par l'API GitHub, pas de mémoire). Le run CI du même SHA est vert.
 
-### Chiffres réels au 2026-08-03
+### Chiffres réels au 2026-08-05
 
 Relevés en base par le connecteur Supabase en lecture seule, pas estimés :
 
-| Mesure | Valeur | (au 2026-08-02) |
+| Mesure | Valeur | (au 2026-08-03) |
 |---|---|---|
-| Deals `publie` | **113** | 93 |
-| Deals toutes lignes confondues | **1 553** | — |
-| Deals `auto_draft` (file de curation) | **645** | — |
-| Deals `en_attente` (soumissions humaines) | **0** | — |
-| Enseignes curées | **9** | 7 |
+| Deals `publie` | **113** | 113 |
+| Deals toutes lignes confondues | **1 592** | 1 553 |
+| Deals `auto_draft` (file de curation) | **646** | 645 |
+| Deals `en_attente` (soumissions humaines) | **2** | 0 |
+| Deals `rejete` | **417** | — |
+| Deals `expire` | **414** | — |
+| Enseignes curées | **9** | 9 |
 | Villes distinctes portant un deal publié | **2** | 2 |
 | Comptes membres (`users`) | **4** | 4 |
-| Lignes `diffusions` **vivantes** | **0** | — |
+| Lignes `diffusions` **vivantes** | **0** | 0 |
 | Diffusions **historiques** (`pg_stat_user_tables`) | **3 insérées, 3 supprimées** | — |
+
+Les deux `en_attente` sont `gygr5z7qyn` et `c7hwa6eute` (soumission `marwa.com`, objet du
+diagnostic du 04/08 — voir `docs/INCIDENTS.md` et le lot « File admin » ci-dessous) :
+vérifiées visibles dans l'onglet « En attente » du back-office après déploiement de #83, et
+le compte affiché par `GET /api/v1/admin/deals/compte` (**2**) coïncide avec ce `count(*)`
+direct.
 
 Ces nombres ne sont plus seulement un relevé : depuis #75, **`/concept` les relit en base à
 chaque affichage** au lieu d'afficher les « +50 enseignes / +20 villes » écrits en dur.
@@ -94,7 +102,20 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
     les deals disponibles en ligne** — un deal en ligne est achetable de partout.
 - **Page deal** (`/deal/[slug]-[public_id]`) — résolution sur le `public_id` seul, 301 si le slug
   diverge, données structurées, partage, votes, commentaires.
-- **Pages enseigne** (`/enseigne/[slug]`), charte, confidentialité, contact.
+- **Pages enseigne** (`/enseigne/[slug]`), charte, confidentialité, contact. `/confidentialite`
+  décrit désormais le réel mesuré (#79) : cookie de session et brouillon local, Vercel
+  Analytics et Turnstile d'après leurs politiques publiques, hébergement Supabase+Vercel
+  (Irlande, UE), droits étendus au RGPD pour les résidents UE. Un repère explicite (non
+  rempli) y marque l'identité juridique manquante du responsable de traitement — voir
+  « Ce qui reste ouvert ».
+- **Consentement** — bandeau minimal (#80, #82) : Vercel Analytics ne se monte plus
+  inconditionnellement, seulement après acceptation explicite (`Consentement.tsx`, lecture
+  paresseuse du `localStorage` dès l'hydratation — aucune requête avant le choix, vérifié en
+  conditions réelles sur `fidwastafid.com`). Titre « Cookies », texte neutre (aucun nom de
+  prestataire), Accepter/Refuser de même poids visuel, choix révocable depuis le pied de
+  page. Structure de données ouverte (`finalites: Record<string, boolean>`) : une
+  personnalisation future s'ajoute sans réécriture, la version stockée permet de redemander
+  le choix le jour venu.
 - **Page concept** (`/concept`) — SSR par requête (`force-dynamic`). Ses deux statistiques
   chiffrées viennent de `GET /api/v1/deals/compte` et `GET /api/v1/enseignes`, handlers
   appelés directement comme le fait le feed. Un comptage en échec **masque sa tuile** et
@@ -106,7 +127,12 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
   de rejet visible, export/suppression de compte (loi 09-08).
 - **Back-office** (`/admin`) — pipeline de curation, édition complète d'un deal, actions
   groupées, récupération et upload d'image, motif de rejet obligatoire, **boutons de diffusion
-  Telegram et Discord** (voir §3.2).
+  Telegram et Discord** (voir §3.2). Chaque onglet filtre désormais **en base** par son statut
+  et pagine par curseur (#83) — plus de chargement de la table entière tranché côté client ;
+  les compteurs d'onglet viennent d'un `count(*)` par statut (`GET /api/v1/admin/deals/compte`),
+  jamais de la longueur d'une liste. Vérifié après déploiement : badges cohérents avec un
+  `count(*)` direct, pagination de l'onglet `publie` (113 lignes, 4 pages) intégralement
+  parcourue sans doublon.
 - **Pipeline quotidien** (`apps/pipeline`) — **six sources** : bringo, inwi,
   universparadiscount, decathlon, **kiabi** et **bestmark** (ces deux dernières ajoutées le
   02/08 par leurs API publiques, #71). Insertion directe en base, expiration des `auto_draft`
@@ -123,6 +149,11 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| File admin — filtre serveur | #83 | 05/08 | `GET /api/v1/admin/deals` : `statut` requis, filtre en base, pagination par curseur (neuvième amendement conscient, CONTRAT-V1 §4) — corrige le défaut diagnostiqué le 04/08 (`docs/INCIDENTS.md`) : une soumission `en_attente` invisible derrière un `LIMIT` global tranché côté client. `en_attente` trie `created_at` croissant ; nouvel endpoint `GET /api/v1/admin/deals/compte` pour les badges. Vérifié en production (ci-dessus). |
+| Bandeau de consentement — texte neutre | #82 | 04/08 | Retire toute mention de prestataire et la catégorie « personnalisation » (inactive) de l'interface du bandeau — détail technique déplacé vers `/confidentialite`, seule censée être exhaustive. Enregistrement généralisé (`finalites: Record<string, boolean>`), version passée à 2. |
+| Consentement — Analytics gaté | #80 | 04/08 | Vercel Analytics ne se charge qu'après consentement explicite (voir « Fonctionnel livré »). |
+| `/confidentialite` — réalité mesurée | #79 | 04/08 | Page réécrite pour décrire le réel constaté, puis mise à jour pour l'état d'arrivée post-#80 (voir « Fonctionnel livré »). |
+| Retrait mention CNDP non attestée | #78 | 04/08 | « Déclaré auprès de la CNDP » retiré sans remplacement de deux gabarits e-mail et deux maquettes — aucune preuve d'une déclaration réelle dans le dépôt. Consigné dans `docs/INCIDENTS.md` : ne se rétablit que sur numéro et date. |
 | Chiffres de `/concept` | #75 | 03/08 | Les trois statistiques en dur remplacées par deux comptages réels (endpoints existants, **aucun amendement** de la liste fermée §4) et une constante assumée (« 100% Gratuit », qui est le modèle économique, pas une mesure). Aucun arrondi flatteur, aucun repli sur `0`. Au passage, `decrireErreur()` : `err.message` seul journalisait « indisponible — . » parce que `pg` remonte un `AggregateError` au message vide. |
 | Diffusion Discord | #73 | 02/08 | Second canal, **et le canal passe DANS le chemin** (`/diffuser/discord`, `/diffuser/telegram`). Gardes et ordre des opérations factorisés dans `_lib/diffusion.ts`. Migration `0012` : `telegram_message_id` → `external_message_id` (`text`, les snowflakes Discord ne survivent pas à un `Number` JS). |
 | Diffusion Telegram | #72 | 02/08 | Migration `0011` (`diffusions`, `unique (deal_id, canal)`), endpoints POST/DELETE, bouton dans l'admin, UTM sur le lien diffusé, code d'erreur `CONFLICT` (409). |
@@ -140,6 +171,43 @@ Aucune PR de travail ouverte. Six PR Dependabot en attente de tri (#32, #58, #60
 Un délai de refroidissement de 2 jours est configuré (`.github/dependabot.yml`), aligné sur la
 politique pnpm `minimumReleaseAge` de 24 h — les mises à jour de **sécurité** en sont exemptées et
 ne sont jamais retardées.
+
+### Aucun cron de péremption du SUIVI n'existe *(diagnostiqué le 05/08/2026)*
+
+**La question posée avait une prémisse fausse : il n'y a pas de cron à réparer, il n'y en a
+jamais eu.** Recherche exhaustive : les trois workflows du dépôt
+(`.github/workflows/ci.yml`, `db-backup.yml`, `pipeline-quotidien.yml`) ne mentionnent ni
+« SUIVI » ni « péremption » ; aucun autre fichier de ce dépôt n'implémente de vérification
+automatisée de fraîcheur de ce document. Le seul mécanisme réel est le **gabarit de PR**
+(`.github/pull_request_template.md`, créé le 03/08) : une case à cocher humaine, « `docs/SUIVI.md`
+est à jour », lue au moment de la fusion — jamais un job CI, jamais bloquante.
+
+Ce mécanisme a fonctionné exactement comme un gabarit fonctionne : les cinq PR de ce lot
+(#78, #79, #80, #82, #83) ont chacune **honnêtement laissé la case décochée** et signalé
+« non fait » dans leur section « Ce que cette PR ne vérifie pas ». Rien n'a menti — et rien
+n'a non plus empêché le retard de s'accumuler sur cinq fusions, parce qu'une case décochée
+n'est pas un `quality`/`docker`/`openapi-check`/`Vercel` rouge : elle ne bloque rien, elle
+ne notifie personne, elle attend d'être lue.
+
+**Leçon, du même ordre que celle du 27/07/2026** (`docs/INCIDENTS.md` : « un garde-fou qu'on
+contourne par lassitude n'en est pas un ») : un gabarit décrit une intention, il ne
+l'applique pas. Un vrai garde-fou serait un check CI comparant les fichiers touchés par une
+PR à la présence de `docs/SUIVI.md` dans ce même diff — non construit ici (diagnostic
+demandé, pas de correctif). *Il n'a pas été demandé d'en construire un ; consigné pour que
+la question ne se repose pas sans réponse la prochaine fois.*
+
+### Conformité de la collecte — suite du 04/08/2026
+
+**Toujours bloqué sur Kamel** : l'identité juridique du responsable de traitement
+(raison sociale, forme, adresse) est absente de `/confidentialite` — un repère explicite
+marque l'emplacement dans le code (section Contact), volontairement non rempli plutôt
+qu'inventé.
+
+**Limites acceptées, pas des blocages** : le lieu de traitement exact des serveurs Vercel
+Analytics et la durée de conservation des signaux Turnstile côté Cloudflare ne sont pas
+précisés par les politiques publiques des deux fournisseurs — rien n'est affirmé sur la
+page à ce sujet. La personnalisation du feed reste une finalité déclarée
+(`apps/web/src/lib/consentement.ts`), pas construite.
 
 ### Phase 0 rouverte — le backup n'a qu'une seule copie *(02/08/2026)*
 
@@ -330,7 +398,7 @@ sur *où* filtre la recherche, mais sur ce qu'elle vaut.
   utilisateur qui tape sans accent ne trouve rien.
 - **Aucun index sur `titre`** (vérifié : 0 index le mentionnant), et `ilike '%…%'` ne peut de
   toute façon pas utiliser un btree classique. À 113 deals publiés c'est sans effet ; ça se
-  dégrade linéairement, et la table porte déjà 1 553 lignes toutes catégories de statut
+  dégrade linéairement, et la table porte déjà 1 592 lignes toutes catégories de statut
   confondues.
 - **Aucun classement par pertinence** : un deal dont le titre commence par le terme ne remonte pas
   avant un autre où il apparaît en fin.
