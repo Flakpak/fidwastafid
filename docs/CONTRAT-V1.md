@@ -865,6 +865,16 @@ Référence directe pour la config Tailwind (`@theme`, `apps/web/src/app/globals
 UI (`apps/web/src/components`). La refonte est portée en trois lots : lot 1 = ce contrat + tokens +
 primitives ; lots 2 et 3 = migration de `DealCard`, des pages et du chrome.
 
+**Décision du 05/08/2026 — `rejete`/`auto_draft` n'étendent PAS `Badge`.** Inventaire des badges de
+statut de deal rendus à la main (`/compte`, fiche deal, `UrgenceCountdown`) : les cinq statuts
+(`publie`, `en_attente`, `rejete`, `expire`, `auto_draft`) tiennent tous dans les cinq variantes
+existantes — `accent`/`warn`/`cold` pour les trois qui ont un rôle chromatique dédié (règle 3),
+`outline` pour les deux qui n'en ont pas. `hot` est écarté (réservé au score chaud, règle 3) ; `safran`
+n'a jamais été candidat (ornemental, règle 4). **Ce n'est pas un amendement** : aucun token nouveau,
+aucune variante nouvelle — `outline` couvrait déjà ce cas (le test de primitives, §8 règle 6, l'illustre
+depuis sa création avec le libellé « Brouillon »), il manquait seulement un appelant réel. Les trois
+rendus manuels ont été rapatriés sur la primitive.
+
 ## 9 — Sécurité by design
 
 **Amendement du 22/07/2026 — surface plateforme (sixième amendement conscient de la

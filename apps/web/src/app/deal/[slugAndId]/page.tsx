@@ -10,6 +10,7 @@ import { CardVote } from "../../../components/CardVote.js";
 import { ShareButton } from "../../../components/ShareButton.js";
 import { UrgenceCountdown } from "../../../components/UrgenceCountdown.js";
 import { Avatar } from "../../../components/Avatar.js";
+import { Badge } from "../../../components/Badge.js";
 import { CommentForm } from "./CommentForm.js";
 import { CommentairesErreur } from "./CommentairesErreur.js";
 import { lireCommentaires, type ResultatCommentaires } from "./commentaires.js";
@@ -279,9 +280,7 @@ export default async function DealPage({ params }: PageParams) {
                       {deal.ville}
                     </span>
                   )}
-                  {urg?.mode === "expiree" && (
-                    <span className="text-xs font-bold bg-cold-soft text-cold rounded-full px-2.5 py-1">Expiré</span>
-                  )}
+                  {urg?.mode === "expiree" && <Badge variant="cold">Expiré</Badge>}
                   {urg?.mode === "compte-a-rebours" && <UrgenceCountdown dateFin={deal.dateFin!} />}
                   {urg?.mode === "lointaine" && (
                     <span className="flex items-center gap-1 text-xs text-ink-subtle">

@@ -454,21 +454,18 @@ btree sur `unaccent(titre)` n'aurait de toute façon PAS accéléré `ilike '%mo
 en queue) — seul un index trigramme (`pg_trgm`) le ferait. Aucun index n'a donc été créé par ce lot :
 coût d'écriture nul pour le pipeline, vérifié (`\d deals` : jeu d'index inchangé).
 
-### 3.4 — Badge de `/compte` rendu à la main *(priorité 4)*
+### 3.4 — Badge de `/compte` rendu à la main — LIVRÉ le 05/08/2026, PR non fusionnée
 
-**Constat.** `apps/web/src/app/compte/page.tsx` rend le statut de chaque deal (« Publié »,
-« En attente », « Refusé », « Expiré », « Brouillon ») avec un `<span>` maison et sa propre table
-de classes (`STATUT_BADGE`), alors que la primitive `Badge` existe et couvre exactement ce cas.
-C'est la dérive que le CONTRAT-V1 §8 règle 6 cherche à empêcher.
+**Décision de charte tranchée** (CONTRAT-V1 §8, décision du 05/08/2026 — pas un amendement, aucun
+token/variante nouveau) : `rejete` et `auto_draft` -> `outline`, comme cette entrée l'anticipait déjà.
+`publie` → `accent`, `en_attente` → `warn`, `expire` → `cold` confirmés inchangés.
 
-**Ce qui bloque.** La migration n'est pas neutre visuellement : `rejete` et `auto_draft` utilisent
-`bg-surface-subtle`, sans équivalent exact parmi les variantes de `Badge` — la plus proche est
-`outline`, transparente et cerclée. **C'est une décision de charte, pas un remplacement
-mécanique.**
-
-**Par quoi commencer.** Trancher le rendu de ces deux états neutres, puis migrer. Le reste
-(`publie` → `accent`, `en_attente` → `warn`, `expire` → `cold`) correspond déjà, et `expire` →
-`cold` est même ce qu'impose §8 règle 3.
+**Rapatriement plus large que prévu — le motif, pas le cas isolé.** L'audit a trouvé DEUX autres
+badges de statut rendus à la main, hors `/compte` : la fiche deal publique (badge « Expiré » en
+ligne) et `UrgenceCountdown` (badges « Expiré » et « Expire dans Xj » du décompte live). Les trois
+rapatriés sur `Badge`. Aucune régression de tokens détectée (`apps/web/tests/primitives.ts`, 108
+assertions, toujours vert — la variante `outline` y était déjà illustrée avec le libellé
+« Brouillon », elle attendait juste un vrai appelant).
 
 ### 3.5 — État voté persistant *(priorité 5)*
 
