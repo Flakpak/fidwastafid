@@ -9,6 +9,7 @@ import { SiteFooter } from "../../components/SiteFooter.js";
 import { relativeDate } from "../../lib/format.js";
 import { IdentiteForm } from "./IdentiteForm.js";
 import { SupprimerCompteButton } from "./SupprimerCompteButton.js";
+import { Badge, type BadgeVariant } from "../../components/Badge.js";
 
 /** noindex — page de compte, jamais indexable (même famille que /connexion, /admin). */
 export const metadata: Metadata = {
@@ -19,12 +20,21 @@ export const metadata: Metadata = {
 /** Résolu à chaque requête (état du profil), jamais pré-rendu — même raison que /admin/*. */
 export const dynamic = "force-dynamic";
 
-const STATUT_BADGE: Record<string, { label: string; classes: string }> = {
-  publie: { label: "Publié", classes: "bg-accent-soft text-accent" },
-  en_attente: { label: "En attente", classes: "bg-warn-soft text-warn" },
-  rejete: { label: "Refusé", classes: "bg-surface-subtle text-ink-muted" },
-  expire: { label: "Expiré", classes: "bg-cold-soft text-cold" },
-  auto_draft: { label: "Brouillon", classes: "bg-surface-subtle text-ink-muted" },
+/**
+ * Statut -> variante de la primitive `Badge` (CONTRAT-V1 §8) — aucun rendu
+ * manuel ici, la primitive porte déjà le contour et les tokens de chaque
+ * famille. `rejete` et `auto_draft` partagent `outline` : ni l'un ni
+ * l'autre n'est un score chaud (réservé, règle 3) ni un ornement (`safran`,
+ * règle 4) — `outline` est le variant neutre déjà prévu pour ce cas, pas
+ * une extension. Aucune régression de lisibilité : les deux étaient déjà
+ * visuellement identiques avant ce lot (même gris).
+ */
+const STATUT_BADGE: Record<string, { label: string; variant: BadgeVariant }> = {
+  publie: { label: "Publié", variant: "accent" },
+  en_attente: { label: "En attente", variant: "warn" },
+  rejete: { label: "Refusé", variant: "outline" },
+  expire: { label: "Expiré", variant: "cold" },
+  auto_draft: { label: "Brouillon", variant: "outline" },
 };
 
 const CARD = "bg-surface rounded-2xl border border-border shadow-[0_1px_2px_rgba(26,24,21,0.05)] p-6 md:p-8";
@@ -69,7 +79,7 @@ export default async function ComptePage() {
           {me.mesDeals.length > 0 && (
             <ul className="flex flex-col gap-2">
               {me.mesDeals.map((d) => {
-                const badge = STATUT_BADGE[d.statut] ?? { label: d.statut, classes: "bg-surface-subtle text-ink-muted" };
+                const badge = STATUT_BADGE[d.statut] ?? { label: d.statut, variant: "outline" as const };
                 const titre =
                   d.statut === "publie" ? (
                     <Link href={`/deal/${dealUrlSlug(d.titre, d.publicId)}`} className="font-semibold hover:text-accent">
@@ -90,9 +100,9 @@ export default async function ComptePage() {
                         <p className="text-xs text-warn font-semibold mt-0.5">Rejeté : {d.motifRejet}</p>
                       )}
                     </div>
-                    <span className={`shrink-0 text-xs font-bold rounded-full px-2.5 py-1 ${badge.classes}`}>
+                    <Badge variant={badge.variant} className="shrink-0">
                       {badge.label}
-                    </span>
+                    </Badge>
                   </li>
                 );
               })}
