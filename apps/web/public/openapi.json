@@ -372,6 +372,13 @@
               "null"
             ],
             "format": "date-time"
+          },
+          "imagePurgeeLe": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         },
         "required": [
@@ -394,7 +401,8 @@
           "turnstileVerifie",
           "diffuseTelegram",
           "diffuseDiscord",
-          "supprimeLe"
+          "supprimeLe",
+          "imagePurgeeLe"
         ]
       },
       "DealInput": {

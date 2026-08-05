@@ -254,6 +254,53 @@ changement de statut ultérieur. Trois voies, dans l'ordre :
 | `en_attente` | 0 | 2 |
 | **Total** | **115** | **1490** |
 
+**Amendement du 05/08/2026 — purge d'images (treizième amendement conscient, lot 4).** Le seul geste
+irréversible de tout le plan « suppression administrative des deals » : contrairement à
+`supprime_le` (lot 1) et `memoire_curation.levee_le` (lot 2), un fichier Storage réellement effacé ne
+revient pas. Construit **désarmé** — voir plus bas.
+
+`deals` gagne **`image_purgee_le`** (`timestamptz`, nullable, migration 0016). `image_key` **n'est
+jamais effacé** : il reste la trace historique de ce qui existait ; seul `image_purgee_le` fait foi
+de ce qui est réellement récupérable. `toDeal()`/`toDealAdmin()` (`_lib/deals.ts`) et
+`resolveDealImageKey()` (`_lib/lookup.ts`) masquent l'image dès que `image_purgee_le` est renseigné,
+quel que soit l'état de `supprime_le`.
+
+**Question posée à la conception : que devient une ligne purgée puis restaurée ?** `POST
+.../restaurer` (lot 1) n'efface que `supprime_le`, jamais `image_purgee_le` — la ligne redevient
+visible **sans image**, jamais avec un lien mort servi comme si le fichier existait encore. Vérifié
+par test d'intégration (`apps/web/tests/integration.ts`) : après restauration, la fiche publique
+reste 200 (deal `expire`, actif public), `imageKey` est absent du payload, et la route proxy
+`/img/deals/[publicId]` répond 404 plutôt que de tenter de servir un fichier disparu.
+
+Script `apps/pipeline/purger-images.mjs`, double garde-fou :
+
+1. **Délai de 90 jours** après `supprime_le`, pas 30 — l'artefact de backup GitHub ne vit que 30
+   jours (`db-backup.yml`). Purger avant créerait une fenêtre où une restauration serait incomplète
+   et silencieuse : le deal revient, son image non.
+2. **Double condition, jamais une seule** : `supprime_le is not null` **ET**
+   `deals_protection.protege = false` (lot 3, même repli protecteur — tout doute protège).
+
+**Désarmé par défaut** : `PURGE_IMAGES_ACTIF` absent (ou différent de `"true"`) → le job rapporte
+(nombre de fichiers, volume) sans effacer un seul octet de Storage, sans poser `image_purgee_le`,
+sans écrire au `journal_audit`. `.github/workflows/purge-images.yml` n'a **aucun déclencheur
+`schedule:`**, volontairement — contrairement au backup et au pipeline quotidien, ce job ne doit
+jamais tourner tout seul avant que l'activation ait été une décision explicite et nommée ;
+`workflow_dispatch` uniquement, avec `actif` (faux par défaut) et `delai_jours` (permet de simuler
+un autre délai, ex. `0` pour « qu'est-ce qui serait purgé aujourd'hui » — ce réglage ne touche que la
+sélection des candidats, jamais `actif`). Vérifié en lecture seule sur la production le 05/08/2026 :
+0 ligne actuellement en suppression douce, donc 0 fichier candidat quel que soit le délai simulé —
+attendu, aucune ligne n'a encore atteint le seuil.
+
+**Attribution `journal_audit`** : première écriture non portée par un admin humain. Utilisateur
+système **`Pipeline`** (`00000000-0000-0000-0000-000000000001`, `public_id` `systemepq2`, inséré par
+la migration 0016) — sans ligne dans `admins`, aucun accès, seulement une identité de traçabilité.
+Une entrée par run actif (jamais en mode à blanc), `cible_type = 'deals_purge'`, `details` porte le
+compte de fichiers, le volume et la liste des `public_id` traités.
+
+**Alerte en cas d'échec réutilisée, jamais dupliquée** : `.github/actions/alerte-issue` (même
+mécanisme que le backup et le pipeline quotidien) — un job de purge muet qui échoue laisserait croire
+au nettoyage.
+
 ## 4 — Contrat API v1
 
 **Erreurs** — format unique partout :

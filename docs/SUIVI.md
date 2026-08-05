@@ -209,22 +209,34 @@ précisés par les politiques publiques des deux fournisseurs — rien n'est aff
 page à ce sujet. La personnalisation du feed reste une finalité déclarée
 (`apps/web/src/lib/consentement.ts`), pas construite.
 
-### Suppression administrative des deals — lots 1 à 3 livrés *(05/08/2026)*
+### Suppression administrative des deals — lots 1 à 3 fusionnés, lot 4 en PR *(05/08/2026)*
 
-Plan en 5 lots (conception validée le 05/08/2026). Livrés : suppression douce (`deals.supprime_le`,
-#87), mémoire de curation (`memoire_curation`, empreinte sans prix, #88), critère de protection
-(`deals_protection`, trace de publication au journal d'audit — PR ouverte, non fusionnée). Classification
-réelle mesurée sur la production : **115 lignes protégées** (113 `publie` + 2 `rejete` ayant été
-publiées puis retirées — le critère les protège malgré leur statut courant), **1490 purgeables**
-(643 `auto_draft`, 430 `expire`, 415 `rejete` jamais publiés, 2 `en_attente`). Ce chiffre dimensionnera
-les lots 4 (purge d'image) et 5 (purge automatique).
+Plan en 5 lots (conception validée le 05/08/2026). Fusionnés et appliqués en production : suppression
+douce (`deals.supprime_le`, #87, migration 0013), mémoire de curation (`memoire_curation`, empreinte
+sans prix, #88, migration 0014), critère de protection (`deals_protection`, trace de publication au
+journal d'audit, #89, migration 0015). Classification réelle mesurée sur la production : **115 lignes
+protégées** (113 `publie` + 2 `rejete` ayant été publiées puis retirées — le critère les protège
+malgré leur statut courant), **1490 purgeables** (643 `auto_draft`, 430 `expire`, 415 `rejete` jamais
+publiés, 2 `en_attente`).
 
-**⚠️ Suppression douce — vérifiée en base et en test, pas par le chemin applicatif réel.** Les 142+
-tests d'intégration appellent les handlers de route directement (même pattern que le reste de la
-suite) ; la vérification « en production » du 05/08 a écrit directement via la connexion de
-migration, faute de session admin HTTP authentifiée disponible ici (seul compte admin : Flakpak).
-**Le bouton Supprimer/Restaurer du back-office (`/admin`, onglet Supprimés) n'a jamais été cliqué
-réellement** — à vérifier depuis l'interface avant de considérer le lot 1 pleinement éprouvé.
+**Lot 4 — purge d'images, PR ouverte, non fusionnée, construite désarmée.** `deals.image_purgee_le`
+(migration 0016, pas encore appliquée en production) + `apps/pipeline/purger-images.mjs` (délai 90
+jours, double condition `supprime_le`/`deals_protection.protege = false`, mode à blanc par défaut) +
+`.github/workflows/purge-images.yml` (déclenchement manuel uniquement, aucun `schedule:` — l'activation
+reste une décision séparée). Vérifié en lecture seule sur la production le 05/08/2026 : **0 fichier
+candidat, y compris à délai simulé nul** — aucune ligne n'est actuellement en suppression douce, pas
+seulement à cause du délai. Le mécanisme de sélection lui-même est éprouvé par 14 assertions
+d'intégration sur des lignes synthétiques vieillies artificiellement (`apps/web/tests/integration.ts`,
+section « purge d'images ») ; **le vrai DELETE Storage n'est exercé par aucun test automatisé** —
+risque assumé, jamais de suppression réelle déclenchée sans un geste manuel explicite
+(`workflow_dispatch`, `actif` coché).
+
+**⚠️ Suppression douce — vérifiée en base et en test, pas par le chemin applicatif réel.** Les tests
+d'intégration appellent les handlers de route directement (même pattern que le reste de la suite) ; la
+vérification « en production » du 05/08 a écrit directement via la connexion de migration, faute de
+session admin HTTP authentifiée disponible ici (seul compte admin : Flakpak). **Le bouton
+Supprimer/Restaurer du back-office (`/admin`, onglet Supprimés) n'a jamais été cliqué réellement** — à
+vérifier depuis l'interface avant de considérer le lot 1 pleinement éprouvé.
 
 ### Phase 0 rouverte — le backup n'a qu'une seule copie *(02/08/2026)*
 

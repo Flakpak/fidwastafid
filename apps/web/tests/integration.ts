@@ -1,5 +1,6 @@
-import { withTransaction, closePool, query } from "@fidwastafid/db";
+import { withTransaction, closePool, query, getPool } from "@fidwastafid/db";
 import { generatePublicId } from "@fidwastafid/schemas";
+import { purgerImages, DELAI_JOURS_PURGE_IMAGES, UTILISATEUR_SYSTEME_ID } from "../../pipeline/purger-images.mjs";
 import { PUBLIC_IDS_FIXTURES, PUBLIC_ID_INEXISTANT } from "./fixtures.js";
 import { POST as postDeal, GET as getDealsList } from "../src/app/api/v1/deals/route.js";
 import { GET as getCompte } from "../src/app/api/v1/deals/compte/route.js";
@@ -1636,6 +1637,133 @@ async function main() {
   } finally {
     const ids = [PROT_JAMAIS_PUBLIE, PROT_PUBLIE_PUIS_AUTO_DRAFT, PROT_REJETE_SEUL, PROT_ACTION_INCONNUE];
     await query("delete from journal_audit where cible_type = 'deal' and cible_id = any($1::text[])", [ids]);
+    await query("delete from deals where public_id = any($1::text[])", [ids]);
+  }
+
+  // -------------------------------------------------------------------------
+  // Purge d'images (lot 4) — apps/pipeline/purger-images.mjs appelé
+  // directement (même client pg que le reste de ce fichier), en mode à blanc
+  // uniquement : aucun test automatisé n'efface de fichier réel sur le
+  // Storage (`actif: true` déclenche un vrai DELETE Storage, cf. en-tête du
+  // script — jamais exercé ici). Ce qui est éprouvé : la sélection des
+  // candidats (double condition + délai) et le comportement d'une ligne
+  // purgée puis restaurée côté lecture (toDeal()/toDealAdmin()/lookup.ts).
+  // -------------------------------------------------------------------------
+  console.log("\npurge d'images — double condition, délai, comportement après restauration");
+
+  const PURGE_VIEUX_PURGEABLE = generatePublicId();
+  const PURGE_VIEUX_PROTEGE = generatePublicId();
+  const PURGE_RECENT = generatePublicId();
+  const PURGE_RESTAURE = generatePublicId();
+
+  try {
+    // Vieux (>90j), jamais publié, image présente -> CANDIDAT.
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score, image_key, supprime_le)
+       values ($1, 'Purge — vieux, purgeable', $2, 'Autre', 'physique', 10, 'expire', 0, 'deals/fixture-purge-1.webp', now() - interval '100 days')`,
+      [PURGE_VIEUX_PURGEABLE, enseigneIdSuppr]
+    );
+
+    // Vieux (>90j) mais déjà publié un jour (protégé, lot 3) -> jamais candidat,
+    // même supprimé depuis longtemps et avec une image.
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score, image_key, supprime_le)
+       values ($1, 'Purge — vieux mais protégé', $2, 'Autre', 'physique', 10, 'expire', 0, 'deals/fixture-purge-2.webp', now() - interval '100 days')`,
+      [PURGE_VIEUX_PROTEGE, enseigneIdSuppr]
+    );
+    await query(
+      `insert into journal_audit (admin_id, action, cible_type, cible_id, details)
+       values ($1, 'update_statut', 'deal', $2, '{"apres":"publie"}')`,
+      [userId, PURGE_VIEUX_PROTEGE]
+    );
+
+    // Supprimé récemment (10j) -> pas encore assez vieux pour 90j, mais le
+    // serait pour un délai simulé à 0j ("qu'est-ce qui serait purgé aujourd'hui").
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score, image_key, supprime_le)
+       values ($1, 'Purge — récent', $2, 'Autre', 'physique', 10, 'expire', 0, 'deals/fixture-purge-3.webp', now() - interval '10 days')`,
+      [PURGE_RECENT, enseigneIdSuppr]
+    );
+
+    const pool = getPool();
+
+    const auDelaiDefaut = await purgerImages({ client: pool, delaiJours: DELAI_JOURS_PURGE_IMAGES, actif: false });
+    const idsDefaut = auDelaiDefaut.traites.map((t) => t.publicId);
+    check("délai 90j -> le vieux purgeable est candidat", idsDefaut.includes(PURGE_VIEUX_PURGEABLE));
+    check("délai 90j -> le vieux mais protégé N'EST PAS candidat", !idsDefaut.includes(PURGE_VIEUX_PROTEGE));
+    check("délai 90j -> le récent (10j) N'EST PAS candidat", !idsDefaut.includes(PURGE_RECENT));
+
+    const auDelaiZero = await purgerImages({ client: pool, delaiJours: 0, actif: false });
+    const idsZero = auDelaiZero.traites.map((t) => t.publicId);
+    check("délai 0j (simulation) -> le récent devient candidat", idsZero.includes(PURGE_RECENT));
+    check("délai 0j (simulation) -> le protégé reste exclu même à délai nul", !idsZero.includes(PURGE_VIEUX_PROTEGE));
+
+    // Mode à blanc : aucune écriture, ni sur les lignes candidates ni au journal.
+    const apresSimulation = await query<{ image_purgee_le: string | null }>(
+      "select image_purgee_le from deals where public_id = $1",
+      [PURGE_VIEUX_PURGEABLE]
+    );
+    check("mode à blanc -> image_purgee_le reste null après simulation", apresSimulation[0]?.image_purgee_le === null);
+    const journalApresSimulation = await query(
+      "select 1 from journal_audit where action = 'purger_images' and admin_id = $1",
+      [UTILISATEUR_SYSTEME_ID]
+    );
+    check("mode à blanc -> aucune ligne journal_audit écrite", journalApresSimulation.length === 0);
+
+    // --- Comportement d'une ligne purgée puis restaurée (question posée à
+    // la conception du lot) : image_purgee_le n'est JAMAIS effacé par une
+    // restauration (seul supprime_le l'est) -> la fiche revient SANS image,
+    // jamais avec un lien mort. Purge simulée directement en base (pas de
+    // vrai DELETE Storage dans ce test) : c'est exactement l'état dans
+    // lequel purgerImages({actif:true}) laisserait la ligne.
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score, image_key, supprime_le, image_purgee_le)
+       values ($1, 'Purge — restauré après purge', $2, 'Autre', 'physique', 10, 'expire', 0, 'deals/fixture-purge-4.webp', now() - interval '100 days', now())`,
+      [PURGE_RESTAURE, enseigneIdSuppr]
+    );
+
+    const restauration = await postRestaurer(
+      authedRequest(`http://localhost/api/v1/admin/deals/${PURGE_RESTAURE}/restaurer`, token, { method: "POST" }),
+      { params: Promise.resolve({ publicId: PURGE_RESTAURE }) }
+    );
+    check("restauration d'une ligne purgée -> 200", restauration.status === 200);
+
+    // `expire` est un statut public (CONTRAT-V1 §1, URL vivante à vie) : la
+    // fiche reste servie normalement, seule l'image doit avoir disparu.
+    const ficheApresRestauration = await getDeal(new Request(`http://localhost/api/v1/deals/${PURGE_RESTAURE}`), {
+      params: Promise.resolve({ publicId: PURGE_RESTAURE }),
+    });
+    const ficheBody = (await ficheApresRestauration.json()) as { imageKey?: string };
+    check("restauration -> la fiche publique reste servie (200, statut expire)", ficheApresRestauration.status === 200);
+    check("restauration -> imageKey absent de la fiche publique (image purgée)", ficheBody.imageKey === undefined);
+
+    const adminApresRestauration = await query<{ image_key: string | null; image_purgee_le: string | null; supprime_le: string | null }>(
+      "select image_key, image_purgee_le, supprime_le from deals where public_id = $1",
+      [PURGE_RESTAURE]
+    );
+    check("restauration -> supprime_le redevient null", adminApresRestauration[0]?.supprime_le === null);
+    check(
+      "restauration -> image_purgee_le N'EST PAS effacé (jamais annulé par une restauration)",
+      adminApresRestauration[0]?.image_purgee_le !== null
+    );
+    check(
+      "restauration -> image_key reste en base comme trace historique (non effacé)",
+      adminApresRestauration[0]?.image_key === "deals/fixture-purge-4.webp"
+    );
+
+    const clePubliqueApresRestauration = await getImgProxy(new Request(`http://localhost/img/deals/${PURGE_RESTAURE}`), {
+      params: Promise.resolve({ publicId: PURGE_RESTAURE }),
+    });
+    check(
+      "restauration -> la route image publique ne sert plus le fichier purgé (404, pas l'ancien fichier)",
+      clePubliqueApresRestauration.status === 404
+    );
+  } finally {
+    const ids = [PURGE_VIEUX_PURGEABLE, PURGE_VIEUX_PROTEGE, PURGE_RECENT, PURGE_RESTAURE];
+    await query("delete from journal_audit where cible_type = 'deal' and cible_id = any($1::text[])", [ids]);
+    await query("delete from journal_audit where action = 'purger_images' and admin_id = $1", [
+      UTILISATEUR_SYSTEME_ID,
+    ]);
     await query("delete from deals where public_id = any($1::text[])", [ids]);
   }
 

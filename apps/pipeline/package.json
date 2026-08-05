@@ -16,7 +16,8 @@
     "extract-catalogue": "tsx extract-catalogue.mjs",
     "insert-deals": "tsx insert-deals.mjs",
     "rattrapage-descriptions": "tsx rattrapage-descriptions.mjs",
-    "expirer-auto-draft": "tsx expirer-auto-draft.mjs"
+    "expirer-auto-draft": "tsx expirer-auto-draft.mjs",
+    "purger-images": "tsx purger-images.mjs"
   },
   "dependencies": {
     "@fidwastafid/schemas": "workspace:*",
