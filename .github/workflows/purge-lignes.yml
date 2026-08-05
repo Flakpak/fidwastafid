@@ -4,17 +4,25 @@
 # deals ») — EN SUPPRESSION DOUCE, jamais un DELETE réel. Réversible par
 # construction (POST .../restaurer, lot 1), contrairement à purge-images.yml.
 #
-# Même doctrine que purge-images.yml : PAS de `schedule:` ici. L'activation
-# reste une décision explicite et nommée, jamais un cron qui tournerait déjà
-# quand la décision est prise. `workflow_dispatch` uniquement.
+# `schedule:` AJOUTÉ le 05/08/2026 (armement du mode à blanc, PAS de la
+# purge) : même doctrine que purge-images.yml — hebdomadaire, rapporte sans
+# jamais écrire, `actif` structurellement impossible hors `workflow_dispatch`
+# (condition explicite ci-dessous, pas seulement l'absence implicite de
+# `inputs` sur `schedule`). Objectif : voir l'écart entre 0 et un nombre non
+# nul de lignes candidates AVANT toute décision d'armement.
 
 name: Purge automatique des lignes (suppression douce)
 
 on:
+  schedule:
+    # Dimanche 04:30 UTC — juste après purge-images.yml (04:00), décalé pour
+    # ne pas partager exactement la même minute. Toujours à blanc, délai réel
+    # (60 jours par défaut).
+    - cron: "30 4 * * 0"
   workflow_dispatch:
     inputs:
       actif:
-        description: "Active réellement la suppression douce (+ journal_audit). Décoché = mode à blanc, ne fait que rapporter."
+        description: "Active réellement la suppression douce (+ journal_audit). Décoché = mode à blanc, ne fait que rapporter. Sans effet hors workflow_dispatch."
         type: boolean
         default: false
       delai_jours:
@@ -32,7 +40,7 @@ jobs:
     timeout-minutes: 15
     env:
       DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
-      PURGE_LIGNES_ACTIF: ${{ inputs.actif && 'true' || 'false' }}
+      PURGE_LIGNES_ACTIF: ${{ github.event_name == 'workflow_dispatch' && inputs.actif && 'true' || 'false' }}
       PURGE_LIGNES_DELAI_JOURS: ${{ inputs.delai_jours }}
     steps:
       - uses: actions/checkout@v7
@@ -46,10 +54,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # `tee` double le rapport dans le résumé du run — même motif que
+      # purge-images.yml : visibilité du passage hebdomadaire à blanc, pas un
+      # nouveau canal d'alerte.
       - name: Purge des lignes (ou simulation)
-        run: pnpm --filter pipeline run purger-lignes
+        run: pnpm --filter pipeline run purger-lignes | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Alerte — échec de la purge de lignes
+      - name: Alerte — échec de la purge de lignes (ou de son rapport à blanc)
         if: failure()
         uses: ./.github/actions/alerte-issue
         env:
@@ -59,17 +70,19 @@ jobs:
           depot: ${{ github.repository }}
           assignes: Flakpak
           labels-supplementaires: urgent
-          titre: "Purge automatique des lignes en échec"
+          titre: "Purge automatique des lignes (ou son rapport à blanc) en échec"
           corps: |
             Le workflow **Purge automatique des lignes (suppression douce)** a **échoué**.
 
             | | |
             |---|---|
             | Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
-            | Mode | `actif=${{ inputs.actif }}`, `delai_jours=${{ inputs.delai_jours || '60 (défaut)' }}` |
+            | Déclencheur | `${{ github.event_name }}` |
+            | Mode | `actif=${{ env.PURGE_LIGNES_ACTIF }}`, `delai_jours=${{ inputs.delai_jours || '60 (défaut)' }}` |
 
             Action réversible (suppression DOUCE, `deals.supprime_le`) : contrairement à la purge
             d'images, un run interrompu ici ne perd rien — chaque ligne déjà marquée reste
             restaurable (`POST .../restaurer`). L'UPDATE porte sa propre garde
             (`supprime_le is null`) : relancer le workflow ne re-traite jamais une ligne déjà
-            marquée.
+            marquée. Un rapport à blanc (y compris le passage hebdomadaire automatique) qui
+            plante ne prouve rien sur ce qu'il aurait dû annoncer — traité comme tout autre échec.
