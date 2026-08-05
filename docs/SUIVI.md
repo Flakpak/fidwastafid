@@ -467,20 +467,27 @@ rapatriés sur `Badge`. Aucune régression de tokens détectée (`apps/web/tests
 assertions, toujours vert — la variante `outline` y était déjà illustrée avec le libellé
 « Brouillon », elle attendait juste un vrai appelant).
 
-### 3.5 — État voté persistant *(priorité 5)*
+### 3.5 — État voté persistant — LIVRÉ le 05/08/2026, PR non fusionnée
 
-**Constat.** `CardVote` affiche un état « voté » (fond plein `hot`/`cold`) **optimiste côté
-client** : le composant ne reçoit que le score du deal, jamais le sens du vote de l'utilisateur
-courant. L'état ne survit donc pas à un rechargement — on revote sans savoir qu'on avait déjà
-voté.
+**`dealSchema` n'a PAS bougé** — contrairement à ce que cette entrée anticipait. Le vote courant de
+l'appelant n'est structurellement pas une propriété du deal (il dépend de qui regarde) ; l'ajouter à
+`Deal` aurait rendu ce payload dépendant de l'identité de l'appelant. Chemin retenu à la place,
+CONTRAT-V1 §4 (seizième amendement conscient) :
 
-**Où.** `docs/IDEES.md`, section « Refonte Tadelakt — suites ».
+- **Fiche deal + page enseigne** (non paginées) : SSR direct, `resolveCurrentUser()` déjà appelé
+  pour `SiteHeader` (dédupliqué par requête), zéro appel client, zéro flash.
+- **Feed** (paginé, visiteurs anonymes) : `GET /api/v1/deals/mes-votes?ids=...`, endpoint séparé,
+  appelé côté client **uniquement si `estConnecte`** (calculé serveur, jamais déduit côté client) —
+  un anonyme n'émet AUCUNE requête. `GET /api/v1/deals` reste inchangé, byte pour byte.
 
-**Par quoi commencer.** Exposer le vote courant de l'utilisateur authentifié dans la
-représentation du deal. Attention : cela touche `dealSchema`, donc le modèle de domaine du
-CONTRAT-V1 §3 et la spec OpenAPI — c'est un amendement, à assumer comme tel. Le champ ne doit
-apparaître que pour une requête authentifiée, et son absence ne doit pas se détecter en creux
-(même règle que `whatsappContact`, §4).
+**Coût mesuré** (`EXPLAIN ANALYZE`, production, requête réelle) : **0,19 ms**, 20 buffers en cache,
+aucun disque touché — la jointure `votes`/`deals` utilise déjà l'index `unique(deal_id, user_id)`
+existant, aucun index nouveau créé.
+
+**État optimiste inchangé** : `CardVote` applique le vote serveur UNE seule fois (`useRef`), jamais
+après un clic local. Couvre le vote retiré : `votes` ne garde que l'état courant, un retrait
+n'appelle simplement plus de clé dans la réponse — testé explicitement (vote, retrait, revote,
+retrait à nouveau).
 
 ---
 

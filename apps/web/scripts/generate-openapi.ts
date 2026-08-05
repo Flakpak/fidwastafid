@@ -10,6 +10,7 @@ import {
   dealAdminUpdateSchema,
   enseigneSchema,
   voteInputSchema,
+  mesVotesResponseSchema,
   commentaireInputSchema,
   commentaireSchema,
   meSchema,
@@ -34,6 +35,7 @@ const Enseigne = registry.register("Enseigne", enseigneSchema);
 const VoteInput = registry.register("VoteInput", voteInputSchema);
 const CommentaireInput = registry.register("CommentaireInput", commentaireInputSchema);
 const Commentaire = registry.register("Commentaire", commentaireSchema);
+const MesVotes = registry.register("MesVotes", mesVotesResponseSchema);
 const Me = registry.register("Me", meSchema);
 const MeUpdate = registry.register("MeUpdate", meUpdateSchema);
 const ApiError = registry.register("ApiError", apiErrorSchema);
@@ -194,6 +196,26 @@ registry.registerPath({
     200: { description: "OK — score recalculé", content: { "application/json": { schema: Deal } } },
     401: errorResponse("Authentification requise"),
     404: errorResponse("Deal introuvable"),
+  },
+  tags: ["deals"],
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/deals/mes-votes",
+  summary: "Vote courant de l'appelant pour les deals demandés (CONTRAT-V1 §4, seizième amendement)",
+  description:
+    "Absent d'une clé = pas de vote (émis puis retiré, ou jamais émis). Jamais dans la charge utile " +
+    "de GET /deals : le vote courant dépend de qui regarde, pas du deal — endpoint séparé pour ne " +
+    "jamais rendre ce payload dépendant de l'appelant.",
+  security: [{ [bearerAuth.name]: [] }],
+  request: {
+    query: z.object({ ids: z.string().openapi({ description: "publicId séparés par des virgules, 50 max" }) }),
+  },
+  responses: {
+    200: { description: "OK", content: { "application/json": { schema: MesVotes } } },
+    400: errorResponse("ids manquant, vide, trop nombreux, ou identifiant invalide"),
+    401: errorResponse("Authentification requise"),
   },
   tags: ["deals"],
 });

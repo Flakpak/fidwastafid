@@ -9,6 +9,7 @@ import { HeroBand } from "../components/HeroBand.js";
 import { Feed } from "./Feed.js";
 import { construireParamsCompte, construireParamsFeed } from "../lib/feedPagination.js";
 import { lireFiltresUrl, type EtatFiltres } from "../lib/filtresFeed.js";
+import { resolveCurrentUser } from "../lib/currentUser.js";
 
 
 const DESCRIPTION = "Les meilleurs bons plans et promotions au Maroc, votés par la communauté : alimentaire, high-tech, mode et plus.";
@@ -79,7 +80,15 @@ function versSearchParams(brut: Record<string, string | string[] | undefined>): 
 export default async function Home({ searchParams }: PageParams) {
   const brut = await searchParams;
   const filtres = lireFiltresUrl(versSearchParams(brut));
-  const [premierePage, total] = await Promise.all([fetchFeed(filtres), fetchTotal(filtres)]);
+  // `resolveCurrentUser()` est déjà appelé par SiteHeader ci-dessous —
+  // dédupliqué par requête (cache(), React) : ce troisième appel ne coûte
+  // rien de plus. Seul un booléen part vers Feed (CONTRAT-V1 §4, seizième
+  // amendement conscient) — jamais l'identité elle-même.
+  const [premierePage, total, utilisateurCourant] = await Promise.all([
+    fetchFeed(filtres),
+    fetchTotal(filtres),
+    resolveCurrentUser(),
+  ]);
 
   const compte = typeof brut.compte === "string" ? brut.compte : undefined;
   const motdepasse = typeof brut.motdepasse === "string" ? brut.motdepasse : undefined;
@@ -111,6 +120,7 @@ export default async function Home({ searchParams }: PageParams) {
         initialCursor={premierePage.nextCursor}
         initialFiltres={filtres}
         initialTotal={total}
+        estConnecte={Boolean(utilisateurCourant)}
       />
       <SiteFooter />
     </div>

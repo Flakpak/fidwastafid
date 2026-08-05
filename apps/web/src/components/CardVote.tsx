@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import type { VoteSens } from "@fidwastafid/schemas";
 import { temperature } from "../lib/score.js";
 
 interface ApiErrorBody {
@@ -28,19 +29,40 @@ const CHEVRON_DOWN = "M6 9l6 6 6-6";
  * la maquette montre des boutons chevron seuls, mais le contrat prime. Les
  * chevrons 16px demandés sont ajoutés à côté des libellés.
  *
- * L'état « voté » (fond plein) est optimiste, côté client : le composant ne
- * reçoit que le score, pas le vote courant de l'utilisateur (le brancher
- * durablement demanderait une donnée SSR/API — hors périmètre cosmétique).
+ * L'état « voté » (fond plein) reste optimiste au clic — inchangé. Ce qui
+ * change (CONTRAT-V1 §4, seizième amendement conscient) : l'état INITIAL
+ * peut désormais venir du serveur via `monVote` — `undefined` tant qu'il
+ * n'est pas connu (anonyme, ou fetch en cours), `null` = connu et non voté,
+ * `"chaud"`/`"froid"` = connu et voté. Appliqué UNE SEULE fois (`appliqueRef`) :
+ * un clic qui suit n'est jamais écrasé par une réponse serveur arrivée en
+ * retard — c'est ce qui garde l'état optimiste intact après cette persistance.
  */
-export function CardVote({ publicId, initialScore }: { publicId: string; initialScore: number }) {
+export function CardVote({
+  publicId,
+  initialScore,
+  monVote,
+}: {
+  publicId: string;
+  initialScore: number;
+  /** `undefined` = pas encore connu (jamais appliqué) ; `null` = connu, non voté. */
+  monVote?: VoteSens | null;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [score, setScore] = useState(initialScore);
-  const [voted, setVoted] = useState<"chaud" | "froid" | null>(null);
+  const [voted, setVoted] = useState<VoteSens | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function vote(sens: "chaud" | "froid") {
+  const appliqueRef = useRef(false);
+  useEffect(() => {
+    if (!appliqueRef.current && monVote !== undefined) {
+      setVoted(monVote);
+      appliqueRef.current = true;
+    }
+  }, [monVote]);
+
+  async function vote(sens: VoteSens) {
     setPending(true);
     setError(null);
     try {

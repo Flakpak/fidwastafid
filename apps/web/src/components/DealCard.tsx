@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { dealUrlSlug, type Deal } from "@fidwastafid/schemas";
+import { dealUrlSlug, type Deal, type VoteSens } from "@fidwastafid/schemas";
 import { relativeDate, shortDate } from "../lib/format.js";
 import { urgence } from "../lib/urgence.js";
 import { SEUIL_CHAUD } from "../lib/score.js";
@@ -48,7 +48,7 @@ function economie(deal: Deal): number | null {
  * <Link> — la pilule de vote et le pied de carte (liens/boutons) vivent
  * donc hors des <Link> qui couvrent l'image et le bloc titre/prix/description.
  */
-export function DealCard({ deal }: { deal: Deal }) {
+export function DealCard({ deal, monVote }: { deal: Deal; monVote?: VoteSens | null }) {
   const pct = reduction(deal);
   const gain = economie(deal);
   const dealHref = `/deal/${dealUrlSlug(deal.titre, deal.publicId)}`;
@@ -105,7 +105,7 @@ export function DealCard({ deal }: { deal: Deal }) {
         {/* a. Ligne haute : pilule de vote + urgence/tendance. */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
-            <CardVote publicId={deal.publicId} initialScore={deal.score} />
+            <CardVote publicId={deal.publicId} initialScore={deal.score} monVote={monVote} />
             {isHot && (
               <Badge variant="hot">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true" className="w-3 h-3">

@@ -11,6 +11,8 @@ import { ShareButton } from "../../../components/ShareButton.js";
 import { UrgenceCountdown } from "../../../components/UrgenceCountdown.js";
 import { Avatar } from "../../../components/Avatar.js";
 import { Badge } from "../../../components/Badge.js";
+import { resolveCurrentUser } from "../../../lib/currentUser.js";
+import { fetchMesVotes } from "../../api/v1/_lib/votes.js";
 import { CommentForm } from "./CommentForm.js";
 import { CommentairesErreur } from "./CommentairesErreur.js";
 import { lireCommentaires, type ResultatCommentaires } from "./commentaires.js";
@@ -134,7 +136,20 @@ export default async function DealPage({ params }: PageParams) {
   }
 
   const dealHref = `/deal/${canonical}`;
-  const resultatCommentaires = await fetchCommentaires(deal.publicId);
+  // État voté persistant (CONTRAT-V1 §4, seizième amendement conscient) —
+  // résolu en SSR direct, jamais un appel client : resolveCurrentUser() est
+  // déjà appelé par SiteHeader sur cette page, dédupliqué par requête
+  // (cache(), React) — cette résolution ne coûte rien de plus qu'une
+  // requête SQL supplémentaire, triviale (un seul deal). `undefined` tant
+  // qu'aucun utilisateur n'est connu (visiteur anonyme) : CardVote ne
+  // l'applique alors jamais, comportement identique à avant ce lot.
+  const utilisateurCourant = await resolveCurrentUser();
+  const [resultatCommentaires, monVote] = await Promise.all([
+    fetchCommentaires(deal.publicId),
+    utilisateurCourant
+      ? fetchMesVotes(utilisateurCourant.id, [deal.publicId]).then((v) => v[deal.publicId] ?? null)
+      : Promise.resolve(undefined),
+  ]);
   const expire = deal.statut === "expire";
   const pct = reduction(deal);
   const urg = urgence(deal);
@@ -210,7 +225,7 @@ export default async function DealPage({ params }: PageParams) {
             <div className="p-5 md:p-8 flex flex-col gap-3">
               {/* a. Pilule de vote + actions. */}
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <CardVote publicId={deal.publicId} initialScore={deal.score} />
+                <CardVote publicId={deal.publicId} initialScore={deal.score} monVote={monVote} />
                 <div className="flex items-center gap-3 text-sm font-bold">
                   <Link href={`${dealHref}#commentaires`} className="flex items-center gap-1 text-ink-muted hover:text-ink">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true" className="h-4 w-4">
