@@ -3,6 +3,46 @@ import Link from "next/link";
 import { SiteHeader } from "../../components/SiteHeader.js";
 import { SiteFooter } from "../../components/SiteFooter.js";
 
+/**
+ * Identité juridique du responsable de traitement — obligatoire tant sous
+ * la loi 09-08 (Maroc) que sous le RGPD (art. 13, UE). Valeurs fournies par
+ * Kamel UNIQUEMENT — jamais inventées ni devinées ici (aucune forme
+ * sociale, aucune adresse plausible écrite à sa place). Tant qu'un champ
+ * vaut `A_COMPLETER`, la page l'affiche TEL QUEL, visible — une absence
+ * masquée par un texte plausible serait pire qu'une absence honnête (même
+ * doctrine que le fallback silencieux, docs/INCIDENTS.md).
+ *
+ * Remplir ces quatre constantes suffit à publier la page correctement :
+ * rien d'autre dans le fichier n'a besoin de changer.
+ */
+const A_COMPLETER = "à compléter";
+
+const RESPONSABLE_TRAITEMENT = {
+  /** Nom légal complet de l'entité — ou de la personne physique si
+   *  exploitation en nom propre / auto-entrepreneur. Ex. "SARL Untel",
+   *  "Kamel Lazrek (auto-entrepreneur)". */
+  raisonSociale: A_COMPLETER,
+  /** Forme juridique seule, séparée de la raison sociale pour rester
+   *  affichable indépendamment. Ex. "SARL", "SARL AU", "auto-entrepreneur",
+   *  "personne physique". */
+  formeJuridique: A_COMPLETER,
+  /** Adresse postale complète du siège (ou de l'exploitant), telle qu'elle
+   *  doit apparaître publiquement. */
+  adresse: A_COMPLETER,
+  /** Canal dédié à l'exercice des droits (accès/rectification/effacement/
+   *  opposition) — peut être identique à contact@fidwastafid.com (déjà
+   *  utilisé plus bas) ou un canal distinct : à confirmer par Kamel. */
+  contactDroits: A_COMPLETER,
+  /**
+   * Optionnel — registre de commerce (numéro + ville) et ICE (Identifiant
+   * Commun de l'Entreprise), usuels dans une mention légale marocaine
+   * complète mais pas explicitement demandés. `null` = non renseigné,
+   * n'affiche simplement rien (jamais un `A_COMPLETER` pour un champ dont
+   * l'applicabilité même n'est pas encore confirmée).
+   */
+  rcEtIce: null as string | null,
+};
+
 const DESCRIPTION =
   "Quelles données Fidwastafid conserve, ce que ton navigateur reçoit, où elles sont hébergées, et comment exercer tes droits (loi 09-08 et RGPD).";
 
@@ -159,20 +199,22 @@ export default function ConfidentialitePage() {
             </p>
           </Section>
 
-          <Section titre="Contact">
-            {/*
-             * REPÈRE — identité juridique du responsable de traitement.
-             * Obligatoire tant au Maroc (loi 09-08) que dans l'UE (RGPD,
-             * art. 13) : raison sociale, forme juridique, adresse du siège.
-             * À fournir par Kamel — volontairement NON inventée ici (aucune
-             * forme sociale, aucune adresse plausible écrite à sa place).
-             * Une fois fournie, l'ajouter en premier paragraphe de cette
-             * section, avant la phrase de contact ci-dessous.
-             */}
+          <Section titre="Responsable du traitement">
             <p>
-              Une question sur tes données ? Le responsable du traitement est Fidwastafid, joignable à{" "}
+              {RESPONSABLE_TRAITEMENT.raisonSociale} ({RESPONSABLE_TRAITEMENT.formeJuridique}), dont le siège se
+              trouve {RESPONSABLE_TRAITEMENT.adresse}, est responsable du traitement des données décrites sur
+              cette page.
+              {RESPONSABLE_TRAITEMENT.rcEtIce && ` ${RESPONSABLE_TRAITEMENT.rcEtIce}.`}
+            </p>
+            <p>
+              Pour exercer tes droits (accès, rectification, effacement, opposition) ou pour toute question sur
+              tes données, écris à{" "}
+              <a href={`mailto:${RESPONSABLE_TRAITEMENT.contactDroits}`} className="text-accent font-bold hover:underline">
+                {RESPONSABLE_TRAITEMENT.contactDroits}
+              </a>
+              , ou{" "}
               <Link href="/contact" className="text-accent font-bold hover:underline">
-                contact@fidwastafid.com
+                utilise le formulaire de contact
               </Link>
               .
             </p>

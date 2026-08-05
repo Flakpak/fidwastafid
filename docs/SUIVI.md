@@ -198,10 +198,19 @@ la question ne se repose pas sans réponse la prochaine fois.*
 
 ### Conformité de la collecte — suite du 04/08/2026
 
-**Toujours bloqué sur Kamel** : l'identité juridique du responsable de traitement
-(raison sociale, forme, adresse) est absente de `/confidentialite` — un repère explicite
-marque l'emplacement dans le code (section Contact), volontairement non rempli plutôt
-qu'inventé.
+**Toujours bloqué sur Kamel, structure prête** *(05/08/2026, PR non fusionnée)* : l'identité
+juridique du responsable de traitement (raison sociale, forme juridique, adresse, contact dédié
+à l'exercice des droits) est absente de `/confidentialite`. La page porte désormais une structure
+d'accueil nommée (`RESPONSABLE_TRAITEMENT`, quatre champs + un cinquième optionnel RC/ICE), rendue
+dans une nouvelle section « Responsable du traitement » — chaque champ vaut littéralement
+`A_COMPLETER` tant qu'il n'est pas fourni, affiché tel quel plutôt que masqué (même doctrine que le
+fallback silencieux). Remplir les quatre constantes en tête de fichier suffit à publier.
+D'autres pages/gabarits vérifiés pour le même besoin : aucune page « mentions légales »/CGU
+n'existe (`/confidentialite` reste seule porteuse) ; `/contact` et le pied de page n'en ont pas
+besoin (portée différente, décision déjà actée) ; les e-mails transactionnels ne sont pas encore
+construits (priorité 1 ci-dessous) mais leur charte (`docs/runbooks/emails-tadelakt.md`) réserve
+déjà une teinte au pied pour des mentions légales — à alimenter avec les mêmes valeurs le jour où
+ils existeront.
 
 **Limites acceptées, pas des blocages** : le lieu de traitement exact des serveurs Vercel
 Analytics et la durée de conservation des signaux Turnstile côté Cloudflare ne sont pas
