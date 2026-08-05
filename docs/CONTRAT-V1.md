@@ -379,6 +379,38 @@ l'armement :
 12/07/2026) — attendu, pas un bug. Le chiffre à 1057 dit la taille du bassin qui s'accumulera
 progressivement ; c'est lui qui doit être regardé avant toute décision d'armer, pas le 0 d'aujourd'hui.
 
+**Amendement du 05/08/2026 — recherche insensible aux accents (quinzième amendement conscient).**
+Fait générateur : « electromenager » ne trouvait jamais un deal dont le titre contient
+« Électroménager » — `ILIKE` (paramètre `q`, `_lib/dealsFilters.ts`) est déjà insensible à la casse,
+jamais aux accents. Vérifié en lecture seule sur la production le 05/08/2026, cas réel : 3 deals
+`publie` contiennent « crêpière » dans leur titre, 0 trouvés en cherchant « crepiere » (sans accent).
+
+Extension **`unaccent`** (migration 0017), schéma `public` — pas `extensions` (convention Supabase
+pour pgcrypto/uuid-ossp) : cette migration doit s'appliquer identiquement sur Supabase ET sur un
+Postgres nu (local, CI, VPS cible, CONTRAT-V1 §7), qui n'a pas de schéma `extensions`.
+
+- **`unaccent()` appliqué aux DEUX côtés de la comparaison** (le motif ET les trois colonnes déjà
+  interrogées : `titre`, `enseigne.nom`, `enseigne.slug`) — symétrique par construction, jamais deux
+  chemins de code séparés pour « la requête a des accents » et « le contenu en a » : peu importe
+  lequel des deux, la comparaison passe toujours par la même transformation des deux côtés.
+- **AUCUN INDEX créé — décision délibérée, pas un oubli.** Un index expression btree sur
+  `unaccent(titre)` n'accélérerait PAS `ilike '%motif%'` (joker en tête ET en queue, jamais un
+  préfixe) : seul un index trigramme (`pg_trgm`) le ferait. **`pg_trgm` et le classement par
+  pertinence sont explicitement HORS PÉRIMÈTRE** de ce lot (113 deals : gain non mesurable,
+  complexifierait le curseur de pagination — CONTRAT-V1 §4, « le curseur embarque la signature des
+  filtres » — sans bénéfice observable). Un index qui ne sert à rien en lecture coûterait quand même
+  à chaque écriture du pipeline (insertion en volume, quotidienne) : la décision retenue est un coût
+  d'écriture **nul** — vérifié après migration, `\d deals` ne montre aucun index nouveau, le jeu
+  d'index reste identique à avant ce lot.
+- **Testé sur des cas réels** (fixtures d'intégration délibérément asymétriques — l'une porte les
+  accents dans le titre, l'autre dans la requête, pour que le test ne puisse pas réussir par
+  coïncidence) : « electromenager » trouve « Électroménager », « café »/« crêpière » (avec accent)
+  trouvent des titres écrits sans accent, et réciproquement — les deux sens vérifiés séparément.
+  « Électroménager » n'apparaît littéralement dans aucun titre de production à ce jour (c'est une
+  `categorie`, jamais recherchée par `q` — hors périmètre de ce lot, `q` reste titre/enseigne
+  uniquement) ; « téléphonie » n'apparaît que sur des deals non publiés — deux constats honnêtes,
+  pas des échecs du correctif.
+
 ## 4 — Contrat API v1
 
 **Erreurs** — format unique partout :
