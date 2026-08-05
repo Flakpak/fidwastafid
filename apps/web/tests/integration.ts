@@ -1,6 +1,7 @@
 import { withTransaction, closePool, query, getPool } from "@fidwastafid/db";
 import { generatePublicId } from "@fidwastafid/schemas";
 import { purgerImages, DELAI_JOURS_PURGE_IMAGES, UTILISATEUR_SYSTEME_ID } from "../../pipeline/purger-images.mjs";
+import { purgerLignes, DELAI_JOURS_PURGE_LIGNES } from "../../pipeline/purger-lignes.mjs";
 import { PUBLIC_IDS_FIXTURES, PUBLIC_ID_INEXISTANT } from "./fixtures.js";
 import { POST as postDeal, GET as getDealsList } from "../src/app/api/v1/deals/route.js";
 import { GET as getCompte } from "../src/app/api/v1/deals/compte/route.js";
@@ -1764,6 +1765,108 @@ async function main() {
     await query("delete from journal_audit where action = 'purger_images' and admin_id = $1", [
       UTILISATEUR_SYSTEME_ID,
     ]);
+    await query("delete from deals where public_id = any($1::text[])", [ids]);
+  }
+
+  // -------------------------------------------------------------------------
+  // Purge automatique des lignes (lot 5) — apps/pipeline/purger-lignes.mjs
+  // appelé directement. En suppression DOUCE uniquement (jamais un DELETE) :
+  // contrairement au lot 4, aucun risque d'irréversibilité ici, donc pas de
+  // client-façade pour un « pire cas » — un vrai appel actif suffit.
+  // -------------------------------------------------------------------------
+  console.log("\npurge automatique des lignes — double condition, dormance, périmètre restreint (pas expire/en_attente)");
+
+  const LIGNE_REJETE_VIEUX = generatePublicId();
+  const LIGNE_REJETE_RECENT = generatePublicId();
+  const LIGNE_REJETE_PROTEGE = generatePublicId();
+  const LIGNE_EXPIRE_VIEUX = generatePublicId();
+  const LIGNE_EN_ATTENTE_VIEUX = generatePublicId();
+
+  try {
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score, created_at)
+       values ($1, 'Ligne — rejeté, vieux', $2, 'Autre', 'physique', 10, 'rejete', 0, now() - interval '100 days')`,
+      [LIGNE_REJETE_VIEUX, enseigneIdSuppr]
+    );
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score, created_at)
+       values ($1, 'Ligne — rejeté, récent', $2, 'Autre', 'physique', 10, 'rejete', 0, now() - interval '10 days')`,
+      [LIGNE_REJETE_RECENT, enseigneIdSuppr]
+    );
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score, created_at)
+       values ($1, 'Ligne — rejeté mais protégé', $2, 'Autre', 'physique', 10, 'rejete', 0, now() - interval '100 days')`,
+      [LIGNE_REJETE_PROTEGE, enseigneIdSuppr]
+    );
+    await query(
+      `insert into journal_audit (admin_id, action, cible_type, cible_id, details)
+       values ($1, 'update_statut', 'deal', $2, '{"apres":"publie"}')`,
+      [userId, LIGNE_REJETE_PROTEGE]
+    );
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score, created_at)
+       values ($1, 'Ligne — expire, vieux (hors périmètre)', $2, 'Autre', 'physique', 10, 'expire', 0, now() - interval '365 days')`,
+      [LIGNE_EXPIRE_VIEUX, enseigneIdSuppr]
+    );
+    await query(
+      `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, statut, score, created_at)
+       values ($1, 'Ligne — en_attente, vieux (hors périmètre)', $2, 'Autre', 'physique', 10, 'en_attente', 0, now() - interval '365 days')`,
+      [LIGNE_EN_ATTENTE_VIEUX, enseigneIdSuppr]
+    );
+
+    const pool = getPool();
+
+    const auDelaiDefaut = await purgerLignes({ client: pool, delaiJours: DELAI_JOURS_PURGE_LIGNES, actif: false });
+    const idsDefaut = auDelaiDefaut.traites.map((t) => t.publicId);
+    check("délai 60j -> rejeté vieux est candidat", idsDefaut.includes(LIGNE_REJETE_VIEUX));
+    check("délai 60j -> rejeté récent N'EST PAS candidat", !idsDefaut.includes(LIGNE_REJETE_RECENT));
+    check("délai 60j -> rejeté mais protégé N'EST PAS candidat", !idsDefaut.includes(LIGNE_REJETE_PROTEGE));
+    check("délai 60j -> expire JAMAIS candidat, même vieux et jamais publié (hors périmètre)", !idsDefaut.includes(LIGNE_EXPIRE_VIEUX));
+    check(
+      "délai 60j -> en_attente JAMAIS candidat, même vieux et jamais publié (hors périmètre)",
+      !idsDefaut.includes(LIGNE_EN_ATTENTE_VIEUX)
+    );
+
+    const auDelaiZero = await purgerLignes({ client: pool, delaiJours: 0, actif: false });
+    const idsZero = auDelaiZero.traites.map((t) => t.publicId);
+    check("délai 0j (simulation) -> le rejeté récent devient candidat", idsZero.includes(LIGNE_REJETE_RECENT));
+    check("délai 0j (simulation) -> expire reste exclu même à délai nul (périmètre, pas dormance)", !idsZero.includes(LIGNE_EXPIRE_VIEUX));
+
+    // Mode à blanc : aucune écriture.
+    const apresSimulation = await query<{ supprime_le: string | null }>("select supprime_le from deals where public_id = $1", [
+      LIGNE_REJETE_VIEUX,
+    ]);
+    check("mode à blanc -> supprime_le reste null après simulation", apresSimulation[0]?.supprime_le === null);
+
+    // --- Mode actif : suppression douce réelle + journal_audit réutilisant
+    // l'action 'supprimer_deal' (déjà classée non-probante par deals_protection,
+    // migration 0015) avec automatise:true — pas une action distincte.
+    const resultatActif = await purgerLignes({ client: pool, delaiJours: DELAI_JOURS_PURGE_LIGNES, actif: true });
+    check("mode actif -> le rejeté vieux traité", resultatActif.traites.some((t) => t.publicId === LIGNE_REJETE_VIEUX));
+
+    const apresActif = await query<{ supprime_le: string | null }>("select supprime_le from deals where public_id = $1", [
+      LIGNE_REJETE_VIEUX,
+    ]);
+    check("mode actif -> supprime_le posé pour de vrai", apresActif[0]?.supprime_le !== null);
+
+    const journalActif = await query<{ action: string; admin_id: string; details: { automatise?: boolean } }>(
+      "select action, admin_id, details from journal_audit where cible_type = 'deal' and cible_id = $1 order by created_at desc limit 1",
+      [LIGNE_REJETE_VIEUX]
+    );
+    check("mode actif -> journal_audit réutilise l'action 'supprimer_deal'", journalActif[0]?.action === "supprimer_deal");
+    check("mode actif -> journal_audit attribué à l'utilisateur système", journalActif[0]?.admin_id === UTILISATEUR_SYSTEME_ID);
+    check("mode actif -> details.automatise = true (distingue du geste manuel)", journalActif[0]?.details?.automatise === true);
+
+    // Symétrie avec le lot 1 : une ligne soft-supprimée automatiquement se
+    // restaure exactement comme une ligne soft-supprimée à la main.
+    const restaurationAuto = await postRestaurer(
+      authedRequest(`http://localhost/api/v1/admin/deals/${LIGNE_REJETE_VIEUX}/restaurer`, token, { method: "POST" }),
+      { params: Promise.resolve({ publicId: LIGNE_REJETE_VIEUX }) }
+    );
+    check("restauration d'une ligne auto-supprimée -> 200, même chemin que le geste manuel", restaurationAuto.status === 200);
+  } finally {
+    const ids = [LIGNE_REJETE_VIEUX, LIGNE_REJETE_RECENT, LIGNE_REJETE_PROTEGE, LIGNE_EXPIRE_VIEUX, LIGNE_EN_ATTENTE_VIEUX];
+    await query("delete from journal_audit where cible_type = 'deal' and cible_id = any($1::text[])", [ids]);
     await query("delete from deals where public_id = any($1::text[])", [ids]);
   }
 

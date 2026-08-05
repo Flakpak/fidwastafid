@@ -47,11 +47,12 @@
 // ============================================================
 
 import pg from "pg";
+import { UTILISATEUR_SYSTEME_ID } from "./_lib/utilisateurSysteme.mjs";
 
 /** 90 jours après supprime_le — cf. justification en tête de fichier. */
 export const DELAI_JOURS_PURGE_IMAGES = 90;
 
-export const UTILISATEUR_SYSTEME_ID = "00000000-0000-0000-0000-000000000001";
+export { UTILISATEUR_SYSTEME_ID };
 
 const BUCKET = "deals-images";
 
@@ -80,13 +81,38 @@ async function tailleFichier(cle) {
   return len ? Number(len) : null;
 }
 
+/**
+ * Sondé pour de vrai sur un préfixe de test isolé (`test-purge/`, hors du
+ * motif `deals/{publicId}.webp`, jamais un fichier réel) le 05/08/2026,
+ * projet prod réel — jamais un émulateur : Supabase Storage encapsule un
+ * DELETE sur une clé absente sous un **HTTP 400 générique**, pas un 404. Le
+ * vrai statut sémantique vit dans le corps JSON (`code: "NoSuchKey"`), pas
+ * dans `res.status`. Un fichier déjà absent n'est PAS un échec — c'est
+ * exactement l'état que la purge cherche à atteindre — et ne doit jamais
+ * bloquer la pose du marqueur : sinon une ligne dont le fichier a disparu
+ * pour toute autre raison (purge précédente interrompue après le DELETE
+ * mais avant le marqueur, suppression manuelle) resterait candidate à
+ * chaque run, échouant identiquement à l'infini.
+ *
+ * Toute AUTRE réponse non-ok (auth invalide, 5xx, corps qui ne ressemble
+ * pas à cette erreur précise) reste fatale — seul ce cas précis est traité
+ * comme un succès.
+ */
 async function supprimerFichier(cle) {
   const url = `${process.env.SUPABASE_URL}/storage/v1/object/${BUCKET}/${cle}`;
   const res = await fetch(url, { method: "DELETE", headers: storageAuthHeaders() });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`suppression storage ${res.status} pour "${cle}" : ${body.slice(0, 200)}`);
+  if (res.ok) return;
+
+  const bodyText = await res.text().catch(() => "");
+  let body = null;
+  try {
+    body = JSON.parse(bodyText);
+  } catch {
+    // corps non-JSON — traité ci-dessous comme une erreur générique.
   }
+  if (body?.code === "NoSuchKey") return;
+
+  throw new Error(`suppression storage ${res.status} pour "${cle}" : ${bodyText.slice(0, 200)}`);
 }
 
 /**
@@ -137,8 +163,28 @@ export async function purgerImages({ client, delaiJours = DELAI_JOURS_PURGE_IMAG
     traites.push({ publicId: row.public_id, imageKey: row.image_key, octets: taille });
 
     if (actif) {
+      // Ordre non négociable : jamais marquer avant d'avoir confirmé la
+      // suppression Storage (l'inverse marquerait purgé un fichier qui
+      // existe encore). Le pire cas est le symétrique — DELETE Storage
+      // abouti, écriture du marqueur qui échoue ou n'affecte aucune ligne
+      // (id disparu entre temps, contrainte, coupure) : la base croirait
+      // alors l'image encore présente alors qu'elle a été détruite pour de
+      // bon. `rowCount !== 1` ARRÊTE le run immédiatement (jamais avalé) —
+      // l'alerte part, rien n'est écrit au journal_audit pour ce run
+      // (résultat partiel, pas de faux « tout va bien »). Au prochain run,
+      // ce candidat reste sélectionné (image_purgee_le toujours null) ;
+      // supprimerFichier() retrouvera le fichier déjà absent (NoSuchKey,
+      // ci-dessus) et le traitera comme un succès — la pose du marqueur est
+      // alors retentée, sans jamais retenter une suppression déjà faite.
       await supprimerFichier(row.image_key);
-      await client.query("update deals set image_purgee_le = now() where id = $1", [row.id]);
+      const maj = await client.query("update deals set image_purgee_le = now() where id = $1", [row.id]);
+      if (maj.rowCount !== 1) {
+        throw new Error(
+          `purge : "${row.image_key}" (${row.public_id}) supprimé du Storage, mais la pose du ` +
+            `marqueur image_purgee_le a affecté ${maj.rowCount} ligne(s) au lieu d'une — arrêt ` +
+            `immédiat (le fichier n'existe plus, la base ne le sait pas encore).`
+        );
+      }
     }
   }
 
