@@ -6,6 +6,8 @@ import { GET as getEnseignesHandler } from "../../api/v1/enseignes/route.js";
 import { SiteHeader } from "../../../components/SiteHeader.js";
 import { SiteFooter } from "../../../components/SiteFooter.js";
 import { DealCard } from "../../../components/DealCard.js";
+import { resolveCurrentUser } from "../../../lib/currentUser.js";
+import { fetchMesVotes } from "../../api/v1/_lib/votes.js";
 
 /** SSR par requête — mêmes raisons que le feed (voir app/page.tsx). */
 export const dynamic = "force-dynamic";
@@ -47,7 +49,16 @@ export default async function EnseignePage({ params }: PageParams) {
   const enseigne = await fetchEnseigne(slug);
   if (!enseigne) notFound();
 
-  const deals = await fetchDeals(slug);
+  // État voté persistant (CONTRAT-V1 §4, seizième amendement conscient) —
+  // page non paginée (limit=24, pas de « charger plus ») : SSR direct comme
+  // la fiche deal, aucun appel client. Coût nul pour un visiteur anonyme.
+  const [deals, utilisateurCourant] = await Promise.all([fetchDeals(slug), resolveCurrentUser()]);
+  const mesVotes = utilisateurCourant
+    ? await fetchMesVotes(
+        utilisateurCourant.id,
+        deals.map((d) => d.publicId)
+      )
+    : {};
 
   return (
     <div className="min-h-screen bg-surface-base text-ink">
@@ -59,7 +70,11 @@ export default async function EnseignePage({ params }: PageParams) {
           <p className="text-center text-ink-muted py-16">Aucun bon plan pour {enseigne.nom} pour l&apos;instant.</p>
         )}
         {deals.map((deal) => (
-          <DealCard key={deal.publicId} deal={deal} />
+          <DealCard
+            key={deal.publicId}
+            deal={deal}
+            monVote={utilisateurCourant ? (mesVotes[deal.publicId] ?? null) : undefined}
+          />
         ))}
       </main>
       <SiteFooter />

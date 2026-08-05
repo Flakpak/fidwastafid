@@ -711,6 +711,24 @@
           "createdAt"
         ]
       },
+      "MesVotes": {
+        "type": "object",
+        "properties": {
+          "votes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "chaud",
+                "froid"
+              ]
+            }
+          }
+        },
+        "required": [
+          "votes"
+        ]
+      },
       "Me": {
         "type": "object",
         "properties": {
@@ -1490,6 +1508,63 @@
           },
           "404": {
             "description": "Deal introuvable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/mes-votes": {
+      "get": {
+        "summary": "Vote courant de l'appelant pour les deals demandés (CONTRAT-V1 §4, seizième amendement)",
+        "description": "Absent d'une clé = pas de vote (émis puis retiré, ou jamais émis). Jamais dans la charge utile de GET /deals : le vote courant dépend de qui regarde, pas du deal — endpoint séparé pour ne jamais rendre ce payload dépendant de l'appelant.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "deals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "publicId séparés par des virgules, 50 max"
+            },
+            "required": true,
+            "name": "ids",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MesVotes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ids manquant, vide, trop nombreux, ou identifiant invalide",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentification requise",
             "content": {
               "application/json": {
                 "schema": {

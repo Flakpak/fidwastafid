@@ -7,6 +7,7 @@ import { POST as postDeal, GET as getDealsList } from "../src/app/api/v1/deals/r
 import { GET as getCompte } from "../src/app/api/v1/deals/compte/route.js";
 import { GET as getDeal } from "../src/app/api/v1/deals/[publicId]/route.js";
 import { POST as postVote, DELETE as deleteVote } from "../src/app/api/v1/deals/[publicId]/votes/route.js";
+import { GET as getMesVotes } from "../src/app/api/v1/deals/mes-votes/route.js";
 import {
   POST as postComment,
   GET as getComments,
@@ -971,6 +972,72 @@ async function main() {
   const voteDelete = await deleteVote(authedRequest(`http://localhost/api/v1/deals/${DEAL_PUBLIC_ID}/votes`, token), context);
   const voteDeleteBody = (await voteDelete.json()) as { score?: number };
   check("delete vote -> score = 0", voteDeleteBody.score === 0);
+
+  // ---------------------------------------------------------------------
+  // État voté persistant (CONTRAT-V1 §4, seizième amendement conscient) —
+  // GET /api/v1/deals/mes-votes. Couvre explicitement le vote RETIRÉ, pas
+  // seulement émis : le deal ci-dessus vient d'être dévoté (ligne
+  // précédente) — mes-votes doit déjà le refléter avant même un nouveau
+  // vote.
+  // ---------------------------------------------------------------------
+  console.log("\nmes-votes — vote émis puis retiré, les deux reflétés");
+
+  const mesVotesApresRetrait = await getMesVotes(
+    authedRequest(`http://localhost/api/v1/deals/mes-votes?ids=${DEAL_PUBLIC_ID}`, token),
+    {}
+  );
+  const mesVotesApresRetraitBody = (await mesVotesApresRetrait.json()) as { votes?: Record<string, string> };
+  check("mes-votes après retrait -> 200", mesVotesApresRetrait.status === 200);
+  check(
+    "mes-votes après retrait -> deal ABSENT de la réponse (pas de vote)",
+    !(DEAL_PUBLIC_ID in (mesVotesApresRetraitBody.votes ?? {}))
+  );
+
+  await postVote(
+    authedRequest(`http://localhost/api/v1/deals/${DEAL_PUBLIC_ID}/votes`, token, {
+      method: "POST",
+      body: JSON.stringify({ sens: "chaud" }),
+    }),
+    context
+  );
+
+  const mesVotesApresVote = await getMesVotes(
+    authedRequest(`http://localhost/api/v1/deals/mes-votes?ids=${DEAL_PUBLIC_ID},${PUBLIC_ID_INEXISTANT}`, token),
+    {}
+  );
+  const mesVotesApresVoteBody = (await mesVotesApresVote.json()) as { votes?: Record<string, string> };
+  check("mes-votes après vote -> deal présent avec sens=chaud", mesVotesApresVoteBody.votes?.[DEAL_PUBLIC_ID] === "chaud");
+  check(
+    "mes-votes -> un id inconnu demandé en plus n'apparaît simplement pas (pas d'erreur)",
+    !(PUBLIC_ID_INEXISTANT in (mesVotesApresVoteBody.votes ?? {}))
+  );
+
+  await deleteVote(authedRequest(`http://localhost/api/v1/deals/${DEAL_PUBLIC_ID}/votes`, token), context);
+  const mesVotesRetireDeNouveau = await getMesVotes(
+    authedRequest(`http://localhost/api/v1/deals/mes-votes?ids=${DEAL_PUBLIC_ID}`, token),
+    {}
+  );
+  const mesVotesRetireDeNouveauBody = (await mesVotesRetireDeNouveau.json()) as { votes?: Record<string, string> };
+  check(
+    "mes-votes -> retiré à nouveau, redevient absent (jamais un historique)",
+    !(DEAL_PUBLIC_ID in (mesVotesRetireDeNouveauBody.votes ?? {}))
+  );
+
+  const mesVotesSansAuth = await getMesVotes(new Request(`http://localhost/api/v1/deals/mes-votes?ids=${DEAL_PUBLIC_ID}`), {});
+  check("mes-votes sans authentification -> 401", mesVotesSansAuth.status === 401);
+
+  const mesVotesSansIds = await getMesVotes(authedRequest("http://localhost/api/v1/deals/mes-votes", token), {});
+  check("mes-votes sans paramètre ids -> 400 VALIDATION_ERROR", mesVotesSansIds.status === 400);
+
+  const mesVotesIdInvalide = await getMesVotes(
+    authedRequest("http://localhost/api/v1/deals/mes-votes?ids=pas-un-id-valide", token),
+    {}
+  );
+  check("mes-votes avec un identifiant mal formé -> 400 VALIDATION_ERROR", mesVotesIdInvalide.status === 400);
+
+  const tropDIds = Array.from({ length: 51 }, () => generatePublicId()).join(",");
+  const mesVotesTropDIds = await getMesVotes(authedRequest(`http://localhost/api/v1/deals/mes-votes?ids=${tropDIds}`, token), {});
+  check("mes-votes avec plus de 50 identifiants -> 400 VALIDATION_ERROR", mesVotesTropDIds.status === 400);
 
   console.log("\ncommentaires — pseudo exposé en plus de auteurPublicId");
   const postCommentRes = await postComment(

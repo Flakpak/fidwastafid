@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { Deal } from "@fidwastafid/schemas";
+import type { Deal, VoteSens } from "@fidwastafid/schemas";
 import { DealCard } from "../components/DealCard.js";
 import { construireParamsFeed, fusionnerSansDoublon, messageErreurFeed } from "../lib/feedPagination.js";
 import {
@@ -33,6 +33,7 @@ export function Feed({
   initialFiltres,
   initialTotal,
   hero,
+  estConnecte,
 }: {
   initialDeals: Deal[];
   /** Curseur de la page suivante, tel que renvoyé par l'API — `null` si la
@@ -45,6 +46,11 @@ export function Feed({
   /** Rendu AU-DESSUS de la barre de filtres, donc au-dessus du contenu
    *  collant : le hero et ses trois cartes restent en haut de page. */
   hero: React.ReactNode;
+  /** Calculé serveur (`resolveCurrentUser()`, page.tsx) — jamais déduit côté
+   *  client. Un visiteur anonyme (`false`) n'émet AUCUNE requête vers
+   *  `/api/v1/deals/mes-votes` : coût strictement nul (CONTRAT-V1 §4,
+   *  seizième amendement conscient). */
+  estConnecte: boolean;
 }) {
   const [deals, setDeals] = useState(initialDeals);
   /** Curseur courant. Retransmis verbatim à l'API : il encode `asOf` (fige le
@@ -189,6 +195,56 @@ export function Feed({
       cancelled = true;
     };
   }, [cleFiltres]);
+
+  /**
+   * État voté persistant (CONTRAT-V1 §4, seizième amendement conscient) —
+   * batché, jamais un appel par carte. `idsConnus` (state, pas une ref : lu
+   * au rendu ci-dessous) retient les `publicId` déjà résolus (votés OU
+   * non — l'absence d'une clé dans `mesVotes` une fois `idsConnus` SIGNIFIE
+   * « non voté », jamais « pas encore su ») : sans cette distinction, un
+   * deal réellement voté pourrait recevoir `null` (non voté) avant que la
+   * vraie réponse n'arrive, et `CardVote` — qui n'applique `monVote` qu'UNE
+   * fois — figerait ce faux négatif. `idsInterrogesRef` (une vraie ref,
+   * jamais lue au rendu) évite seulement de redemander deux fois le même id
+   * si l'effet se rejoue. Se déclenche au montage ET après chaque « Charger
+   * plus » (nouveaux `publicId` uniquement). Anonyme (`estConnecte` faux) :
+   * cet effet ne fait RIEN, aucune requête n'est jamais émise.
+   */
+  const [mesVotes, setMesVotes] = useState<Record<string, VoteSens>>({});
+  const [idsConnus, setIdsConnus] = useState<Set<string>>(new Set());
+  const idsInterrogesRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!estConnecte) return;
+    const manquants = deals.map((d) => d.publicId).filter((id) => !idsInterrogesRef.current.has(id));
+    if (manquants.length === 0) return;
+    for (const id of manquants) idsInterrogesRef.current.add(id);
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/v1/deals/mes-votes?ids=${manquants.join(",")}`);
+        // Best-effort : un échec laisse simplement ces deals « non voté »
+        // (comportement identique à avant ce lot), jamais une erreur
+        // bloquante — l'état voté persistant est un confort, pas une
+        // garantie fonctionnelle critique. Les ids restent alors ABSENTS de
+        // `idsConnus` : un futur rendu (ex. après un nouveau montage) peut
+        // les redemander plutôt que les figer « non voté » à tort.
+        if (!res.ok) {
+          for (const id of manquants) idsInterrogesRef.current.delete(id);
+          return;
+        }
+        const body = (await res.json()) as { votes: Record<string, VoteSens> };
+        setMesVotes((prev) => ({ ...prev, ...body.votes }));
+        setIdsConnus((prev) => {
+          const next = new Set(prev);
+          for (const id of manquants) next.add(id);
+          return next;
+        });
+      } catch {
+        for (const id of manquants) idsInterrogesRef.current.delete(id);
+      }
+    })();
+  }, [deals, estConnecte]);
 
   /**
    * Page suivante — le curseur est réémis tel quel, jamais reconstruit. Les
@@ -352,7 +408,11 @@ export function Feed({
               </div>
             )}
             {deals.map((deal) => (
-              <DealCard key={deal.publicId} deal={deal} />
+              <DealCard
+                key={deal.publicId}
+                deal={deal}
+                monVote={estConnecte && idsConnus.has(deal.publicId) ? (mesVotes[deal.publicId] ?? null) : undefined}
+              />
             ))}
           </div>
 
