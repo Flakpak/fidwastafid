@@ -142,6 +142,9 @@ function mapDeal(d) {
     statut: STATUT_AUTO,
     score: 0,
     date_fin: d.date_fin || null,
+    // Rayon d'origine (migration 0018) — seul scraper-bringo.mjs le peuple
+    // aujourd'hui ; NULL pour les autres sources.
+    rayon: d.rayon || null,
   };
 }
 
@@ -273,8 +276,8 @@ try {
     await client.query(
       `INSERT INTO deals
          (public_id, titre, enseigne_id, ville, categorie, type, prix_promo,
-          prix_normal, description, lien, image_key, statut, score, date_fin)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+          prix_normal, description, lien, image_key, statut, score, date_fin, rayon)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
       [
         publicId,
         d.titre,
@@ -290,6 +293,7 @@ try {
         d.statut,
         d.score,
         d.date_fin,
+        d.rayon,
       ]
     );
     inseres++;
