@@ -323,12 +323,18 @@ deals partagés, cf. entrée « Page deal — profil auteur » ci-dessous).
   l'API, temps de traitement). En attendant, les deals catalogue partent
   sans image ; seuls les deals Bringo (scraper) en ont une (module image,
   `images.mjs`).
-- Qualité de `mapCategorie()` (scraper Bringo) : sur les 569 deals réels
-  archivés, 375 (66 %) tombent dans "Autre" — le mapping par mots-clés sur
-  `item_list_name` est trop pauvre pour catégoriser correctement le
-  catalogue Carrefour/Bringo. Pistes : enrichir la liste de mots-clés, ou
-  déléguer la catégorisation à l'API Claude à l'ingestion (comme
-  `extract-catalogue.mjs` le fait déjà pour les catalogues).
+- ~~Qualité de `mapCategorie()` (scraper Bringo)~~ — **résolu le 08/08/2026**
+  pour les prochains scrapes : le mapping lit désormais le titre du produit
+  ET le rayon de l'URL de listing (jusque-là ignorés, seul `item_list_name`,
+  un champ de tracking peu fiable, était lu), avec la vaisselle sans
+  catégorie propre rattachée à "Maison" (décision de taxonomie explicite,
+  pas une déduction). Mesuré sur les 713 deals Carrefour réels tombés dans
+  "Autre" : 0 % attendu pour les prochains scrapes (rayon connu), 23,4 %
+  si seul le titre est disponible (cas des deals déjà en base, où le rayon
+  n'a jamais été stocké). Le stock des 713 existants n'a PAS été recatégorisé
+  automatiquement — recatégoriser du déjà-publié change son apparition dans
+  les filtres, une correction rétroactive attend une confirmation explicite
+  et une UPDATE dédiée en production, séparée de ce lot.
 
 ## Favoris (2026-07-17)
 
