@@ -1,6 +1,7 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-08-05, sur `main` à `f453c07`.*
+*Dernière mise à jour : 2026-08-08, sur `main` après fusion de #92, #93, #94, #95, #97 (recherche
+sans accents, badges rapatriés sur `Badge`, état voté persistant, identité juridique en pause).*
 
 Ce document est le **point d'entrée pour reprendre le travail sans contexte préalable**. Il dit
 ce qui tourne, ce qui reste ouvert, et par quoi continuer. Il ne remplace aucun autre document :
@@ -167,7 +168,9 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 ### Pull requests
 
-Aucune PR de travail ouverte. Six PR Dependabot en attente de tri (#32, #58, #60, #61, #62, #63).
+Une PR de travail ouverte : #98 (retrait de vote — reclic sur une flèche déjà active, correctif
+client, aucun amendement — DELETE existait déjà), en test par Kamel, **ne pas fusionner sans son
+retour**. Six PR Dependabot en attente de tri (#32, #58, #60, #61, #62, #63).
 Un délai de refroidissement de 2 jours est configuré (`.github/dependabot.yml`), aligné sur la
 politique pnpm `minimumReleaseAge` de 24 h — les mises à jour de **sécurité** en sont exemptées et
 ne sont jamais retardées.
@@ -215,8 +218,8 @@ page à ce sujet. La personnalisation du feed reste une finalité déclarée
 (`deals.supprime_le`, #87, migration 0013), mémoire de curation (`memoire_curation`, empreinte sans
 prix, #88, migration 0014), critère de protection (`deals_protection`, trace de publication au
 journal d'audit, #89, migration 0015), purge d'images (`deals.image_purgee_le`, #90, migration 0016,
-DELETE Storage durci et éprouvé pour de vrai, #91). **Le lot 5 (purge automatique des lignes) est en
-PR, non fusionné** au moment où cette entrée est écrite.
+DELETE Storage durci et éprouvé pour de vrai, #91), **purge automatique des lignes (lot 5, #92,
+mode à blanc hebdomadaire armé)**. Les cinq lots sont fusionnés.
 
 **Le dispositif entier reste désarmé.** Les deux jobs de purge (`purge-images.yml`, `purge-lignes.yml`)
 tournent chaque semaine (dimanche 04:00/04:30 UTC) en **mode à blanc uniquement** — ils rapportent, ils
@@ -439,7 +442,7 @@ message formaté prêt à coller n'est pas écrit.
 **Où.** `docs/IDEES.md`, section « Diffusion communautaire » — liens d'invitation officiels et
 architecture. `config/community.ts` reste à créer (liens en clair, ce ne sont pas des secrets).
 
-### 3.3 — Qualité de recherche : accents — LIVRÉ le 05/08/2026, PR non fusionnée
+### 3.3 — Qualité de recherche : accents — LIVRÉ et fusionné le 05/08/2026 (#93)
 
 **Insensibilité aux accents livrée** (extension `unaccent`, migration 0017, quinzième amendement
 conscient) : `unaccent()` appliqué aux deux côtés de la comparaison `ilike` (motif ET
@@ -454,7 +457,7 @@ btree sur `unaccent(titre)` n'aurait de toute façon PAS accéléré `ilike '%mo
 en queue) — seul un index trigramme (`pg_trgm`) le ferait. Aucun index n'a donc été créé par ce lot :
 coût d'écriture nul pour le pipeline, vérifié (`\d deals` : jeu d'index inchangé).
 
-### 3.4 — Badge de `/compte` rendu à la main — LIVRÉ le 05/08/2026, PR non fusionnée
+### 3.4 — Badge de `/compte` rendu à la main — LIVRÉ et fusionné le 05/08/2026 (#94)
 
 **Décision de charte tranchée** (CONTRAT-V1 §8, décision du 05/08/2026 — pas un amendement, aucun
 token/variante nouveau) : `rejete` et `auto_draft` -> `outline`, comme cette entrée l'anticipait déjà.
@@ -467,7 +470,7 @@ rapatriés sur `Badge`. Aucune régression de tokens détectée (`apps/web/tests
 assertions, toujours vert — la variante `outline` y était déjà illustrée avec le libellé
 « Brouillon », elle attendait juste un vrai appelant).
 
-### 3.5 — État voté persistant — LIVRÉ le 05/08/2026, PR non fusionnée
+### 3.5 — État voté persistant — LIVRÉ et fusionné le 05/08/2026 (#95)
 
 **`dealSchema` n'a PAS bougé** — contrairement à ce que cette entrée anticipait. Le vote courant de
 l'appelant n'est structurellement pas une propriété du deal (il dépend de qui regarde) ; l'ajouter à
@@ -488,6 +491,13 @@ existant, aucun index nouveau créé.
 après un clic local. Couvre le vote retiré : `votes` ne garde que l'état courant, un retrait
 n'appelle simplement plus de clé dans la réponse — testé explicitement (vote, retrait, revote,
 retrait à nouveau).
+
+**Bug découvert par ce lot, correctif en PR séparée** *(#98, non fusionnée, en test par Kamel)* :
+recliquer une flèche déjà active laissait l'état rempli — recliquer n'a **jamais** retiré un vote,
+sur `main` comme sur ce lot (`DELETE /api/v1/deals/:publicId/votes` existait déjà et fonctionne,
+jamais appelé côté client — fonctionnalité absente, pas une régression de ce lot). `CardVote` gagne
+`onClicVote`/`retirer()` : reclic sur la flèche déjà active -> `DELETE`, sinon -> `POST` (upsert,
+couvre aussi voté -> sens opposé, déjà fonctionnel, non cassé).
 
 ---
 
