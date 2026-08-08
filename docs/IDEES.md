@@ -335,6 +335,14 @@ deals partagés, cf. entrée « Page deal — profil auteur » ci-dessous).
   automatiquement — recatégoriser du déjà-publié change son apparition dans
   les filtres, une correction rétroactive attend une confirmation explicite
   et une UPDATE dédiée en production, séparée de ce lot.
+  **Suite du 08/08/2026** : migration 0018 (`deals.rayon`, stocké dès
+  l'insertion pour les prochains scrapes — sans ça, la prochaine amélioration
+  du mapping perdrait à nouveau l'information à chaque run) + script de passe
+  rétroactive `apps/pipeline/recategoriser-autre.mjs` (désarmé par défaut,
+  périmètre `categorie='Autre'` + lien Bringo uniquement, réversible via
+  `details.lot` en `journal_audit`) — écrit, testé, PAS encore exécuté en
+  mode actif contre la production, en attente de validation du rapport à
+  blanc.
 
 ## Favoris (2026-07-17)
 
