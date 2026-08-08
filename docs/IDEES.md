@@ -42,10 +42,11 @@ n'est plus un diagnostic ponctuel mais une propriété du wrapper.)*
 
 ## Refonte Tadelakt — suites (2026-07-24)
 
-- Brancher le vote courant en SSR/API pour un état voté persistant — lot
-  données post-refonte. `CardVote` affiche aujourd'hui un état « voté » (fond
-  plein `hot`/`cold`) optimiste côté client : il ne reçoit que le score, pas le
-  sens du vote de l'utilisateur, donc l'état ne survit pas à un rechargement.
+- ~~Brancher le vote courant en SSR/API pour un état voté persistant~~ — **Fait
+  le 05/08/2026** (#95, `docs/SUIVI.md` §3.5) : SSR direct sur la fiche deal et
+  la page enseigne, endpoint dédié `GET /api/v1/deals/mes-votes` pour le feed
+  paginé, appelé uniquement si connecté. Le retrait de vote (reclic sur la
+  flèche déjà active) restait absent après ce lot — corrigé séparément (#98).
 
 ## ~~Bloc de marque du rail d'accueil — RETRAIT ASSUMÉ (2026-07-28)~~ — ANNULÉ le 28/07/2026
 
@@ -430,14 +431,15 @@ seconde ne se justifiera que si l'enseigne ouvre de vraies opérations
 commerciales — si elle reste à zéro sur la durée, la retirer est une décision à
 prendre, pas une panne à diagnostiquer.
 
-## Diversification des sources (2026-07-18)
+## Diversification des sources (2026-07-18) — partiellement caduque
 
-Le pipeline ne scrape aujourd'hui que Bringo (`scraper-bringo.mjs`).
-Marjane a déjà été exploré via `discover-site.mjs` (capture des appels API
-+ rendu HTML, début juillet) sans suite donnée. Étendre à d'autres
-enseignes (Marjane, Carrefour direct hors Bringo, etc.) élargirait la
-couverture au-delà du catalogue actuel — chantier de découverte +
-adaptation par source, un par un, post-Phase 7.
+**« Le pipeline ne scrape que Bringo » n'est plus vrai** : six sources tournent
+en production (bringo, inwi, universparadiscount, decathlon, kiabi, bestmark —
+voir l'entrée du 02/08/2026 ci-dessous pour les deux dernières). Ce qui reste
+un chantier réel, non repris ailleurs : **Marjane**, déjà exploré via
+`discover-site.mjs` (capture des appels API + rendu HTML, début juillet) sans
+suite donnée, et Carrefour direct hors Bringo — chantier de découverte +
+adaptation par source, un par un.
 
 ## Galerie multi-images (2026-07-18)
 
