@@ -3,6 +3,7 @@ import {
   DiffusionRefusError,
   type CanalDiffusion,
   type DealADiffuser,
+  type ModeDiffusion,
 } from "./diffusionCanal.js";
 
 /**
@@ -49,13 +50,25 @@ export function decouperWebhook(url: string): { id: string; token: string; base:
   return { id, token, base: parsed.origin };
 }
 
-function lireWebhook(): { id: string; token: string; base: string; test: boolean } {
-  // Même doctrine que Telegram : une variable de test PRIME par sa seule
-  // présence, jamais un test sur NODE_ENV.
-  const test = process.env.DISCORD_WEBHOOK_URL_TEST;
-  const url = test || process.env.DISCORD_WEBHOOK_URL;
-  if (!url) throw new DiffusionConfigError("DISCORD_WEBHOOK_URL manquant.");
-  return { ...decouperWebhook(url), test: Boolean(test) };
+/**
+ * Même doctrine que Telegram (`lireChatId`, CONTRAT-V1 §4, dix-septième
+ * amendement conscient) : `mode` EXPLICITE, jamais déduit de la présence
+ * de `_TEST`. `mode === "test"` sans `DISCORD_WEBHOOK_URL_TEST` lève —
+ * fail-closed, jamais un repli vers la production.
+ */
+function lireWebhook(mode: ModeDiffusion): { id: string; token: string; base: string; test: boolean } {
+  if (mode === "test") {
+    const test = process.env.DISCORD_WEBHOOK_URL_TEST;
+    if (!test) {
+      throw new DiffusionConfigError(
+        "Mode test demandé, mais DISCORD_WEBHOOK_URL_TEST n'est pas configurée — aucun envoi."
+      );
+    }
+    return { ...decouperWebhook(test), test: true };
+  }
+  const prod = process.env.DISCORD_WEBHOOK_URL;
+  if (!prod) throw new DiffusionConfigError("DISCORD_WEBHOOK_URL manquant.");
+  return { ...decouperWebhook(prod), test: false };
 }
 
 /** Construit l'embed. Fonction pure — testée sans réseau. */
@@ -118,12 +131,12 @@ export const canalDiscord: CanalDiffusion = {
   nom: "discord",
   libelle: "Discord",
 
-  estConfigure() {
-    return Boolean(process.env.DISCORD_WEBHOOK_URL_TEST || process.env.DISCORD_WEBHOOK_URL);
+  estConfigure(mode) {
+    return Boolean(mode === "test" ? process.env.DISCORD_WEBHOOK_URL_TEST : process.env.DISCORD_WEBHOOK_URL);
   },
 
-  async publier(deal: DealADiffuser) {
-    const { id, token, base, test } = lireWebhook();
+  async publier(deal: DealADiffuser, mode: ModeDiffusion) {
+    const { id, token, base, test } = lireWebhook(mode);
     // `wait=true` : sans lui, 204 sans corps — et un message qu'on ne peut
     // plus retirer (voir l'en-tête de ce fichier).
     const response = await appeler(
@@ -146,7 +159,10 @@ export const canalDiscord: CanalDiffusion = {
   },
 
   async supprimer(messageId: string) {
-    const { id, token, base } = lireWebhook();
+    // Cible toujours la production — limite assumée, voir CONTRAT-V1 §4,
+    // dix-septième amendement : annuler un envoi de test n'est pas exposé
+    // par cette route admin.
+    const { id, token, base } = lireWebhook("production");
     await appeler(
       `${base}/api/webhooks/${id}/${token}/messages/${encodeURIComponent(messageId)}`,
       { method: "DELETE" },

@@ -3,6 +3,7 @@ import {
   DiffusionRefusError,
   type CanalDiffusion,
   type DealADiffuser,
+  type ModeDiffusion,
 } from "./diffusionCanal.js";
 import { buildLegendeTelegram } from "./diffusionMessage.js";
 
@@ -30,19 +31,25 @@ function lireJeton(): string {
 }
 
 /**
- * Destination du message.
- *
- * `TELEGRAM_CHAT_ID_TEST` PRIME sur `TELEGRAM_CHAT_ID` dès qu'elle est
- * définie, quel que soit l'environnement. Interrupteur par PRÉSENCE de
- * variable, jamais par `NODE_ENV`/`VERCEL_ENV` : un envoi qui part dans le
- * canal public est irrattrapable pour qui l'a vu passer, et une condition
- * d'environnement se trompe en silence (preview mal étiqueté, script lancé à
- * la main, build local pointant sur la prod). Une variable présente, elle, se
- * lit dans le dashboard.
+ * Destination du message — `mode` EXPLICITE, jamais déduit d'une variable
+ * présente ou absente (CONTRAT-V1 §4, dix-septième amendement conscient,
+ * 08/08/2026). L'ancienne préférence ambiante (`_TEST` prime si définie)
+ * faisait retomber silencieusement un envoi sur `TELEGRAM_CHAT_ID` dès que
+ * `_TEST` manquait — constaté en production le 02/08/2026, jamais découvert
+ * par une erreur : c'est exactement le risque qu'un filet de sécurité
+ * invisible fait courir. `mode === "test"` sans `TELEGRAM_CHAT_ID_TEST`
+ * lève désormais — fail-closed, jamais un repli.
  */
-export function lireChatId(): { chatId: string; test: boolean } {
-  const test = process.env.TELEGRAM_CHAT_ID_TEST;
-  if (test) return { chatId: test, test: true };
+export function lireChatId(mode: ModeDiffusion): { chatId: string; test: boolean } {
+  if (mode === "test") {
+    const test = process.env.TELEGRAM_CHAT_ID_TEST;
+    if (!test) {
+      throw new DiffusionConfigError(
+        "Mode test demandé, mais TELEGRAM_CHAT_ID_TEST n'est pas configurée — aucun envoi."
+      );
+    }
+    return { chatId: test, test: true };
+  }
   const prod = process.env.TELEGRAM_CHAT_ID;
   if (!prod) throw new DiffusionConfigError("TELEGRAM_CHAT_ID manquant.");
   return { chatId: prod, test: false };
@@ -87,10 +94,9 @@ export const canalTelegram: CanalDiffusion = {
   nom: "telegram",
   libelle: "Telegram",
 
-  estConfigure() {
-    return Boolean(
-      process.env.TELEGRAM_BOT_TOKEN && (process.env.TELEGRAM_CHAT_ID_TEST || process.env.TELEGRAM_CHAT_ID)
-    );
+  estConfigure(mode) {
+    const cible = mode === "test" ? process.env.TELEGRAM_CHAT_ID_TEST : process.env.TELEGRAM_CHAT_ID;
+    return Boolean(process.env.TELEGRAM_BOT_TOKEN && cible);
   },
 
   /**
@@ -99,8 +105,8 @@ export const canalTelegram: CanalDiffusion = {
    * l'URL de la photo, qui doit donc être publiquement atteignable (route
    * proxy /img/deals/[publicId], CONTRAT-V1 §6).
    */
-  async publier(deal: DealADiffuser) {
-    const { chatId, test } = lireChatId();
+  async publier(deal: DealADiffuser, mode: ModeDiffusion) {
+    const { chatId, test } = lireChatId(mode);
     const legende = buildLegendeTelegram({
       titre: deal.titre,
       prixPromo: deal.prixPromo,
@@ -132,7 +138,10 @@ export const canalTelegram: CanalDiffusion = {
    * au-delà de 48 h la suppression peut être refusée. Ces refus remontent.
    */
   async supprimer(messageId: string) {
-    const { chatId } = lireChatId();
+    // Cible toujours la production — limite assumée, voir CONTRAT-V1 §4,
+    // dix-septième amendement : annuler un envoi de test n'est pas exposé
+    // par cette route admin.
+    const { chatId } = lireChatId("production");
     await appeler("deleteMessage", { chat_id: chatId, message_id: Number(messageId) });
   },
 };

@@ -4,7 +4,12 @@ import type { AuthUser } from "@fidwastafid/auth";
 import { apiError } from "./errors.js";
 import { logAudit } from "./audit.js";
 import { lienDiffusion } from "./diffusionMessage.js";
-import { DiffusionConfigError, DiffusionRefusError, type CanalDiffusion } from "./diffusionCanal.js";
+import {
+  DiffusionConfigError,
+  DiffusionRefusError,
+  type CanalDiffusion,
+  type ModeDiffusion,
+} from "./diffusionCanal.js";
 import { SITE_URL } from "../../../../lib/siteUrl.js";
 
 /**
@@ -32,6 +37,21 @@ interface DealRow {
 }
 
 /**
+ * Lit et valide `?mode=production|test` — REQUIS, jamais de valeur par
+ * défaut (CONTRAT-V1 §4, dix-septième amendement conscient). Partagé par
+ * les deux routes (`telegram`, `discord`) : un mode manquant ou hors de
+ * cette liste est un `VALIDATION_ERROR`, jamais une supposition silencieuse.
+ */
+export function lireModeDiffusion(request: Request): ModeDiffusion | NextResponse {
+  const mode = new URL(request.url).searchParams.get("mode");
+  if (mode === "production" || mode === "test") return mode;
+  return apiError(
+    "VALIDATION_ERROR",
+    `Paramètre mode requis, "production" ou "test" (reçu : ${mode === null ? "absent" : `"${mode}"`}).`
+  );
+}
+
+/**
  * POST — publie un deal sur un canal.
  *
  * ORDRE NON NÉGOCIABLE :
@@ -50,7 +70,8 @@ interface DealRow {
 export async function diffuser(
   admin: AuthUser,
   publicId: string,
-  canal: CanalDiffusion
+  canal: CanalDiffusion,
+  mode: ModeDiffusion
 ): Promise<NextResponse> {
   const rows = await query<DealRow>(
     `select d.id, d.titre, d.statut, d.prix_promo, d.prix_normal, d.image_key,
@@ -85,14 +106,17 @@ export async function diffuser(
 
   let envoi: { messageId: string; test: boolean };
   try {
-    envoi = await canal.publier({
-      titre: deal.titre,
-      prixPromo: Number(deal.prix_promo),
-      prixNormal: deal.prix_normal === null ? null : Number(deal.prix_normal),
-      enseigneNom: deal.enseigne_nom,
-      photoUrl,
-      lien,
-    });
+    envoi = await canal.publier(
+      {
+        titre: deal.titre,
+        prixPromo: Number(deal.prix_promo),
+        prixNormal: deal.prix_normal === null ? null : Number(deal.prix_normal),
+        enseigneNom: deal.enseigne_nom,
+        photoUrl,
+        lien,
+      },
+      mode
+    );
   } catch (err) {
     const echec = traiterEchec(err, canal, publicId, "diffusion");
     if (echec) return echec;

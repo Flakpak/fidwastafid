@@ -450,9 +450,20 @@ registry.registerPath({
   path: "/admin/deals/{publicId}/diffuser/telegram",
   summary:
     "Diffuse le deal sur le canal Telegram communautaire (curation manuelle, un deal à la fois) — " +
-    "CONTRAT-V1 §4, amendement du 02/08/2026. La ligne `diffusions` n'est écrite qu'après un envoi réellement abouti.",
+    "CONTRAT-V1 §4, amendement du 02/08/2026, mode explicite depuis le dix-septième amendement (08/08/2026). " +
+    "La ligne `diffusions` n'est écrite qu'après un envoi réellement abouti.",
   security: [{ [bearerAuth.name]: [] }],
-  request: { params: z.object({ publicId: z.string() }) },
+  request: {
+    params: z.object({ publicId: z.string() }),
+    query: z.object({
+      mode: z
+        .enum(["production", "test"])
+        .openapi({
+          description:
+            "REQUIS, aucune valeur par défaut. \"test\" sans TELEGRAM_CHAT_ID_TEST configurée : refus explicite, jamais un repli vers la production.",
+        }),
+    }),
+  },
   responses: {
     200: {
       description: "OK — message publié",
@@ -463,13 +474,15 @@ registry.registerPath({
             canal: z.literal("telegram"),
             messageId: z.number().int(),
             canalTest: z.boolean().openapi({
-              description: "true si l'envoi est parti vers TELEGRAM_CHAT_ID_TEST plutôt que vers le canal public",
+              description: "true si mode=test (l'envoi est parti vers TELEGRAM_CHAT_ID_TEST)",
             }),
           }),
         },
       },
     },
-    400: errorResponse("Diffusion non configurée sur cet environnement, ou envoi refusé par Telegram"),
+    400: errorResponse(
+      "mode manquant/invalide, diffusion non configurée pour ce mode sur cet environnement, ou envoi refusé par Telegram"
+    ),
     403: errorResponse("Accès refusé (non-admin)"),
     404: errorResponse("Deal introuvable"),
     409: errorResponse("Deal non publié, ou déjà diffusé sur ce canal"),
@@ -510,10 +523,21 @@ registry.registerPath({
   method: "post",
   path: "/admin/deals/{publicId}/diffuser/discord",
   summary:
-    "Diffuse le deal sur le canal Discord (webhook entrant, embed) — CONTRAT-V1 §4, amendement du 02/08/2026. " +
+    "Diffuse le deal sur le canal Discord (webhook entrant, embed) — CONTRAT-V1 §4, amendement du 02/08/2026, " +
+    "mode explicite depuis le dix-septième amendement (08/08/2026). " +
     "Webhook appelé avec ?wait=true : sans lui Discord répond 204 sans identifiant, et le message serait indélébile.",
   security: [{ [bearerAuth.name]: [] }],
-  request: { params: z.object({ publicId: z.string() }) },
+  request: {
+    params: z.object({ publicId: z.string() }),
+    query: z.object({
+      mode: z
+        .enum(["production", "test"])
+        .openapi({
+          description:
+            "REQUIS, aucune valeur par défaut. \"test\" sans DISCORD_WEBHOOK_URL_TEST configurée : refus explicite, jamais un repli vers la production.",
+        }),
+    }),
+  },
   responses: {
     200: {
       description: "OK — message publié",
@@ -523,12 +547,16 @@ registry.registerPath({
             diffuse: z.literal(true),
             canal: z.literal("discord"),
             messageId: z.string().openapi({ description: "Snowflake Discord, transporté en chaîne" }),
-            canalTest: z.boolean(),
+            canalTest: z.boolean().openapi({
+              description: "true si mode=test (l'envoi est parti vers DISCORD_WEBHOOK_URL_TEST)",
+            }),
           }),
         },
       },
     },
-    400: errorResponse("Diffusion non configurée, ou envoi refusé par Discord"),
+    400: errorResponse(
+      "mode manquant/invalide, diffusion non configurée pour ce mode sur cet environnement, ou envoi refusé par Discord"
+    ),
     403: errorResponse("Accès refusé (non-admin)"),
     404: errorResponse("Deal introuvable"),
     409: errorResponse("Deal non publié, ou déjà diffusé sur Discord"),

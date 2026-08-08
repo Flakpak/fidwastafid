@@ -43,6 +43,16 @@ export class DiffusionRefusError extends Error {
   }
 }
 
+/**
+ * Destination explicite d'un envoi — CONTRAT-V1 §4, dix-septième amendement
+ * conscient (08/08/2026). Remplace l'ancienne préférence ambiante
+ * (`_TEST` prime si présente) : celle-ci faisait retomber silencieusement
+ * un envoi sur la production dès que `_TEST` manquait — constaté en
+ * production le 02/08/2026. `mode` est désormais TOUJOURS explicite, jamais
+ * déduit d'une variable d'environnement présente ou absente.
+ */
+export type ModeDiffusion = "production" | "test";
+
 export interface DealADiffuser {
   titre: string;
   prixPromo: number;
@@ -59,14 +69,19 @@ export interface CanalDiffusion {
   readonly nom: string;
   /** Libellé humain, pour les messages d'erreur rendus au curateur. */
   readonly libelle: string;
-  /** Vrai si les variables d'environnement du canal sont présentes. */
-  estConfigure(): boolean;
+  /** Vrai si la variable d'environnement de CE mode précis est présente —
+   *  jamais « l'une ou l'autre ». */
+  estConfigure(mode: ModeDiffusion): boolean;
   /**
    * Publie et renvoie l'identifiant du message **en chaîne** — jamais un
    * nombre : les identifiants Discord dépassent la précision entière de
-   * JavaScript (cf. migration 0012).
+   * JavaScript (cf. migration 0012). `mode` choisit la destination ; si
+   * `mode === "test"` et que la variable `_TEST` du canal est absente,
+   * lève `DiffusionConfigError` — jamais un repli vers la production.
    */
-  publier(deal: DealADiffuser): Promise<{ messageId: string; test: boolean }>;
-  /** Retire un message déjà publié. Lève si la plateforme refuse. */
+  publier(deal: DealADiffuser, mode: ModeDiffusion): Promise<{ messageId: string; test: boolean }>;
+  /** Retire un message déjà publié. Lève si la plateforme refuse. Cible
+   *  toujours la production (voir CONTRAT-V1 §4, dix-septième amendement —
+   *  limite assumée : annuler un envoi de test n'est pas exposé ici). */
   supprimer(messageId: string): Promise<void>;
 }

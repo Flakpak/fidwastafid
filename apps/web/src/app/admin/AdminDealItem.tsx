@@ -66,6 +66,10 @@ export type SuppressionResult = { ok: true } | { ok: false; message: string };
  *  figure pas : semi-manuel assumé, l'API Meta ne poste pas dans les groupes. */
 export type CanalDiffusion = "telegram" | "discord";
 
+/** Mode EXPLICITE (CONTRAT-V1 §4, dix-septième amendement conscient) — plus
+ *  de préférence ambiante entre `_TEST` et production : l'admin choisit. */
+export type ModeDiffusion = "production" | "test";
+
 /**
  * Bouton de diffusion d'UN canal. Composant à part, avec son propre état :
  * deux canaux qui partageraient un `pending` afficheraient « Diffusion... »
@@ -82,7 +86,7 @@ function BoutonDiffusion({
   libelle: string;
   diffuse: boolean;
   pending: boolean;
-  onDiffuser: () => Promise<DiffusionResult>;
+  onDiffuser: (mode: ModeDiffusion) => Promise<DiffusionResult>;
   onAnnuler: () => Promise<AnnulationResult>;
 }) {
   const [etat, setEtat] = useState<"idle" | "pending">("idle");
@@ -91,11 +95,11 @@ function BoutonDiffusion({
   /** Deux temps sur l'annulation : le geste touche un canal public. */
   const [confirmAnnul, setConfirmAnnul] = useState(false);
 
-  async function diffuser() {
+  async function diffuser(mode: ModeDiffusion) {
     setEtat("pending");
     setErreur(null);
     setInfo(null);
-    const r = await onDiffuser();
+    const r = await onDiffuser(mode);
     setEtat("idle");
     if (r.ok) setInfo(r.canalTest ? "Envoyé sur la destination de TEST" : null);
     else setErreur(r.message);
@@ -138,14 +142,29 @@ function BoutonDiffusion({
           </button>
         </>
       ) : (
-        <button
-          type="button"
-          onClick={() => void diffuser()}
-          disabled={pending || etat === "pending"}
-          className="rounded-lg px-3 py-1.5 text-xs font-bold cursor-pointer border border-border-strong bg-surface text-ink hover:bg-surface-subtle disabled:opacity-50 transition-colors duration-[130ms] motion-reduce:transition-none"
-        >
-          {etat === "pending" ? "Diffusion..." : `Diffuser sur ${libelle}`}
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => void diffuser("production")}
+            disabled={pending || etat === "pending"}
+            className="rounded-lg px-3 py-1.5 text-xs font-bold cursor-pointer border border-border-strong bg-surface text-ink hover:bg-surface-subtle disabled:opacity-50 transition-colors duration-[130ms] motion-reduce:transition-none"
+          >
+            {etat === "pending" ? "Diffusion..." : `Diffuser sur ${libelle}`}
+          </button>
+          {/* Mode explicite (dix-septième amendement conscient) : un envoi de
+              TEST se demande, il ne se devine plus d'une variable présente ou
+              non. Absence de destination de test configurée → refus lisible
+              dans `erreur`, jamais un envoi vers le canal public. */}
+          <button
+            type="button"
+            onClick={() => void diffuser("test")}
+            disabled={pending || etat === "pending"}
+            title={`Envoyer sur la destination de TEST ${libelle}`}
+            className="rounded-lg px-3 py-1.5 text-xs font-bold cursor-pointer border border-border-strong bg-surface text-ink-muted hover:bg-surface-subtle disabled:opacity-50 transition-colors duration-[130ms] motion-reduce:transition-none"
+          >
+            Tester
+          </button>
+        </>
       )}
       {erreur && <p className="text-warn text-xs font-bold max-w-[14rem]">{erreur}</p>}
       {info && <p className="text-accent text-xs font-bold max-w-[14rem]">{info}</p>}
@@ -340,7 +359,7 @@ export function AdminDealItem({
   onSaveFields: (fields: DealEditFields) => Promise<SaveResult>;
   onFetchImageFromLink: () => Promise<ImageFetchResult>;
   onUploadImage: (file: File) => Promise<ImageFetchResult>;
-  onDiffuser: (canal: CanalDiffusion) => Promise<DiffusionResult>;
+  onDiffuser: (canal: CanalDiffusion, mode: ModeDiffusion) => Promise<DiffusionResult>;
   onAnnulerDiffusion: (canal: CanalDiffusion) => Promise<AnnulationResult>;
   onSupprimer: () => Promise<SuppressionResult>;
 }) {
@@ -523,14 +542,14 @@ export function AdminDealItem({
                 libelle="Telegram"
                 diffuse={deal.diffuseTelegram}
                 pending={pending}
-                onDiffuser={() => onDiffuser("telegram")}
+                onDiffuser={(mode) => onDiffuser("telegram", mode)}
                 onAnnuler={() => onAnnulerDiffusion("telegram")}
               />
               <BoutonDiffusion
                 libelle="Discord"
                 diffuse={deal.diffuseDiscord}
                 pending={pending}
-                onDiffuser={() => onDiffuser("discord")}
+                onDiffuser={(mode) => onDiffuser("discord", mode)}
                 onAnnuler={() => onAnnulerDiffusion("discord")}
               />
             </>

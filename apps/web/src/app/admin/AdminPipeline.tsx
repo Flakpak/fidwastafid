@@ -11,6 +11,7 @@ import {
   type DiffusionResult,
   type AnnulationResult,
   type CanalDiffusion,
+  type ModeDiffusion,
   type SuppressionResult,
 } from "./AdminDealItem.js";
 import { AdminDealSupprime, type RestaurationResult } from "./AdminDealSupprime.js";
@@ -290,8 +291,8 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
    *  d'après la base plutôt que d'après un état local optimiste :
    *  l'anti-double-publication doit refléter ce qui est écrit, pas ce qu'on
    *  croit avoir écrit. */
-  async function diffuser(publicId: string, canal: CanalDiffusion): Promise<DiffusionResult> {
-    const res = await fetch(`/api/v1/admin/deals/${publicId}/diffuser/${canal}`, { method: "POST" });
+  async function diffuser(publicId: string, canal: CanalDiffusion, mode: ModeDiffusion): Promise<DiffusionResult> {
+    const res = await fetch(`/api/v1/admin/deals/${publicId}/diffuser/${canal}?mode=${mode}`, { method: "POST" });
     if (!res.ok) {
       const body = (await res.json()) as ApiErrorBody;
       return { ok: false, message: body.error?.message ?? "Diffusion impossible." };
@@ -478,7 +479,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
                 onSaveFields={(fields) => saveDeal(deal.publicId, deal.statut, fields)}
                 onFetchImageFromLink={() => fetchImageFromLink(deal.publicId)}
                 onUploadImage={(file) => uploadImage(deal.publicId, file)}
-                onDiffuser={(canal) => diffuser(deal.publicId, canal)}
+                onDiffuser={(canal, mode) => diffuser(deal.publicId, canal, mode)}
                 onAnnulerDiffusion={(canal) => annulerDiffusion(deal.publicId, canal)}
                 onSupprimer={() => supprimer(deal.publicId)}
               />
