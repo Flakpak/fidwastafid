@@ -116,10 +116,18 @@ export const PUBLIC_STATUTS = new Set(["publie", "expire"]);
  */
 /** `diffuse_telegram` est calculé, jamais stocké sur `deals` : la vérité est
  *  la table `diffusions` (migration 0011). Un booléen dupliqué sur le deal
- *  se désynchroniserait le jour où une diffusion est supprimée à la main. */
+ *  se désynchroniserait le jour où une diffusion est supprimée à la main.
+ *  `mode = 'production'` (migration 0019) : un envoi de test n'écrit jamais
+ *  dans `diffusions` (dix-septième amendement, prolongé le 08/08/2026), la
+ *  condition est donc redondante en pratique aujourd'hui — mais explicite,
+ *  jamais un « ça marche par construction » tacite. */
 export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.motif_rejet, d.turnstile_verifie, d.supprime_le,
-  exists (select 1 from diffusions df where df.deal_id = d.id and df.canal = 'telegram') as diffuse_telegram,
-  exists (select 1 from diffusions df where df.deal_id = d.id and df.canal = 'discord') as diffuse_discord`;
+  exists (
+    select 1 from diffusions df where df.deal_id = d.id and df.canal = 'telegram' and df.mode = 'production'
+  ) as diffuse_telegram,
+  exists (
+    select 1 from diffusions df where df.deal_id = d.id and df.canal = 'discord' and df.mode = 'production'
+  ) as diffuse_discord`;
 
 export interface DealAdminRow extends DealRow {
   motif_rejet: string | null;

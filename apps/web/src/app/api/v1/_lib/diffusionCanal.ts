@@ -80,8 +80,10 @@ export interface CanalDiffusion {
    * lève `DiffusionConfigError` — jamais un repli vers la production.
    */
   publier(deal: DealADiffuser, mode: ModeDiffusion): Promise<{ messageId: string; test: boolean }>;
-  /** Retire un message déjà publié. Lève si la plateforme refuse. Cible
-   *  toujours la production (voir CONTRAT-V1 §4, dix-septième amendement —
-   *  limite assumée : annuler un envoi de test n'est pas exposé ici). */
-  supprimer(messageId: string): Promise<void>;
+  /** Retire un message déjà publié. Lève si la plateforme refuse. `mode`
+   *  vient de `diffusions.mode` (lu par l'appelant, jamais deviné) — un
+   *  envoi de test n'écrit toutefois jamais dans `diffusions` (cf.
+   *  diffusion.ts), donc `mode` vaut `"production"` en pratique tant que
+   *  ça reste vrai ; la fonction ne le suppose plus, elle le reçoit. */
+  supprimer(messageId: string, mode: ModeDiffusion): Promise<void>;
 }
