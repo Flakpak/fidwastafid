@@ -4,6 +4,25 @@
 
 ## Dette technique temporaire
 
+- **Diffusion — deux constats trouvés en préparant la reprise (08/08/2026),
+  jamais construits, à garder en tête au premier test réel :**
+  - `diffuser()` (`_lib/diffusion.ts`) écrit la ligne `diffusions` (donc
+    `deja_diffuse = true`) **quel que soit le mode** — un clic « Tester »
+    bloque ensuite « Diffuser » (production) sur ce canal avec un 409, EXACTEMENT
+    comme un vrai envoi. Et `supprimer()` (Telegram/Discord) cible toujours la
+    production (dix-septième amendement) : « Retirer » sur une diffusion de
+    test échoue (message introuvable côté prod), et la ligne reste bloquée —
+    aucun chemin UI pour la débloquer, seule une suppression manuelle de la
+    ligne `diffusions` en base répare.
+  - `diffuser()` ne filtre pas `supprime_le is null` — seul `statut = 'publie'`
+    est vérifié, et la suppression douce ne touche pas `statut`. Un deal
+    publié puis supprimé (doux) reste donc diffusable via un appel direct à
+    la route, même si l'UI ne l'expose plus (`Publiés` exclut déjà
+    `supprime_le`, `Supprimés` n'a pas de bouton Diffuser) — trou côté route,
+    pas côté UI.
+  - Mémoire de curation (`memoire_curation`) : aucune interférence, elle ne
+    s'applique qu'à l'insertion pipeline, jamais lue par `diffusion.ts`.
+
 *(Le log temporaire `[turnstile-diag]` a été retiré le 26/07/2026 : la
 journalisation d'échec est désormais permanente et structurée dans
 `_lib/turnstile.ts`, avec le statut HTTP et le nombre de tentatives — elle
