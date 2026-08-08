@@ -1,6 +1,7 @@
+import { NextResponse } from "next/server";
 import { requireAdmin } from "@fidwastafid/auth";
 import { withAuthErrors } from "../../../../../_lib/errors.js";
-import { diffuser, annuler } from "../../../../../_lib/diffusion.js";
+import { diffuser, annuler, lireModeDiffusion } from "../../../../../_lib/diffusion.js";
 import { canalTelegram } from "../../../../../_lib/telegram.js";
 
 export const runtime = "nodejs";
@@ -8,8 +9,11 @@ export const runtime = "nodejs";
 type Context = { params: Promise<{ publicId: string }> };
 
 /**
- * POST /api/v1/admin/deals/:publicId/diffuser/telegram — publie le deal sur
- * Telegram. DELETE annule cette diffusion (retire le message, puis la ligne).
+ * POST /api/v1/admin/deals/:publicId/diffuser/telegram?mode=production|test
+ * — publie le deal sur Telegram. `mode` REQUIS (CONTRAT-V1 §4, dix-septième
+ * amendement conscient) : plus de préférence ambiante entre `_TEST` et
+ * production, jamais de repli. DELETE annule cette diffusion (retire le
+ * message, puis la ligne) — cible toujours la production.
  *
  * Route volontairement MINCE : gardes, ordre des opérations et traduction des
  * échecs vivent dans _lib/diffusion.ts, communs à tous les canaux. Ce fichier
@@ -23,8 +27,10 @@ type Context = { params: Promise<{ publicId: string }> };
  */
 export const POST = withAuthErrors<Context>(async (request, { params }) => {
   const admin = await requireAdmin(request);
+  const mode = lireModeDiffusion(request);
+  if (mode instanceof NextResponse) return mode;
   const { publicId } = await params;
-  return diffuser(admin, publicId, canalTelegram);
+  return diffuser(admin, publicId, canalTelegram, mode);
 });
 
 export const DELETE = withAuthErrors<Context>(async (request, { params }) => {

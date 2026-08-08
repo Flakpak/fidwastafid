@@ -1044,7 +1044,7 @@ console.log("\nDiffusion — légende Telegram : jamais de remise devinée");
   check("HTML du titre échappé (parse_mode HTML)", injection.includes("&lt;b&gt;&amp;&lt;/b&gt;"));
 }
 
-console.log("\nDiffusion — destination : le canal de test prime, par PRÉSENCE de variable");
+console.log("\nDiffusion — destination : mode EXPLICITE, jamais un repli (CONTRAT-V1 §4, dix-septième amendement)");
 {
   const avant = {
     test: process.env.TELEGRAM_CHAT_ID_TEST,
@@ -1052,30 +1052,61 @@ console.log("\nDiffusion — destination : le canal de test prime, par PRÉSENCE
     token: process.env.TELEGRAM_BOT_TOKEN,
   };
 
+  // mode=production lit TOUJOURS la variable de production, que _TEST
+  // existe ou non — c'est exactement le point du dix-septième amendement :
+  // plus aucune lecture ambiante de _TEST sur ce chemin.
   delete process.env.TELEGRAM_CHAT_ID_TEST;
   process.env.TELEGRAM_CHAT_ID = "-100public";
-  check("sans variable de test : canal public", lireChatId().chatId === "-100public");
-  check("et l'envoi n'est PAS marqué test", lireChatId().test === false);
+  check("mode=production, _TEST absente : canal public", lireChatId("production").chatId === "-100public");
+  check("et l'envoi n'est PAS marqué test", lireChatId("production").test === false);
 
   process.env.TELEGRAM_CHAT_ID_TEST = "-100test";
-  check("avec variable de test : elle prime sur le canal public", lireChatId().chatId === "-100test");
-  check("et l'envoi est marqué test", lireChatId().test === true);
+  check(
+    "mode=production, _TEST présente quand même : IGNORÉE, toujours le canal public",
+    lireChatId("production").chatId === "-100public" && lireChatId("production").test === false
+  );
+
+  // mode=test lit TOUJOURS _TEST, jamais un repli vers la production.
+  check("mode=test, _TEST présente : canal de test", lireChatId("test").chatId === "-100test");
+  check("et l'envoi est marqué test", lireChatId("test").test === true);
 
   delete process.env.TELEGRAM_CHAT_ID;
   delete process.env.TELEGRAM_CHAT_ID_TEST;
-  let leve = false;
+  let leveProd = false;
   try {
-    lireChatId();
+    lireChatId("production");
   } catch (err) {
-    leve = err instanceof DiffusionConfigError;
+    leveProd = err instanceof DiffusionConfigError;
   }
-  check("aucune destination : erreur de config, jamais un envoi au hasard", leve);
+  check("mode=production sans TELEGRAM_CHAT_ID : erreur de config, jamais un envoi au hasard", leveProd);
+
+  // LE CAS CENTRAL DE CE LOT : mode=test demandé, _TEST absente — refus
+  // explicite, JAMAIS un repli silencieux vers la production (même si
+  // TELEGRAM_CHAT_ID, lui, est configuré).
+  process.env.TELEGRAM_CHAT_ID = "-100public";
+  let leveTest = false;
+  let messageTest = "";
+  try {
+    lireChatId("test");
+  } catch (err) {
+    leveTest = err instanceof DiffusionConfigError;
+    messageTest = err instanceof Error ? err.message : "";
+  }
+  check("mode=test sans TELEGRAM_CHAT_ID_TEST : refus explicite, MÊME si le canal public est configuré", leveTest);
+  check("le message nomme la variable manquante", messageTest.includes("TELEGRAM_CHAT_ID_TEST"));
 
   process.env.TELEGRAM_BOT_TOKEN = "jeton-de-test";
   process.env.TELEGRAM_CHAT_ID = "-100public";
-  check("canalTelegram.estConfigure() vraie avec jeton + destination", canalTelegram.estConfigure() === true);
+  check(
+    "canalTelegram.estConfigure(\"production\") vraie avec jeton + destination prod",
+    canalTelegram.estConfigure("production") === true
+  );
+  check(
+    "canalTelegram.estConfigure(\"test\") fausse sans TELEGRAM_CHAT_ID_TEST, même prod configurée",
+    canalTelegram.estConfigure("test") === false
+  );
   delete process.env.TELEGRAM_BOT_TOKEN;
-  check("canalTelegram.estConfigure() fausse sans jeton", canalTelegram.estConfigure() === false);
+  check("canalTelegram.estConfigure(\"production\") fausse sans jeton", canalTelegram.estConfigure("production") === false);
 
   if (avant.test === undefined) delete process.env.TELEGRAM_CHAT_ID_TEST;
   else process.env.TELEGRAM_CHAT_ID_TEST = avant.test;
@@ -1139,15 +1170,35 @@ console.log("\nDiffusion Discord — embed : jamais de remise devinée");
   check("image portée", (complet.image as { url?: string })?.url === "https://x.io/i.webp");
 }
 
-console.log("\nDiffusion Discord — configuration");
+console.log("\nDiffusion Discord — configuration et mode explicite (dix-septième amendement)");
 {
   const avant = { url: process.env.DISCORD_WEBHOOK_URL, test: process.env.DISCORD_WEBHOOK_URL_TEST };
   delete process.env.DISCORD_WEBHOOK_URL;
   delete process.env.DISCORD_WEBHOOK_URL_TEST;
-  check("non configuré sans variable", canalDiscord.estConfigure() === false);
+  check("non configuré sans variable (production)", canalDiscord.estConfigure("production") === false);
+  check("non configuré sans variable (test)", canalDiscord.estConfigure("test") === false);
+
   process.env.DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1/t";
-  check("configuré avec l'URL de prod", canalDiscord.estConfigure() === true);
+  check("configuré avec l'URL de prod (mode production)", canalDiscord.estConfigure("production") === true);
+  check("mode test reste FAUX même si la prod est configurée", canalDiscord.estConfigure("test") === false);
   check("les deux canaux ont des noms distincts", canalDiscord.nom === "discord" && canalTelegram.nom === "telegram");
+
+  // Le cas central : mode=test demandé, DISCORD_WEBHOOK_URL_TEST absente —
+  // refus explicite, même avec DISCORD_WEBHOOK_URL configuré.
+  let leveTest = false;
+  let messageTest = "";
+  try {
+    await canalDiscord.publier(
+      { titre: "x", prixPromo: 1, prixNormal: null, enseigneNom: null, photoUrl: null, lien: "https://x.io" },
+      "test"
+    );
+  } catch (err) {
+    leveTest = err instanceof DiffusionConfigError;
+    messageTest = err instanceof Error ? err.message : "";
+  }
+  check("publier(mode=test) sans DISCORD_WEBHOOK_URL_TEST : refus explicite, jamais un envoi vers la prod", leveTest);
+  check("le message nomme la variable manquante", messageTest.includes("DISCORD_WEBHOOK_URL_TEST"));
+
   if (avant.url === undefined) delete process.env.DISCORD_WEBHOOK_URL;
   else process.env.DISCORD_WEBHOOK_URL = avant.url;
   if (avant.test === undefined) delete process.env.DISCORD_WEBHOOK_URL_TEST;
