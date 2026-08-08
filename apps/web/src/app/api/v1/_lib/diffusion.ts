@@ -29,6 +29,7 @@ interface DealRow {
   id: string;
   titre: string;
   statut: string;
+  supprime_le: string | null;
   prix_promo: string;
   prix_normal: string | null;
   image_key: string | null;
@@ -74,9 +75,12 @@ export async function diffuser(
   mode: ModeDiffusion
 ): Promise<NextResponse> {
   const rows = await query<DealRow>(
-    `select d.id, d.titre, d.statut, d.prix_promo, d.prix_normal, d.image_key,
+    `select d.id, d.titre, d.statut, d.supprime_le, d.prix_promo, d.prix_normal, d.image_key,
             e.nom as enseigne_nom,
-            exists (select 1 from diffusions df where df.deal_id = d.id and df.canal = $2) as deja_diffuse
+            exists (
+              select 1 from diffusions df
+               where df.deal_id = d.id and df.canal = $2 and df.mode = 'production'
+            ) as deja_diffuse
        from deals d
        left join enseignes e on e.id = d.enseigne_id
       where d.public_id = $1`,
@@ -84,6 +88,17 @@ export async function diffuser(
   );
   const deal = rows[0];
   if (!deal) return apiError("NOT_FOUND", "Deal introuvable.");
+
+  // Garde CÔTÉ ROUTE, jamais seulement côté interface (même principe que le
+  // fail-closed du dix-septième amendement) : un deal supprimé (doux) reste
+  // `statut = 'publie'` — la suppression ne touche pas cette colonne (voir
+  // DELETE /api/v1/admin/deals/:publicId) — donc SEULE cette vérification
+  // l'empêche de repasser par un appel direct à la route, l'UI ne le montrant
+  // déjà plus (onglet Publiés exclut `supprime_le`, onglet Supprimés n'offre
+  // pas ce bouton) mais ne protégeant que l'affichage, jamais l'API.
+  if (deal.supprime_le) {
+    return apiError("CONFLICT", "Ce deal a été supprimé, il ne peut pas être diffusé.");
+  }
 
   // On ne diffuse que ce qui est public : un auto_draft ou un en_attente
   // enverrait la communauté sur une page qui répond 404.
@@ -93,8 +108,13 @@ export async function diffuser(
   // Garde applicative, doublée en base par `unique (deal_id, canal)`
   // (migration 0011) : celle-ci donne un message clair, la contrainte est ce
   // qui tient sous deux clics simultanés. Le verrou est PAR CANAL — diffuser
-  // sur Discord un deal déjà sur Telegram reste légitime.
-  if (deal.deja_diffuse) {
+  // sur Discord un deal déjà sur Telegram reste légitime. Ne s'applique
+  // JAMAIS à un envoi de test (`mode === "test"`) : un test n'est pas une
+  // diffusion, il ne bloque ni ne se fait bloquer par l'état réel du canal
+  // (dix-septième amendement, prolongé le 08/08/2026 — `deja_diffuse`
+  // lui-même ne compte plus que les lignes `mode = 'production'`, la
+  // condition ci-dessous est la garde explicite, pas une simple redondance).
+  if (mode === "production" && deal.deja_diffuse) {
     return apiError("CONFLICT", `Ce deal a déjà été diffusé sur ${canal.libelle}.`);
   }
 
@@ -129,13 +149,20 @@ export async function diffuser(
   // « on ne veut pas d'action admin sans sa trace, ni l'inverse ». Enchaînées
   // en autocommit, une coupure entre les deux laissait une diffusion sans
   // trace nominative.
+  //
+  // `mode === "test"` N'ÉCRIT JAMAIS dans `diffusions` — un test n'est pas
+  // une diffusion (dix-septième amendement, prolongé le 08/08/2026) : sa
+  // seule trace est cette ligne `journal_audit` (`details.canalTest`), déjà
+  // distincte d'un envoi réel. `journal_audit` reste écrit dans les DEUX cas
+  // — le principe « pas d'action sans trace » ne dépend pas du mode.
   try {
     await withTransaction(async (client) => {
-      await client.query(`insert into diffusions (deal_id, canal, external_message_id) values ($1, $2, $3)`, [
-        deal.id,
-        canal.nom,
-        envoi.messageId,
-      ]);
+      if (mode === "production") {
+        await client.query(
+          `insert into diffusions (deal_id, canal, external_message_id, mode) values ($1, $2, $3, 'production')`,
+          [deal.id, canal.nom, envoi.messageId]
+        );
+      }
       await logAudit(
         {
           adminId: admin.id,
@@ -195,8 +222,8 @@ export async function annuler(
   publicId: string,
   canal: CanalDiffusion
 ): Promise<NextResponse> {
-  const rows = await query<{ diffusion_id: string | null; external_message_id: string | null }>(
-    `select df.id as diffusion_id, df.external_message_id
+  const rows = await query<{ diffusion_id: string | null; external_message_id: string | null; mode: ModeDiffusion | null }>(
+    `select df.id as diffusion_id, df.external_message_id, df.mode
        from deals d
        left join diffusions df on df.deal_id = d.id and df.canal = $2
       where d.public_id = $1`,
@@ -214,8 +241,13 @@ export async function annuler(
     );
   }
 
+  // `mode` vient de la ligne elle-même — un envoi de test n'écrit jamais ici
+  // (cf. diffuser() ci-dessus), donc en pratique toujours 'production', mais
+  // LU plutôt que supposé : c'est le fait même que corrige ce lot.
+  const mode: ModeDiffusion = ligne.mode ?? "production";
+
   try {
-    await canal.supprimer(ligne.external_message_id);
+    await canal.supprimer(ligne.external_message_id, mode);
   } catch (err) {
     const echec = traiterEchec(err, canal, publicId, "annulation");
     if (echec) return echec;

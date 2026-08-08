@@ -134,14 +134,14 @@ export const canalTelegram: CanalDiffusion = {
    * l'envoi, Telegram répond « message to delete not found » — un refus
    * lisible, jamais une suppression au mauvais endroit.
    *
+   * `mode` vient de la ligne `diffusions` de l'appelant (jamais deviné ici) —
+   * cf. CanalDiffusion.supprimer.
+   *
    * Limites propres à Telegram : le bot doit être administrateur du canal, et
    * au-delà de 48 h la suppression peut être refusée. Ces refus remontent.
    */
-  async supprimer(messageId: string) {
-    // Cible toujours la production — limite assumée, voir CONTRAT-V1 §4,
-    // dix-septième amendement : annuler un envoi de test n'est pas exposé
-    // par cette route admin.
-    const { chatId } = lireChatId("production");
+  async supprimer(messageId: string, mode) {
+    const { chatId } = lireChatId(mode);
     await appeler("deleteMessage", { chat_id: chatId, message_id: Number(messageId) });
   },
 };

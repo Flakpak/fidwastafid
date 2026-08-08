@@ -158,11 +158,10 @@ export const canalDiscord: CanalDiffusion = {
     return { messageId: body.id, test };
   },
 
-  async supprimer(messageId: string) {
-    // Cible toujours la production — limite assumée, voir CONTRAT-V1 §4,
-    // dix-septième amendement : annuler un envoi de test n'est pas exposé
-    // par cette route admin.
-    const { id, token, base } = lireWebhook("production");
+  // `mode` vient de la ligne `diffusions` de l'appelant (jamais deviné ici)
+  // — cf. CanalDiffusion.supprimer.
+  async supprimer(messageId: string, mode) {
+    const { id, token, base } = lireWebhook(mode);
     await appeler(
       `${base}/api/webhooks/${id}/${token}/messages/${encodeURIComponent(messageId)}`,
       { method: "DELETE" },
