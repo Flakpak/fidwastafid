@@ -523,12 +523,15 @@ POST   /api/v1/admin/deals/:publicId/image-depuis-lien
 POST   /api/v1/admin/deals/:publicId/image  upload manuel (multipart/form-data, jpeg/png/webp,
                                              5 Mo max) — fallback si image-depuis-lien est
                                              bloqué par la source ; même amendement du 19/07/2026
-POST   /api/v1/admin/deals/:publicId/diffuser/telegram
+POST   /api/v1/admin/deals/:publicId/diffuser/telegram?mode=production|test
 DELETE /api/v1/admin/deals/:publicId/diffuser/telegram
-POST   /api/v1/admin/deals/:publicId/diffuser/discord
+POST   /api/v1/admin/deals/:publicId/diffuser/discord?mode=production|test
 DELETE /api/v1/admin/deals/:publicId/diffuser/discord
                                              diffusion communautaire, un canal par chemin —
-                                             ajouté le 02/08/2026, huitième amendement conscient
+                                             ajouté le 02/08/2026, huitième amendement conscient.
+                                             `?mode=` REQUIS sur POST depuis le 08/08/2026,
+                                             dix-septième amendement conscient (voir §3) : jamais de
+                                             repli automatique vers la production
 ```
 
 **Amendement du 05/08/2026 — la file admin filtre en base, pas côté client (neuvième
@@ -598,11 +601,36 @@ geste de curation, pas un traitement de lot.
   interdit l'action alors que la requête est valide et les droits bons — diffuser un deal non
   publié, ou déjà diffusé. `VALIDATION_ERROR` aurait envoyé le curateur corriger un corps de
   requête sans faute ; `FORBIDDEN` lui aurait fait douter de ses droits.
-- **Destination pilotée par présence de variable** : `TELEGRAM_CHAT_ID_TEST`, si elle est définie,
-  prime sur `TELEGRAM_CHAT_ID` — quel que soit l'environnement, jamais sur un test de
-  `NODE_ENV`/`VERCEL_ENV`. Un envoi qui part par erreur dans le canal public est irrattrapable ;
-  une condition d'environnement se trompe en silence, une variable se lit dans le dashboard. La
-  réponse renvoie `canalTest` pour que l'admin sache lequel des deux vient de se produire.
+- ~~**Destination pilotée par présence de variable** : `TELEGRAM_CHAT_ID_TEST`, si elle est
+  définie, prime sur `TELEGRAM_CHAT_ID`~~ — **remplacé le 08/08/2026, dix-septième amendement
+  conscient, voir ci-dessous** : cette préférence ambiante s'est révélée être exactement le risque
+  qu'elle prétendait éviter (une variable de test absente faisait silencieusement retomber
+  l'envoi sur le canal public). La réponse renvoie toujours `canalTest` pour que l'admin sache
+  lequel des deux vient de se produire.
+
+**Amendement du 08/08/2026 — mode de diffusion explicite, fail-closed (dix-septième amendement
+conscient).** Fait générateur : `TELEGRAM_CHAT_ID_TEST`/`DISCORD_WEBHOOK_URL_TEST` absentes en
+production au 02/08/2026 (vérifié) — chaque diffusion serait alors partie en silence vers le canal
+PUBLIC, sans qu'aucun message ni aucune erreur ne le signale. Même motif que Turnstile, le backup et
+les commentaires (`docs/INCIDENTS.md`) : **un repli qui ne se voit pas n'est pas un filet, c'est un
+risque déguisé en garde-fou.**
+
+- **`POST .../diffuser/telegram` et `.../discord` exigent désormais `?mode=production|test`** — ni
+  optionnel, ni de valeur par défaut. Sans ce paramètre, ou avec une valeur hors de cette liste :
+  `VALIDATION_ERROR` (400), aucun envoi.
+- **`mode=test` avec la variable `_TEST` correspondante absente : refus explicite** —
+  `VALIDATION_ERROR` (400), message nommant la variable manquante, **aucun envoi, sur aucun
+  canal**. Il n'existe plus de chemin qui fasse atterrir un envoi « test » sur le canal de
+  production.
+- **`mode=production` lit TOUJOURS `TELEGRAM_CHAT_ID`/`DISCORD_WEBHOOK_URL` directement**, que la
+  variable `_TEST` existe ou non — plus aucune lecture ambiante de `_TEST` sur ce chemin.
+- **`DELETE` (annulation) reste volontairement inchangé dans son contrat** (aucun paramètre) et cible
+  toujours la destination de **production** — annuler un envoi de test n'est pas exposé par cette
+  route admin, comme lors de la session de vérification manuelle du 02/08/2026 (annulé par appel
+  direct de l'API). Limite assumée, pas un oubli : documentée ici pour ne pas être redécouverte.
+- **Aucun nouveau code d'erreur** : `VALIDATION_ERROR` (400) couvre les deux refus ci-dessus — la
+  requête elle-même est en cause (mode manquant/invalide, ou mode demandé non configuré), jamais
+  l'état de la ressource (`CONFLICT` reste réservé à « deal non publié »/« déjà diffusé »).
 
 **Notes** :
 - **Amendement du 27/07/2026 — compte de résultats (septième amendement conscient, lot 7)** :
