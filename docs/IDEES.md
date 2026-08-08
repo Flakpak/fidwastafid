@@ -246,7 +246,14 @@ les 10 places étaient encore prises : la limite ne s'applique donc pas aux
 mises à jour de sécurité. Elle reste à 10 — la relever n'aurait rien débloqué.
 Ce qui manquait était le canal de sécurité, pas des places.
 
-## Magic link et changement d'e-mail — gabarits prêts, flux non câblés (2026-08-02)
+## Magic link et changement d'e-mail — gabarits prêts, flux non câblés (2026-08-02) — ÉCARTÉS le 08/08/2026
+
+**Décision : ne pas construire, pour l'instant.** Le mot de passe fonctionne, aucun
+besoin utilisateur ne s'est exprimé pour la connexion sans mot de passe, et le
+changement d'e-mail porte un bug bloquant déjà identifié (ci-dessous) pour
+environ deux jours de travail (correctif + amendement §4 + UI) — aucun des
+deux ne justifie la dépense aujourd'hui. Section conservée telle quelle pour
+qu'on la retrouve le jour où le besoin se présente, plutôt que de la refaire.
 
 Les gabarits Supabase « Magic link or OTP » et « Change email address » pointent
 depuis le 2026-08-02 sur `/auth/confirm` avec `token_hash` (types `magiclink` et
