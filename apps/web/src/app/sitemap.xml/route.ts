@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { query } from "@fidwastafid/db";
 import { dealUrlSlug } from "@fidwastafid/schemas";
 import { SITE_URL } from "../../lib/siteUrl.js";
+import { estActifSeo } from "../api/v1/_lib/deals.js";
 
 export const runtime = "nodejs";
 
@@ -23,12 +24,10 @@ export const runtime = "nodejs";
  * (expirer-auto-draft.mjs), sans jamais passer par un statut `publie`. La
  * garantie « URL vivante à vie » du §1 protège un actif SEO réel (une page
  * publiée, potentiellement partagée) — pas un brouillon jamais montré à
- * personne. Réutilise `deals_protection` (migration 0015, lot 3) :
- * `protege` y est vrai dès qu'une trace d'audit prouve une publication
- * (transition explicite vers `publie`, ou une diffusion communautaire —
- * preuve indépendante) ; un `expire` sans AUCUNE de ces traces n'a jamais
- * été publié, il sort du sitemap. Un `publie` reste toujours inclus (il
- * l'est par construction : passer en `publie` EST la transition détectée).
+ * personne. Filtré via `estActifSeo()` (`_lib/deals.ts`) — SOURCE UNIQUE
+ * partagée avec la balise `robots` de la fiche deal (CONTRAT-V1 §1,
+ * dix-huitième amendement conscient) : deux définitions indépendantes de
+ * « jamais publié » dériveraient un jour.
  *
  * Mesuré en production avant ce correctif (lecture seule, 12/08/2026) :
  * 681 `expire` protégés = 0, 681 non protégés = 681 — tous les `expire`
@@ -41,6 +40,7 @@ interface DealRow {
   titre: string;
   updated_at: string;
   statut: string;
+  protege: boolean;
 }
 
 interface EnseigneRow {
@@ -65,13 +65,13 @@ function urlXml(e: UrlEntry): string {
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const [deals, enseignes] = await Promise.all([
+  const [dealsBruts, enseignes] = await Promise.all([
     query<DealRow>(
-      `select d.public_id, d.titre, d.updated_at, d.statut
+      `select d.public_id, d.titre, d.updated_at, d.statut, dp.protege
          from deals d
          join deals_protection dp on dp.public_id = d.public_id
         where d.supprime_le is null
-          and (d.statut = 'publie' or (d.statut = 'expire' and dp.protege))
+          and d.statut = any(array['publie', 'expire'])
         order by d.updated_at desc`
     ),
     // `derniere_maj` = plus récent updated_at des deals de CETTE enseigne —
@@ -87,6 +87,10 @@ export async function GET(request: Request): Promise<NextResponse> {
         group by e.slug`
     ),
   ]);
+
+  // Filtre en JS, pas en SQL — SOURCE UNIQUE (`estActifSeo`) partagée avec
+  // la fiche deal, voir en-tête de fichier.
+  const deals = dealsBruts.filter((d) => estActifSeo(d.statut, d.protege));
 
   // Accueil : pas de ligne dédiée en base, mais son contenu EST le plus
   // récent des deals PUBLIÉS qu'il liste (le feed par défaut ne montre que

@@ -1,4 +1,4 @@
-import type { PoolClient } from "@fidwastafid/db";
+import { query, type PoolClient } from "@fidwastafid/db";
 import { dealSchema, dealAdminSchema, type Deal, type DealAdmin } from "@fidwastafid/schemas";
 
 /**
@@ -294,4 +294,35 @@ export async function recalculateScore(client: PoolClient, dealId: string): Prom
 export async function fetchDealById(client: PoolClient, dealId: string): Promise<DealRow | null> {
   const result = await client.query<DealRow>(`select ${DEAL_SELECT} ${DEAL_FROM} where d.id = $1`, [dealId]);
   return result.rows[0] ?? null;
+}
+
+/**
+ * Un deal est un actif SEO (indexable) s'il a été PUBLIÉ au moins une fois
+ * — CONTRAT-V1 §1, dix-huitième amendement conscient (12/08/2026). `publie`
+ * l'est par construction (passer en `publie` EST la transition que
+ * `deals_protection` détecte, `protege` y est donc toujours vrai). `expire`
+ * ne l'est que s'il porte une trace de publication réelle — un `auto_draft`
+ * expiré automatiquement sans jamais être passé par `publie` ne l'est pas :
+ * il reste servi (200, jamais supprimé), simplement pas indexé.
+ *
+ * SOURCE UNIQUE, appelée par le sitemap (`sitemap.xml/route.ts`) ET la
+ * balise `robots` de la fiche deal (`deal/[slugAndId]/page.tsx`) — deux
+ * définitions indépendantes de « jamais publié » dériveraient un jour,
+ * exactement le défaut que `deals_protection` (migration 0015, lot 3)
+ * existe déjà pour éviter côté purge.
+ */
+export function estActifSeo(statut: string, protege: boolean): boolean {
+  return statut === "publie" || (statut === "expire" && protege);
+}
+
+/**
+ * `protege` d'un deal précis (`deals_protection`, migration 0015) — vue
+ * unconditionnelle : une ligne existe pour tout `public_id` réel, jamais
+ * de repli nécessaire pour un deal déjà résolu par ailleurs.
+ */
+export async function fetchProtege(publicId: string): Promise<boolean> {
+  const rows = await query<{ protege: boolean }>("select protege from deals_protection where public_id = $1", [
+    publicId,
+  ]);
+  return rows[0]?.protege ?? false;
 }

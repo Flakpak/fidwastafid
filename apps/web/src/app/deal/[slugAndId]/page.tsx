@@ -14,6 +14,7 @@ import { Badge } from "../../../components/Badge.js";
 import { resolveCurrentUser } from "../../../lib/currentUser.js";
 import { fetchMesVotes } from "../../api/v1/_lib/votes.js";
 import { fetchDealsLies } from "../../api/v1/_lib/dealsLies.js";
+import { estActifSeo, fetchProtege } from "../../api/v1/_lib/deals.js";
 import { DealCardMini } from "../../../components/DealCardMini.js";
 import { CommentForm } from "./CommentForm.js";
 import { CommentairesErreur } from "./CommentairesErreur.js";
@@ -107,10 +108,19 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
   const canonical = `/deal/${dealUrlSlug(deal.titre, deal.publicId)}`;
   const description = dealDescription(deal);
 
+  // CONTRAT-V1 §1, dix-huitième amendement conscient : un `expire` jamais
+  // publié (auto_draft expiré automatiquement, jamais passé par `publie`)
+  // reste servi (200) mais n'est pas un actif SEO — `noindex`. Même
+  // fonction que le sitemap (`estActifSeo`, `_lib/deals.ts`) : une seule
+  // définition de « jamais publié ».
+  const protege = await fetchProtege(deal.publicId);
+  const indexable = estActifSeo(deal.statut, protege);
+
   return {
     title: deal.titre,
     description,
     alternates: { canonical },
+    ...(indexable ? {} : { robots: { index: false, follow: false } }),
     openGraph: {
       siteName: "Fidwastafid",
       title: truncateOgTitle(deal.titre),

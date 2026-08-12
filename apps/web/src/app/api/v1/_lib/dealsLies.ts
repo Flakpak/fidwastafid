@@ -11,7 +11,9 @@ const LIMITE_DEALS_LIES = 4;
  * les fiches, aujourd'hui inexistant »). `statut = 'publie'` UNIQUEMENT —
  * jamais un `expire`, même protégé (sitemap, correctif du 12/08/2026) :
  * suggérer un deal potentiellement plus disponible reproduirait le défaut
- * qu'on retire du sitemap, dans l'autre sens.
+ * qu'on retire du sitemap, dans l'autre sens. `publie` est TOUJOURS
+ * indexable (`estActifSeo`, CONTRAT-V1 §1, dix-huitième amendement
+ * conscient) — ce chemin ne peut donc jamais lier vers un deal `noindex`.
  *
  * `(e.slug = $2) desc` classe les correspondances par enseigne avant celles
  * par catégorie ; `$2` null (deal sans enseigne) rend cette comparaison

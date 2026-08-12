@@ -20,6 +20,10 @@ async function fetchEnseigne(slug: string): Promise<Enseigne | null> {
   return body.data.find((e) => e.slug === slug) ?? null;
 }
 
+/** Pas de `?statut=` : `lireFiltres()` retombe sur `publie` par défaut
+ *  (`_lib/dealsFilters.ts`) — cette page ne peut donc jamais lier vers un
+ *  deal `noindex` (CONTRAT-V1 §1, dix-huitième amendement conscient) : un
+ *  lien interne vers une page non indexable gaspillerait le signal. */
 async function fetchDeals(slug: string): Promise<Deal[]> {
   const response = await getDealsHandler(
     new Request(`http://localhost/api/v1/deals?enseigne=${encodeURIComponent(slug)}&limit=24`)
