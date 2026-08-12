@@ -29,6 +29,25 @@
 # Contrepartie assumée : un échec d'une source secondaire ne déclenche PAS
 # d'email (job vert) — il se signale par une annotation ::warning:: sur la
 # page du run.
+#
+# SUPERVISION (lot du 12/08/2026, migration 0020, table pipeline_runs) — le
+# contrôle ci-dessus ne teste qu'un FICHIER produit par le scraper, jamais
+# l'INSERTION nette en base : il ne distinguait pas une source injoignable
+# (panne technique) d'une source sans rien d'assez remisé (état de marché)
+# ou d'une source dont tout est déjà en base (catalogue figé). Chaque étape
+# de scraping/insertion écrit maintenant sa cause dans pipeline_runs (via
+# insert-deals.mjs ou enregistrer-echec-scraping.mjs selon le cas), et le job
+# verification-sources détecte les séries de runs consécutifs en échec par
+# cause (seuils différents — voir apps/pipeline/verifier-sources-mortes.mjs),
+# escaladées par le job alerte-sources via .github/actions/alerte-issue (même
+# mécanisme que l'alerte pipeline/backup ci-dessous, un label par source).
+#
+# Corrigé dans le même lot : `run:` sous bash s'exécute avec `-e` par défaut
+# (GitHub Actions) — `sortie=$(pnpm ... | tee /dev/stderr)` qui échoue tuait
+# le script AVANT les branches `if [ -z "$fichier_relatif" ]` etc., qui
+# auraient pourtant donné le bon diagnostic. `|| true` sur cette ligne laisse
+# le script atteindre ses propres branches de diagnostic, sur les six étapes
+# de scraping.
 
 name: Pipeline quotidien
 
@@ -116,21 +135,31 @@ jobs:
       # et échoue EXPLICITEMENT si ce compte est 0 — un run qui n'a rien
       # scrapé doit être rouge, jamais rattrapé silencieusement par un
       # fichier vide ou périmé.
+      #
+      # `|| true` sur `sortie=$(...)` : sans lui, bash (-e par défaut sous
+      # GitHub Actions) tue le script exactement à cette ligne si le scraper
+      # échoue (crash réseau) — AVANT que les branches ci-dessous n'aient la
+      # chance de distinguer "aucun fichier" de "fichier vide". Constaté sur
+      # bestmark (fetch failed, 10 runs) : le job restait vert malgré
+      # continue-on-error, sans qu'aucune des trois annotations n'apparaisse
+      # jamais — seule l'annotation générique de pnpm/GitHub était visible.
       - name: Scraping Bringo (Casablanca)
         id: scraping
         run: |
           set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-bringo bringo-categories.txt Casablanca | tee /dev/stderr)
+          sortie=$(pnpm --filter pipeline run scraper-bringo bringo-categories.txt Casablanca | tee /dev/stderr) || true
 
           fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
           if [ -z "$fichier_relatif" ]; then
             echo "::error::scraper-bringo n'a annoncé aucun fichier d'archive (ligne \"→ Archive : ...\" absente des logs) — run marqué en échec."
+            pnpm --filter pipeline run enregistrer-echec-scraping bringo injoignable || true
             exit 1
           fi
 
           fichier="apps/pipeline/$fichier_relatif"
           if [ ! -f "$fichier" ]; then
             echo "::error::Fichier annoncé par scraper-bringo introuvable sur disque : $fichier"
+            pnpm --filter pipeline run enregistrer-echec-scraping bringo injoignable || true
             exit 1
           fi
 
@@ -138,15 +167,29 @@ jobs:
           echo "Deals extraits : $nb_deals"
           if [ "$nb_deals" -eq 0 ]; then
             echo "::error::0 deal extrait par scraper-bringo — run marqué en échec (rien à insérer)."
+            pnpm --filter pipeline run enregistrer-echec-scraping bringo rien_retenu || true
             exit 1
           fi
 
           echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
 
+      # Capture RESUME_JSON (émis par insert-deals.mjs, qui écrit déjà la
+      # ligne pipeline_runs correspondante) pour que l'annotation du run
+      # reflète la cause réelle — jamais un succès muet qui masquerait
+      # "rien retenu" ou "tout déjà en base" derrière une étape verte.
       - name: Insertion en base (validation zod partagée)
         env:
           FICHIER_EXTRACTION: ${{ steps.scraping.outputs.fichier }}
-        run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION"
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION" | tee /dev/stderr)
+          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
+          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
+          if [ "$cause" = "rien_retenu" ]; then
+            echo "::warning::Bringo — aucun deal retenu après filtrage sur ce run : $resume"
+          elif [ "$cause" = "deja_en_base" ]; then
+            echo "::warning::Bringo — tout ce qui a été retenu était déjà en base sur ce run : $resume"
+          fi
 
       # Source secondaire inwi (lot du 23/07/2026) — même pattern de capture/
       # vérification que l'étape Bringo ci-dessus, avec deux divergences
@@ -162,17 +205,19 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-inwi | tee /dev/stderr)
+          sortie=$(pnpm --filter pipeline run scraper-inwi | tee /dev/stderr) || true
 
           fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
           if [ -z "$fichier_relatif" ]; then
             echo "::warning::scraper-inwi n'a annoncé aucun fichier d'archive — source inwi sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping inwi injoignable || true
             exit 1
           fi
 
           fichier="apps/pipeline/$fichier_relatif"
           if [ ! -f "$fichier" ]; then
             echo "::warning::Fichier annoncé par scraper-inwi introuvable sur disque : $fichier — source inwi sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping inwi injoignable || true
             exit 1
           fi
 
@@ -180,6 +225,7 @@ jobs:
           echo "Deals inwi extraits : $nb_deals"
           if [ "$nb_deals" -eq 0 ]; then
             echo "::warning::0 deal extrait par scraper-inwi — rien à insérer pour cette source ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping inwi rien_retenu || true
             exit 1
           fi
 
@@ -190,7 +236,16 @@ jobs:
         continue-on-error: true
         env:
           FICHIER_EXTRACTION_INWI: ${{ steps.scraping_inwi.outputs.fichier }}
-        run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_INWI"
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_INWI" | tee /dev/stderr)
+          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
+          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
+          if [ "$cause" = "rien_retenu" ]; then
+            echo "::warning::inwi — aucun deal retenu après filtrage sur ce run : $resume"
+          elif [ "$cause" = "deja_en_base" ]; then
+            echo "::warning::inwi — tout ce qui a été retenu était déjà en base sur ce run : $resume"
+          fi
 
       # Source secondaire universparadiscount (lot du 23/07/2026) — pattern
       # strictement identique à inwi ci-dessus : continue-on-error (échec
@@ -205,17 +260,19 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-universparadiscount | tee /dev/stderr)
+          sortie=$(pnpm --filter pipeline run scraper-universparadiscount | tee /dev/stderr) || true
 
           fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
           if [ -z "$fichier_relatif" ]; then
             echo "::warning::scraper-universparadiscount n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping universparadiscount injoignable || true
             exit 1
           fi
 
           fichier="apps/pipeline/$fichier_relatif"
           if [ ! -f "$fichier" ]; then
             echo "::warning::Fichier annoncé par scraper-universparadiscount introuvable sur disque : $fichier — source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping universparadiscount injoignable || true
             exit 1
           fi
 
@@ -223,6 +280,7 @@ jobs:
           echo "Deals universparadiscount extraits : $nb_deals"
           if [ "$nb_deals" -eq 0 ]; then
             echo "::warning::0 deal extrait par scraper-universparadiscount — rien à insérer pour cette source ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping universparadiscount rien_retenu || true
             exit 1
           fi
 
@@ -233,7 +291,16 @@ jobs:
         continue-on-error: true
         env:
           FICHIER_EXTRACTION_UPD: ${{ steps.scraping_upd.outputs.fichier }}
-        run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_UPD"
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_UPD" | tee /dev/stderr)
+          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
+          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
+          if [ "$cause" = "rien_retenu" ]; then
+            echo "::warning::universparadiscount — aucun deal retenu après filtrage sur ce run : $resume"
+          elif [ "$cause" = "deja_en_base" ]; then
+            echo "::warning::universparadiscount — tout ce qui a été retenu était déjà en base sur ce run : $resume"
+          fi
 
       # Source secondaire decathlon (lot du 23/07/2026) — pattern strictement
       # identique à inwi/universparadiscount ci-dessus : continue-on-error
@@ -251,17 +318,19 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-decathlon | tee /dev/stderr)
+          sortie=$(pnpm --filter pipeline run scraper-decathlon | tee /dev/stderr) || true
 
           fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
           if [ -z "$fichier_relatif" ]; then
             echo "::warning::scraper-decathlon n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping decathlon injoignable || true
             exit 1
           fi
 
           fichier="apps/pipeline/$fichier_relatif"
           if [ ! -f "$fichier" ]; then
             echo "::warning::Fichier annoncé par scraper-decathlon introuvable sur disque : $fichier — source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping decathlon injoignable || true
             exit 1
           fi
 
@@ -269,6 +338,7 @@ jobs:
           echo "Deals decathlon extraits : $nb_deals"
           if [ "$nb_deals" -eq 0 ]; then
             echo "::warning::0 deal extrait par scraper-decathlon — rien à insérer pour cette source ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping decathlon rien_retenu || true
             exit 1
           fi
 
@@ -279,7 +349,16 @@ jobs:
         continue-on-error: true
         env:
           FICHIER_EXTRACTION_DECA: ${{ steps.scraping_deca.outputs.fichier }}
-        run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_DECA"
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_DECA" | tee /dev/stderr)
+          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
+          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
+          if [ "$cause" = "rien_retenu" ]; then
+            echo "::warning::decathlon — aucun deal retenu après filtrage sur ce run : $resume"
+          elif [ "$cause" = "deja_en_base" ]; then
+            echo "::warning::decathlon — tout ce qui a été retenu était déjà en base sur ce run : $resume"
+          fi
 
       # Source secondaire kiabi (lot du 02/08/2026) — même pattern que les
       # trois ci-dessus. Particularité de cette source : ~45 % du catalogue est
@@ -293,17 +372,19 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-kiabi | tee /dev/stderr)
+          sortie=$(pnpm --filter pipeline run scraper-kiabi | tee /dev/stderr) || true
 
           fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
           if [ -z "$fichier_relatif" ]; then
             echo "::warning::scraper-kiabi n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping kiabi injoignable || true
             exit 1
           fi
 
           fichier="apps/pipeline/$fichier_relatif"
           if [ ! -f "$fichier" ]; then
             echo "::warning::Fichier annoncé par scraper-kiabi introuvable sur disque : $fichier — source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping kiabi injoignable || true
             exit 1
           fi
 
@@ -311,6 +392,7 @@ jobs:
           echo "Deals kiabi extraits : $nb_deals"
           if [ "$nb_deals" -eq 0 ]; then
             echo "::warning::0 deal extrait par scraper-kiabi — rien à insérer pour cette source ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping kiabi rien_retenu || true
             exit 1
           fi
 
@@ -321,40 +403,56 @@ jobs:
         continue-on-error: true
         env:
           FICHIER_EXTRACTION_KIABI: ${{ steps.scraping_kiabi.outputs.fichier }}
-        run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_KIABI"
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_KIABI" | tee /dev/stderr)
+          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
+          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
+          if [ "$cause" = "rien_retenu" ]; then
+            echo "::warning::kiabi — aucun deal retenu après filtrage sur ce run : $resume"
+          elif [ "$cause" = "deja_en_base" ]; then
+            echo "::warning::kiabi — tout ce qui a été retenu était déjà en base sur ce run : $resume"
+          fi
 
       # Source secondaire bestmark (lot du 02/08/2026) — même pattern.
       #
       # ⚠️ RENDEMENT CONNU ET FAIBLE : balayage complet du catalogue le
-      # 02/08/2026 — 865 produits, **1 seul remisé**. Un run à 0 deal est donc
-      # le cas NORMAL ici, d'où le ::warning:: (jamais ::error::). Cette source
-      # n'a d'intérêt que si Bestmark ouvre de vraies opérations commerciales ;
-      # si elle reste à 0 sur la durée, la retirer est une décision à prendre,
-      # pas un incident à diagnostiquer. Prérequis prod : enseigne `bestmark`
-      # en base (ajoutée le 02/08/2026).
+      # 02/08/2026 — 865 produits, **1 seul remisé**. Un run à 0 deal EXTRAIT
+      # est donc plausible ici (d'où le ::warning::, jamais ::error::) — mais
+      # ce n'est PAS une exemption de supervision : un run à 0 deal parce que
+      # le scraper a RÉELLEMENT tourné (cause 'rien_retenu', déclarée par
+      # enregistrer-echec-scraping.mjs ci-dessous) est traité comme les
+      # autres sources par verifier-sources-mortes.mjs, SANS seuil relevé.
+      # Seule une panne réseau (cause 'injoignable', aucun fichier produit)
+      # a un seuil différent — 2 runs, comme toutes les sources — jamais
+      # exemptée : un zéro qui vient d'une panne n'est pas un état normal,
+      # même documenté pour le zéro qui vient d'un vrai run vide.
       - name: Scraping bestmark (GraphQL Magento public)
         id: scraping_bestmark
         continue-on-error: true
         run: |
           set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-bestmark | tee /dev/stderr)
+          sortie=$(pnpm --filter pipeline run scraper-bestmark | tee /dev/stderr) || true
 
           fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
           if [ -z "$fichier_relatif" ]; then
-            echo "::warning::scraper-bestmark n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            echo "::warning::scraper-bestmark n'a annoncé aucun fichier d'archive (probable échec réseau) — source sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping bestmark injoignable || true
             exit 1
           fi
 
           fichier="apps/pipeline/$fichier_relatif"
           if [ ! -f "$fichier" ]; then
             echo "::warning::Fichier annoncé par scraper-bestmark introuvable sur disque : $fichier — source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping bestmark injoignable || true
             exit 1
           fi
 
           nb_deals=$(jq 'length' "$fichier")
           echo "Deals bestmark extraits : $nb_deals"
           if [ "$nb_deals" -eq 0 ]; then
-            echo "::warning::0 deal extrait par scraper-bestmark — catalogue sans remise ce jour-là (cas courant sur cette source)."
+            echo "::warning::0 deal extrait par scraper-bestmark — catalogue sans remise ce jour-là (cas courant sur cette source, mais le scraper a réellement tourné)."
+            pnpm --filter pipeline run enregistrer-echec-scraping bestmark rien_retenu || true
             exit 1
           fi
 
@@ -365,7 +463,16 @@ jobs:
         continue-on-error: true
         env:
           FICHIER_EXTRACTION_BESTMARK: ${{ steps.scraping_bestmark.outputs.fichier }}
-        run: pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_BESTMARK"
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_BESTMARK" | tee /dev/stderr)
+          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
+          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
+          if [ "$cause" = "rien_retenu" ]; then
+            echo "::warning::bestmark — aucun deal retenu après filtrage sur ce run : $resume"
+          elif [ "$cause" = "deja_en_base" ]; then
+            echo "::warning::bestmark — tout ce qui a été retenu était déjà en base sur ce run : $resume"
+          fi
 
       - name: Revalidation Next.js (feed, enseignes, sitemap)
         run: |
@@ -484,3 +591,86 @@ jobs:
             À vérifier dans l'ordre : le workflow est-il encore `active` (GitHub désactive
             un workflow planifié après 60 jours d'inactivité du dépôt) ? Le cron a-t-il été
             supprimé ou modifié ?
+
+  # ----------------------------------------------------------------------
+  # SUPERVISION DES SOURCES (lot du 12/08/2026) — lit pipeline_runs (écrite
+  # par insert-deals.mjs et enregistrer-echec-scraping.mjs ci-dessus),
+  # calcule la série de runs consécutifs en échec par (source, cause), et
+  # sort une ligne ALERTE=<json> par source qui dépasse le seuil de SA
+  # cause. `if: always()` : tourne même si le job `pipeline` a échoué —
+  # certaines sources secondaires ont pu écrire des lignes avant l'échec
+  # d'une autre étape.
+  # ----------------------------------------------------------------------
+  verification-sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: pipeline
+    if: always()
+    outputs:
+      alertes: ${{ steps.verifier.outputs.alertes }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Détecte les sources en série d'échecs
+        id: verifier
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run verifier-sources-mortes | tee /dev/stderr)
+          alertes=$(printf '%s\n' "$sortie" | sed -n 's/^ALERTE=//p' | jq -s -c '.')
+          echo "Sources en alerte : $(printf '%s' "$alertes" | jq 'length')"
+          echo "alertes=$alertes" >> "$GITHUB_OUTPUT"
+
+  # Un job séparé, avec une matrice dynamique construite depuis la sortie du
+  # précédent : la seule façon d'appeler .github/actions/alerte-issue une
+  # fois PAR SOURCE en alerte, sans dupliquer sa logique de dédoublonnage —
+  # réutilise le MÊME mécanisme que alerte-pipeline/alerte-backup ci-dessus,
+  # un label par source (alerte-source-<source>) pour que chacune se referme
+  # indépendamment des autres.
+  alerte-sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: verification-sources
+    if: needs.verification-sources.outputs.alertes != '[]'
+    permissions:
+      contents: read
+      issues: write
+    strategy:
+      matrix:
+        alerte: ${{ fromJson(needs.verification-sources.outputs.alertes) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Alerte — source en série d'échecs
+        uses: ./.github/actions/alerte-issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          label: alerte-source-${{ matrix.alerte.source }}
+          depot: ${{ github.repository }}
+          titre: "Source ${{ matrix.alerte.source }} : ${{ matrix.alerte.serie }} runs consécutifs en échec (${{ matrix.alerte.cause }})"
+          corps: |
+            La source **${{ matrix.alerte.source }}** enchaîne **${{ matrix.alerte.serie }} run(s)**
+            avec la cause `${{ matrix.alerte.cause }}` (seuil de cette cause : ${{ matrix.alerte.seuil }}).
+
+            | | |
+            |---|---|
+            | Cause | `${{ matrix.alerte.cause }}` — voir `packages/db/migrations/0020_pipeline_runs.sql` pour le détail des trois causes |
+            | Série actuelle | ${{ matrix.alerte.serie }} run(s) consécutif(s) |
+            | Seuil de cette cause | ${{ matrix.alerte.seuil }} |
+            | Vu depuis | run [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+
+            Historique complet (base de production) :
+            ```sql
+            select * from pipeline_runs where source = '${{ matrix.alerte.source }}' order by cree_le desc limit 20;
+            ```
+
+            Cette issue se referme manuellement une fois la cause traitée — un nouveau run
+            'ok' pour cette source ne la referme pas automatiquement, il remet seulement la
+            série à zéro pour les prochaines vérifications.

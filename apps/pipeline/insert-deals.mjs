@@ -30,6 +30,7 @@ import { extraireDescription } from "./fiche-produit.mjs";
 import { validateDeal } from "./validation.mjs";
 import { estRemiseSuffisante, SEUIL_REMISE_MIN_PCT } from "./remise.mjs";
 import { resoudreFichierArgument } from "./argv.mjs";
+import { sourceDepuisFichier, classifierCause, enregistrerRun } from "./_lib/pipelineRuns.mjs";
 
 // ---------- Description depuis la fiche produit (Bringo uniquement) ----------
 const BRINGO_LIEN_RE = /^https:\/\/(www\.)?bringo\.ma\//i;
@@ -311,6 +312,22 @@ try {
       `${rejetes} rejetés (validation) | ${rejetesRemise} rejetés (remise < ${SEUIL_REMISE_MIN_PCT} %) | ` +
       `${rejetesEnseigne} rejetés (enseigne inconnue) | ${rejetesMemoire} rejetés (mémoire de curation)`
   );
+
+  // Supervision du pipeline (lot du 12/08/2026) — les quatre chiffres qui
+  // comptent pour distinguer « rien d'assez remisé » de « tout déjà en
+  // base » sont déjà calculés ci-dessus ; retenus = ce qui a survécu à
+  // TOUS les filtres avant le dédoublonnage (validation, remise, enseigne,
+  // mémoire de curation) — extraits - rejetes - rejetesRemise -
+  // rejetesEnseigne - rejetesMemoire. inseres + doublons = retenus,
+  // toujours (le dédoublonnage est le seul chemin restant après retenus).
+  const extraits = deals.length;
+  const retenus = extraits - rejetes - rejetesRemise - rejetesEnseigne - rejetesMemoire;
+  const cause = classifierCause({ retenus, inseres });
+  const source = sourceDepuisFichier(fichier);
+  await enregistrerRun(client, { source, cause, extraits, retenus, inseres, doublons });
+  // Ligne structurée, capturée par le workflow après cette étape — pour que
+  // l'annotation du run reflète la CAUSE réelle plutôt qu'un succès muet.
+  console.log(`RESUME_JSON=${JSON.stringify({ source, cause, extraits, retenus, inseres, doublons })}`);
   if (remisesNonMesurables > 0) {
     console.log(
       `📉 ${remisesNonMesurables} deal(s) insérable(s) sans remise mesurable (prix barré absent) — ` +
