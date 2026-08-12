@@ -13,6 +13,8 @@ import { Avatar } from "../../../components/Avatar.js";
 import { Badge } from "../../../components/Badge.js";
 import { resolveCurrentUser } from "../../../lib/currentUser.js";
 import { fetchMesVotes } from "../../api/v1/_lib/votes.js";
+import { fetchDealsLies } from "../../api/v1/_lib/dealsLies.js";
+import { DealCardMini } from "../../../components/DealCardMini.js";
 import { CommentForm } from "./CommentForm.js";
 import { CommentairesErreur } from "./CommentairesErreur.js";
 import { lireCommentaires, type ResultatCommentaires } from "./commentaires.js";
@@ -144,11 +146,12 @@ export default async function DealPage({ params }: PageParams) {
   // qu'aucun utilisateur n'est connu (visiteur anonyme) : CardVote ne
   // l'applique alors jamais, comportement identique à avant ce lot.
   const utilisateurCourant = await resolveCurrentUser();
-  const [resultatCommentaires, monVote] = await Promise.all([
+  const [resultatCommentaires, monVote, dealsLies] = await Promise.all([
     fetchCommentaires(deal.publicId),
     utilisateurCourant
       ? fetchMesVotes(utilisateurCourant.id, [deal.publicId]).then((v) => v[deal.publicId] ?? null)
       : Promise.resolve(undefined),
+    fetchDealsLies(deal),
   ]);
   const expire = deal.statut === "expire";
   const pct = reduction(deal);
@@ -276,8 +279,21 @@ export default async function DealPage({ params }: PageParams) {
               {aMeta && (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-bold text-ink-muted">
                   {deal.enseigneNom ? (
+                    // Lien interne le plus rentable de la fiche (état des
+                    // lieux SEO du 08/08/2026) : jusqu'ici du texte brut,
+                    // aucun poids ne remontait vers les 9 pages enseigne,
+                    // pourtant destinations naturelles du site.
+                    // `enseigneSlug` toujours présent quand `enseigneNom`
+                    // l'est (même source, DEAL_SELECT) — jamais l'inverse.
                     <span>
-                      Dispo. chez <strong className="text-ink">{deal.enseigneNom}</strong>
+                      Dispo. chez{" "}
+                      {deal.enseigneSlug ? (
+                        <Link href={`/enseigne/${deal.enseigneSlug}`} className="text-ink font-bold hover:text-accent hover:underline">
+                          {deal.enseigneNom}
+                        </Link>
+                      ) : (
+                        <strong className="text-ink">{deal.enseigneNom}</strong>
+                      )}
                     </span>
                   ) : (
                     deal.nomVendeur && (
@@ -398,6 +414,22 @@ export default async function DealPage({ params }: PageParams) {
                 Plus de détails{deal.enseigneNom ? ` sur ${deal.enseigneNom}` : ""} ↗
               </a>
             )}
+          </div>
+        )}
+
+        {/* CARTE 2-bis — deals liés (état des lieux SEO du 08/08/2026 :
+            « aucun chemin entre les fiches, aujourd'hui inexistant »).
+            Même enseigne d'abord, puis même catégorie ; publiés
+            uniquement (fetchDealsLies). Omise si rien à montrer — un
+            titre suivi de rien serait pire que son absence. */}
+        {dealsLies.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h2 className="text-lg font-black">Autres bons plans qui pourraient t&apos;intéresser</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {dealsLies.map((d) => (
+                <DealCardMini key={d.publicId} deal={d} />
+              ))}
+            </div>
           </div>
         )}
 
