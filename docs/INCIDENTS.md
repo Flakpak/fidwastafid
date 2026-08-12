@@ -46,6 +46,50 @@ depuis zéro — le mécanisme de dédoublonnage lui-même n'est pas garanti ato
 
 ---
 
+## 2026-08-12 — `/admin` bloqué sur « Chargement… » : une garde anti-redondance sans cas initial
+
+**Symptôme.** Après fusion des PR #113/#114/#115/#116 (filtres/tri, rejet en masse par
+filtre, annulation de lot), `/admin` reste bloqué indéfiniment sur « Chargement… » en
+production, pour toute session admin réelle.
+
+**Diagnostic.** Logs runtime Vercel : `GET /api/v1/admin/deals/compte` répond 200 à
+chaque chargement de page, mais `GET /api/v1/admin/deals?statut=...` (la liste)
+n'apparaît JAMAIS dans les logs — ni succès ni échec. La requête ne part pas du tout,
+côté client.
+
+**Cause — le motif à retenir, pas la ligne fautive.** Le lot avait remplacé l'effet de
+montage inconditionnel (`useEffect(() => { fetchOnglet(onglet); }, [])`) par un effet
+réactif à `searchParams`, pensé pour recharger l'état affiché après un retour arrière
+navigateur. Cet effet comparait l'URL courante à l'état déjà affiché pour éviter un
+rechargement redondant — une garde anti-redondance légitime pour SON cas d'usage (les
+navigations suivantes). Mais au tout premier rendu, l'état initial est dérivé de CETTE
+MÊME URL par les mêmes fonctions : la garde était donc trivialement vraie dès le
+montage, et le chargement initial n'avait plus AUCUN cas qui l'appelait. Une garde
+anti-redondance qui fusionne le cas « rien n'a changé » et le cas « rien n'a encore été
+chargé » les traite tous deux comme des no-op — alors que seul le premier en est un.
+
+**Pourquoi non détecté avant fusion.** Deux couvertures manquaient, indépendamment :
+aucun test ne montait le composant dans un DOM réel (les effets ne s'exécutent qu'après
+montage, jamais avec `renderToStaticMarkup`, seul rendu testé jusque-là) ; et aucun
+compte admin de test n'existait en production pour observer le rendu réel avant fusion
+(voir la proposition séparée sur ce point).
+
+**Correctif.** Rétablissement immédiat par `git revert` des trois commits fautifs sur
+`main` (PR #117), pas de correctif à chaud — le rendu navigateur n'avait jamais été
+vérifié avant la fusion initiale, un correctif non plus ne l'aurait pas été. Correction
+proposée séparément (PR #118, non fusionnée) : un effet de montage dédié, symétrique à
+celui déjà existant pour les compteurs, garantit un appel initial indépendamment de la
+garde réactive — qui reste légitime pour son propre cas.
+
+**Règle.** Une garde anti-redondance compare toujours un état À un autre : vérifier
+explicitement qu'elle couvre le cas où l'état de comparaison n'existe pas encore (premier
+rendu, première ouverture de connexion, premier appel), pas seulement le cas où les deux
+états sont déjà peuplés et diffèrent. Un composant qui charge des données au montage doit
+être monté par un test dans un DOM réel — un rendu statique ne le prouve pas, les effets
+n'y tournent jamais.
+
+---
+
 ## 2026-08-04 — Une soumission `en_attente` existait en base, invisible dans le back-office
 
 *(Consigné ici le 2026-08-05, après diagnostic.)*
