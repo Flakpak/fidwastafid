@@ -277,6 +277,26 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   }, [fetchComptes]);
 
   /**
+   * Montage seul : charge la première page, quoi qu'il arrive. Sans cet
+   * effet dédié, seul l'effet réactif à `searchParams` ci-dessous chargeait
+   * la liste — mais sa garde anti-redondance compare l'URL à l'état déjà
+   * affiché, et au tout premier rendu les deux sont IDENTIQUES (le state
+   * initial est dérivé de la même URL par les mêmes fonctions) : la garde
+   * était donc trivialement vraie dès le montage, l'effet retournait sans
+   * jamais appeler `fetchOnglet`, et la page restait bloquée sur «
+   * Chargement… » indéfiniment (incident du 12/08/2026 — jamais reproduit
+   * en local faute de compte admin en production pour l'observer avant
+   * fusion). Ce second effet garantit un appel initial indépendamment de la
+   * garde ; le doublon au montage est impossible, la garde ci-dessous étant
+   * alors trivialement vraie et ne refait rien.
+   */
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- montage seul, cas initial de la garde ci-dessous
+    void fetchOnglet(onglet, filtres, tri);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- montage seul (deps volontairement vides) : l'état initial est figé, l'effet réactif à searchParams gère les changements ultérieurs
+  }, []);
+
+  /**
    * Réagit à `searchParams` plutôt qu'à un montage unique — c'est ce qui
    * fait « survivre au retour arrière » (lot du 12/08/2026) : le bouton
    * précédent/suivant du navigateur change l'URL sans repasser par
@@ -284,7 +304,10 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
    * l'URL elle-même peut recharger l'état correspondant. Se compare à l'état
    * déjà affiché pour ignorer les changements d'URL que ce composant vient
    * de poser lui-même (`syncUrl`) — sinon chaque navigation interne
-   * déclencherait un second chargement identique, redondant.
+   * déclencherait un second chargement identique, redondant. Au montage,
+   * cette comparaison est TOUJOURS vraie (voir l'effet dédié ci-dessus) :
+   * ce n'est pas un cas à gérer ici, seulement la conséquence attendue de
+   * ne pas dupliquer le chargement initial.
    */
   useEffect(() => {
     const o = ongletDepuisParams(searchParams);
