@@ -18,9 +18,40 @@ une décision consciente, pas une dérive.*
   calculé, 301 vers l'URL canonique (même `public_id`) — gère nativement le cas d'un titre édité.
 - **id séquentiel interne (`bigint`)** : jamais exposé, nulle part (URL, API, payload, deep link).
 - **Deals expirés** : URL vivante à vie, HTTP 200, affichage d'un état « expiré » + deals similaires.
-  Jamais de 404/410 sur un deal expiré — c'est un actif SEO, pas une suppression.
+  Jamais de 404/410 sur un deal expiré — c'est un actif SEO, pas une suppression. **Précisé le
+  12/08/2026, dix-huitième amendement conscient, voir ci-dessous** : cette garantie protège un deal
+  **ayant été publié**. Un `auto_draft` jamais validé, expiré automatiquement sans être passé par
+  `publie`, reste tout aussi vivant (200, jamais supprimé) mais n'est pas un actif SEO — il n'a
+  jamais été montré à personne.
 - **Prix retiré du slug** (divergence vs plan initial) : un deal est éphémère, son URL est éternelle ;
   le prix vit dans le contenu de la page et les données structurées `Offer` (Phase 5), pas dans l'URL.
+
+**Amendement du 12/08/2026 — indexabilité des deals expirés conditionnée à une publication réelle
+(dix-huitième amendement conscient).** Fait générateur : état des lieux SEO du 08/08/2026 puis mesure
+en production le 12/08/2026 — 681 des 802 URLs de deals que le sitemap déclarait n'avaient **jamais**
+été publiées (`auto_draft` expirés automatiquement après 14 jours, `expirer-auto-draft.mjs`, sans
+jamais passer par `publie`). La garantie « URL vivante à vie » ci-dessus protège un actif SEO réel —
+une page qui a existé publiquement, potentiellement partagée — pas un brouillon jamais validé.
+
+- **`HTTP 200` et absence de suppression restent universels** : un `expire` jamais publié reste
+  accessible à vie, exactement comme avant cet amendement. Rien ne change côté accessibilité —
+  seule l'**indexabilité** (balise `robots`) se précise.
+- **Critère unique de publication réelle : `deals_protection`** (migration 0015, lot 3) —
+  `protege = true` dès qu'une trace d'audit prouve une transition vers `publie` (ou une diffusion
+  communautaire, preuve indépendante). Un seul critère, partagé par le sitemap
+  (`apps/web/src/app/sitemap.xml/route.ts`) et la balise `robots` de la fiche deal
+  (`estActifSeo(statut, protege)`, `_lib/deals.ts`) — deux définitions de « jamais publié »
+  dériveraient un jour, exactement le défaut que `deals_protection` existe déjà pour éviter côté
+  purge (lot 3/5).
+- **`publie` reste toujours indexable** — il l'est par construction : passer en `publie` EST la
+  transition que `deals_protection` détecte, `protege` y est donc toujours vrai.
+- **`expire` protégé (a été publié) reste toujours indexable** — c'est exactement l'actif SEO que
+  cette règle protège depuis l'origine.
+- **`expire` non protégé (jamais publié) devient `noindex`** — `{ index: false, follow: false }`,
+  même convention que les autres routes non indexables (§2). La page reste servie normalement, le
+  maillage interne (fiche → enseigne, fiche → deals liés) ne pointe jamais vers un deal dans cet
+  état — ces deux chemins ne surfacent que des `publie` par construction (`fetchDealsLies`,
+  `enseigne/[slug]`), jamais un `expire`.
 
 ## 2 — Arborescence d'URLs
 
