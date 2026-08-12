@@ -22,6 +22,14 @@ declare global {
  * simulé (URL vide, comme un premier accès à `/admin`), et vérifie qu'un
  * appel réseau vers la liste part bien au montage — pas seulement vers le
  * compteur.
+ *
+ * Couvre aussi l'onglet « Lots récents » (lot du 12/08/2026, réintroduit
+ * après le revert de l'incident) : `afficherLots()` est déclenché par clic,
+ * pas par montage — pas le même motif de bug que la garde anti-redondance
+ * ci-dessus (rien ne compare l'état à l'URL ici), mais aucun test ne
+ * vérifiait qu'un clic sur cet onglet déclenche bien l'appel réseau
+ * correspondant. Même méthode : cassé délibérément puis réparé avant de
+ * committer, pour prouver que le test détecte réellement une régression.
  */
 
 let pass = 0;
@@ -56,6 +64,12 @@ const appelsFetch: string[] = [];
 globalThis.fetch = (async (input: RequestInfo | URL) => {
   const url = typeof input === "string" ? input : input.toString();
   appelsFetch.push(url);
+  if (url.includes("/admin/deals/compte-filtre")) {
+    return new Response(JSON.stringify({ total: 0 }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }
   if (url.includes("/admin/deals/compte")) {
     return new Response(
       JSON.stringify({
@@ -64,6 +78,12 @@ globalThis.fetch = (async (input: RequestInfo | URL) => {
       }),
       { status: 200, headers: { "content-type": "application/json" } }
     );
+  }
+  if (url.includes("/admin/deals/lots")) {
+    return new Response(JSON.stringify({ data: [] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
   }
   return new Response(JSON.stringify({ data: [], nextCursor: null }), {
     status: 200,
@@ -107,6 +127,33 @@ check(
 check(
   "l'appel vers le COMPTEUR part aussi au montage (effet séparé, inchangé)",
   appelsFetch.some((u) => u.includes("/admin/deals/compte"))
+);
+
+function bouton(texte: string): HTMLButtonElement {
+  const boutons = Array.from(document.querySelectorAll("button"));
+  const trouve = boutons.find((b) => b.textContent?.trim().startsWith(texte));
+  if (!trouve) {
+    throw new Error(`Bouton « ${texte} » introuvable — boutons présents : ${boutons.map((b) => b.textContent).join(" | ")}`);
+  }
+  return trouve as HTMLButtonElement;
+}
+
+function cliquer(el: HTMLButtonElement) {
+  el.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+}
+
+console.log("\nAdminPipeline — bascule vers l'onglet « Lots récents »");
+appelsFetch.length = 0;
+await act(async () => {
+  cliquer(bouton("Lots récents"));
+});
+await act(async () => {
+  await new Promise((r) => setTimeout(r, 0));
+});
+
+check(
+  "cliquer « Lots récents » déclenche un appel vers /admin/deals/lots",
+  appelsFetch.some((u) => u.includes("/admin/deals/lots") && !u.includes("annuler"))
 );
 
 act(() => {
