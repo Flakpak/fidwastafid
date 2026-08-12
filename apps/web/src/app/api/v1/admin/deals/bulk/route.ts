@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withTransaction } from "@fidwastafid/db";
@@ -6,13 +5,11 @@ import { requireAdmin } from "@fidwastafid/auth";
 import { publicIdSchema, dealStatutSchema } from "@fidwastafid/schemas";
 import { withAuthErrors } from "../../../_lib/errors.js";
 import { parseJsonBody } from "../../../_lib/validation.js";
-import { appliquerLotStatut } from "../../../_lib/adminDealsBulk.js";
+import { logAudit } from "../../../_lib/audit.js";
 
 /**
  * Forme non fixée par CONTRAT-V1 (qui ne dit que "actions groupées") —
  * un statut appliqué à un lot de public_id, borné à 100 par appel.
- * Sélection MANUELLE (cases à cocher) — voir `bulk-filtre` pour l'action
- * « tout le résultat filtré », qui ne transmet jamais de liste d'id.
  *
  * `motifRejet` ajouté le 27/07/2026 : sans lui, cet endpoint était un
  * contournement complet de l'obligation de motiver un rejet (CONTRAT-V1 §3).
@@ -44,11 +41,6 @@ const bulkUpdateSchema = z
  * ignorés silencieusement (pas d'échec du lot entier pour une entrée
  * périmée) ; `updated` liste ceux réellement modifiés pour que l'admin
  * puisse réconcilier côté UI.
- *
- * `lot` (lot filtres/tri, 12/08/2026) — identifiant généré ici, posé sur
- * chaque entrée d'audit du lot (`appliquerLotStatut`, `_lib/
- * adminDealsBulk.ts`) : clé de l'annulation groupée symétrique, que la
- * sélection ait été manuelle (ici) ou par filtre (`bulk-filtre`).
  */
 export const POST = withAuthErrors(async (request: Request): Promise<NextResponse> => {
   const admin = await requireAdmin(request);
@@ -57,10 +49,73 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
   if (!parsed.success) return parsed.response;
   const { publicIds, statut, motifRejet } = parsed.data;
 
-  const lot = randomUUID();
-  const updated = await withTransaction((client) =>
-    appliquerLotStatut({ client, admin, publicIds, statut, motifRejet, lot })
-  );
+  const updated = await withTransaction(async (client) => {
+    const done: string[] = [];
+    for (const publicId of publicIds) {
+      const before = await client.query<{
+        id: string;
+        statut: string;
+        motif_rejet: string | null;
+        titre: string;
+        lien: string | null;
+        enseigne_id: string | null;
+      }>(
+        "select id, statut, motif_rejet, titre, lien, enseigne_id from deals where public_id = $1 for update",
+        [publicId]
+      );
+      const deal = before.rows[0];
+      if (!deal) continue;
 
-  return NextResponse.json({ updated, lot });
+      // `coalesce($2, motif_rejet)` : même convention que le PATCH unitaire —
+      // un motif absent (statut non-rejet) laisse l'existant intact plutôt que
+      // d'effacer l'historique d'un rejet précédent.
+      await client.query(
+        "update deals set statut = $1, motif_rejet = coalesce($2, motif_rejet), updated_at = now() where id = $3",
+        [statut, motifRejet ?? null, deal.id]
+      );
+
+      // Mémoire de curation (lot 2) — même règle que le PATCH unitaire :
+      // seulement sur une VRAIE transition vers rejete. bulk n'édite jamais
+      // titre/lien/enseigne, l'empreinte se calcule donc directement sur
+      // les valeurs existantes de la ligne (jamais le prix).
+      if (deal.statut !== "rejete" && statut === "rejete") {
+        const empreinteRow = await client.query<{ empreinte: string }>(
+          `select empreinte_curation($1, $2, $3) as empreinte`,
+          [deal.lien, deal.titre, deal.enseigne_id]
+        );
+        const empreinte = empreinteRow.rows[0]?.empreinte;
+        if (!empreinte) throw new Error("empreinte_curation n'a renvoyé aucune ligne — ne devrait pas arriver.");
+        await client.query(
+          `insert into memoire_curation (empreinte, decision, deal_origine_public_id, motif, decide_par)
+           values ($1, 'rejete', $2, $3, $4)`,
+          [empreinte, publicId, motifRejet ?? deal.motif_rejet, admin.id]
+        );
+      }
+
+      await logAudit(
+        {
+          adminId: admin.id,
+          action: "bulk_update_statut",
+          cibleType: "deal",
+          cibleId: publicId,
+          details: {
+            avant: deal.statut,
+            apres: statut,
+            // Consigné seulement quand il change réellement quelque chose —
+            // un journal ne rapporte pas de modification inexistante
+            // (cf. _lib/auditDiff.ts, même règle sur le PATCH unitaire).
+            ...(motifRejet && motifRejet !== deal.motif_rejet
+              ? { motifRejet: { avant: deal.motif_rejet, apres: motifRejet } }
+              : {}),
+          },
+        },
+        client
+      );
+
+      done.push(publicId);
+    }
+    return done;
+  });
+
+  return NextResponse.json({ updated });
 });
