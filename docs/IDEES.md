@@ -471,6 +471,37 @@ seconde ne se justifiera que si l'enseigne ouvre de vraies opérations
 commerciales — si elle reste à zéro sur la durée, la retirer est une décision à
 prendre, pas une panne à diagnostiquer.
 
+## Catégorisation dynamique par rayon — écartée pour decathlon/kiabi/universparadiscount (2026-08-12)
+
+Chiffrée (pas codée) sur demande explicite avant de lancer quoi que ce soit :
+étendre le mécanisme de Bringo (`mapCategorie()`/`rayonDepuisUrl()`,
+`_lib/categoriser.mjs`) à ces trois sources pour diversifier au-delà de leur
+catégorie fixe actuelle (Sport/Mode/Beauté).
+
+**Constat qui ferme le sujet, pas seulement le coût** : les trois catalogues
+sont **mono-domaine**. Un magasin de sport vend du sport, une enseigne de
+mode vend de la mode, une para-pharmacie vend de la beauté — la catégorie
+fixe actuelle est déjà juste pour l'essentiel du catalogue de chacune. Un
+rayon plus fin diversifierait les LIBELLÉS internes (« crèmes solaires »,
+« rouge à lèvres »…), pas la CATÉGORIE canonique de destination (les 12 de
+`packages/schemas`) — la quasi-totalité resterait de toute façon dans le
+même bucket qu'aujourd'hui.
+
+- **UniversParaDiscount** : rayon déjà présent dans le lien produit scrapé
+  (≥20 segments observés sur un run), coût faible (~0,5 j, mapping seul) —
+  mais gain quasi nul, tout reste « Beauté ».
+- **Kiabi** : `product_type`/`tags` Shopify potentiellement exploitables,
+  jamais vérifiés — mais même conclusion attendue, tout reste « Mode ».
+- **Decathlon** : aucune donnée rayon sur les pages déjà scrapées (ni
+  breadcrumb, ni URL par catégorie) — coût élevé (~1-2 j, nouvelle requête
+  par fiche ou nouvelles URLs de rayon) pour un gain quasi nul, tout reste
+  « Sport ».
+
+**Conclusion** : pas de lot. La diversification du catalogue passe par de
+nouvelles sources (domaines différents), pas par un rayon plus fin sur des
+sources déjà mono-domaine — ne pas reposer la question sans un fait nouveau
+(ex. une de ces enseignes élargit réellement son offre hors de son domaine).
+
 ## Diversification des sources (2026-07-18) — partiellement caduque
 
 **« Le pipeline ne scrape que Bringo » n'est plus vrai** : six sources tournent
