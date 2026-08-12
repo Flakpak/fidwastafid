@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { VILLES, CATEGORIES, dealUrlSlug, type DealAdmin, type DealStatut, type Enseigne } from "@fidwastafid/schemas";
 import type { DoublonInfo } from "../api/v1/_lib/deals.js";
-import { joinMeta } from "../../lib/format.js";
+import { joinMeta, shortDate } from "../../lib/format.js";
 import { MotifRejet } from "./MotifRejet.js";
 
 /** Libellés courts de statut pour le badge de doublon (l'onglet où retrouver
@@ -446,6 +446,27 @@ export function AdminDealItem({
             {deal.prixNormal && <span className="text-sm text-ink-subtle line-through tabular-nums">{deal.prixNormal} DH</span>}
             {remise(deal) > 0 && (
               <span className="text-xs font-bold bg-accent-soft text-accent rounded px-2 py-0.5 tabular-nums">-{remise(deal)}%</span>
+            )}
+          </div>
+          {/* Date d'insertion + lien produit — les deux étaient déjà dans le
+              payload (DealAdmin.createdAt/lien), simplement pas affichés sur
+              la ligne : c'était le manque identifié pour décider sans devoir
+              ouvrir le panneau « Éditer » (état des lieux du 12/08/2026). */}
+          <div className="text-xs text-ink-subtle flex items-center gap-2 flex-wrap">
+            <span>Inséré le {shortDate(deal.createdAt)}</span>
+            {deal.lien && (
+              <>
+                <span aria-hidden="true">·</span>
+                <a
+                  href={deal.lien}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="text-accent font-semibold hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Voir le produit ↗
+                </a>
+              </>
             )}
           </div>
           {/* Badge doublon produit — INFORMATIF, aucune action automatique
