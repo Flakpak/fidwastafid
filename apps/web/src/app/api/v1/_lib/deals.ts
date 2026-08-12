@@ -244,14 +244,9 @@ export function toDoublon(row: DoublonColumns): DoublonInfo | null {
  * `en_attente` EST une file d'attente : un modérateur la traite dans
  * l'ordre d'arrivée, pas par classement — plus ancien d'abord. Les autres
  * onglets conservent le tri déjà en vigueur (remise décroissante).
- *
- * DÉFAUT seulement (lot filtres/tri, 12/08/2026) : l'appelant peut choisir
- * explicitement un autre tri via `?tri=` (`_lib/adminDealsCursor.ts`,
- * `TriAdmin`) — ce choix prime, `triPourStatut` ne s'applique qu'en son
- * absence.
  */
-export function triPourStatut(statut: string): "date_asc" | "remise_desc" {
-  return statut === "en_attente" ? "date_asc" : "remise_desc";
+export function triPourStatut(statut: string): "recent_asc" | "remise_desc" {
+  return statut === "en_attente" ? "recent_asc" : "remise_desc";
 }
 
 /**
