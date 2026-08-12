@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "openapi:generate": "tsx scripts/generate-openapi.ts",
     "favicon:generate": "tsx scripts/generate-favicon.ts",
-    "test": "tsx tests/unit.ts && tsx --tsconfig tests/tsconfig.json tests/primitives.ts",
+    "test": "tsx tests/unit.ts && tsx --tsconfig tests/tsconfig.json tests/primitives.ts && tsx --tsconfig tests/tsconfig.json --experimental-test-module-mocks tests/adminMount.tsx",
     "test:integration": "tsx tests/integration.ts"
   },
   "dependencies": {
@@ -28,9 +28,11 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^22.10.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "jsdom": "^30.0.1",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.1",
     "typescript": "^5.6.3"
