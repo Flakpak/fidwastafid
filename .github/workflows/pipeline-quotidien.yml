@@ -45,9 +45,13 @@
 # Corrigé dans le même lot : `run:` sous bash s'exécute avec `-e` par défaut
 # (GitHub Actions) — `sortie=$(pnpm ... | tee /dev/stderr)` qui échoue tuait
 # le script AVANT les branches `if [ -z "$fichier_relatif" ]` etc., qui
-# auraient pourtant donné le bon diagnostic. `|| true` sur cette ligne laisse
-# le script atteindre ses propres branches de diagnostic, sur les six étapes
-# de scraping.
+# auraient pourtant donné le bon diagnostic. `&& code=0 || code=$?` sur cette
+# ligne (jamais un `|| true` seul — trop large, il avalerait TOUT échec du
+# scraper, pas seulement le crash avant écriture) capture le code réel sans
+# tuer le script, sur les six étapes de scraping. Un DEUXIÈME cas est vérifié
+# juste après, avec ce code : un fichier annoncé mais un processus qui
+# termine quand même en erreur (bug sans rapport avec le réseau, survenu
+# après l'écriture) est traité comme un échec, jamais comme un run propre.
 
 name: Pipeline quotidien
 
@@ -136,22 +140,38 @@ jobs:
       # scrapé doit être rouge, jamais rattrapé silencieusement par un
       # fichier vide ou périmé.
       #
-      # `|| true` sur `sortie=$(...)` : sans lui, bash (-e par défaut sous
-      # GitHub Actions) tue le script exactement à cette ligne si le scraper
-      # échoue (crash réseau) — AVANT que les branches ci-dessous n'aient la
-      # chance de distinguer "aucun fichier" de "fichier vide". Constaté sur
-      # bestmark (fetch failed, 10 runs) : le job restait vert malgré
-      # continue-on-error, sans qu'aucune des trois annotations n'apparaisse
-      # jamais — seule l'annotation générique de pnpm/GitHub était visible.
+      # `&& code=0 || code=$?` sur `sortie=$(...)` : sans lui, bash (-e par
+      # défaut sous GitHub Actions) tue le script exactement à cette ligne si
+      # le scraper échoue (crash réseau) — AVANT que les branches ci-dessous
+      # n'aient la chance de distinguer "aucun fichier" de "fichier vide".
+      # Constaté sur bestmark (fetch failed, 10 runs) : le job restait vert
+      # malgré continue-on-error, sans qu'aucune des trois annotations
+      # n'apparaisse jamais — seule l'annotation générique de pnpm/GitHub
+      # était visible. Un simple `|| true` réglerait ce cas mais en ouvrirait
+      # un autre : il avalerait AUSSI un fichier annoncé suivi d'une erreur
+      # sans rapport avec le réseau (bug après écriture) — le code réel est
+      # donc capturé dans `code` et revérifié juste après le premier `if`.
       - name: Scraping Bringo (Casablanca)
         id: scraping
         run: |
           set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-bringo bringo-categories.txt Casablanca | tee /dev/stderr) || true
+          sortie=$(pnpm --filter pipeline run scraper-bringo bringo-categories.txt Casablanca | tee /dev/stderr) && code=0 || code=$?
 
           fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
           if [ -z "$fichier_relatif" ]; then
             echo "::error::scraper-bringo n'a annoncé aucun fichier d'archive (ligne \"→ Archive : ...\" absente des logs) — run marqué en échec."
+            pnpm --filter pipeline run enregistrer-echec-scraping bringo injoignable || true
+            exit 1
+          fi
+
+          # Un fichier a été annoncé, mais le processus s'est quand même
+          # terminé en erreur APRÈS coup (bug sans rapport avec le réseau,
+          # exception non rattrapée, etc.) — `code` ne peut être non-nul ici
+          # que si `pnpm` a échoué malgré la ligne "→ Archive :" imprimée.
+          # Ignorer cette archive potentiellement incomplète par précaution,
+          # plutôt que de la traiter comme un run propre.
+          if [ "$code" -ne 0 ]; then
+            echo "::error::scraper-bringo a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, run marqué en échec."
             pnpm --filter pipeline run enregistrer-echec-scraping bringo injoignable || true
             exit 1
           fi
@@ -205,11 +225,19 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-inwi | tee /dev/stderr) || true
+          sortie=$(pnpm --filter pipeline run scraper-inwi | tee /dev/stderr) && code=0 || code=$?
 
           fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
           if [ -z "$fichier_relatif" ]; then
             echo "::warning::scraper-inwi n'a annoncé aucun fichier d'archive — source inwi sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping inwi injoignable || true
+            exit 1
+          fi
+
+          # Fichier annoncé, mais processus terminé en erreur après coup —
+          # archive potentiellement incomplète, ignorée par précaution.
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::scraper-inwi a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, source inwi sautée."
             pnpm --filter pipeline run enregistrer-echec-scraping inwi injoignable || true
             exit 1
           fi
@@ -260,11 +288,19 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-universparadiscount | tee /dev/stderr) || true
+          sortie=$(pnpm --filter pipeline run scraper-universparadiscount | tee /dev/stderr) && code=0 || code=$?
 
           fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
           if [ -z "$fichier_relatif" ]; then
             echo "::warning::scraper-universparadiscount n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping universparadiscount injoignable || true
+            exit 1
+          fi
+
+          # Fichier annoncé, mais processus terminé en erreur après coup —
+          # archive potentiellement incomplète, ignorée par précaution.
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::scraper-universparadiscount a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, source sautée."
             pnpm --filter pipeline run enregistrer-echec-scraping universparadiscount injoignable || true
             exit 1
           fi
@@ -318,11 +354,19 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-decathlon | tee /dev/stderr) || true
+          sortie=$(pnpm --filter pipeline run scraper-decathlon | tee /dev/stderr) && code=0 || code=$?
 
           fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
           if [ -z "$fichier_relatif" ]; then
             echo "::warning::scraper-decathlon n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping decathlon injoignable || true
+            exit 1
+          fi
+
+          # Fichier annoncé, mais processus terminé en erreur après coup —
+          # archive potentiellement incomplète, ignorée par précaution.
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::scraper-decathlon a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, source sautée."
             pnpm --filter pipeline run enregistrer-echec-scraping decathlon injoignable || true
             exit 1
           fi
@@ -372,11 +416,19 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-kiabi | tee /dev/stderr) || true
+          sortie=$(pnpm --filter pipeline run scraper-kiabi | tee /dev/stderr) && code=0 || code=$?
 
           fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
           if [ -z "$fichier_relatif" ]; then
             echo "::warning::scraper-kiabi n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping kiabi injoignable || true
+            exit 1
+          fi
+
+          # Fichier annoncé, mais processus terminé en erreur après coup —
+          # archive potentiellement incomplète, ignorée par précaution.
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::scraper-kiabi a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, source sautée."
             pnpm --filter pipeline run enregistrer-echec-scraping kiabi injoignable || true
             exit 1
           fi
@@ -432,11 +484,19 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-bestmark | tee /dev/stderr) || true
+          sortie=$(pnpm --filter pipeline run scraper-bestmark | tee /dev/stderr) && code=0 || code=$?
 
           fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
           if [ -z "$fichier_relatif" ]; then
             echo "::warning::scraper-bestmark n'a annoncé aucun fichier d'archive (probable échec réseau) — source sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping bestmark injoignable || true
+            exit 1
+          fi
+
+          # Fichier annoncé, mais processus terminé en erreur après coup —
+          # archive potentiellement incomplète, ignorée par précaution.
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::scraper-bestmark a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, source sautée."
             pnpm --filter pipeline run enregistrer-echec-scraping bestmark injoignable || true
             exit 1
           fi
