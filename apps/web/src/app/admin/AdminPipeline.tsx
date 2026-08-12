@@ -16,7 +16,6 @@ import {
   type SuppressionResult,
 } from "./AdminDealItem.js";
 import { AdminDealSupprime, type RestaurationResult } from "./AdminDealSupprime.js";
-import { AdminLots, type LotResume, type AnnulerLotResult } from "./AdminLots.js";
 import { MotifRejet } from "./MotifRejet.js";
 import { Button } from "../../components/Button.js";
 
@@ -223,12 +222,6 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     verbe: "publie" | "rejete";
     motifRejet?: string;
   } | null>(null);
-  /** Onglet « Lots récents » (lot du 12/08/2026) — vue INDÉPENDANTE de
-   *  `onglet`/`filtres`/`tri` : pas un statut de deal, une catégorie
-   *  d'action admin. `null` tant que non chargé (distinct de `[]`, liste
-   *  réellement vide). */
-  const [vueLots, setVueLots] = useState(false);
-  const [lots, setLots] = useState<LotResume[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -390,46 +383,12 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     setSelected(new Set());
     // Sinon le panneau de motif reste ouvert au-dessus d'une sélection vidée.
     setDemandeMotifLot(false);
-    setVueLots(false);
     syncUrl(o, f, t);
     void fetchOnglet(o, f, t);
   }
 
   function changerOnglet(o: Onglet) {
     appliquerNavigation(o, filtres, tri);
-  }
-
-  const fetchLots = useCallback(async () => {
-    const res = await fetch("/api/v1/admin/deals/lots");
-    if (!res.ok) return;
-    const body = (await res.json()) as { data: LotResume[] };
-    setLots(body.data);
-  }, []);
-
-  function afficherLots() {
-    setVueLots(true);
-    setLots(null);
-    void fetchLots();
-  }
-
-  /** Défait un lot — rafraîchit la liste des lots (le nombre de « sautés »
-   *  y devient visible) ET les comptes par onglet (des deals ont changé de
-   *  statut, leurs badges doivent le refléter au retour sur un onglet
-   *  normal). */
-  async function annulerLot(lot: string): Promise<AnnulerLotResult> {
-    setPending(true);
-    try {
-      const res = await fetch(`/api/v1/admin/deals/lots/${encodeURIComponent(lot)}/annuler`, { method: "POST" });
-      if (!res.ok) {
-        const body = (await res.json()) as ApiErrorBody;
-        return { ok: false, message: body.error?.message ?? "Annulation du lot impossible." };
-      }
-      const body = (await res.json()) as { revertes: number; sautes: number };
-      await Promise.all([fetchLots(), fetchComptes()]);
-      return { ok: true, revertes: body.revertes, sautes: body.sautes };
-    } finally {
-      setPending(false);
-    }
   }
 
   function appliquerFiltres() {
@@ -771,23 +730,8 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         >
           Supprimés ({comptesSupprimes})
         </button>
-        {/* Onglet Lots récents (lot du 12/08/2026) — même famille que
-            Supprimés : une vue transversale, pas un statut de deal. */}
-        <button
-          type="button"
-          onClick={afficherLots}
-          className={`px-4 py-2 text-sm font-bold whitespace-nowrap border-b-2 -mb-px ${
-            vueLots ? "border-accent text-accent" : "border-transparent text-ink-muted"
-          }`}
-        >
-          Lots récents
-        </button>
       </div>
 
-      {vueLots && <AdminLots lots={lots} pending={pending} onAnnuler={annulerLot} />}
-
-      {!vueLots && (
-        <>
       {/* Filtres — combinables en AND avec l'onglet, filtrés/triés EN BASE
           (voir `urlApi`/`route.ts`, jamais côté client). Appliqués
           explicitement (bouton), pas à chaque frappe : un champ numérique
@@ -1040,8 +984,6 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
             {chargementPage ? "Chargement…" : "Charger plus"}
           </button>
         </div>
-      )}
-        </>
       )}
     </div>
   );
