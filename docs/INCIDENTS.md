@@ -10,6 +10,42 @@ en a appris. Une leçon gravée ici a vocation à être citée depuis le code ou
 
 ---
 
+## 2026-08-12 — Contrainte : `alerte-issue` peut dupliquer une issue au lieu de commenter
+
+*Entrée de **contrainte**, pas d'incident : rien n'a cassé en production. Découverte en
+éprouvant réellement le nouveau mécanisme `alerte-sources` (lot supervision-pipeline) contre
+le vrai dépôt — quatre issues de test créées et fermées, labels nettoyés ensuite.*
+
+**Le fait.** `.github/actions/alerte-issue` déduplique en cherchant une issue déjà ouverte
+portant le même label (`gh issue list --label X --state open`) avant de décider de créer ou
+de commenter. Deux appels rapprochés — à quelques secondes d'écart — peuvent tous les deux
+ne RIEN trouver et créer chacun leur propre issue, au lieu que le second commente celle du
+premier : l'index de recherche de GitHub (utilisé par `gh issue list`) n'a pas forcément
+rattrapé la création précédente au moment de la deuxième requête.
+
+**Constaté concrètement.** Quatre appels de test contre `Flakpak/fidwastafid`, le dernier
+répété deux fois de suite sur le MÊME label (`alerte-source-test-deja-en-base`) : la seconde
+occurrence a créé l'issue #125 au lieu de commenter #124. Une requête `gh issue list`
+identique, relancée environ une minute plus tard, retrouvait bien #125 comme seule ouverte —
+transitoire, pas un bug de logique permanent.
+
+**Portée — infra partagée.** `alerte-issue` sert `alerte-pipeline`, `alerte-backup` (déjà en
+production) et le nouveau `alerte-sources` (un label par source scrapée) — les trois
+partagent ce risque. En usage réel, le risque est faible : les occurrences d'un même label
+sont espacées d'au moins un jour (cadence des crons quotidiens), largement au-delà du délai
+d'indexation observé. Le cas qui l'a révélé — deux appels à quelques secondes d'écart, dans
+la même minute — n'arrive normalement jamais en production.
+
+**Non corrigé.** Pas de fix dans le lot qui l'a découvert : infra partagée, pré-existante,
+hors périmètre de ce lot-là. Piste si ça devient nécessaire : `gh api` avec une lecture plus
+directe que la recherche indexée (`/repos/{owner}/{repo}/issues?labels=...&state=open`), ou
+un court retry avant de conclure à l'absence d'issue ouverte.
+
+**Leçon.** Tracée ici pour qu'un doublon d'issue observé un jour ne soit pas rediagnostiqué
+depuis zéro — le mécanisme de dédoublonnage lui-même n'est pas garanti atomique.
+
+---
+
 ## 2026-08-04 — Une soumission `en_attente` existait en base, invisible dans le back-office
 
 *(Consigné ici le 2026-08-05, après diagnostic.)*
