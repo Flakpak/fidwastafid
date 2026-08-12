@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { DealAdmin, DealStatut, Enseigne } from "@fidwastafid/schemas";
+import { useRouter, useSearchParams } from "next/navigation";
+import { CATEGORIES, type DealAdmin, type DealStatut, type Enseigne } from "@fidwastafid/schemas";
 import type { DoublonInfo } from "../api/v1/_lib/deals.js";
 import {
   AdminDealItem,
@@ -81,37 +82,163 @@ const ONGLET_ACTIONS: Record<DealStatut, Action[]> = {
 /** Sélection groupée réservée aux deux onglets de modération initiale (v1 : idem). */
 const BULK_ONGLETS = new Set<DealStatut>(["auto_draft", "en_attente"]);
 
+/**
+ * Filtres de la file (lot du 12/08/2026) — mêmes clés que les paramètres
+ * `GET /api/v1/admin/deals` acceptés côté serveur (`_lib/adminDealsFilters.ts`).
+ * Chaîne vide = pas de filtre, jamais `undefined` : des champs contrôlés
+ * React ont besoin d'une valeur stable, et une chaîne vide est l'état neutre
+ * naturel d'un input texte/date.
+ */
+interface Filtres {
+  enseigne: string;
+  categorie: string;
+  remiseMin: string;
+  remiseMax: string;
+  prixMin: string;
+  prixMax: string;
+  /** `<input type=date>`, sans heure — `apiDateMax()` l'étend à la fin de
+   *  journée avant l'appel API, pour que le jour choisi soit inclus. */
+  dateMin: string;
+  dateMax: string;
+}
+
+const FILTRES_VIDES: Filtres = {
+  enseigne: "",
+  categorie: "",
+  remiseMin: "",
+  remiseMax: "",
+  prixMin: "",
+  prixMax: "",
+  dateMin: "",
+  dateMax: "",
+};
+
+const TRI_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "Tri par défaut de l'onglet" },
+  { value: "date_desc", label: "Date d'insertion — plus récent d'abord" },
+  { value: "date_asc", label: "Date d'insertion — plus ancien d'abord" },
+  { value: "remise_desc", label: "Remise — plus haute d'abord" },
+  { value: "remise_asc", label: "Remise — plus basse d'abord" },
+  { value: "prix_desc", label: "Prix — plus cher d'abord" },
+  { value: "prix_asc", label: "Prix — moins cher d'abord" },
+];
+
+function filtresDepuisParams(params: URLSearchParams): Filtres {
+  return {
+    enseigne: params.get("enseigne") ?? "",
+    categorie: params.get("categorie") ?? "",
+    remiseMin: params.get("remiseMin") ?? "",
+    remiseMax: params.get("remiseMax") ?? "",
+    prixMin: params.get("prixMin") ?? "",
+    prixMax: params.get("prixMax") ?? "",
+    dateMin: params.get("dateMin") ?? "",
+    dateMax: params.get("dateMax") ?? "",
+  };
+}
+
+function ongletDepuisParams(params: URLSearchParams): Onglet {
+  const brut = params.get("onglet");
+  if (brut === "supprime") return "supprime";
+  if (brut && (ONGLETS_STATUT as string[]).includes(brut)) return brut as DealStatut;
+  return "en_attente";
+}
+
+/** Fin de journée LOCALE (pas UTC) — `<input type=date>` renvoie une date
+ *  sans heure, la comparer telle quelle à `created_at` (`timestamptz`)
+ *  exclurait la quasi-totalité de la journée choisie (minuit UTC ≠ minuit
+ *  local, et une comparaison à minuit pile exclut de toute façon tout ce
+ *  qui a été inséré plus tard ce jour-là). */
+function finDeJournee(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1, 23, 59, 59, 999).toISOString();
+}
+
+/** Paramètres d'URL communs à un chargement (onglet + filtres + tri) —
+ *  UNE fonction pour construire à la fois l'URL de navigation (partageable,
+ *  valeurs brutes) et l'URL d'appel API (`dateMax` étendu). */
+function paramsCommuns(onglet: Onglet, filtres: Filtres, tri: string): URLSearchParams {
+  const params = new URLSearchParams();
+  if (onglet !== "en_attente") params.set("onglet", onglet);
+  if (filtres.enseigne) params.set("enseigne", filtres.enseigne);
+  if (filtres.categorie) params.set("categorie", filtres.categorie);
+  if (filtres.remiseMin) params.set("remiseMin", filtres.remiseMin);
+  if (filtres.remiseMax) params.set("remiseMax", filtres.remiseMax);
+  if (filtres.prixMin) params.set("prixMin", filtres.prixMin);
+  if (filtres.prixMax) params.set("prixMax", filtres.prixMax);
+  if (filtres.dateMin) params.set("dateMin", filtres.dateMin);
+  if (filtres.dateMax) params.set("dateMax", filtres.dateMax);
+  if (tri) params.set("tri", tri);
+  return params;
+}
+
 export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
-  // La liste chargée est déjà celle de L'ONGLET COURANT SEUL — filtrée en
-  // base (`GET /api/v1/admin/deals?statut=…` ou `?supprime=true`), jamais
-  // la table entière triée/filtrée côté client (docs/INCIDENTS.md,
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // La liste chargée est déjà celle de L'ONGLET COURANT SEUL, avec les
+  // FILTRES ACTIFS — filtrés et triés EN BASE (`GET /api/v1/admin/deals`),
+  // jamais la table entière triée/filtrée côté client (docs/INCIDENTS.md,
   // 04/08/2026 : une soumission `en_attente` restait invisible derrière un
-  // `LIMIT` global).
+  // `LIMIT` global — c'est exactement le motif que ce lot évite pour les
+  // filtres/tri).
   const [deals, setDeals] = useState<DealAdminAvecDoublon[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [chargementPage, setChargementPage] = useState(false);
   // Comptes par onglet — TOUJOURS un count(*) en base
   // (`GET /api/v1/admin/deals/compte`), jamais la longueur de `deals` : cette
   // liste est paginée, elle ne peut pas se compter elle-même sans mentir sur
-  // ce qu'elle n'a pas encore chargé.
+  // ce qu'elle n'a pas encore chargé. Volontairement PAS filtrés par les
+  // filtres actifs : le badge d'onglet répond « combien dans ce statut au
+  // total », les filtres répondent « combien j'en vois ici ».
   const [comptes, setComptes] = useState<Record<DealStatut, number>>(COMPTES_INITIAUX);
   const [comptesSupprimes, setComptesSupprimes] = useState(0);
-  const [onglet, setOnglet] = useState<Onglet>("en_attente");
+  // État initial lu depuis l'URL (partage/retour arrière, lot du 12/08/2026)
+  // — un `useState(() => …)` lazy pour le premier rendu ; les navigations
+  // SUIVANTES (internes via `appliquerNavigation`, ou externes — retour
+  // arrière du navigateur) sont reprises par l'effet réactif à
+  // `searchParams` plus bas, seule façon de couvrir les deux origines.
+  const [onglet, setOnglet] = useState<Onglet>(() => ongletDepuisParams(searchParams));
+  const [filtres, setFiltres] = useState<Filtres>(() => filtresDepuisParams(searchParams));
+  const [tri, setTri] = useState<string>(() => searchParams.get("tri") ?? "");
+  /** Filtres non encore appliqués — les inputs sont contrôlés par cet état
+   *  local, jamais directement par `filtres` : un déclenchement réseau par
+   *  frappe (remise/prix numériques) serait une rafale de requêtes pour un
+   *  filtre qui n'a bien souvent de sens qu'à la dernière frappe. */
+  const [filtresBrouillon, setFiltresBrouillon] = useState<Filtres>(filtres);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   /** Le rejet groupé passe par le panneau de motif, jamais par le bouton seul. */
   const [demandeMotifLot, setDemandeMotifLot] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  function urlOnglet(o: Onglet): string {
-    return o === "supprime" ? "/api/v1/admin/deals?supprime=true" : `/api/v1/admin/deals?statut=${o}`;
+  /** URL d'appel API pour un (onglet, filtres, tri) donné — `dateMax` étendu
+   *  à la fin de journée locale (voir `finDeJournee`), pour que le jour
+   *  choisi soit inclus plutôt qu'exclu par une comparaison à minuit. */
+  function urlApi(o: Onglet, f: Filtres, t: string): string {
+    if (o === "supprime") return "/api/v1/admin/deals?supprime=true";
+    const params = paramsCommuns(o, f, t);
+    params.delete("onglet"); // c'est `statut` côté API, pas `onglet`.
+    params.set("statut", o);
+    if (f.dateMax) params.set("dateMax", finDeJournee(f.dateMax));
+    return `/api/v1/admin/deals?${params.toString()}`;
   }
 
-  /** Charge la PREMIÈRE page d'un onglet (ou de l'onglet Supprimés) —
-   *  remplace la liste affichée. */
-  const fetchOnglet = useCallback(async (o: Onglet) => {
+  /** Pose l'état courant dans l'URL — `replace` (pas `push`) : chaque
+   *  ajustement de filtre ne doit pas empiler une entrée d'historique par
+   *  champ modifié, seulement refléter l'état final pour qu'il soit
+   *  partageable et retrouvé après un retour arrière DEPUIS cette page vers
+   *  ailleurs dans l'admin, pas pour naviguer champ par champ en arrière. */
+  function syncUrl(o: Onglet, f: Filtres, t: string) {
+    const params = paramsCommuns(o, f, t);
+    const qs = params.toString();
+    router.replace(qs ? `/admin?${qs}` : "/admin", { scroll: false });
+  }
+
+  /** Charge la PREMIÈRE page d'un (onglet, filtres, tri) — remplace la liste
+   *  affichée. */
+  const fetchOnglet = useCallback(async (o: Onglet, f: Filtres, t: string) => {
     setError(null);
-    const res = await fetch(urlOnglet(o));
+    const res = await fetch(urlApi(o, f, t));
     if (!res.ok) {
       const body = (await res.json()) as ApiErrorBody;
       if (body.error?.code === "UNAUTHENTICATED" || body.error?.code === "FORBIDDEN") {
@@ -136,26 +263,52 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     setComptesSupprimes(body.supprimes);
   }, []);
 
-  /** Après toute mutation : reprend l'onglet courant depuis sa première page
-   *  (un item peut en être sorti — statut changé, supprimé ou restauré — ou
-   *  avoir bougé de rang) et rafraîchit les comptes, qu'elle que soit la
-   *  mutation. */
+  /** Après toute mutation : reprend l'onglet/filtres/tri courants depuis
+   *  leur première page (un item peut en être sorti — statut changé,
+   *  supprimé ou restauré — ou avoir bougé de rang) et rafraîchit les
+   *  comptes, qu'elle que soit la mutation. */
   const rafraichir = useCallback(async () => {
-    await Promise.all([fetchOnglet(onglet), fetchComptes()]);
-  }, [onglet, fetchOnglet, fetchComptes]);
+    await Promise.all([fetchOnglet(onglet, filtres, tri), fetchComptes()]);
+  }, [onglet, filtres, tri, fetchOnglet, fetchComptes]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- chargement initial au montage, pattern standard (https://react.dev/reference/react/useEffect#fetching-data-with-effects), pas de state dérivable du render
-    void fetchOnglet(onglet);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- montage seul, comptes indépendants des filtres/onglet
     void fetchComptes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- montage seul (deps volontairement vides) : l'onglet initial est figé, changerOnglet() gère explicitement les changements d'onglet
-  }, []);
+  }, [fetchComptes]);
+
+  /**
+   * Réagit à `searchParams` plutôt qu'à un montage unique — c'est ce qui
+   * fait « survivre au retour arrière » (lot du 12/08/2026) : le bouton
+   * précédent/suivant du navigateur change l'URL sans repasser par
+   * `appliquerNavigation` (posé par CE composant), seul un effet qui observe
+   * l'URL elle-même peut recharger l'état correspondant. Se compare à l'état
+   * déjà affiché pour ignorer les changements d'URL que ce composant vient
+   * de poser lui-même (`syncUrl`) — sinon chaque navigation interne
+   * déclencherait un second chargement identique, redondant.
+   */
+  useEffect(() => {
+    const o = ongletDepuisParams(searchParams);
+    const f = filtresDepuisParams(searchParams);
+    const t = searchParams.get("tri") ?? "";
+    if (o === onglet && JSON.stringify(f) === JSON.stringify(filtres) && t === tri) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- dérive l'état affiché depuis l'URL, seule source de vérité pour survivre à une navigation externe (retour arrière)
+    setOnglet(o);
+    setFiltres(f);
+    setFiltresBrouillon(f);
+    setTri(t);
+    setDeals(null);
+    setCursor(null);
+    setSelected(new Set());
+    setDemandeMotifLot(false);
+    void fetchOnglet(o, f, t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ne réagit qu'à l'URL ; (onglet, filtres, tri) sont lus pour comparer à l'état COURANT, pas pour déclencher cet effet
+  }, [searchParams]);
 
   const chargerPlus = useCallback(async () => {
     if (!cursor || chargementPage) return;
     setChargementPage(true);
     try {
-      const res = await fetch(`${urlOnglet(onglet)}&cursor=${encodeURIComponent(cursor)}`);
+      const res = await fetch(`${urlApi(onglet, filtres, tri)}&cursor=${encodeURIComponent(cursor)}`);
       if (!res.ok) return;
       const body = (await res.json()) as { data: DealAdminAvecDoublon[]; nextCursor: string | null };
       setDeals((prev) => [...(prev ?? []), ...body.data]);
@@ -163,16 +316,41 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     } finally {
       setChargementPage(false);
     }
-  }, [cursor, chargementPage, onglet]);
+  }, [cursor, chargementPage, onglet, filtres, tri]);
 
-  function changerOnglet(t: Onglet) {
-    setOnglet(t);
+  /** Tout changement d'onglet, de filtre ou de tri RÉINITIALISE le curseur
+   *  de pagination — sans ça, un curseur de la position précédente serait
+   *  rejoué sur un jeu de résultats différent (le serveur le refuse déjà,
+   *  `AdminDealsCursor.filtres`, mais repartir de la première page est le
+   *  comportement attendu, pas une erreur à afficher). */
+  function appliquerNavigation(o: Onglet, f: Filtres, t: string) {
+    setOnglet(o);
+    setFiltres(f);
+    setTri(t);
     setDeals(null);
     setCursor(null);
     setSelected(new Set());
     // Sinon le panneau de motif reste ouvert au-dessus d'une sélection vidée.
     setDemandeMotifLot(false);
-    void fetchOnglet(t);
+    syncUrl(o, f, t);
+    void fetchOnglet(o, f, t);
+  }
+
+  function changerOnglet(o: Onglet) {
+    appliquerNavigation(o, filtres, tri);
+  }
+
+  function appliquerFiltres() {
+    appliquerNavigation(onglet, filtresBrouillon, tri);
+  }
+
+  function reinitialiserFiltres() {
+    setFiltresBrouillon(FILTRES_VIDES);
+    appliquerNavigation(onglet, FILTRES_VIDES, tri);
+  }
+
+  function changerTri(t: string) {
+    appliquerNavigation(onglet, filtres, t);
   }
 
   function toggle(publicId: string) {
@@ -420,6 +598,126 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         >
           Supprimés ({comptesSupprimes})
         </button>
+      </div>
+
+      {/* Filtres — combinables en AND avec l'onglet, filtrés/triés EN BASE
+          (voir `urlApi`/`route.ts`, jamais côté client). Appliqués
+          explicitement (bouton), pas à chaque frappe : un champ numérique
+          déclencherait une requête par chiffre tapé pour un filtre qui n'a
+          de sens qu'une fois complet. */}
+      <div className="bg-surface-subtle border border-border rounded-xl p-3 flex flex-col gap-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-0.5 text-xs font-bold text-ink-muted">
+            Source
+            <select
+              value={filtresBrouillon.enseigne}
+              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, enseigne: e.target.value }))}
+              className="rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
+            >
+              <option value="">Toutes</option>
+              {enseignes.map((ens) => (
+                <option key={ens.slug} value={ens.slug}>
+                  {ens.nom}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-0.5 text-xs font-bold text-ink-muted">
+            Catégorie
+            <select
+              value={filtresBrouillon.categorie}
+              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, categorie: e.target.value }))}
+              className="rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
+            >
+              <option value="">Toutes</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-0.5 text-xs font-bold text-ink-muted">
+            Remise % min
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={filtresBrouillon.remiseMin}
+              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, remiseMin: e.target.value }))}
+              className="w-20 rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
+            />
+          </label>
+          <label className="flex flex-col gap-0.5 text-xs font-bold text-ink-muted">
+            Remise % max
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={filtresBrouillon.remiseMax}
+              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, remiseMax: e.target.value }))}
+              className="w-20 rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
+            />
+          </label>
+          <label className="flex flex-col gap-0.5 text-xs font-bold text-ink-muted">
+            Prix min (DH)
+            <input
+              type="number"
+              min={0}
+              value={filtresBrouillon.prixMin}
+              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, prixMin: e.target.value }))}
+              className="w-24 rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
+            />
+          </label>
+          <label className="flex flex-col gap-0.5 text-xs font-bold text-ink-muted">
+            Prix max (DH)
+            <input
+              type="number"
+              min={0}
+              value={filtresBrouillon.prixMax}
+              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, prixMax: e.target.value }))}
+              className="w-24 rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
+            />
+          </label>
+          <label className="flex flex-col gap-0.5 text-xs font-bold text-ink-muted">
+            Inséré depuis le
+            <input
+              type="date"
+              value={filtresBrouillon.dateMin}
+              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, dateMin: e.target.value }))}
+              className="rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
+            />
+          </label>
+          <label className="flex flex-col gap-0.5 text-xs font-bold text-ink-muted">
+            Jusqu&apos;au
+            <input
+              type="date"
+              value={filtresBrouillon.dateMax}
+              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, dateMax: e.target.value }))}
+              className="rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
+            />
+          </label>
+          <label className="flex flex-col gap-0.5 text-xs font-bold text-ink-muted">
+            Tri
+            <select
+              value={tri}
+              onChange={(e) => changerTri(e.target.value)}
+              className="rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
+            >
+              {TRI_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button variant="primary" size="sm" onClick={appliquerFiltres}>
+            Appliquer les filtres
+          </Button>
+          <Button variant="secondary" size="sm" onClick={reinitialiserFiltres}>
+            Réinitialiser
+          </Button>
+        </div>
       </div>
 
       {!modeSupprimes && BULK_ONGLETS.has(onglet) && deals.length > 0 && (
