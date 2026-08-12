@@ -208,6 +208,20 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   /** Le rejet groupé passe par le panneau de motif, jamais par le bouton seul. */
   const [demandeMotifLot, setDemandeMotifLot] = useState(false);
+  /** Nombre EXACT de lignes que le filtre actif toucherait (lot du
+   *  12/08/2026, `GET /admin/deals/compte-filtre`) — `null` tant qu'il n'a
+   *  pas encore été chargé pour ce (onglet, filtres). Alimente la
+   *  confirmation de « traiter tout le résultat filtré » : la personne doit
+   *  lire le nombre exact, pas un ordre de grandeur. */
+  const [compteFiltre, setCompteFiltre] = useState<number | null>(null);
+  /** Rejet groupé PAR FILTRE — motif d'abord (comme la sélection manuelle). */
+  const [demandeMotifLotFiltre, setDemandeMotifLotFiltre] = useState(false);
+  /** Confirmation nommant le nombre exact + les filtres appliqués — posée
+   *  au-delà du seuil (voir `SEUIL_CONFIRMATION`), quel que soit le verbe. */
+  const [confirmationLotFiltre, setConfirmationLotFiltre] = useState<{
+    verbe: "publie" | "rejete";
+    motifRejet?: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -223,6 +237,27 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     return `/api/v1/admin/deals?${params.toString()}`;
   }
 
+  /** Paramètres onglet+filtres SEULS (pas de tri, pas de curseur — hors
+   *  sujet pour un compte ou une action groupée) — communs à
+   *  `compte-filtre` et `bulk-filtre`, garantit que les DEUX visent
+   *  exactement le même jeu de lignes que la liste affichée. */
+  function paramsFiltreSeul(o: Onglet, f: Filtres): URLSearchParams {
+    const params = paramsCommuns(o, f, "");
+    params.delete("onglet");
+    params.delete("tri");
+    params.set("statut", o);
+    if (f.dateMax) params.set("dateMax", finDeJournee(f.dateMax));
+    return params;
+  }
+
+  function urlCompteFiltre(o: Onglet, f: Filtres): string {
+    return `/api/v1/admin/deals/compte-filtre?${paramsFiltreSeul(o, f).toString()}`;
+  }
+
+  function urlBulkFiltre(o: Onglet, f: Filtres): string {
+    return `/api/v1/admin/deals/bulk-filtre?${paramsFiltreSeul(o, f).toString()}`;
+  }
+
   /** Pose l'état courant dans l'URL — `replace` (pas `push`) : chaque
    *  ajustement de filtre ne doit pas empiler une entrée d'historique par
    *  champ modifié, seulement refléter l'état final pour qu'il soit
@@ -235,7 +270,9 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   }
 
   /** Charge la PREMIÈRE page d'un (onglet, filtres, tri) — remplace la liste
-   *  affichée. */
+   *  affichée. Charge aussi `compteFiltre` (lot du 12/08/2026), SEULEMENT
+   *  sur les onglets où l'action groupée par filtre est offerte — inutile
+   *  ailleurs. */
   const fetchOnglet = useCallback(async (o: Onglet, f: Filtres, t: string) => {
     setError(null);
     const res = await fetch(urlApi(o, f, t));
@@ -248,11 +285,25 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       }
       setDeals(null);
       setCursor(null);
+      setCompteFiltre(null);
       return;
     }
     const body = (await res.json()) as { data: DealAdminAvecDoublon[]; nextCursor: string | null };
     setDeals(body.data);
     setCursor(body.nextCursor);
+
+    if (o !== "supprime" && BULK_ONGLETS.has(o)) {
+      const resCompte = await fetch(urlCompteFiltre(o, f));
+      if (resCompte.ok) {
+        const bodyCompte = (await resCompte.json()) as { total: number };
+        setCompteFiltre(bodyCompte.total);
+      } else {
+        setCompteFiltre(null);
+      }
+    } else {
+      setCompteFiltre(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- urlApi/urlCompteFiltre sont des fonctions pures du composant, pas des dépendances réactives distinctes de (o, f, t) déjà passés en paramètres
   }, []);
 
   const fetchComptes = useCallback(async () => {
@@ -562,6 +613,87 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     }
   }
 
+  /**
+   * Action groupée PAR FILTRE (lot du 12/08/2026) — `statut` et les
+   * filtres vivent dans l'URL de l'appel (`urlBulkFiltre`), jamais un
+   * `publicIds` transmis : le serveur résout lui-même les lignes touchées,
+   * avec le MÊME prédicat que ce que l'écran affiche.
+   */
+  async function bulkFiltre(verbe: "publie" | "rejete", motifRejet?: string) {
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch(urlBulkFiltre(onglet, filtres), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verbe, motifRejet }),
+      });
+      if (!res.ok) {
+        const body = (await res.json()) as ApiErrorBody;
+        setError(body.error?.message ?? "Action groupée impossible.");
+        return;
+      }
+      setDemandeMotifLotFiltre(false);
+      setConfirmationLotFiltre(null);
+      await rafraichir();
+    } finally {
+      setPending(false);
+    }
+  }
+
+  /** Au-delà de ce nombre, une confirmation nommant le compte exact et les
+   *  filtres appliqués s'interpose — en-deçà, le geste reste direct (même
+   *  seuil que pour la sélection manuelle n'en a pas besoin : elle est déjà
+   *  bornée par ce qui est visible et coché à l'écran). */
+  const SEUIL_CONFIRMATION = 20;
+
+  /** Résumé lisible des filtres actifs — porté par la confirmation : la
+   *  personne doit lire CE QU'ELLE s'apprête à faire, pas seulement combien. */
+  function resumeFiltres(f: Filtres): string {
+    const parts: string[] = [];
+    if (f.enseigne) {
+      const nom = enseignes.find((e) => e.slug === f.enseigne)?.nom ?? f.enseigne;
+      parts.push(`Source : ${nom}`);
+    }
+    if (f.categorie) parts.push(`Catégorie : ${f.categorie}`);
+    if (f.remiseMin) parts.push(`Remise ≥ ${f.remiseMin}%`);
+    if (f.remiseMax) parts.push(`Remise ≤ ${f.remiseMax}%`);
+    if (f.prixMin) parts.push(`Prix ≥ ${f.prixMin} DH`);
+    if (f.prixMax) parts.push(`Prix ≤ ${f.prixMax} DH`);
+    if (f.dateMin) parts.push(`Inséré depuis le ${f.dateMin}`);
+    if (f.dateMax) parts.push(`Jusqu'au ${f.dateMax}`);
+    return parts.length > 0 ? parts.join(" · ") : "Aucun filtre — tout l'onglet";
+  }
+
+  /** Point d'entrée « Valider tout le résultat filtré » — pas de motif à
+   *  demander pour ce verbe, directement le seuil de confirmation. */
+  function demanderValidationFiltre() {
+    if (compteFiltre === null) return;
+    if (compteFiltre > SEUIL_CONFIRMATION) {
+      setConfirmationLotFiltre({ verbe: "publie" });
+    } else {
+      void bulkFiltre("publie");
+    }
+  }
+
+  /** Point d'entrée « Rejeter tout le résultat filtré » — motif d'abord
+   *  (`demandeMotifLotFiltre`), le seuil de confirmation se pose APRÈS
+   *  le motif choisi (`onMotifChoisiFiltre`), jamais avant : les deux
+   *  exigences sont indépendantes, chacune couvre un risque différent. */
+  function demanderRejetFiltre() {
+    if (compteFiltre === null) return;
+    setDemandeMotifLotFiltre(true);
+  }
+
+  function onMotifChoisiFiltre(motif: string) {
+    setDemandeMotifLotFiltre(false);
+    if (compteFiltre !== null && compteFiltre > SEUIL_CONFIRMATION) {
+      setConfirmationLotFiltre({ verbe: "rejete", motifRejet: motif });
+    } else {
+      void bulkFiltre("rejete", motif);
+    }
+  }
+
   if (error) {
     return <p className="bg-surface border border-border rounded-xl p-5 text-center text-warn font-bold">{error}</p>;
   }
@@ -742,6 +874,63 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
               onAnnuler={() => setDemandeMotifLot(false)}
               onRejeter={(motif) => bulk("rejete", motif)}
             />
+          )}
+        </div>
+      )}
+
+      {/* Action groupée PAR FILTRE (lot du 12/08/2026) — « tout Kiabi sous
+          30 % » se traite d'un bloc, pas coche par coche. Séparée visuellement
+          de la sélection manuelle ci-dessus : celle-ci agit sur ce qui est
+          COCHÉ, celle-là sur TOUT ce que le filtre actif désigne — deux
+          portées différentes, jamais confondues à l'écran. */}
+      {!modeSupprimes && BULK_ONGLETS.has(onglet) && compteFiltre !== null && compteFiltre > 0 && (
+        <div className="border-t border-border pt-3 flex flex-col gap-2">
+          <p className="text-xs font-bold text-ink-muted">
+            Traiter TOUT le résultat filtré — {compteFiltre} deal{compteFiltre > 1 ? "s" : ""} ({resumeFiltres(filtres)})
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="primary" size="sm" onClick={demanderValidationFiltre} disabled={pending}>
+              Valider tout ({compteFiltre})
+            </Button>
+            <Button variant="danger" size="sm" onClick={demanderRejetFiltre} disabled={pending}>
+              Rejeter tout ({compteFiltre})
+            </Button>
+          </div>
+          {demandeMotifLotFiltre && (
+            <MotifRejet
+              libelleConfirmation={`Rejeter les ${compteFiltre}`}
+              pending={pending}
+              onAnnuler={() => setDemandeMotifLotFiltre(false)}
+              onRejeter={onMotifChoisiFiltre}
+            />
+          )}
+          {/* Confirmation nommant le nombre exact ET les filtres — la
+              personne doit lire ce qu'elle s'apprête à faire, pas
+              seulement combien (au-delà de SEUIL_CONFIRMATION). */}
+          {confirmationLotFiltre && (
+            <div className="bg-warn-soft border border-warn/40 rounded-xl p-3 flex flex-col gap-2">
+              <p className="text-sm font-bold text-ink">
+                {confirmationLotFiltre.verbe === "rejete" ? "Rejeter" : "Valider"} précisément {compteFiltre} deal
+                {compteFiltre > 1 ? "s" : ""} ?
+              </p>
+              <p className="text-xs text-ink-muted">Filtre appliqué : {resumeFiltres(filtres)}</p>
+              {confirmationLotFiltre.motifRejet && (
+                <p className="text-xs text-ink-muted">Motif : {confirmationLotFiltre.motifRejet}</p>
+              )}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={confirmationLotFiltre.verbe === "rejete" ? "danger" : "primary"}
+                  size="sm"
+                  onClick={() => void bulkFiltre(confirmationLotFiltre.verbe, confirmationLotFiltre.motifRejet)}
+                  disabled={pending}
+                >
+                  Confirmer
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setConfirmationLotFiltre(null)} disabled={pending}>
+                  Annuler
+                </Button>
+              </div>
+            </div>
           )}
         </div>
       )}
