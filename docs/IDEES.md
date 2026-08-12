@@ -638,9 +638,10 @@ d'ici là dans l'advisor Supabase — état nominal documenté au CONTRAT-V1 §9
 Le lot 5 du plan « suppression administrative des deals » (`apps/pipeline/purger-lignes.mjs`,
 CONTRAT-V1 §1/§3, quatorzième amendement) exclut explicitement les deals `expire` de son périmètre
 automatique — CONTRAT-V1 **§1** grave « URL vivante à vie, jamais de suppression » pour un deal
-expiré, un actif SEO. Cette exclusion couvre aujourd'hui les 430 `expire` jamais publiés (« purgeables »
-au sens du lot 3, `deals_protection.protege = false`) sans distinction : traités comme un bloc protégé,
-qu'ils aient ou non une valeur SEO réelle.
+expiré, un actif SEO. Cette exclusion couvre aujourd'hui les **681** `expire` jamais publiés (« purgeables »
+au sens du lot 3, `deals_protection.protege = false` — 430 le 05/08/2026, remesuré à 681 le 12/08/2026,
+le pipeline a continué de tourner) sans distinction : traités comme un bloc protégé, qu'ils aient ou non
+une valeur SEO réelle.
 
 **Ce n'est pas tranché, c'est différé faute de mesure.** L'argument SEO suppose que ces pages sont
 effectivement indexées et rapportent du trafic — rien ne le vérifie aujourd'hui. Avant d'envisager une
@@ -658,6 +659,23 @@ purge automatique de ce sous-ensemble (jamais publié, donc jamais mis en avant,
 
 Déblocage : uniquement piloté par la mesure Search Console, jamais spéculativement — même principe que
 la taxonomie v3 et les facettes croisées ci-dessus.
+
+**Suite du 12/08/2026 — ces 681 pages sont sorties du sitemap** (`apps/web/src/app/sitemap.xml/route.ts` :
+seuls `publie` et `expire` avec `deals_protection.protege = true` y figurent désormais ; mesuré avant
+écriture, lecture seule production : 681 `expire` protégés = 0). Elles restent cependant en **200**
+aujourd'hui — aucune trace de diffusion pour aucune des 681 (`protege = false` couvre ce cas), donc
+aucun lien externe déjà partagé connu, mais rien ne garantit une absence totale (un `public_id` deviné
+ou une capture d'écran partagée resteraient possibles, juste extrêmement improbables — nanoid 10
+caractères).
+
+Options pour leur statut HTTP, décision à prendre séparément (aucune construite) :
+
+| Option | Coût | Conséquence |
+|---|---|---|
+| **A — statu quo** (200, juste hors sitemap, déjà l'état après ce lot) | Nul | Réversible à 100 %. Mais Google peut encore les (re)découvrir hors sitemap (exploration profonde, lien externe hypothétique) et les indexer par accident — ne règle le problème qu'à moitié. |
+| **B — `noindex` explicite** sur ces pages précises (condition déjà disponible : `statut='expire' && !protege`, dans `generateMetadata` de la fiche deal) | Faible — quelques lignes, pas de migration | Page reste 200, un lien déjà partagé continue de fonctionner à l'identique, mais dit explicitement à Google de ne pas indexer — désindexe aussi les 22 pages déjà dans l'index si certaines en font partie. Le signal le plus honnête : « ceci n'est pas un actif ». |
+| **C — page d'archive dédiée** listant ces deals à part | Élevé — nouvelle route, UX à concevoir, risque de confusion (« pourquoi ce deal n'a jamais été validé ? ») | Recrée un chemin interne, mais vers du contenu jamais modéré — tension avec l'objectif même de ce lot (qualité perçue). |
+| **D — 410 Gone** au lieu de 200 | Moyen — modifie la résolution de la fiche deal pour ce cas précis | Signal le plus fort, Google purge plus vite qu'un simple 404. Seule option qui casse un lien déjà partagé s'il en existait un — irréversible côté UX (les données restent en base, la page non). |
 
 ## Identité juridique du responsable de traitement — en pause, structure prête (2026-08-05)
 
