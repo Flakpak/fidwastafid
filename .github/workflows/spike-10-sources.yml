@@ -1,0 +1,64 @@
+# Spike jetable — jamais destiné à être fusionné sur main.
+# Joignabilité depuis un runner GitHub + signaux de structure pour les
+# candidats ayant passé le filtre robots.txt. C'est le point qui a fait
+# tomber bestmark et decathlon, invisible depuis un réseau normal.
+name: Spike 10 sources (jetable)
+on:
+  workflow_dispatch:
+  push:
+    branches: [ops/spike-10-sources]
+    paths: [.github/workflows/spike-10-sources.yml]
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Fetch + signaux structure pour chaque candidat
+        run: |
+          cat > /tmp/spike.mjs <<'SPIKE_EOF'
+          const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
+
+          const cibles = [
+            { nom: "marjanemall.ma", url: "https://www.marjanemall.ma/" },
+            { nom: "marjanemall.ma/promotions", url: "https://www.marjanemall.ma/promotions" },
+            { nom: "ab-maroc.com", url: "https://ab-maroc.com/" },
+            { nom: "biougnach.ma", url: "https://www.biougnach.ma/" },
+            { nom: "beautymall.ma", url: "https://www.beautymall.ma/" },
+            { nom: "lemobilier.ma", url: "https://lemobilier.ma/" },
+            { nom: "aswakassalam.com", url: "https://aswakassalam.com/" },
+          ];
+
+          function analyse(html) {
+            const del = (html.match(/<del/gi) || []).length;
+            const ins = (html.match(/<ins/gi) || []).length;
+            const jsonLd = (html.match(/application\/ld\+json/gi) || []).length;
+            const jsonLdOffer = (html.match(/"@type"\s*:\s*"Offer"/gi) || []).length;
+            const priceClass = (html.match(/class="[^"]*price[^"]*"/gi) || []).length;
+            const appRoot = /<app-root|ng-version|data-reactroot|__NEXT_DATA__|id="app"[^>]*>\s*<\/div>/i.test(html);
+            const promoWord = (html.match(/promo|solde|r[ée]duction|remise/gi) || []).length;
+            return { len: html.length, del, ins, jsonLd, jsonLdOffer, priceClass, appRoot, promoWord };
+          }
+
+          for (const { nom, url } of cibles) {
+            try {
+              const r = await fetch(url, { headers: { "User-Agent": ua } });
+              const t = await r.text();
+              const a = analyse(t);
+              console.log(
+                nom, "|", url, "| STATUS", r.status,
+                "| LEN", a.len,
+                "| <del>", a.del, "| <ins>", a.ins,
+                "| JSON-LD", a.jsonLd, "(Offer:", a.jsonLdOffer + ")",
+                "| class*=price", a.priceClass,
+                "| indices SPA/CSR (app-root/next/react)", a.appRoot,
+                "| mots promo/solde/reduction", a.promoWord
+              );
+            } catch (e) {
+              console.log(nom, "|", url, "| FETCH FAILED:", e.message);
+            }
+          }
+          SPIKE_EOF
+          node /tmp/spike.mjs
