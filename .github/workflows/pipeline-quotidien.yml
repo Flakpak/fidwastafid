@@ -11,13 +11,16 @@
 # Automatisé uniquement : scraper-bringo (categories.txt auto-suffisant),
 # scraper-inwi (page unique auto-suffisante), scraper-universparadiscount
 # (homepage auto-suffisante), scraper-decathlon (catégorie /5080-promotions
-# auto-suffisante, pagination bornée), scraper-kiabi (products.json Shopify,
-# pagination bornée + cap de 120 deals/run) et scraper-bestmark (GraphQL
-# Magento public, pagination bornée par total_count) + insert-deals (qui fait lui-même
+# auto-suffisante, pagination bornée) et scraper-kiabi (products.json Shopify,
+# pagination bornée + cap de 120 deals/run) + insert-deals (qui fait lui-même
 # l'extraction de description via fiche-produit.mjs, cf. README). PAS
 # extract-catalogue : ce script attend une URL/chemin de catalogue précis à
 # chaque appel (aucun mécanisme de découverte automatique) — il ne peut pas
 # tourner sans surveillance, il reste un geste manuel ponctuel.
+#
+# scraper-bestmark RETIRÉ du cron le 13/08/2026 — voir docs/IDEES.md,
+# section « Bestmark — retrait du cron ». Le script reste dans le dépôt
+# (exécutable à la main), simplement plus appelé automatiquement.
 #
 # Pas de continue-on-error sur la chaîne PRINCIPALE (expiration -> Bringo ->
 # insertion -> revalidation) : un échec y fait échouer le job franchement —
@@ -464,74 +467,6 @@ jobs:
             echo "::warning::kiabi — aucun deal retenu après filtrage sur ce run : $resume"
           elif [ "$cause" = "deja_en_base" ]; then
             echo "::warning::kiabi — tout ce qui a été retenu était déjà en base sur ce run : $resume"
-          fi
-
-      # Source secondaire bestmark (lot du 02/08/2026) — même pattern.
-      #
-      # ⚠️ RENDEMENT CONNU ET FAIBLE : balayage complet du catalogue le
-      # 02/08/2026 — 865 produits, **1 seul remisé**. Un run à 0 deal EXTRAIT
-      # est donc plausible ici (d'où le ::warning::, jamais ::error::) — mais
-      # ce n'est PAS une exemption de supervision : un run à 0 deal parce que
-      # le scraper a RÉELLEMENT tourné (cause 'rien_retenu', déclarée par
-      # enregistrer-echec-scraping.mjs ci-dessous) est traité comme les
-      # autres sources par verifier-sources-mortes.mjs, SANS seuil relevé.
-      # Seule une panne réseau (cause 'injoignable', aucun fichier produit)
-      # a un seuil différent — 2 runs, comme toutes les sources — jamais
-      # exemptée : un zéro qui vient d'une panne n'est pas un état normal,
-      # même documenté pour le zéro qui vient d'un vrai run vide.
-      - name: Scraping bestmark (GraphQL Magento public)
-        id: scraping_bestmark
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-bestmark | tee /dev/stderr) && code=0 || code=$?
-
-          fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
-          if [ -z "$fichier_relatif" ]; then
-            echo "::warning::scraper-bestmark n'a annoncé aucun fichier d'archive (probable échec réseau) — source sautée pour ce run."
-            pnpm --filter pipeline run enregistrer-echec-scraping bestmark injoignable || true
-            exit 1
-          fi
-
-          # Fichier annoncé, mais processus terminé en erreur après coup —
-          # archive potentiellement incomplète, ignorée par précaution.
-          if [ "$code" -ne 0 ]; then
-            echo "::warning::scraper-bestmark a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, source sautée."
-            pnpm --filter pipeline run enregistrer-echec-scraping bestmark injoignable || true
-            exit 1
-          fi
-
-          fichier="apps/pipeline/$fichier_relatif"
-          if [ ! -f "$fichier" ]; then
-            echo "::warning::Fichier annoncé par scraper-bestmark introuvable sur disque : $fichier — source sautée."
-            pnpm --filter pipeline run enregistrer-echec-scraping bestmark injoignable || true
-            exit 1
-          fi
-
-          nb_deals=$(jq 'length' "$fichier")
-          echo "Deals bestmark extraits : $nb_deals"
-          if [ "$nb_deals" -eq 0 ]; then
-            echo "::warning::0 deal extrait par scraper-bestmark — catalogue sans remise ce jour-là (cas courant sur cette source, mais le scraper a réellement tourné)."
-            pnpm --filter pipeline run enregistrer-echec-scraping bestmark rien_retenu || true
-            exit 1
-          fi
-
-          echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
-
-      - name: Insertion bestmark en base (validation zod partagée)
-        if: steps.scraping_bestmark.outcome == 'success'
-        continue-on-error: true
-        env:
-          FICHIER_EXTRACTION_BESTMARK: ${{ steps.scraping_bestmark.outputs.fichier }}
-        run: |
-          set -o pipefail
-          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_BESTMARK" | tee /dev/stderr)
-          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
-          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
-          if [ "$cause" = "rien_retenu" ]; then
-            echo "::warning::bestmark — aucun deal retenu après filtrage sur ce run : $resume"
-          elif [ "$cause" = "deja_en_base" ]; then
-            echo "::warning::bestmark — tout ce qui a été retenu était déjà en base sur ce run : $resume"
           fi
 
       - name: Revalidation Next.js (feed, enseignes, sitemap)
