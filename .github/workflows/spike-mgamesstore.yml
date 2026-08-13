@@ -18,31 +18,30 @@ jobs:
           node-version: 22
       - name: Fetch + analyse
         run: |
-          node -e "
-          async function main() {
-            const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
-            const url = 'https://mgamesstore.com/product-category/jeux-video/promotion/';
-            const r = await fetch(url, { headers: { 'User-Agent': ua } });
-            const t = await r.text();
-            console.log('STATUS', r.status, 'LEN', t.length);
-            console.log('Cloudflare challenge:', t.includes('Just a moment') || t.includes('Attention Required'));
+          cat > /tmp/spike.mjs <<'SPIKE_EOF'
+          const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
+          const url = "https://mgamesstore.com/product-category/jeux-video/promotion/";
+          const r = await fetch(url, { headers: { "User-Agent": ua } });
+          const t = await r.text();
+          console.log("STATUS", r.status, "LEN", t.length);
+          console.log("Cloudflare challenge:", t.includes("Just a moment") || t.includes("Attention Required"));
 
-            const liEls = [...t.matchAll(/<li[^>]*class=\"[^\"]*product[^\"]*\"[\s\S]*?<\/li>/gi)];
-            console.log('cartes <li class=product...> trouvées :', liEls.length);
+          const liEls = [...t.matchAll(/<li[^>]*class="[^"]*product[^"]*"[\s\S]*?<\/li>/gi)];
+          console.log("cartes li.product trouvees :", liEls.length);
 
-            for (const cand of ['woocommerce-loop-product__title','onsale','woocommerce-Price-amount','<del','<ins','wp-post-image','attachment-woocommerce_thumbnail']) {
-              const n = (t.match(new RegExp(cand.replace(/[.*+?^\${}()|[\]\\]/g, '\\\\\$&'), 'gi')) || []).length;
-              console.log('occurrences de', cand, ':', n);
-            }
-
-            if (liEls.length > 0) {
-              console.log('--- PREMIERE CARTE PRODUIT (brut, 2500 car max) ---');
-              console.log(liEls[0][0].slice(0, 2500));
-            } else {
-              const idx = t.indexOf('woocommerce-Price-amount');
-              console.log('--- FRAGMENT AUTOUR DU PREMIER PRIX (brut) ---');
-              console.log(idx >= 0 ? t.slice(Math.max(0, idx - 800), idx + 800) : 'introuvable');
-            }
+          const candidats = ["woocommerce-loop-product__title", "onsale", "woocommerce-Price-amount", "<del", "<ins", "wp-post-image", "attachment-woocommerce_thumbnail", "product-title", "product_title"];
+          for (const c of candidats) {
+            const n = t.split(c).length - 1;
+            console.log("occurrences de", c, ":", n);
           }
-          main().catch(e => console.log('FETCH FAILED:', e.message));
-          "
+
+          if (liEls.length > 0) {
+            console.log("--- PREMIERE CARTE (brut, 2500 car) ---");
+            console.log(liEls[0][0].slice(0, 2500));
+          } else {
+            const idx = t.indexOf("woocommerce-Price-amount");
+            console.log("--- FRAGMENT AUTOUR DU PREMIER PRIX ---");
+            console.log(idx >= 0 ? t.slice(Math.max(0, idx - 1000), idx + 1000) : "introuvable");
+          }
+          SPIKE_EOF
+          node /tmp/spike.mjs
