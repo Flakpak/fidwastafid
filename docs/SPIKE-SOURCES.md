@@ -744,7 +744,119 @@ du point 10 couvre déjà probablement le même contenu sans passer par
 l'extraction visuelle : **les deux voies se recoupent largement**, pas la
 peine de les construire toutes les deux sans clarifier laquelle sert quoi.
 
-**Pas de scraper codé, ni ici ni au point 10.**
+**Pas de scraper codé, ni ici ni au point 10** au moment de la première
+rédaction — le point 12 ci-dessous couvre la suite : le scraper de l'API
+(point 10) a depuis été construit, en PR séparée (`feat/scraper-carrefour`,
+PR #134), avec une vraie mesure de recouvrement contre bringo.
+
+---
+
+## 12 — Suite du 13/08 : recouvrement bringo mesuré, prospectus PDF non comparé faute d'outillage
+
+**Décision prise entre-temps (13/08/2026)** : l'API JSON est retenue, mais
+**ne remplace pas bringo tout de suite** — apparue le jour même, stabilité
+non prouvée, bringo première source en volume. Le scraper (`scraper-carrefour.mjs`,
+PR #134, non fusionnée) tourne **en parallèle** de bringo, sous la **même
+enseigne** (`"Carrefour"`, délibéré) pour que le dédoublonnage
+titre+enseigne+prix d'`insert-deals.mjs` s'applique sans amendement.
+
+### Taux de doublons réel — mesuré, pas supposé
+
+Run réel du scraper (13/08/2026) : **162 deals extraits sur 187 produits**
+API. Comparaison en lecture seule contre les deals `Carrefour` (bringo)
+actuellement actifs en base, avec **exactement le prédicat de dédoublonnage
+d'`insert-deals.mjs`** (`lower(titre) = lower($1) AND enseigne_id = $2 AND
+prix_promo = $3 AND (date_fin IS NULL OR date_fin >= CURRENT_DATE) AND
+supprime_le IS NULL`) :
+
+```
+total_fraiches = 162
+doublons_exacts_titre_prix = 0
+```
+
+**0 doublon exact.** Contrôle complémentaire, semantique cette fois (pas
+seulement le prédicat SQL) : les 8 téléviseurs et 8 gros électroménagers
+(réfrigérateurs, congélateurs, four) extraits de l'API du jour ont été
+comparés à la main aux 30 deals `High-Tech`/`Électroménager` actuellement
+actifs côté bringo — **aucun recoupement même approximatif** (bringo
+scrape aujourd'hui des accessoires et petit électroménager de marque
+détaillée — casques Bluetooth JBL/Energy Sistem, mini-hachoirs Taurus —
+quand l'API sert des téléviseurs Samsung/LG/Haier et de gros électroménager
+Whirlpool/Candy : **des gammes de produits différentes dans les mêmes
+catégories**, pas seulement des titres différents pour les mêmes articles).
+
+**Portée de la mesure, à ne pas sur-interpréter** : 0 % aujourd'hui ne
+garantit pas 0 % demain — c'est un instantané sur un run, pas une preuve
+structurelle. Le risque théorique documenté au point 10(d) (dédoublonnage
+sur titre+prix, pas sur lien — un même produit physique avec un titre ou
+un prix formaté différemment entre les deux sources ne serait pas détecté)
+**reste réel**, simplement non observé sur ce run précis. **Décision, sur
+la base de cette mesure** : le cumul est tenable pour l'instant — recouvrement
+nul aujourd'hui, sur des catégories qui se recoupent peu structurellement
+(bringo = 2 rayons étroits déjà occupés par d'autres gammes). À
+re-mesurer périodiquement pendant la période de recouvrement, pas une
+vérification unique.
+
+### Prospectus PDF vs API — non comparé, limite d'outillage assumée
+
+**Le prospectus Carrefour Express** (le plus petit des 9, 2,4 Mo, valide
+13-19/08/2026, téléchargé et vérifié) **ne contient aucun texte
+extractible** : `pdftotext` renvoie 0 caractère — confirmation directe que
+c'est un flyer 100 % image, l'extraction Vision (Claude) est la **seule**
+voie possible, jamais un parsing de texte.
+
+**La comparaison produit-à-produit prospectus ↔ API n'a pas pu être faite
+dans cet environnement** : ni rendu d'image (`pdftoppm`/poppler absent, seul
+`pdftotext` est disponible), ni appel à l'API Claude Vision
+(`ANTHROPIC_API_KEY` non disponible ici). Honnêtement non mesuré, pas
+supposé négligeable — **la question posée (les prospectus couvrent-ils des
+offres magasin absentes de l'API de livraison) reste ouverte**, à trancher
+par un run réel d'`extract-catalogue.mjs` (avec la clé de production) sur
+ce même prospectus Express, comparé aux ~40 produits `Carrefour Express` de
+l'API sur la même fenêtre de dates. Pas fait ici, à faire avant toute
+décision sur les prospectus.
+
+### extract-catalogue.mjs — ce qui manque pour la production
+
+**Ce qui est déjà en place** : le script accepte une URL PDF directement
+(`loadSource()`, `apps/pipeline/extract-catalogue.mjs`), encode en base64,
+un seul appel à l'API Messages Claude par catalogue — **le PDF entier en
+un bloc, jamais découpé page par page**. Conséquence directe : le coût
+domine par la **taille** du PDF envoyé (17-18 Mo pour les 2 gros
+catalogues Carrefour hypermarché, 2,4-7,4 Mo pour les 3 petits), pas par
+un nombre d'appels proportionnel aux pages — 9 catalogues actifs
+aujourd'hui = 9 appels par cycle, pas 9×n_pages. Le prompt d'extraction
+sait déjà lire une date de validité globale et l'appliquer à tous les
+produits (`date_fin`), et une confiance basse plutôt qu'un prix deviné.
+
+**Ce qui manque, concrètement, avant un branchement production :**
+
+1. **Coût réel non mesuré ici** (pas de clé API dans cet environnement) —
+   à chiffrer avec un run réel sur les 2 gros catalogues (17-18 Mo) avant
+   d'engager quoi que ce soit : la facturation Vision de Claude dépend de
+   la résolution/du nombre de pages rendues en interne par l'API, pas
+   directement du poids du fichier, donc le Mo du PDF n'est qu'un indice,
+   pas une mesure de coût.
+2. **Limite de taille/pages de l'API Messages non vérifiée** pour un PDF de
+   17-18 Mo — à confirmer avant d'automatiser, pas supposée passer.
+3. **Aucun mécanisme de découverte automatique des catalogues actifs** —
+   `extract-catalogue.mjs` attend une URL précise en argument (comme
+   documenté depuis l'origine, `pipeline-quotidien.yml`) ; brancher
+   `/api/catalogues` (filtré sur `endDate >= aujourd'hui`) comme source de
+   cette liste est simple (JSON propre, 9 entrées) mais n'existe pas
+   encore.
+4. **Fiabilité de l'extraction sur ce type de flyer non vérifiée** — jamais
+   testé sur un prospectus Carrefour réel, seulement sur les cas d'usage
+   d'origine du script. À valider par un run réel avant tout branchement.
+
+**Recommandation, compte tenu des deux voies déjà posées (API vs
+prospectus)** : ne pas construire l'automatisation des prospectus avant
+d'avoir la mesure de recouvrement ci-dessus (section précédente) — si
+l'API couvre déjà l'essentiel des offres des prospectus, l'extraction
+Vision (plus lourde, coût non chiffré, fiabilité non vérifiée) n'ajoute
+rien qui justifie sa complexité.
+
+**Aucun scraper de prospectus codé.**
 
 ---
 
