@@ -78,9 +78,13 @@ que de les interpréter lui-même.
   de la requête, aucune URL à query string n'est demandée. Ne retient que les
   produits dont `final_price < regular_price` et `IN_STOCK`. Pagination bornée
   par `total_count` (jamais découverte en dépassant : Magento répond une erreur
-  au-delà de la dernière page). ⚠️ **Rendement mesuré : 1 produit remisé sur
-  865** — un run à 0 deal est le cas normal ici. Écrit
-  `extractions/AAAA-MM-JJ_HH-mm_bestmark.json`. Prérequis d'insertion :
+  au-delà de la dernière page). ⚠️ **RETIRÉ du cron le 13/08/2026** — voir
+  `docs/IDEES.md` (« Bestmark — retrait du cron ») : blocage réseau depuis les
+  runners GitHub (`fetch failed`, dix runs consécutifs), site normal depuis un
+  autre réseau, et rendement déjà quasi nul (1 produit remisé sur 865). Le
+  script reste exécutable à la main (`pnpm --filter pipeline run
+  scraper-bestmark`), simplement plus appelé par `pipeline-quotidien.yml`.
+  Écrit `extractions/AAAA-MM-JJ_HH-mm_bestmark.json`. Prérequis d'insertion :
   l'enseigne curée `bestmark` en base.
 - **extract-catalogue** — extrait les deals d'un catalogue (PDF/image) via
   l'API Claude. Écrit une archive dans `extractions/AAAA-MM-JJ_HH-mm_<enseigne>.json`.

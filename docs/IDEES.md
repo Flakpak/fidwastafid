@@ -502,6 +502,60 @@ nouvelles sources (domaines différents), pas par un rayon plus fin sur des
 sources déjà mono-domaine — ne pas reposer la question sans un fait nouveau
 (ex. une de ces enseignes élargit réellement son offre hors de son domaine).
 
+## Bestmark — retrait du cron (2026-08-13)
+
+**Retiré de `pipeline-quotidien.yml`, pas supprimé du dépôt.** Le script
+(`scraper-bestmark.mjs`) reste exécutable à la main ; simplement plus appelé
+automatiquement chaque jour.
+
+**Motif — deux constats indépendants, chacun suffisant seul :**
+
+- **Blocage réseau depuis les runners GitHub, pas une politique déclarée.**
+  `fetch failed` (échec TCP/TLS, jamais un statut HTTP) sur au moins dix runs
+  consécutifs (`pipeline-quotidien.yml`, commentaire du 12/08). Vérifié le
+  13/08/2026 depuis un réseau tiers : le site répond normalement (200,
+  contenu e-commerce complet), et son `robots.txt` ne nomme aucun bot IA —
+  contrairement à marwa.com/iam.ma (`Disallow: ClaudeBot` explicite), ce
+  n'est pas un refus délibéré à respecter, mais une plage d'IP bloquée qu'on
+  ne peut pas réparer sans changer d'infrastructure d'exécution (hors
+  périmètre).
+- **Rendement déjà quasi nul, indépendamment du blocage** : 1 seul produit
+  remisé sur 865 mesurés (`SPIKE-SOURCES.md`, 02/08/2026). Même joignable à
+  100 %, la source ne justifierait pas sa place dans le cron quotidien.
+
+**Ne pas réintroduire sans fait nouveau** : soit le blocage réseau se lève
+de lui-même (à revérifier ponctuellement, pas activement surveillé), soit
+Bestmark ouvre de vraies opérations commerciales qui changeraient le
+rendement — l'un des deux, pas une réintroduction par habitude.
+
+## Gaming — spike réel avant tout code (2026-08-13)
+
+Candidats identifiés (recherche web, aucun n'avait été évalué dans
+`SPIKE-SOURCES.md`) : zonetech.ma, mediazone.ma, marjanemall.ma,
+mgamesstore.com, boutika.co.ma, setupgame.ma, **gamezone.ma**, playstore.ma.
+
+**gamezone.ma (PrestaShop, même plateforme que decathlon/universparadiscount)
+— pas le gain espéré.** `robots.txt` permissif (aucun `Disallow` pertinent,
+aucun bot IA nommé), mais la page d'accueil est un **coquille vide côté
+données** : 14 `href` seulement dans le HTML brut (assets + connexion), zéro
+lien catégorie, zéro marqueur de prix — la grille produit est chargée par des
+modules PrestaShop custom (`gz_hometab`, `gz_homesearch`) en AJAX après coup.
+Pas de `sitemap.xml` (404) pour contourner par découverte. Testé avec Node
+`fetch` (le client réellement utilisé en prod, pas `curl` — leçon
+mrbricolage), depuis ce réseau, pas depuis un runner GitHub. Verdict :
+**pas cheerio-compatible en l'état** — nécessiterait de retrouver l'endpoint
+AJAX interne (non fait, hors budget de ce spike) ou un rendu JS (écarté par
+principe, cf. electroplanet).
+
+**Piste de repli trouvée en cours de route : mgamesstore.com**
+(`/product-category/jeux-video/promotion/`) — WooCommerce, `robots.txt`
+permissif, **28 résultats** sur la page promo dédiée, vrais prix barrés
+WooCommerce standard (`<del>`/`<ins>`), 200 en Node `fetch`, aucun challenge
+Cloudflare rencontré (contrairement à mrbricolage, même plateforme). Non
+développé — un seul test, à spiker plus complètement (volume réel,
+pagination, stabilité) avant tout code. Meilleur candidat Gaming actuel,
+au-dessus de gamezone.ma.
+
 ## Diversification des sources (2026-07-18) — partiellement caduque
 
 **« Le pipeline ne scrape que Bringo » n'est plus vrai** : six sources tournent
