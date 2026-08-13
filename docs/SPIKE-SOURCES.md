@@ -602,80 +602,149 @@ pour aucune des dix cibles de ce lot.
 
 ---
 
-## 10 — carrefour.ma : le site officiel, pas juste bringo.ma (2026-08-13)
+## 10 — carrefour.ma : le site officiel, pas juste bringo.ma (2026-08-13, CORRIGÉ)
 
-**Contexte** : `bringo.ma` (source actuelle, `enseigne: "Carrefour"`, 2 rayons
-seulement — `high-tech-multimedia` et `tout-pour-votre-cuisine-4`,
-`apps/pipeline/bringo-categories.txt`) n'a jamais été un choix éditorial :
-c'était un repli, `carrefour.ma` étant injoignable à l'époque. Le site vient
-de redevenir accessible — hypothèse à vérifier : catalogue plus large,
-davantage de rayons.
+**Correction du même jour.** La première passe de ce spike concluait « pas
+de catalogue, vitrine institutionnelle » sur la seule foi du HTML brut
+(`curl`/`fetch`, sans JS). **Faux, et la nuance change tout** : le HTML brut
+est vide parce que la page est rendue côté client (Next.js), pas parce que
+le catalogue n'existe pas. Kamel a vérifié visuellement — `/promotions/`
+affiche bien des produits (prix barré, prix promo, date de validité),
+`/catalogues/` bien des prospectus par enseigne. Reconstat avec Playwright
+(`chromium.launch({headless: true})`, même dépendance que
+`discover-site.mjs`, interception réseau `page.on("response")`), une seule
+fois — pas pour scraper, pour découvrir l'API derrière le rendu.
 
-**a. robots.txt** — `https://carrefour.ma/robots.txt` (sans `www`) →
-`200`, **`User-agent: * / Allow: /`** — maximalement permissif, aucun bot
-nommé. Passe le filtre.
+**Contexte inchangé** : `bringo.ma` (source actuelle, `enseigne: "Carrefour"`,
+2 rayons seulement — `high-tech-multimedia` et `tout-pour-votre-cuisine-4`,
+`apps/pipeline/bringo-categories.txt`) était un repli, jamais un choix ;
+`carrefour.ma` était injoignable à l'époque.
 
-**Note DNS, pas anti-bot** : `www.carrefour.ma` ne résout pas (`ENOTFOUND`
-depuis deux réseaux différents, y compris un runner GitHub) — seul le
-domaine nu `carrefour.ma` répond. À utiliser tel quel si une source est
-construite un jour.
+**a. robots.txt** — `https://carrefour.ma/robots.txt` (sans `www`, qui ne
+résout pas en DNS) → `200`, `User-agent: * / Allow: /`, maximalement
+permissif. **b. Joignabilité runner GitHub** — `200`, aucun challenge
+Cloudflare, confirmé (inchangé depuis la première passe).
 
-**b. Joignabilité depuis un runner GitHub** — **`200`, aucun challenge
-Cloudflare**, cohérent avec un test depuis un réseau normal (même contenu,
-même taille ~55 Ko). Contrairement à bestmark/decathlon/marjanemall.ma,
-rien ne bloque ce domaine niveau réseau.
+**c. Ce que Playwright a révélé derrière le rendu — une vraie API JSON,
+publique, sans authentification :**
 
-**c. Ampleur du catalogue face à bringo — négatif, et c'est le constat qui
-ferme ce lot.** La page d'accueil ne liste que **12 liens de navigation**,
-aucun rayon produit : `/catalogues/`, `/magasins/`, `/actualites/`,
-`/faq/`, `/contact/`, `/promotions/`, `/produits/` (« Produits Exclusifs »),
-`/avantages/`. **Zéro** occurrence de « high-tech », « gaming », « jeux »,
-« bricolage », « jardin », « jouet », « électroménager » dans le HTML brut
-de l'accueil. Aucun sitemap (`/sitemap.xml` → 404).
+```
+GET https://backend.carrefour.ma/api/products?status=active&isPromotion=true&limit=21&page=N
+GET https://backend.carrefour.ma/api/product-categories
+GET https://backend.carrefour.ma/api/catalogues
+```
 
-Les trois pages les plus prometteuses par leur nom — `/promotions/`,
-`/produits/`, `/catalogues/` — répondent `200` mais portent toutes le même
-marqueur Next.js : **`data-dgst="BAILOUT_TO_CLIENT_SIDE_RENDERING"`**. Le
-contenu réel (liste de produits, prix, catalogues PDF) est chargé
-**côté client, après hydratation** — rien dans le HTML brut, même pas un
-lien vers un PDF de catalogue sur `/catalogues/` (vérifié explicitement,
-0 lien `.pdf`). Même famille de problème que biougnach.ma et gamezone.ma
-(Gaming, 13/08) : écarté par le même principe qu'electroplanet.ma, pas de
-rendu JS dans ce pipeline.
+**`/api/products`** — pagination propre (`pagination.total`,
+`.totalPages`), **187 produits en promotion** au moment du test, répartis
+sur les 4 enseignes du groupe (**Carrefour Express** 40, **Carrefour
+Gourmet** 43, **Carrefour Market** 40, **Carrefour** 4, non classé 60).
+Champs directement exploitables : `name`, `slug`, `mainImageUrl`, `price`
+(prix courant/promo), `crossedPrice` (prix normal, barré — **sens vérifié
+empiriquement** : `crossedPrice > price` sur 162/187 lignes, cohérent avec
+« prix normal > prix promo » ; 9 lignes vont dans l'autre sens, à traiter
+comme rejets — « jamais de prix deviné » s'applique), **`promotionEndDate`**
+(ISO 8601, présent sur 178/187 — **exploitable tel quel comme `date_fin`
+réelle**, au lieu du délai fixe de 14 jours qui régit aujourd'hui
+l'auto-expiration des `auto_draft` sans lien avec la fin réelle de l'offre —
+amélioration distincte, pas incluse dans ce spike), `internalProductId`
+(ressemble à un SKU Bringo — cf. point (d)).
 
-**Conclusion factuelle** : `carrefour.ma`, dans son état actuel, **n'est
-pas un catalogue e-commerce** — c'est un site vitrine/institutionnel
-(localisateur de magasins, actualités, avantages carte de fidélité) qui
-vient tout juste de redevenir joignable, probablement encore en
-reconstruction. L'hypothèse d'un catalogue plus large que bringo.ma **ne
-se vérifie pas aujourd'hui** — pas parce que le site refuse ou bloque, mais
-parce que le catalogue qu'on espérait n'y est pas (encore ?) exposé
-statiquement.
+**Seuil de remise ≥ 30 %** (`crossedPrice` vs `price`) : **26 produits sur
+187 (14 %)**, remise moyenne 19,7 % sur l'ensemble — modeste mais réel,
+supérieur à bestmark (1/865), du même ordre que inwi (~10 offres actives).
 
-**d. Recoupement avec bringo — répondu par la lecture du code, pas par un
-test (rien à tester tant que (c) est négatif), pour que la question ne se
-repose pas sans réponse.** `insert-deals.mjs` dédoublonne sur **`lower(titre)
-= lower($1) AND enseigne_id = $2 AND prix_promo = $3`** — **jamais sur
-`lien`** pour ce contrôle (`lien` sert uniquement à `empreinte_curation`,
-la mémoire de rejet, lot 2). Comme `scraper-bringo.mjs` insère déjà sous
-`enseigne: "Carrefour"` (`apps/pipeline/scraper-bringo.mjs:147`), une future
-source `carrefour.ma` partagerait le même `enseigne_id` — le dédoublonnage
-s'appliquerait donc automatiquement **si et seulement si le titre et le
-prix promo sont identiques au caractère et au dirham près** entre les deux
-sources. **Risque réel, pas théorique** : deux exports produit distincts
-(canal livraison Bringo vs site vitrine officiel) peuvent légitimement
-diverger sur la ponctuation du titre, un préfixe de marque, ou un prix
-arrondi différemment — dans ce cas, le même produit physique entrerait deux
-fois, sous deux `public_id` et deux liens distincts, sans qu'aucune garde
-actuelle ne le détecte. **À vérifier avec de vrais échantillons appariés
-avant de brancher les deux sources ensemble**, pas supposé sûr par défaut.
+**`/api/product-categories`** — **16 rayons**, dont `high-tech-multimedia`
+et `tout-pour-votre-cuisine` (mêmes slugs que bringo — **même taxonomie
+sous-jacente**, cf. (d)), plus 14 non couverts par bringo aujourd'hui :
+`Ma Maison`, `Droguerie`, `Librairie & Jouets`, `Vêtements & Textile`,
+`Monde Bébé`, `Animaux`, etc. **Aucun rayon dédié « Jardin » ni
+« Gaming »** dans cette liste — `Librairie & Jouets` est l'angle le plus
+proche du jeu, `Droguerie` le plus proche du bricolage, sans certitude sur
+leur contenu réel. Filtré par `categoryId` : **High-Tech & Multimédia = 4
+promos actives seulement** au moment du test — la catégorie existe et est
+accessible, mais son volume promotionnel réel est mince aujourd'hui,
+pas un jackpot. **Réserve de mesure** : la moitié des 187 produits (87) n'a
+pas de `categoryId` renseigné dans ce nouveau système (un ancien champ
+`primaryCategory`, en majuscules, hérité de la synchro Bringo, en couvre
+une partie) — la catégorisation du site est elle-même en migration,
+incomplète.
 
-**e. Remplacer bringo ou garder les deux — question sans objet aujourd'hui.**
-Rien à remplacer : `carrefour.ma` n'expose aucun catalogue scrapable dans son
-état actuel. **Recommandation : ne rien construire, revisiter si le site
-change de forme** (ex. le catalogue produit redevient server-rendered,
-comme un futur reconstat pourrait le montrer — même posture que
-mrbricolage.ma, réévaluable si le blocage se lève). Pas de scraper codé.
+**d. Recoupement avec bringo — la preuve la plus forte trouvée dans ce
+spike, pas une déduction.** Chaque entrée de `/api/product-categories`
+porte `carrefourLink`/`marketLink`/`expressLink` qui pointent littéralement
+vers `https://www.bringo.ma/gotoapp/...` — **le nouveau backend
+carrefour.ma référence bringo.ma en interne**. Combiné à
+`internalProductId` (identifiant court, format Bringo) sur chaque produit :
+tout indique que `carrefour.ma` et `bringo.ma` interrogent la **même base
+produit**, pas deux catalogues indépendants.
+
+Conséquence directe sur le dédoublonnage : `insert-deals.mjs` matche sur
+`lower(titre) = lower($1) AND enseigne_id = $2 AND prix_promo = $3`, jamais
+sur `lien`. `scraper-bringo.mjs` insère déjà sous `enseigne: "Carrefour"`
+(ligne 147) — une source `carrefour.ma` partagerait le même `enseigne_id`.
+**Si les deux tournaient en parallèle sur les MÊMES produits** (probable,
+vu le partage de base), le risque de doublon dépendrait entièrement de la
+concordance exacte titre+prix entre les deux exports — non vérifié ici
+(aucune extraction Bringo comparée ligne à ligne dans ce spike).
+
+**e. Remplacer bringo, pas cumuler — recommandation, à trancher.** Vu (d),
+faire tourner les deux sources en parallèle sur la même base produit
+créerait un vrai risque de doublons pour un bénéfice nul. **L'API
+carrefour.ma est structurellement meilleure que le scraping HTML de bringo
+: JSON propre, pagination fiable, `date_fin` réelle, 16 rayons contre 2**
+— remplacer `scraper-bringo.mjs` par un client de cette API couvrirait à la
+fois plus de catégories et une donnée plus fiable, avec moins de code
+(cheerio + sélecteurs CSS vs `fetch` + JSON, comme kiabi/bestmark).
+**Réserve avant tout code** : l'API vient d'apparaître avec le site
+(`createdAt` des catalogues datés d'aujourd'hui, 13/08) — **stabilité non
+prouvée**, aucun historique de fiabilité, endpoint non documenté
+publiquement (découvert par interception réseau, pas par une doc
+officielle) — peut changer de forme sans préavis. À observer quelques
+jours avant d'y bâtir le remplacement de bringo, pas à brancher le jour
+même de la découverte.
+
+**Coût de la découverte (Playwright, une seule fois)** : ~7,8 s jusqu'à
+`networkidle`, ~13,8 s avec scroll complet — **coût de reconnaissance
+ponctuel, pas un coût récurrent** : une fois l'API connue, le scraper
+n'a plus besoin de Playwright du tout, un simple `fetch` suffit (même
+famille que kiabi/bestmark : JSON public trouvé, jamais besoin de rendu en
+production).
+
+## 11 — carrefour.ma, prospectus PDF (`/catalogues/`) — infrastructure déjà posée
+
+Même méthode : `/api/catalogues` (public, sans auth) renvoie **9 catalogues
+actifs**, un par fenêtre de validité et par enseigne (Carrefour, Carrefour
+Market, Carrefour Express, Carrefour Gourmet), avec **`pdfUrl` directement
+téléchargeable** (`assets.carrefour.ma`, vérifié `HEAD` → `200`,
+`application/pdf`, ~18 Mo pour le premier), `startDate`/`endDate`
+(ISO 8601) et l'enseigne associée en clair.
+
+**L'infrastructure de traitement existe déjà dans le dépôt** :
+`apps/pipeline/extract-catalogue.mjs` — `node extract-catalogue.mjs
+<url-ou-chemin> <enseigne>`, télécharge un PDF/image, l'envoie à l'API
+Claude (Vision) avec un prompt d'extraction structuré qui produit déjà
+`prix_promo`, `prix_normal`, `categorie`, **`date_fin`** (ISO, ou `null`
+si absente — le prompt sait déjà lire une période de validité globale et
+l'appliquer à tous les produits du catalogue), `confiance` (« basse » si
+le prix est ambigu — jamais deviné). Sortie compatible telle quelle avec
+`insert-deals.mjs`. Aucune recherche de « Lot P » nommé ainsi n'a abouti
+dans le dépôt (`git grep` sur la documentation) — mais `extract-catalogue.mjs`
+EST cette brique, déjà écrite, déjà au format attendu ; il ne manque qu'un
+appelant automatique (aujourd'hui : « geste manuel ponctuel », par design,
+cf. `pipeline-quotidien.yml`).
+
+**Ce que ça changerait, concrètement** : `POST /api/catalogues` filtré sur
+les catalogues actifs (`endDate >= aujourd'hui`) donnerait automatiquement
+la liste des PDF à traiter, un par enseigne, avec leur `date_fin` déjà
+connue — **sans deviner** de période de validité, contrairement au mode
+actuel d'`extract-catalogue.mjs` qui dépend du texte du catalogue lui-même.
+9 PDF ≈ 9 appels Vision par cycle (coût à chiffrer avant tout branchement —
+non fait ici) — plus lourd qu'un `fetch` JSON, mais l'API `/api/products`
+du point 10 couvre déjà probablement le même contenu sans passer par
+l'extraction visuelle : **les deux voies se recoupent largement**, pas la
+peine de les construire toutes les deux sans clarifier laquelle sert quoi.
+
+**Pas de scraper codé, ni ici ni au point 10.**
 
 ---
 
