@@ -546,10 +546,20 @@ coûte plus cher que manquer une candidate qui ne rapportait déjà presque
 rien.
 
 **Seuil de retrait posé aujourd'hui, pour ne pas surveiller indéfiniment** :
-si le `403` persiste **14 jours consécutifs** (au-delà du 27/08/2026), retirer
-`scraper-decathlon` du cron exactement comme Bestmark (même geste : retrait de
-`pipeline-quotidien.yml`, script conservé, entrée dans ce fichier). Une source
-qui échoue sans limite finit par devenir un `::warning::` qu'on ne lit plus.
+si le `403` persiste **14 jours consécutifs depuis la première occurrence
+réelle (11/08/2026, confirmée dans les logs GitHub Actions)**, soit
+**au-delà du 25/08/2026**, retirer `scraper-decathlon` du cron exactement
+comme Bestmark (même geste : retrait de `pipeline-quotidien.yml`, script
+conservé, entrée dans ce fichier). Une source qui échoue sans limite finit
+par devenir un `::warning::` qu'on ne lit plus.
+
+**Deux compteurs, deux points de départ — ne pas les confondre.** La date de
+décision ci-dessus (25/08) compte depuis la PREMIÈRE OCCURRENCE réelle
+(11/08). Le mécanisme d'alerte automatique ci-dessous compte forcément
+depuis la PREMIÈRE TRACE en base, pas la première occurrence — les deux
+dates diffèrent de deux jours et ce n'est pas une erreur à corriger, c'est
+une limite structurelle de `pipeline_runs` (créée le 12-13/08, elle ne peut
+pas voir avant sa propre création) :
 
 **Vérifié le 13/08/2026 — la supervision existante couvre déjà ce cas, sans
 changement de code nécessaire** :
@@ -564,9 +574,10 @@ changement de code nécessaire** :
   qu'elle enregistre pour `decathlon` (série affichée : 1, pas 3 — les échecs
   du 11 et 12/08 sont réels, vus dans les logs GitHub Actions, mais
   antérieurs à la table). L'alerte GitHub (`alerte-source-decathlon`) partira
-  donc au run suivant si le 403 persiste (série = 2 dans `pipeline_runs`),
-  pas immédiatement — elle sert de rappel régulier avant le seuil de 14 jours
-  ci-dessus, qui reste la décision de retrait.
+  donc au run suivant si le 403 persiste (série = 2 dans `pipeline_runs`,
+  vers le 14/08), pas immédiatement — elle sert de rappel régulier avant le
+  seuil de décision du 25/08 ci-dessus, qui reste calé sur la première
+  occurrence réelle, pas sur ce que la table peut voir.
 
 ## Voyages — catégorie vide, réexamen posé à échéance (2026-08-13)
 
@@ -615,44 +626,73 @@ mrbricolage), depuis ce réseau, pas depuis un runner GitHub. Verdict :
 AJAX interne (non fait, hors budget de ce spike) ou un rendu JS (écarté par
 principe, cf. electroplanet).
 
-**mgamesstore.com — spiké une seconde fois depuis un vrai runner GitHub
-(13/08/2026)**, exactement le point qui a fait tomber bestmark et decathlon —
-pas seulement depuis un autre réseau cette fois. Workflow jetable
-(`workflow_dispatch`/`push` sur branche de travail, jamais fusionné,
-supprimé après usage) exécuté trois fois pour corriger l'instrumentation en
-route.
+**mgamesstore.com — spike terminé depuis un vrai runner GitHub (13/08/2026)**,
+exactement le point qui a fait tomber bestmark et decathlon — pas seulement
+depuis un autre réseau. Workflow jetable (`workflow_dispatch`/`push` sur
+branche de travail, jamais fusionné, supprimé après usage), plusieurs passages
+pour corriger l'instrumentation en route (voir historique de la branche
+`ops/spike-mgamesstore-suite`, fermée).
 
-- **Joignable depuis un runner GitHub : oui.** `200`, `Cloudflare challenge:
-  false`, taille de réponse stable (~250 Ko) sur trois runs distincts.
-- **Vraies données de prix dans le HTML brut, pas de l'AJAX** (contrairement
-  à gamezone.ma) : `15` balises `<del>` et `15` `<ins>` (prix barré/promo
-  WooCommerce standard), `32` occurrences de `woocommerce-Price-amount`, `13`
-  badges `onsale` — la page promo dédiée sert bien un vrai comparatif de
-  prix côté serveur.
-- **Volume réellement remisé sur cette page : 15**, sur les 28 annoncés au
-  total par le compteur de résultats (le reste vit sur la page suivante,
-  paginée) — pas encore le nombre qui passerait le seuil des 30 % : les
-  couples prix normal/prix promo n'ont **pas pu être appariés
-  automatiquement** dans ce spike (le thème WoodMart — le même que
-  mrbricolage.ma, `SPIKE-SOURCES.md` — n'aligne pas `<del>` et `<ins>` en
-  frères directs ; une balise intermédiaire, non identifiée ici, sépare les
-  deux). Reste à faire avant tout code : localiser la vraie carte produit et
-  apparier les deux montants pour calculer la remise réelle par article.
-- **Sélecteurs titre/image non standard** : `0` occurrence des classes
-  WooCommerce par défaut (`woocommerce-loop-product__title`,
-  `wp-post-image`) — thème custom, comme bricoma.ma/mrbricolage.ma en leur
-  temps (`SPIKE-SOURCES.md`, « aucune mutualisation possible » entre thèmes
-  même dans la même catégorie). Sélecteurs réels à identifier au prochain
-  passage.
-- **Renouvellement du catalogue : pas mesurable en un seul passage** —
-  demanderait plusieurs observations espacées dans le temps (comme pour
-  toute source), pas conclu ici.
+- **Joignable depuis un runner GitHub : oui, de façon stable.** `200`,
+  `Cloudflare challenge: false`, taille de réponse constante (~250 Ko) sur
+  cinq runs distincts. **Une anomalie ponctuelle relevée et non retenue** :
+  un run a reçu une réponse tronquée à 12 Ko sans erreur HTTP — non
+  reproduit sur les quatre autres runs (dont un juste après, contenu
+  complet) ; traité comme un aléa réseau isolé, pas un signal de blocage,
+  faute de récurrence.
+- **Appariement prix normal/promo : RÉSOLU, fiable — PAS le même obstacle
+  que mrbricolage.** La confusion initiale venait d'un mauvais regex de ce
+  spike (recherche de `<del>`/`<ins>` sans leurs attributs réels
+  `<del aria-hidden="true">`), pas d'un problème du site. Le vrai motif,
+  standard WooCommerce, a un **parent commun explicite** :
+  `<span class="price"><del aria-hidden…>…</del> <span class="screen-reader-text">…</span><ins aria-hidden…>…</ins>…</span>`
+  — un sélecteur cheerio classique (`.price del .amount` /
+  `.price ins .amount`) suffit, ce n'est pas une heuristique fragile.
+  **mrbricolage.ma était un blocage réseau (Cloudflare renvoie 403 au client
+  Node par empreinte TLS, `curl` passe) — une catégorie de problème
+  entièrement différente**, qui ne se pose pas ici : mgamesstore répond
+  normalement au client Node lui-même.
+- **Volume réel, mesuré sur les 3 pages de la catégorie promo (grille
+  principale uniquement, `data-source="main_loop"`, sidebar exclue)** :
+  **28 produits remisés, 28 appariés avec succès** (100 %, aucun échec de
+  parsing) — coïncide exactement avec le compteur affiché par le site
+  (« 28 résultats »). **18 sur 28 (64 %) passent le seuil de remise de 30 %**
+  (détail : 39,3 / 41,8 / 20,1 / 3,6 / 9,5 / 31,5 / 8,0 / 54,7 / 54,0 / 33,6 /
+  42,4 / 55,3 / 45,6 / 10,6 / 15,9 / 31,6 / 21,1 / 28,7 / 36,7 / 48,4 / 48,5 /
+  9,3 / 55,4 / 55,5 / 40,7 / 9,2 / 54,0 / 48,5 — dix sous le seuil, pas
+  écartés en douce). Volume net utile comparable à inwi (10 offres actives),
+  nettement au-dessus de bestmark (1/865).
+- **Sélecteurs titre/image non standard** (thème WoodMart custom, comme
+  bricoma.ma/mrbricolage.ma en leur temps — `SPIKE-SOURCES.md`, « aucune
+  mutualisation possible » entre thèmes) : pas encore identifiés
+  précisément, à faire au moment du code (pas bloquant, juste pas fait ici).
+- **Renouvellement du catalogue : toujours pas mesuré.** Snapshot des 28
+  liens produit horodaté le **13/08/2026 19:34 UTC**, à comparer à un second
+  passage **48h plus tard (à partir du 15/08/2026 19:34 UTC)** — pas encore
+  fait, demande que le temps réel s'écoule. Liste de référence :
+  `blaze-et-les-monster-machines-pilotes-de-moteur-city-nintendo-switch`,
+  `casque-gaming-filaire-gioteck-2`, `casque-micro-sans-fil-sony-ps5-pulse-3d-noir-et-gris-2`,
+  `console-sony-ps5-edition-standard-ventes-flash`, `console-sony-ps5-slim-edition-standard-nba-2k24-gta-v`,
+  `dc-super-hero-girls-teen-power-nintendo-switch`, `destiny-2-ps4`,
+  `ea-games-jeux-star-wars-jedi`, `far-cry-6-ps4-2`, `gta-v-edition-premium-ps4-ps5`,
+  `just-for-games-my-universe-fashion-boutique`, `kingdom-hearts-melody-of-memory-ps4`,
+  `lego-worlds-nintendo-switch`, `manette-playstation-5-officielle-dualsense-ps5`,
+  `manette-sans-fil-sony-dualsense-pour-ps5-blanc`, `mario-et-les-lapins-cretins-kingdom-battle-nintendo-switch`,
+  `microcasques-gaming-kappa-rgb`, `miitopia-nintendo-switch`, `namco-museum-archives-volume-1-switch`,
+  `new-super-luckys-tale-nintendo-switch`, `pang-adventures-buster-edition-nintendo-switch`,
+  `playstation-vr2`, `rocket-arena-edition-mythique-ps4`, `star-wars-squadrons-ps4`,
+  `story-of-seasons-friends-of-mineral-town-nintendo-switch`, `super-mario-odyssey-nintendo-switch`,
+  `super-monkey-ball-banana-blitz-hd`, `super-putty-squad-nintendo-switch` (slugs sous
+  `https://mgamesstore.com/product/<slug>/`). Si la majorité de cette liste
+  est encore identique le 15/08, la source est probablement figée
+  (tomberait vite en `deja_en_base`, comme inwi/kiabi aujourd'hui) ; un
+  renouvellement partiel serait un bon signe.
 
-**Verdict : le point bloquant qui a tué bestmark/decathlon est levé
-(joignable depuis un runner, données server-rendered) — mais le spike n'est
-pas fini.** Encore à faire avant tout code de scraper : sélecteurs
-titre/image/lien réels, appariement prix normal/promo fiable, un second
-passage à quelques jours d'écart pour juger du renouvellement. Meilleur
+**Verdict : le spike est terminé sur deux des trois inconnues, favorable sur
+les deux.** Joignable depuis un runner (stable), appariement prix fiable
+(pas l'obstacle mrbricolage), volume net utile (18/28 ≥ 30 %, comparable à
+inwi). **Seule inconnue restante : le renouvellement, qui ne peut pas être
+mesuré avant le 15/08/2026** (48h réelles). Aucun scraper codé. Meilleur
 candidat Gaming actuel, au-dessus de gamezone.ma (celui-là écarté : grille
 chargée en AJAX, aucune donnée dans le HTML brut).
 
