@@ -1,0 +1,70 @@
+# Spike jetable — jamais destiné à être fusionné sur main.
+# Vérifie mgamesstore.com (candidat Gaming) depuis un vrai runner GitHub,
+# pas seulement depuis un autre réseau — c'est ce qui a fait tomber
+# bestmark et decathlon. Aucune écriture en base, aucune insertion.
+name: Spike mgamesstore (jetable)
+on:
+  workflow_dispatch:
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Fetch + analyse
+        run: |
+          node -e "
+          async function main() {
+            const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+            const urls = [
+              'https://mgamesstore.com/robots.txt',
+              'https://mgamesstore.com/product-category/jeux-video/promotion/',
+              'https://mgamesstore.com/product-category/jeux-video/promotion/page/2/',
+            ];
+            for (const url of urls) {
+              try {
+                const r = await fetch(url, { headers: { 'User-Agent': ua } });
+                const t = await r.text();
+                console.log('===', url, '=== STATUS', r.status, 'LEN', t.length);
+                if (url.includes('robots.txt')) {
+                  console.log(t.slice(0, 800));
+                  continue;
+                }
+                console.log('Cloudflare challenge:', t.includes('Just a moment') || t.includes('Attention Required'));
+                const delIns = [...t.matchAll(/<del[^>]*>[\s\S]*?<\/del>\s*<ins[^>]*>[\s\S]*?<\/ins>/gi)];
+                console.log('paires prix barré/promo (del+ins) trouvées:', delIns.length);
+                let sousTrente = 0, auDela = 0;
+                const amountRe = /([\d\s.,]+)\s*(?:MAD|DH|Dhs?)/i;
+                for (const m of delIns) {
+                  const block = m[0];
+                  const delMatch = block.match(/<del[^>]*>([\s\S]*?)<\/del>/i);
+                  const insMatch = block.match(/<ins[^>]*>([\s\S]*?)<\/ins>/i);
+                  const delAmt = delMatch && delMatch[1].match(amountRe);
+                  const insAmt = insMatch && insMatch[1].match(amountRe);
+                  if (delAmt && insAmt) {
+                    const reg = parseFloat(delAmt[1].replace(/\s/g,'').replace(',', '.'));
+                    const promo = parseFloat(insAmt[1].replace(/\s/g,'').replace(',', '.'));
+                    if (reg > 0 && promo > 0 && promo < reg) {
+                      const pct = ((reg - promo) / reg) * 100;
+                      if (pct >= 30) auDela++; else sousTrente++;
+                    }
+                  }
+                }
+                console.log('remise >= 30% :', auDela, '| remise < 30% :', sousTrente);
+                const titres = (t.match(/woocommerce-loop-product__title/g) || []).length;
+                console.log('titres produit (woocommerce-loop-product__title) :', titres);
+                const images = (t.match(/<img[^>]*wp-post-image[^>]*>/gi) || []).length;
+                console.log('images produit (wp-post-image) :', images);
+                const liens = [...t.matchAll(/<a[^>]*href=\"(https:\/\/mgamesstore\.com\/product\/[^\"]+)\"/gi)].map(m=>m[1]);
+                console.log('liens produit distincts :', new Set(liens).size);
+                const resCount = t.match(/(\d+)\s*résultats?/i);
+                console.log('compteur résultats annoncé :', resCount ? resCount[0] : 'absent');
+              } catch (e) {
+                console.log('===', url, '=== FETCH FAILED:', e.message);
+              }
+            }
+          }
+          main();
+          "
