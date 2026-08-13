@@ -469,6 +469,139 @@ vérifiée, absence de test de rate-limiting à volume réel.
 
 ---
 
+## 9 — Dix nouvelles cibles, priorité Gaming/Bricolage & Jardin/High-Tech (2026-08-13)
+
+*Méthode inchangée, avec un ajout : après le faux négatif de mgamesstore.com
+(regex de spike ignorant l'attribut `aria-hidden` réel, corrigé le même
+jour), chaque signal négatif de ce lot a été revérifié à la main sur un
+extrait brut avant d'être retenu comme un verdict — pas seulement compté
+par regex.*
+
+### electroplanet.ma (recheck) — ROUGE, inchangé
+
+`robots.txt` toujours inatteignable en `403` (page de challenge Cloudflare),
+y compris depuis un réseau normal, pas seulement un runner. Cohérent avec le
+constat du 02/08 (`Disallow: /` une fois la redirection suivie). Sujet clos,
+reconfirmé, pas présumé.
+
+### iam.ma (recheck) — ROUGE, inchangé
+
+`robots.txt` nomme toujours explicitement `ClaudeBot`, `GPTBot`, `CCBot` avec
+`Disallow: /`, `Content-Signal: ai-train=no`. Reconfirmé, pas présumé —
+gouvernance, pas technique. Pas insisté.
+
+### marjanemall.ma — ROUGE, technique (pas gouvernance)
+
+**a. robots.txt** — permissif, et nomme `ClaudeBot` avec `Allow: /`
+explicitement (`anthropic-ai`, le bot d'entraînement, est `Disallow: /` —
+distinction volontaire du site entre crawl et entraînement, même famille que
+marwa.com). Passe le filtre (a).
+
+**b. Joignabilité depuis un runner GitHub** — **`403` sur la page d'accueil
+ET sur `/promotions`**, taille de réponse identique (~4,5 Ko, signature
+typique d'une page de blocage WAF) sur les deux URLs. Le site n'a **pas**
+nommé Claude dans un refus — c'est une plage d'IP bloquée, même famille que
+bestmark/decathlon, pas un choix éditorial du marchand. Rien à contourner :
+retiré, comme les deux autres.
+
+### ab-maroc.com — ORANGE, à creuser
+
+**a.** Permissif, aucune restriction. **b.** Joignable (`200`, 515 Ko).
+**c/d.** Aucune paire `<del>`/`<ins>` sur la page d'accueil, mais 20
+occurrences de classes `price` et 53 mentions promo/solde/réduction — du
+contenu réel, pas une coquille vide, mais pas la bonne page. **Catégorie
+servie non déterminée dans ce spike** (pas vérifié quel rayon ab-maroc.com
+sert réellement). Reste à faire avant conclusion : trouver la page
+promo/soldes dédiée (comme universparadiscount.ma, jamais la page d'accueil
+brute d'un site généraliste).
+
+### biougnach.ma (Électroménager) — ROUGE, rendu JS requis
+
+**a.** Pas de vrai `robots.txt` (le serveur sert le shell de l'appli pour
+toute route non reconnue — Angular, fallback SPA) — permissif par absence
+de fichier. **b.** Joignable (`200`). **c.** **Application Angular
+confirmée** (`<app-root>`, `ng-version`, spinner de préchargement dans le
+HTML initial) — zéro donnée produit/prix dans le HTML brut, chargement en
+JS après coup. Même catégorie de problème que gamezone.ma (Gaming, spike du
+même jour) : écarté par principe, pas de rendu JS dans ce pipeline
+(cf. electroplanet.ma).
+
+### beautymall.ma (Beauté) — VERT, meilleur candidat du lot
+
+**a.** `robots.txt` vide (`200`, 0 octet) — permissif par absence de règle.
+**b.** Joignable (`200`, 863 Ko). **c.** **WordPress/WooCommerce confirmé**
+(meta generator), même famille de markup que mgamesstore.com (`<del
+aria-hidden="true">`/`<ins aria-hidden="true">`, span `.price` commun) — le
+sélecteur déjà validé le 13/08 s'applique tel quel. **d.** Appariement
+vérifié à la main sur un exemple réel : `279,00 → 186,00 DH`, soit **33,3 %**
+de remise — au-dessus du seuil. **e.** **87 paires `<del>`/`<ins>` sur la
+seule page d'accueil**, sans même chercher une page promo dédiée — volume
+largement supérieur à tout ce qui a été mesuré dans ce lot. Catégorie
+**Beauté**, aujourd'hui seulement **4 deals publiés** en production — gain
+de diversification réel, pas marginal.
+
+### lemobilier.ma (Maison) — ORANGE, à creuser
+
+**a.** Permissif — seul `Disallow: /reduction` mérite un second regard : en
+PrestaShop c'est typiquement le contrôleur des **codes bons de réduction**
+(panier), pas la liste des produits remisés ; à vérifier avant de conclure
+à un blocage de la page utile. **b.** Joignable (`200`, 946 Ko). **c/d.**
+PrestaShop, 1477 occurrences de classes `price` mais **zéro** `<del>`/`<ins>`
+sur la page d'accueil — la remise n'y est probablement pas affichée
+directement (comme universparadiscount.ma avant reconstat). Reste à faire :
+trouver la vraie page catégorie/promo.
+
+### aswakassalam.com — ORANGE, stratégique mais à confirmer
+
+**a.** Permissif. **b.** Joignable (`200`, 401 Ko). **c.**
+WordPress/WooCommerce confirmé, même famille de markup que beautymall.ma et
+mgamesstore.com. **d.** Appariement vérifié à la main : `29,95 → 27,95 Dh`,
+soit **6,7 %** — **sous le seuil des 30 %** sur cet exemple précis. **e.**
+Seulement **9 paires sur la page d'accueil** (contre 87 pour beautymall.ma) —
+volume et taux de remise réels non conclusifs sans une page promo dédiée.
+**Pourquoi retenir malgré ces réserves** : Aswak Assalam est une chaîne de
+supermarché marocaine (même famille que Marjane) — piste quasi unique vers
+**Alimentaire**, catégorie à **0 deal publié** aujourd'hui. À creuser
+spécifiquement pour ce motif, pas pour le volume déjà mesuré.
+
+### cashplus.ma et wafacash.ma — ROUGE, modèle inadapté (pas technique)
+
+**a.** `robots.txt` propre chez les deux (cashplus.ma : deux chemins exclus,
+rien de bloquant ; wafacash.ma : `403` depuis ce réseau sur `robots.txt`
+précisément, mais la page d'accueil répond normalement ailleurs —
+incohérence non résolue, sans conséquence vu ce qui suit). **Vérifié
+directement sur les deux sites** : ce sont des services de transfert
+d'argent et de paiement, **aucun catalogue produit, aucun article à prix
+affiché**. Le modèle « deal » (prix normal vs promo) ne s'applique
+structurellement pas — même famille que royalairmaroc.com (Voyages). Pas la
+peine d'aller plus loin, y compris de retester le `403` de wafacash.ma
+depuis un runner : même s'il tombait, il n'y a rien à scraper derrière.
+
+| Cible | robots.txt | Joignable (runner) | Plateforme/rendu | Appariement | Volume mesuré | Catégorie | Verdict |
+|---|---|---|---|---|---|---|---|
+| beautymall.ma | Permissif | Oui | WooCommerce, HTML brut | Vérifié (33,3 %) | **87** (accueil seul) | Beauté (4 publiés) | **VERT** |
+| aswakassalam.com | Permissif | Oui | WooCommerce, HTML brut | Vérifié (6,7 %, sous seuil) | 9 (accueil seul) | Alimentaire (0 publié) | **ORANGE — stratégique** |
+| ab-maroc.com | Permissif | Oui | Inconnu (pas de del/ins accueil) | Non conclu | Signaux présents, non chiffrés | Non déterminée | **ORANGE — à creuser** |
+| lemobilier.ma | Permissif | Oui | PrestaShop, HTML brut | Non conclu (0 sur accueil) | Non chiffré | Maison | **ORANGE — à creuser** |
+| marjanemall.ma | Permissif (`ClaudeBot: Allow`) | **Non — 403** | — | — | — | — | **ROUGE — technique** |
+| biougnach.ma | Permissif (pas de fichier) | Oui | **Angular/CSR** | Sans objet | 0 dans le HTML brut | Électroménager | **ROUGE — rendu JS requis** |
+| electroplanet.ma | **Refuse** (`Disallow: /`) | — | — | — | — | — | **ROUGE — reconfirmé** |
+| iam.ma | **Refuse ClaudeBot nommément** | — | — | — | — | — | **ROUGE — reconfirmé** |
+| cashplus.ma | Permissif | Sans objet | — | — | **Aucun catalogue** | — | **ROUGE — modèle inadapté** |
+| wafacash.ma | Incohérent (403 ciblé) | Sans objet | — | — | **Aucun catalogue** | — | **ROUGE — modèle inadapté** |
+
+**Classement gain/effort** : (1) **beautymall.ma** — prêt à coder, volume et
+appariement déjà vérifiés, catégorie clairsemée. (2) **aswakassalam.com** —
+un passage de plus sur sa page promo dédiée avant de trancher, valeur
+stratégique (seule piste Alimentaire). (3) **ab-maroc.com** et
+**lemobilier.ma** — même chose, page d'accueil insuffisante, pas
+disqualifiés. (4) marjanemall.ma, biougnach.ma, electroplanet.ma, iam.ma,
+cashplus.ma, wafacash.ma — écartés, pour quatre motifs différents (bloqué
+runner, rendu JS, gouvernance ×2, modèle inadapté ×2) — aucun scraper codé
+pour aucune des dix cibles de ce lot.
+
+---
+
 ## Recommandation d'ordre de développement (argumentée)
 
 **Aucune décision d'implémentation n'est prise ici — cette recommandation éclaire, la décision reste
