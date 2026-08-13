@@ -528,6 +528,74 @@ de lui-même (à revérifier ponctuellement, pas activement surveillé), soit
 Bestmark ouvre de vraies opérations commerciales qui changeraient le
 rendement — l'un des deux, pas une réintroduction par habitude.
 
+## Decathlon — seuil de retrait posé, pas une surveillance indéfinie (2026-08-13)
+
+**`HTTP 403` sur `/5080-promotions` depuis le 11/08/2026** (le 10/08 fonctionnait
+encore, 24 offres extraites) — 3 jours consécutifs au moment de ce constat.
+Contrairement à Bestmark : `robots.txt` inchangé et permissif (aucun bot IA
+nommé, aucune restriction nouvelle sur les pages promo/catégorie), site
+normal et catalogue complet (1415 produits, promos jusqu'à -70 %) vérifié
+depuis un réseau tiers le 13/08. Pas un refus déclaré — une détection
+anti-bot probable côté runners GitHub, qui a évolué du simple marquage
+(`x-bot: YES`, sans blocage, constaté au spike du 22/07) vers un vrai 403.
+
+**Différence avec Bestmark qui justifie de garder la source active pour
+l'instant** : Decathlon produit réellement (62 `auto_draft` en attente + 22
+`publie`, mesuré en base le 13/08/2026) — perdre une source qui rapporte
+coûte plus cher que manquer une candidate qui ne rapportait déjà presque
+rien.
+
+**Seuil de retrait posé aujourd'hui, pour ne pas surveiller indéfiniment** :
+si le `403` persiste **14 jours consécutifs** (au-delà du 27/08/2026), retirer
+`scraper-decathlon` du cron exactement comme Bestmark (même geste : retrait de
+`pipeline-quotidien.yml`, script conservé, entrée dans ce fichier). Une source
+qui échoue sans limite finit par devenir un `::warning::` qu'on ne lit plus.
+
+**Vérifié le 13/08/2026 — la supervision existante couvre déjà ce cas, sans
+changement de code nécessaire** :
+- Un `HTTP 403` fait échouer `scraper-decathlon.mjs` (`throw new Error`) AVANT
+  la ligne `→ Archive : ...` ; le workflow le classe donc comme n'importe quel
+  échec réseau, cause **`injoignable`** (`packages/db/migrations/0020`) — pas
+  une catégorie à part, pas un angle mort de `verifier-sources-mortes.mjs`.
+- Le seuil d'alerte de cette cause est **2** runs consécutifs
+  (`verifier-sources-mortes.mjs`, `SEUILS.injoignable`) — bien en dessous des
+  14 jours ci-dessus. **Nuance mesurée** : `pipeline_runs` (migration 0020)
+  n'existe que depuis le 12-13/08/2026, le run du 13/08 est le PREMIER
+  qu'elle enregistre pour `decathlon` (série affichée : 1, pas 3 — les échecs
+  du 11 et 12/08 sont réels, vus dans les logs GitHub Actions, mais
+  antérieurs à la table). L'alerte GitHub (`alerte-source-decathlon`) partira
+  donc au run suivant si le 403 persiste (série = 2 dans `pipeline_runs`),
+  pas immédiatement — elle sert de rappel régulier avant le seuil de 14 jours
+  ci-dessus, qui reste la décision de retrait.
+
+## Voyages — catégorie vide, réexamen posé à échéance (2026-08-13)
+
+**0 deal `categorie = 'Voyages'` en base**, sur les 3 semaines écoulées depuis
+l'ajout de la catégorie (5ème amendement conscient, 21/07/2026, CONTRAT-V1
+§3) — vérifié en lecture seule le 13/08/2026. Aucune source pipeline
+scrapable identifiée : `royalairmaroc.com` (`SPIKE-SOURCES.md`) n'a pas de
+prix barré, seulement des tarifs « à partir de X » ; recherche web du
+13/08/2026 : le reste du secteur est soit des OTA internationales ciblant
+les vols *vers* le Maroc (pas un public résident), soit des agences locales
+sans page de promo structurée. Le modèle « deal » (prix normal vs promo) ne
+s'applique structurellement pas à ce secteur — pas un chantier différé faute
+de temps, un constat.
+
+**Décision : l'enum reste ouverte aux soumissions humaines** (`/soumettre`),
+pas retirée. Retirer la valeur nécessiterait de la re-décider plus tard sans
+gagner rien aujourd'hui (aucune migration à défaire, c'est un enum zod pur —
+`packages/schemas`) ; la garder permet à tout instant qu'un utilisateur
+soumette un vrai bon plan voyage (ex. capture d'écran d'une offre trouvée
+ailleurs) sans qu'un nouvel amendement soit nécessaire pour la réouvrir.
+
+**Départ du compte, écrit pour ne pas reposer la question sans mémoire** :
+si `categorie = 'Voyages'` compte toujours **0 deal** (soumission humaine
+comprise, pas seulement pipeline) au **13/11/2026** (90 jours après ce
+constat), rouvrir la question du retrait de l'enum — la fenêtre est jugée
+suffisante pour qu'une soumission humaine spontanée survienne si la demande
+existe réellement, sans être assez longue pour laisser la question dériver
+indéfiniment.
+
 ## Gaming — spike réel avant tout code (2026-08-13)
 
 Candidats identifiés (recherche web, aucun n'avait été évalué dans
