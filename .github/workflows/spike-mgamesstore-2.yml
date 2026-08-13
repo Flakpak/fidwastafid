@@ -1,0 +1,72 @@
+# Spike jetable — jamais destiné à être fusionné sur main.
+# Suite du spike mgamesstore.com (Gaming) : structure DOM réelle autour de
+# <del>/<ins>, volume qui passe le seuil de 30 % sur tout le catalogue promo,
+# snapshot horodaté pour comparaison de renouvellement à 48h.
+name: Spike mgamesstore suite (jetable)
+on:
+  workflow_dispatch:
+  push:
+    branches: [ops/spike-mgamesstore-suite]
+    paths: [.github/workflows/spike-mgamesstore-2.yml]
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Fetch + analyse structure + pagination + snapshot
+        run: |
+          cat > /tmp/spike2.mjs <<'SPIKE_EOF'
+          const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
+          const base = "https://mgamesstore.com/product-category/jeux-video/promotion/";
+
+          async function fetchPage(url) {
+            const r = await fetch(url, { headers: { "User-Agent": ua } });
+            const t = await r.text();
+            return { status: r.status, html: t };
+          }
+
+          // 1) Structure réelle autour d'un <del> : trouver le parent commun.
+          const p1 = await fetchPage(base);
+          console.log("PAGE 1 — STATUS", p1.status, "LEN", p1.html.length);
+          const delIdx = p1.html.indexOf("<del>");
+          if (delIdx >= 0) {
+            console.log("--- FRAGMENT AUTOUR DU PREMIER <del> (1200 car avant, 400 apres) ---");
+            console.log(p1.html.slice(Math.max(0, delIdx - 1200), delIdx + 400));
+          }
+
+          // 2) Pagination : parcourt toutes les pages de la catégorie promo.
+          let pageNum = 1;
+          let allHtml = p1.html;
+          const vus = new Set();
+          while (true) {
+            const nextUrl = pageNum === 1 ? base : base + "page/" + pageNum + "/";
+            const { status, html } = pageNum === 1 ? { status: p1.status, html: p1.html } : await fetchPage(nextUrl);
+            if (status !== 200) { console.log("Page", pageNum, "status", status, "- arret"); break; }
+            const dels = (html.match(/<del>/g) || []).length;
+            console.log("Page", pageNum, ": status", status, "del count", dels);
+            if (dels === 0 && pageNum > 1) break;
+            if (pageNum > 1) allHtml += html;
+            const liens = [...html.matchAll(/href="(https:\/\/mgamesstore\.com\/produit\/[^"]+)"/gi)].map(m => m[1]);
+            for (const l of liens) vus.add(l);
+            pageNum++;
+            if (pageNum > 6) break; // garde-fou
+          }
+          console.log("TOTAL liens produit distincts vus (motif /produit/) :", vus.size);
+
+          // essai motif alternatif si /produit/ n'a rien donné
+          if (vus.size === 0) {
+            const liensAlt = [...p1.html.matchAll(/href="(https:\/\/mgamesstore\.com\/[a-z0-9-]+\/)"[^>]*>[\s\S]{0,80}?<\/a>/gi)].map(m => m[1]);
+            console.log("motif alternatif (racine produit ?), echantillon :", [...new Set(liensAlt)].slice(0, 10));
+          }
+
+          console.log("TOTAL <del> sur toutes les pages parcourues :", (allHtml.match(/<del>/g) || []).length);
+          console.log("TOTAL <ins> sur toutes les pages parcourues :", (allHtml.match(/<ins>/g) || []).length);
+
+          // 3) Snapshot horodaté (liens + un extrait de prix) pour comparaison a 48h.
+          console.log("--- SNAPSHOT", new Date().toISOString(), "---");
+          console.log("SNAPSHOT_LIENS=" + JSON.stringify([...vus].sort()));
+          SPIKE_EOF
+          node /tmp/spike2.mjs
