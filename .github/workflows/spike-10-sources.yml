@@ -60,5 +60,34 @@ jobs:
               console.log(nom, "|", url, "| FETCH FAILED:", e.message);
             }
           }
+
+          console.log("=== ANALYSE FINE : beautymall.ma et aswakassalam.com ===");
+          for (const url of ["https://www.beautymall.ma/", "https://aswakassalam.com/"]) {
+            const r = await fetch(url, { headers: { "User-Agent": ua } });
+            const t = await r.text();
+            console.log("---", url, "---");
+            console.log("Titre :", (t.match(/<title>([^<]*)<\/title>/i) || [])[1]);
+            console.log("Plateforme (générateur meta) :", (t.match(/generator" content="([^"]*)"/i) || [])[1] || "non trouvé");
+            console.log("WooCommerce present:", /woocommerce/i.test(t), "| PrestaShop present:", /prestashop/i.test(t), "| Magento present:", /magento|Mage\./i.test(t), "| Shopify present:", /Shopify|cdn\.shopify/i.test(t));
+
+            const paires = [...t.matchAll(/<del[^>]*>([\s\S]{0,150}?)<\/del>[\s\S]{0,300}?<ins[^>]*>([\s\S]{0,150}?)<\/ins>/gi)];
+            console.log("Paires del/ins trouvees (fenetre large) :", paires.length);
+            const amountRe = /([\d]{1,3}(?:[\s.,]\d{3})*(?:[.,]\d{1,2})?)\s*(?:DH|MAD|Dhs?)/i;
+            let ok = 0, remises = [];
+            for (const p of paires.slice(0, 40)) {
+              const reg = p[1].replace(/<[^>]*>/g, " ").match(amountRe);
+              const promo = p[2].replace(/<[^>]*>/g, " ").match(amountRe);
+              if (reg && promo) {
+                const toNum = (s) => parseFloat(s.replace(/\s/g, "").replace(/\.(?=\d{3})/g, "").replace(",", "."));
+                const r1 = toNum(reg[1]), p1 = toNum(promo[1]);
+                if (r1 > 0 && p1 > 0 && p1 < r1) { ok++; remises.push((((r1 - p1) / r1) * 100).toFixed(1)); }
+              }
+            }
+            console.log("Appariements reussis (sur 40 max testes) :", ok, "| remises % :", remises.join(", "));
+            if (paires.length > 0) {
+              console.log("--- Exemple brut (1 paire) ---");
+              console.log(paires[0][0].slice(0, 500));
+            }
+          }
           SPIKE_EOF
           node /tmp/spike.mjs
