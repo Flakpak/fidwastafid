@@ -602,6 +602,83 @@ pour aucune des dix cibles de ce lot.
 
 ---
 
+## 10 — carrefour.ma : le site officiel, pas juste bringo.ma (2026-08-13)
+
+**Contexte** : `bringo.ma` (source actuelle, `enseigne: "Carrefour"`, 2 rayons
+seulement — `high-tech-multimedia` et `tout-pour-votre-cuisine-4`,
+`apps/pipeline/bringo-categories.txt`) n'a jamais été un choix éditorial :
+c'était un repli, `carrefour.ma` étant injoignable à l'époque. Le site vient
+de redevenir accessible — hypothèse à vérifier : catalogue plus large,
+davantage de rayons.
+
+**a. robots.txt** — `https://carrefour.ma/robots.txt` (sans `www`) →
+`200`, **`User-agent: * / Allow: /`** — maximalement permissif, aucun bot
+nommé. Passe le filtre.
+
+**Note DNS, pas anti-bot** : `www.carrefour.ma` ne résout pas (`ENOTFOUND`
+depuis deux réseaux différents, y compris un runner GitHub) — seul le
+domaine nu `carrefour.ma` répond. À utiliser tel quel si une source est
+construite un jour.
+
+**b. Joignabilité depuis un runner GitHub** — **`200`, aucun challenge
+Cloudflare**, cohérent avec un test depuis un réseau normal (même contenu,
+même taille ~55 Ko). Contrairement à bestmark/decathlon/marjanemall.ma,
+rien ne bloque ce domaine niveau réseau.
+
+**c. Ampleur du catalogue face à bringo — négatif, et c'est le constat qui
+ferme ce lot.** La page d'accueil ne liste que **12 liens de navigation**,
+aucun rayon produit : `/catalogues/`, `/magasins/`, `/actualites/`,
+`/faq/`, `/contact/`, `/promotions/`, `/produits/` (« Produits Exclusifs »),
+`/avantages/`. **Zéro** occurrence de « high-tech », « gaming », « jeux »,
+« bricolage », « jardin », « jouet », « électroménager » dans le HTML brut
+de l'accueil. Aucun sitemap (`/sitemap.xml` → 404).
+
+Les trois pages les plus prometteuses par leur nom — `/promotions/`,
+`/produits/`, `/catalogues/` — répondent `200` mais portent toutes le même
+marqueur Next.js : **`data-dgst="BAILOUT_TO_CLIENT_SIDE_RENDERING"`**. Le
+contenu réel (liste de produits, prix, catalogues PDF) est chargé
+**côté client, après hydratation** — rien dans le HTML brut, même pas un
+lien vers un PDF de catalogue sur `/catalogues/` (vérifié explicitement,
+0 lien `.pdf`). Même famille de problème que biougnach.ma et gamezone.ma
+(Gaming, 13/08) : écarté par le même principe qu'electroplanet.ma, pas de
+rendu JS dans ce pipeline.
+
+**Conclusion factuelle** : `carrefour.ma`, dans son état actuel, **n'est
+pas un catalogue e-commerce** — c'est un site vitrine/institutionnel
+(localisateur de magasins, actualités, avantages carte de fidélité) qui
+vient tout juste de redevenir joignable, probablement encore en
+reconstruction. L'hypothèse d'un catalogue plus large que bringo.ma **ne
+se vérifie pas aujourd'hui** — pas parce que le site refuse ou bloque, mais
+parce que le catalogue qu'on espérait n'y est pas (encore ?) exposé
+statiquement.
+
+**d. Recoupement avec bringo — répondu par la lecture du code, pas par un
+test (rien à tester tant que (c) est négatif), pour que la question ne se
+repose pas sans réponse.** `insert-deals.mjs` dédoublonne sur **`lower(titre)
+= lower($1) AND enseigne_id = $2 AND prix_promo = $3`** — **jamais sur
+`lien`** pour ce contrôle (`lien` sert uniquement à `empreinte_curation`,
+la mémoire de rejet, lot 2). Comme `scraper-bringo.mjs` insère déjà sous
+`enseigne: "Carrefour"` (`apps/pipeline/scraper-bringo.mjs:147`), une future
+source `carrefour.ma` partagerait le même `enseigne_id` — le dédoublonnage
+s'appliquerait donc automatiquement **si et seulement si le titre et le
+prix promo sont identiques au caractère et au dirham près** entre les deux
+sources. **Risque réel, pas théorique** : deux exports produit distincts
+(canal livraison Bringo vs site vitrine officiel) peuvent légitimement
+diverger sur la ponctuation du titre, un préfixe de marque, ou un prix
+arrondi différemment — dans ce cas, le même produit physique entrerait deux
+fois, sous deux `public_id` et deux liens distincts, sans qu'aucune garde
+actuelle ne le détecte. **À vérifier avec de vrais échantillons appariés
+avant de brancher les deux sources ensemble**, pas supposé sûr par défaut.
+
+**e. Remplacer bringo ou garder les deux — question sans objet aujourd'hui.**
+Rien à remplacer : `carrefour.ma` n'expose aucun catalogue scrapable dans son
+état actuel. **Recommandation : ne rien construire, revisiter si le site
+change de forme** (ex. le catalogue produit redevient server-rendered,
+comme un futur reconstat pourrait le montrer — même posture que
+mrbricolage.ma, réévaluable si le blocage se lève). Pas de scraper codé.
+
+---
+
 ## Recommandation d'ordre de développement (argumentée)
 
 **Aucune décision d'implémentation n'est prise ici — cette recommandation éclaire, la décision reste
