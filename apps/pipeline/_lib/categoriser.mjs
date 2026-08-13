@@ -41,7 +41,10 @@ export function mapCategorie(listName = "", titre = "", rayon = "") {
   if (/fruit|légume|viande|poisson|épicerie|boisson|lait|fromage|surgelé|biscuit/.test(l)) return "Alimentaire";
   if (/tv|téléphone|ordinateur|souris|clavier|powerbank|casque|écouteur|câble|informatique|enceinte|audio|bluetooth|tablette|montre|console|chargeur/.test(l)) return "High-Tech";
   if (/vêtement|chaussure|mode/.test(l)) return "Mode";
-  if (/beauté|hygiène|parfum|shampoing/.test(l)) return "Beauté";
+  // shampoing/shampooing : les deux orthographes existent en usage réel
+  // (constaté sur les titres carrefour.ma, 13/08/2026 : "SHAMPOOING GRAPE
+  // MOISTURE" et "SHAMPOING FULL RESIST" cohabitent dans le même catalogue).
+  if (/beauté|hygiène|parfum|shampo?oing/.test(l)) return "Beauté";
   // "Enfants" est absent de l'enum canonique (packages/schemas/src/enums.ts) —
   // comportement inchangé par ce lot (insert-deals.mjs, commentaire Phase 7A) :
   // ces deals sont rejetés en aval plutôt qu'insérés sous une catégorie corrigée.
