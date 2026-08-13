@@ -615,14 +615,46 @@ mrbricolage), depuis ce réseau, pas depuis un runner GitHub. Verdict :
 AJAX interne (non fait, hors budget de ce spike) ou un rendu JS (écarté par
 principe, cf. electroplanet).
 
-**Piste de repli trouvée en cours de route : mgamesstore.com**
-(`/product-category/jeux-video/promotion/`) — WooCommerce, `robots.txt`
-permissif, **28 résultats** sur la page promo dédiée, vrais prix barrés
-WooCommerce standard (`<del>`/`<ins>`), 200 en Node `fetch`, aucun challenge
-Cloudflare rencontré (contrairement à mrbricolage, même plateforme). Non
-développé — un seul test, à spiker plus complètement (volume réel,
-pagination, stabilité) avant tout code. Meilleur candidat Gaming actuel,
-au-dessus de gamezone.ma.
+**mgamesstore.com — spiké une seconde fois depuis un vrai runner GitHub
+(13/08/2026)**, exactement le point qui a fait tomber bestmark et decathlon —
+pas seulement depuis un autre réseau cette fois. Workflow jetable
+(`workflow_dispatch`/`push` sur branche de travail, jamais fusionné,
+supprimé après usage) exécuté trois fois pour corriger l'instrumentation en
+route.
+
+- **Joignable depuis un runner GitHub : oui.** `200`, `Cloudflare challenge:
+  false`, taille de réponse stable (~250 Ko) sur trois runs distincts.
+- **Vraies données de prix dans le HTML brut, pas de l'AJAX** (contrairement
+  à gamezone.ma) : `15` balises `<del>` et `15` `<ins>` (prix barré/promo
+  WooCommerce standard), `32` occurrences de `woocommerce-Price-amount`, `13`
+  badges `onsale` — la page promo dédiée sert bien un vrai comparatif de
+  prix côté serveur.
+- **Volume réellement remisé sur cette page : 15**, sur les 28 annoncés au
+  total par le compteur de résultats (le reste vit sur la page suivante,
+  paginée) — pas encore le nombre qui passerait le seuil des 30 % : les
+  couples prix normal/prix promo n'ont **pas pu être appariés
+  automatiquement** dans ce spike (le thème WoodMart — le même que
+  mrbricolage.ma, `SPIKE-SOURCES.md` — n'aligne pas `<del>` et `<ins>` en
+  frères directs ; une balise intermédiaire, non identifiée ici, sépare les
+  deux). Reste à faire avant tout code : localiser la vraie carte produit et
+  apparier les deux montants pour calculer la remise réelle par article.
+- **Sélecteurs titre/image non standard** : `0` occurrence des classes
+  WooCommerce par défaut (`woocommerce-loop-product__title`,
+  `wp-post-image`) — thème custom, comme bricoma.ma/mrbricolage.ma en leur
+  temps (`SPIKE-SOURCES.md`, « aucune mutualisation possible » entre thèmes
+  même dans la même catégorie). Sélecteurs réels à identifier au prochain
+  passage.
+- **Renouvellement du catalogue : pas mesurable en un seul passage** —
+  demanderait plusieurs observations espacées dans le temps (comme pour
+  toute source), pas conclu ici.
+
+**Verdict : le point bloquant qui a tué bestmark/decathlon est levé
+(joignable depuis un runner, données server-rendered) — mais le spike n'est
+pas fini.** Encore à faire avant tout code de scraper : sélecteurs
+titre/image/lien réels, appariement prix normal/promo fiable, un second
+passage à quelques jours d'écart pour juger du renouvellement. Meilleur
+candidat Gaming actuel, au-dessus de gamezone.ma (celui-là écarté : grille
+chargée en AJAX, aucune donnée dans le HTML brut).
 
 ## Diversification des sources (2026-07-18) — partiellement caduque
 
