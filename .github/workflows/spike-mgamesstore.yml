@@ -35,13 +35,33 @@ jobs:
             console.log("occurrences de", c, ":", n);
           }
 
-          if (liEls.length > 0) {
-            console.log("--- PREMIERE CARTE (brut, 2500 car) ---");
-            console.log(liEls[0][0].slice(0, 2500));
-          } else {
-            const idx = t.indexOf("woocommerce-Price-amount");
-            console.log("--- FRAGMENT AUTOUR DU PREMIER PRIX ---");
-            console.log(idx >= 0 ? t.slice(Math.max(0, idx - 1000), idx + 1000) : "introuvable");
+          const cartes = [...t.matchAll(/<li class="product /gi)];
+          console.log("vraies cartes produit (class=\"product \") :", cartes.length);
+          if (cartes.length > 0) {
+            const start = cartes[0].index;
+            console.log("--- PREMIERE VRAIE CARTE (brut, 3000 car) ---");
+            console.log(t.slice(start, start + 3000));
           }
+
+          const amountRe = />([\d\s.,]+)\s*(?:DH|MAD|Dhs?)/i;
+          const paires = [...t.matchAll(/<del>[\s\S]*?<\/del>\s*<ins>[\s\S]*?<\/ins>/gi)];
+          console.log("paires del/ins strictement adjacentes :", paires.length);
+          let sous30 = 0, au30 = 0;
+          for (const p of paires) {
+            const delTxt = p[0].match(/<del>([\s\S]*?)<\/del>/i)[1];
+            const insTxt = p[0].match(/<ins>([\s\S]*?)<\/ins>/i)[1];
+            const reg = delTxt.match(amountRe);
+            const promo = insTxt.match(amountRe);
+            if (reg && promo) {
+              const r1 = parseFloat(reg[1].replace(/\s/g, "").replace(",", "."));
+              const p1 = parseFloat(promo[1].replace(/\s/g, "").replace(",", "."));
+              if (r1 > 0 && p1 > 0 && p1 < r1) {
+                const pct = ((r1 - p1) / r1) * 100;
+                console.log("remise:", pct.toFixed(1), "% (", r1, "->", p1, ")");
+                if (pct >= 30) au30++; else sous30++;
+              }
+            }
+          }
+          console.log("BILAN remise >= 30% :", au30, "| remise < 30% :", sous30);
           SPIKE_EOF
           node /tmp/spike.mjs
