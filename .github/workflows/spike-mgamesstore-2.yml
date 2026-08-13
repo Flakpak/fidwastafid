@@ -31,6 +31,8 @@ jobs:
           // 1) Structure réelle autour d'un <del> : trouver le parent commun.
           const p1 = await fetchPage(base);
           console.log("PAGE 1 — STATUS", p1.status, "LEN", p1.html.length);
+          console.log("--- CONTENU BRUT COMPLET (page < 15 Ko) ---");
+          console.log(p1.html);
           const delIdx = p1.html.indexOf("<del>");
           if (delIdx >= 0) {
             console.log("--- FRAGMENT AUTOUR DU PREMIER <del> (1200 car avant, 400 apres) ---");
