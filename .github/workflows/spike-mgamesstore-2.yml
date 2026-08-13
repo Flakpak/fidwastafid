@@ -1,7 +1,7 @@
 # Spike jetable — jamais destiné à être fusionné sur main.
-# Suite du spike mgamesstore.com (Gaming) : structure DOM réelle autour de
-# <del>/<ins>, volume qui passe le seuil de 30 % sur tout le catalogue promo,
-# snapshot horodaté pour comparaison de renouvellement à 48h.
+# Suite du spike mgamesstore.com (Gaming) : volume réel dans la grille
+# principale (exclut le widget sidebar "top rated"), snapshot pour
+# comparaison de renouvellement à 48h.
 name: Spike mgamesstore suite (jetable)
 on:
   workflow_dispatch:
@@ -16,59 +16,59 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - name: Fetch + analyse structure + pagination + snapshot
+      - name: Fetch + analyse grille principale + pagination + snapshot
         run: |
-          cat > /tmp/spike2.mjs <<'SPIKE_EOF'
+          cat > /tmp/spike3.mjs <<'SPIKE_EOF'
           const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
           const base = "https://mgamesstore.com/product-category/jeux-video/promotion/";
 
           async function fetchPage(url) {
             const r = await fetch(url, { headers: { "User-Agent": ua } });
-            const t = await r.text();
-            return { status: r.status, html: t };
+            return { status: r.status, html: await r.text() };
           }
 
-          // 1) Structure réelle autour d'un <del> : trouver le parent commun.
-          const p1 = await fetchPage(base);
-          console.log("PAGE 1 — STATUS", p1.status, "LEN", p1.html.length);
-          console.log("--- CONTENU BRUT COMPLET (page < 15 Ko) ---");
-          console.log(p1.html);
-          const delIdx = p1.html.indexOf("<del>");
-          if (delIdx >= 0) {
-            console.log("--- FRAGMENT AUTOUR DU PREMIER <del> (1200 car avant, 400 apres) ---");
-            console.log(p1.html.slice(Math.max(0, delIdx - 1200), delIdx + 400));
+          function grillePrincipale(html) {
+            const start = html.indexOf('data-source="main_loop"');
+            if (start < 0) return null;
+            // La grille se termine au footer de pagination qui suit.
+            const end = html.indexOf('wd-loop-footer', start);
+            return html.slice(start, end > 0 ? end : start + 60000);
           }
 
-          // 2) Pagination : parcourt toutes les pages de la catégorie promo.
-          let pageNum = 1;
-          let allHtml = p1.html;
-          const vus = new Set();
-          while (true) {
-            const nextUrl = pageNum === 1 ? base : base + "page/" + pageNum + "/";
-            const { status, html } = pageNum === 1 ? { status: p1.status, html: p1.html } : await fetchPage(nextUrl);
-            if (status !== 200) { console.log("Page", pageNum, "status", status, "- arret"); break; }
-            const dels = (html.match(/<del>/g) || []).length;
-            console.log("Page", pageNum, ": status", status, "del count", dels);
-            if (dels === 0 && pageNum > 1) break;
-            if (pageNum > 1) allHtml += html;
-            const liens = [...html.matchAll(/href="(https:\/\/mgamesstore\.com\/produit\/[^"]+)"/gi)].map(m => m[1]);
-            for (const l of liens) vus.add(l);
-            pageNum++;
-            if (pageNum > 6) break; // garde-fou
-          }
-          console.log("TOTAL liens produit distincts vus (motif /produit/) :", vus.size);
-
-          // essai motif alternatif si /produit/ n'a rien donné
-          if (vus.size === 0) {
-            const liensAlt = [...p1.html.matchAll(/href="(https:\/\/mgamesstore\.com\/[a-z0-9-]+\/)"[^>]*>[\s\S]{0,80}?<\/a>/gi)].map(m => m[1]);
-            console.log("motif alternatif (racine produit ?), echantillon :", [...new Set(liensAlt)].slice(0, 10));
+          function analysePage(html) {
+            const grille = grillePrincipale(html);
+            if (!grille) return { produits: 0, remises: [] };
+            const liens = [...new Set([...grille.matchAll(/href="(https:\/\/mgamesstore\.com\/product\/[a-z0-9-]+\/)"/gi)].map(m => m[1]))];
+            const paires = [...grille.matchAll(/<del aria-hidden="true"><span class="woocommerce-Price-amount amount"><bdi>([\d.,]+)<span[^>]*>[^<]*<\/span><\/bdi><\/span><\/del>[\s\S]{0,200}?<ins aria-hidden="true"><span class="woocommerce-Price-amount amount"><bdi>([\d.,]+)<span/gi)];
+            const remises = paires.map(p => {
+              const reg = parseFloat(p[1].replace(/\./g, "").replace(",", "."));
+              const promo = parseFloat(p[2].replace(/\./g, "").replace(",", "."));
+              return reg > 0 && promo > 0 && promo < reg ? ((reg - promo) / reg) * 100 : null;
+            }).filter(x => x !== null);
+            return { produits: liens.length, remises, liens };
           }
 
-          console.log("TOTAL <del> sur toutes les pages parcourues :", (allHtml.match(/<del>/g) || []).length);
-          console.log("TOTAL <ins> sur toutes les pages parcourues :", (allHtml.match(/<ins>/g) || []).length);
+          let tousLiens = [];
+          let toutesRemises = [];
+          for (let n = 1; n <= 4; n++) {
+            const url = n === 1 ? base : base + "page/" + n + "/";
+            const { status, html } = await fetchPage(url);
+            if (status !== 200) { console.log("Page", n, "status", status, "- fin pagination"); break; }
+            const { produits, remises, liens } = analysePage(html);
+            console.log("Page", n, ": grille principale =", produits, "produits, paires del/ins appariées =", remises.length);
+            if (produits === 0 && n > 1) break;
+            tousLiens.push(...(liens || []));
+            toutesRemises.push(...remises);
+          }
 
-          // 3) Snapshot horodaté (liens + un extrait de prix) pour comparaison a 48h.
+          const au30 = toutesRemises.filter(r => r >= 30).length;
+          const sous30 = toutesRemises.filter(r => r < 30).length;
+          console.log("TOTAL produits remisés (grille principale, toutes pages) :", tousLiens.length);
+          console.log("TOTAL remises appariées avec succès :", toutesRemises.length);
+          console.log("Détail des remises (%) :", toutesRemises.map(r => r.toFixed(1)).join(", "));
+          console.log("BILAN >= 30% :", au30, "| < 30% :", sous30);
+
           console.log("--- SNAPSHOT", new Date().toISOString(), "---");
-          console.log("SNAPSHOT_LIENS=" + JSON.stringify([...vus].sort()));
+          console.log("SNAPSHOT_LIENS=" + JSON.stringify([...new Set(tousLiens)].sort()));
           SPIKE_EOF
-          node /tmp/spike2.mjs
+          node /tmp/spike3.mjs
