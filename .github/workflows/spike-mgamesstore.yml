@@ -5,6 +5,9 @@
 name: Spike mgamesstore (jetable)
 on:
   workflow_dispatch:
+  push:
+    branches: [ops/seuils-decathlon-voyages]
+    paths: [.github/workflows/spike-mgamesstore.yml]
 jobs:
   spike:
     runs-on: ubuntu-latest
