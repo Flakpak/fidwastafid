@@ -85,6 +85,43 @@ console.log("parseProduits — catégorie déduite du rayon quand le titre ne su
   check("rayon MAISON & CUISINE → Maison", deals[3]?.categorie === "Maison");
 }
 
+console.log("\nparseProduits — rayons Électroménager/High-Tech/Sport (ajoutés le 14/08/2026 après mesure : 320/1053 produits réels tombaient en Autre)");
+{
+  const { deals } = parseProduits([
+    produit({
+      name: "REFRIGERATEUR COMBINE 316L A++ INOX WBMF 606374 XNA WHIRLPOOL",
+      salePrice: "290000",
+      regularPrice: "350000",
+      categories: [{ name: "FROID" }, { name: "GROS ÉLECTROMÉNAGER" }],
+    }),
+    produit({
+      name: "GALAXY TAB Z10 10,1 POUCES 4G 3/64G ANDROID ZATEC",
+      salePrice: "99900",
+      regularPrice: "129900",
+      categories: [{ name: "MULTIMÉDIA" }, { name: "SMARTPHONES & TABLETTES" }],
+    }),
+    produit({
+      name: "MEDECINE BALL ANTIDERAPANTE 4KG",
+      salePrice: "9900",
+      regularPrice: "14900",
+      categories: [{ name: "PLEIN AIR, JOUETS & LOISIRS" }, { name: "SPORT" }],
+    }),
+    produit({
+      name: "COFFRET CREATIF BRACELETS ET COLLIERS",
+      salePrice: "4900",
+      regularPrice: "7900",
+      categories: [{ name: "PLEIN AIR, JOUETS & LOISIRS" }],
+    }),
+  ]);
+  check("titre non accentué (REFRIGERATEUR) rattrapé par le rayon FROID/GROS ÉLECTROMÉNAGER", deals[0]?.categorie === "Électroménager");
+  check("rayon MULTIMÉDIA/SMARTPHONES → High-Tech", deals[1]?.categorie === "High-Tech");
+  check("rayon SPORT (même produit aussi tagué PLEIN AIR, JOUETS & LOISIRS) → Sport", deals[2]?.categorie === "Sport");
+  check(
+    "rayon ambigu seul (PLEIN AIR, JOUETS & LOISIRS, sans SPORT) reste Autre — jamais deviné entre outillage et jouet",
+    deals[3]?.categorie === "Autre"
+  );
+}
+
 console.log("\nparseProduits — sémantique des prix : regular_price DOIT dépasser sale_price");
 {
   const { deals, rejets } = parseProduits([
