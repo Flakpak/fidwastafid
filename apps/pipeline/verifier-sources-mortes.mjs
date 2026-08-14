@@ -22,6 +22,22 @@
 // (label alerte-source-<source>) via .github/actions/alerte-issue, SANS
 // dupliquer ce mécanisme.
 //
+// SOURCE JAMAIS VUE (14/08/2026, septième occurrence du motif « livré en
+// prod, rien ne le signale » — scraper-carrefour.mjs, PR #134, fusionné et
+// déployé le 14/08 sans jamais être appelé par le cron). `select distinct
+// source from pipeline_runs` ci-dessus ne peut structurellement PAS détecter
+// ce cas : une source jamais appelée n'écrit aucune ligne, donc n'apparaît
+// jamais dans cette liste — l'alerte de série ne se déclenche que sur une
+// source qui ÉCHOUE, jamais sur une source ABSENTE.
+//
+// SOURCES_ATTENDUES (variable d'env, liste séparée par des virgules) :
+// définie dans pipeline-quotidien.yml, job verification-sources — LE MÊME
+// FICHIER que les étapes de scraping elles-mêmes, pour qu'ajouter/retirer une
+// source sans mettre à jour cette liste soit visible dans le MÊME diff de
+// PR, pas dans un fichier séparé qu'on oublie d'ouvrir (même leçon que
+// docs/SUIVI.md, cf. son en-tête). Absente (exécution locale/manuelle) :
+// ce contrôle est sauté proprement, le reste du script est inchangé.
+//
 // Variable d'env DATABASE_URL requise, même convention qu'insert-deals.mjs.
 // Exit 0 dans tous les cas — ce script RAPPORTE, il ne fait jamais échouer
 // le job lui-même (l'alerte est portée par l'issue GitHub, pas le run).
@@ -88,6 +104,27 @@ try {
 
     if (etat.serie >= seuil) {
       console.log(`ALERTE=${JSON.stringify({ source, cause: etat.cause, serie: etat.serie, seuil })}`);
+    }
+  }
+
+  // Source jamais vue — voir en-tête. `sources` (ci-dessus) est l'ensemble
+  // de ce qui a DÉJÀ écrit au moins une ligne, jamais périmé par une fenêtre
+  // de temps : une source qui tournait puis a cessé garde son historique
+  // (couvert par la série ci-dessus dès qu'elle re-tourne et échoue) — le
+  // seul trou réel est l'absence TOTALE, jamais couverte par ailleurs.
+  const attendues = (process.env.SOURCES_ATTENDUES || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (attendues.length === 0) {
+    console.log("  info  - SOURCES_ATTENDUES non fournie — contrôle « source jamais vue » sauté.");
+  } else {
+    const vues = new Set(sources);
+    for (const source of attendues) {
+      if (!vues.has(source)) {
+        console.log(`  ALERTE - ${source} : attendue par le cron mais AUCUNE ligne dans pipeline_runs — jamais appelée, ou nom divergent.`);
+        console.log(`ALERTE=${JSON.stringify({ source, cause: "jamais_vue", serie: 0, seuil: 0 })}`);
+      }
     }
   }
 } catch (err) {
