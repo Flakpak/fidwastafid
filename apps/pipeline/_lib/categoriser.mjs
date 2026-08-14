@@ -53,8 +53,25 @@ export function mapCategorie(listName = "", titre = "", rayon = "") {
   // Le rayon scrapé sert de dernier repli, pas de premier critère : un mot-clé
   // trouvé dans le titre est toujours plus précis qu'une catégorie déduite du
   // rayon entier (ex. de la vaisselle Maison figure dans le rayon cuisine).
+  //
+  // Rayons alimentaires/beauté/maison ajoutés le 14/08/2026 (aswakassalam.mjs,
+  // mesuré sur un échantillon réel : "BOUCHEES AGNEAU POUR CHIEN…" ne porte
+  // aucun mot-clé alimentaire au sens du titre ci-dessus, mais son rayon
+  // WooCommerce ("ANIMALERIE") n'a pas d'équivalent dans l'enum — resterait
+  // "Autre" à raison ; en revanche "BOUCHERIE"/"CRÈMERIE"/etc. étaient
+  // auparavant perdus faute de règle). Rayon "Bricolage & Jardin" ajouté au
+  // même lot (ab-maroc.mjs est mono-domaine, catégorie posée en dur — cette
+  // règle sert les rayons mixtes futurs, pas ab-maroc.mjs lui-même).
   const r = rayon.toLowerCase();
   if (/high-tech/.test(r)) return "High-Tech";
-  if (/cuisine/.test(r)) return "Maison";
+  if (
+    /boucherie|boulangerie|charcuterie|cr[eè]merie|conserve|[eé]picerie|biscuiterie|confiserie|petit d[eé]jeuner|yaourt|dessert|compote|beurre|margarine|boisson/.test(
+      r
+    )
+  )
+    return "Alimentaire";
+  if (/beaut[eé]|hygi[eè]ne/.test(r)) return "Beauté";
+  if (/cuisine|maison|d[eé]coration|rangement|entretien|nettoyant|mouchoir|couche/.test(r)) return "Maison";
+  if (/jardin|bricolage|outillage|quincaillerie/.test(r)) return "Bricolage & Jardin";
   return "Autre";
 }
