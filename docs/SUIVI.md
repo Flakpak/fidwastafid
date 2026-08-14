@@ -1,7 +1,7 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-08-08, sur `main` après fusion de #92, #93, #94, #95, #97 (recherche
-sans accents, badges rapatriés sur `Badge`, état voté persistant, identité juridique en pause).*
+*Dernière mise à jour : 2026-08-14, sur `main` après fusion de #133, #134 (carrefour.ma, source de
+scraping en parallèle de bringo — voir §1 et §2 ci-dessous).*
 
 Ce document est le **point d'entrée pour reprendre le travail sans contexte préalable**. Il dit
 ce qui tourne, ce qui reste ouvert, et par quoi continuer. Il ne remplace aucun autre document :
@@ -53,7 +53,7 @@ consultatif reste un échec réel.
 ## 1 — Ce qui tourne en production
 
 **https://fidwastafid.com** — déployé depuis `main` par Vercel à chaque fusion. Dernier
-déploiement de production : `f453c07`, check `Vercel` **`success`**, 2026-08-05 06:51 UTC
+déploiement de production : `187ccdd`, check `Vercel` **`success`**, 2026-08-14
 (relevé par l'API GitHub, pas de mémoire). Le run CI du même SHA est vert.
 
 ### Chiffres réels au 2026-08-05
@@ -134,9 +134,17 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
   jamais de la longueur d'une liste. Vérifié après déploiement : badges cohérents avec un
   `count(*)` direct, pagination de l'onglet `publie` (113 lignes, 4 pages) intégralement
   parcourue sans doublon.
-- **Pipeline quotidien** (`apps/pipeline`) — **six sources** : bringo, inwi,
-  universparadiscount, decathlon, **kiabi** et **bestmark** (ces deux dernières ajoutées le
-  02/08 par leurs API publiques, #71). Insertion directe en base, expiration des `auto_draft`
+- **Pipeline quotidien** (`apps/pipeline`) — **sept sources** : bringo, inwi,
+  universparadiscount, decathlon, kiabi, bestmark et **carrefour.ma** (ajoutée le 14/08 par
+  #134, vraie API JSON `/api/products`, pas un scraping HTML — voir `docs/SPIKE-SOURCES.md`
+  §11-12). **En parallèle de bringo, pas en remplacement** : l'API est apparue le 13/08, sa
+  stabilité n'est pas prouvée, et bringo reste la première source en volume. Recoupement
+  mesuré à blanc le 13/08 : **0 doublon exact** (prédicat titre+enseigne+prix, contre les
+  deals `carrefour` déjà en base) — à re-mesurer sur plusieurs jours réels de cron avant de
+  trancher garder-les-deux vs basculer (voir §2, priorité ajoutée). `carrefour.mjs` est aussi
+  la première source du pipeline à poser une **vraie `date_fin`** (`promotionEndDate`, 178/187
+  produits mesurés lors du spike) plutôt que `null` systématique — le repli sur `null` reste
+  journalisé, jamais silencieux. Insertion directe en base, expiration des `auto_draft`
   de plus de 14 jours, revalidation du cache déclenchée par GitHub Actions.
   - **Seuil de remise unique à 30 %** (`apps/pipeline/remise.mjs`, `SEUIL_REMISE_MIN_PCT`),
     appliqué dans `insert-deals.mjs` — le seul point de passage commun à toutes les sources.
@@ -150,6 +158,8 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| Scraper carrefour.ma | #134 | 14/08 | Septième source, API JSON `/api/products`, en parallèle de bringo (voir « Fonctionnel livré » ci-dessus). `date_fin` réelle via `promotionEndDate`. |
+| Spike carrefour.ma | #133 | 14/08 | `docs/SPIKE-SOURCES.md` §11-12 : correction du faux négatif initial (vitrine crue statique), API JSON confirmée, recoupement bringo mesuré à blanc (0 doublon), prospectus PDF non comparé faute d'outillage (`pdftoppm`/clé Vision absents ici). |
 | File admin — filtre serveur | #83 | 05/08 | `GET /api/v1/admin/deals` : `statut` requis, filtre en base, pagination par curseur (neuvième amendement conscient, CONTRAT-V1 §4) — corrige le défaut diagnostiqué le 04/08 (`docs/INCIDENTS.md`) : une soumission `en_attente` invisible derrière un `LIMIT` global tranché côté client. `en_attente` trie `created_at` croissant ; nouvel endpoint `GET /api/v1/admin/deals/compte` pour les badges. Vérifié en production (ci-dessus). |
 | Bandeau de consentement — texte neutre | #82 | 04/08 | Retire toute mention de prestataire et la catégorie « personnalisation » (inactive) de l'interface du bandeau — détail technique déplacé vers `/confidentialite`, seule censée être exhaustive. Enregistrement généralisé (`finalites: Record<string, boolean>`), version passée à 2. |
 | Consentement — Analytics gaté | #80 | 04/08 | Vercel Analytics ne se charge qu'après consentement explicite (voir « Fonctionnel livré »). |
@@ -168,12 +178,21 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 ### Pull requests
 
-Une PR de travail ouverte : #98 (retrait de vote — reclic sur une flèche déjà active, correctif
-client, aucun amendement — DELETE existait déjà), en test par Kamel, **ne pas fusionner sans son
-retour**. Six PR Dependabot en attente de tri (#32, #58, #60, #61, #62, #63).
-Un délai de refroidissement de 2 jours est configuré (`.github/dependabot.yml`), aligné sur la
+**Aucune PR ouverte au 14/08/2026** — #133 et #134 (spike + scraper carrefour.ma) fusionnées ce
+jour, #98 (retrait de vote) fusionnée le 08/08. Aucune PR Dependabot en attente de tri à date.
+Un délai de refroidissement de 2 jours reste configuré (`.github/dependabot.yml`), aligné sur la
 politique pnpm `minimumReleaseAge` de 24 h — les mises à jour de **sécurité** en sont exemptées et
 ne sont jamais retardées.
+
+### Décision en attente — carrefour.ma garder-les-deux vs basculer *(priorité 0, ajoutée 14/08/2026)*
+
+**Mesure à blanc uniquement pour l'instant** (0 doublon exact, `docs/SPIKE-SOURCES.md` §12) — le
+cron n'a pas encore tourné avec carrefour.ma en production au moment de cette mise à jour
+(fusionné après le run du 14/08, prochain run réel le 15/08 ~05h UTC). **Ce qui décide** :
+insérés nets par source (`pipeline_runs`), taux de doublons réel sur plusieurs jours de cron
+(le dédoublonnage porte sur titre+enseigne+prix, jamais sur le lien — un même produit sous deux
+libellés passerait deux fois), et proportion de deals carrefour portant une vraie `date_fin`
+(`promotionEndDate`) contre repli `null`. À rapporter après le premier run réel, pas avant.
 
 ### Aucun cron de péremption du SUIVI n'existe *(diagnostiqué le 05/08/2026)*
 
