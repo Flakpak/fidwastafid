@@ -63,7 +63,19 @@ export function mapCategorie(listName = "", titre = "", rayon = "") {
   // même lot (ab-maroc.mjs est mono-domaine, catégorie posée en dur — cette
   // règle sert les rayons mixtes futurs, pas ab-maroc.mjs lui-même).
   const r = rayon.toLowerCase();
-  if (/high-tech/.test(r)) return "High-Tech";
+  // Électroménager/High-Tech/Sport par rayon ajoutés le 14/08/2026 (mesuré
+  // sur le catalogue réel aswakassalam.com : 320/1053 produits en promo
+  // tombaient en "Autre", le défaut déjà corrigé sur carrefour.ma une
+  // semaine plus tôt — même cause, l'information de rayon existait,
+  // n'était simplement pas lue pour ces trois familles). "Plein air" et
+  // "jouets" DÉLIBÉRÉMENT absents : le rayon réel observé est un intitulé
+  // unique ambigu ("Plein air, Jouets & Loisirs") qui mélange outillage
+  // extérieur et jouets d'enfant sous UNE seule étiquette — le trancher
+  // sans donnée produit plus fine serait un prix deviné, laissé en "Autre".
+  if (/[eé]lectrom[eé]nager|\bfroid\b|lavage|s[eé]chage|cuisson|chauffage|climatisation|traitement du linge|pr[eé]paration aliments/.test(r))
+    return "Électroménager";
+  if (/high-tech|multim[eé]dia|informatique|smartphone|tablette|\bimage\b|\bson\b/.test(r)) return "High-Tech";
+  if (/\bsport\b/.test(r)) return "Sport";
   if (
     /boucherie|boulangerie|charcuterie|cr[eè]merie|conserve|[eé]picerie|biscuiterie|confiserie|petit d[eé]jeuner|yaourt|dessert|compote|beurre|margarine|boisson/.test(
       r
