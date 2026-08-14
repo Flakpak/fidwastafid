@@ -477,6 +477,35 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     });
   }
 
+  /**
+   * Retire des lignes de la liste affichée SANS refetch (lot du 15/08/2026,
+   * friction de modération sur 253 deals — un `rafraichir()` par action
+   * remplaçait toute la première page à chaque clic, perdant la position de
+   * défilement). Jamais appelée avant confirmation serveur : pas d'optimisme
+   * qui mentirait sur un échec, l'état local ne bouge qu'après un 200.
+   * `publicIds` doit toujours venir de ce que le serveur a RÉELLEMENT modifié
+   * (`updated`, pas la sélection demandée) — un id périmé silencieusement
+   * ignoré côté API ne doit pas disparaître localement comme s'il l'avait été.
+   */
+  function retirerDesListe(publicIds: string[], statutCible: DealStatut) {
+    if (publicIds.length === 0) return;
+    const ids = new Set(publicIds);
+    setDeals((prev) => (prev ? prev.filter((d) => !ids.has(d.publicId)) : prev));
+    setComptes((prev) => {
+      const next = { ...prev };
+      // `onglet` est toujours un DealStatut ici : cette fonction n'est
+      // appelée que depuis le flux de modération par statut, jamais depuis
+      // l'onglet "supprime" (AdminDealSupprime ne l'utilise pas).
+      if (onglet !== "supprime") next[onglet] = Math.max(0, next[onglet] - ids.size);
+      next[statutCible] = (next[statutCible] ?? 0) + ids.size;
+      return next;
+    });
+    // Toute ligne présente dans `deals` a déjà passé le filtre actif (filtré
+    // en base, jamais côté client) — sa sortie de liste vaut donc aussi pour
+    // le compte filtré affiché par "Traiter TOUT le résultat filtré".
+    setCompteFiltre((prev) => (prev === null ? prev : Math.max(0, prev - ids.size)));
+  }
+
   async function updateStatut(publicId: string, statut: DealStatut, motifRejet?: string) {
     setPending(true);
     setError(null);
@@ -491,7 +520,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         setError(body.error?.message ?? "Action impossible.");
         return;
       }
-      await rafraichir();
+      retirerDesListe([publicId], statut);
     } finally {
       setPending(false);
     }
@@ -669,9 +698,14 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         setError(body.error?.message ?? "Action groupée impossible.");
         return;
       }
+      // `updated`, pas `selected` : un id périmé entre la sélection et
+      // l'appel (déjà traité ailleurs, supprimé) est ignoré silencieusement
+      // côté serveur (route bulk) — le retirer quand même localement le
+      // ferait disparaître comme s'il avait été traité ici, un mensonge.
+      const body = (await res.json()) as { updated: string[]; lot: string };
+      retirerDesListe(body.updated, statut);
       setSelected(new Set());
       setDemandeMotifLot(false);
-      await rafraichir();
     } finally {
       setPending(false);
     }
