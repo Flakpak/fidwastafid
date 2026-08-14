@@ -798,6 +798,20 @@ jobs:
 
       - name: Détecte les sources en série d'échecs
         id: verifier
+        env:
+          # LISTE UNIQUE, tenue ICI et nulle part ailleurs — même fichier
+          # que les étapes de scraping ci-dessus (job `pipeline`), pour
+          # qu'ajouter/retirer une source sans mettre à jour cette ligne
+          # soit visible dans le MÊME diff de PR. Valeur = exactement ce que
+          # sourceDepuisFichier() lit dans chaque nom d'archive
+          # (extractions/AAAA-MM-JJ_HH-mm_<source>.json) — PAS le nom du
+          # script npm : bringo est un cas à part, source
+          # "bringo-<ville>" (ici "bringo-casablanca", cf. l'argument
+          # "Casablanca" de l'étape "Scraping Bringo" ci-dessus), toutes les
+          # autres sources partagent leur nom avec leur script scraper-*.
+          SOURCES_ATTENDUES: >-
+            bringo-casablanca,inwi,universparadiscount,decathlon,kiabi,
+            carrefour,ab-maroc,aswakassalam
         run: |
           set -o pipefail
           sortie=$(pnpm --filter pipeline run verifier-sources-mortes | tee /dev/stderr)
@@ -826,7 +840,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # "jamais_vue" (14/08/2026) : pas une série d'échecs (0 run, pas N),
+      # gabarit distinct — "0 runs consécutifs" serait un non-sens pour
+      # l'opérateur qui lit l'issue. Même action, mêmes champs matrix,
+      # seuls titre/corps divergent selon la cause.
       - name: Alerte — source en série d'échecs
+        if: matrix.alerte.cause != 'jamais_vue'
         uses: ./.github/actions/alerte-issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -853,3 +872,32 @@ jobs:
             Cette issue se referme manuellement une fois la cause traitée — un nouveau run
             'ok' pour cette source ne la referme pas automatiquement, il remet seulement la
             série à zéro pour les prochaines vérifications.
+
+      - name: Alerte — source attendue jamais vue en base
+        if: matrix.alerte.cause == 'jamais_vue'
+        uses: ./.github/actions/alerte-issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          label: alerte-source-${{ matrix.alerte.source }}
+          depot: ${{ github.repository }}
+          titre: "Source ${{ matrix.alerte.source }} : listée dans SOURCES_ATTENDUES mais AUCUNE ligne dans pipeline_runs"
+          corps: |
+            La source **${{ matrix.alerte.source }}** est listée dans `SOURCES_ATTENDUES`
+            (job `verification-sources`, `pipeline-quotidien.yml`) mais n'a **jamais** écrit
+            de ligne dans `pipeline_runs` — ni succès, ni échec. Un scraper qui n'est
+            simplement jamais appelé ne déclenche aucune des alertes de série ci-dessus,
+            construites pour détecter un ÉCHEC, pas une ABSENCE (fait générateur du
+            14/08/2026 : `scraper-carrefour.mjs`, fusionné et déployé, jamais câblé au cron).
+
+            | | |
+            |---|---|
+            | Vu depuis | run [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+
+            À vérifier : l'étape de scraping de cette source existe-t-elle bien dans le job
+            `pipeline` de `pipeline-quotidien.yml` ? Son nom de source (suffixe du fichier
+            d'archive, `extractions/AAAA-MM-JJ_HH-mm_<source>.json`) correspond-il
+            exactement à la valeur dans `SOURCES_ATTENDUES` ?
+
+            Cette issue se referme manuellement une fois la source réellement câblée et son
+            premier run réel visible dans `pipeline_runs`.
