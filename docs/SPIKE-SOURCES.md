@@ -504,27 +504,61 @@ nommé Claude dans un refus — c'est une plage d'IP bloquée, même famille que
 bestmark/decathlon, pas un choix éditorial du marchand. Rien à contourner :
 retiré, comme les deux autres.
 
-### ab-maroc.com — ORANGE, à creuser
+### ab-maroc.com — RECONTRÔLÉ le 14/08/2026, ORANGE → **VERT**
+
+*Correction : la première passe s'était arrêtée à la page d'accueil sans
+chercher d'API — même méthode fautive que celle corrigée sur carrefour.ma.*
 
 **a.** Permissif, aucune restriction. **b.** Joignable (`200`, 515 Ko).
-**c/d.** Aucune paire `<del>`/`<ins>` sur la page d'accueil, mais 20
-occurrences de classes `price` et 53 mentions promo/solde/réduction — du
-contenu réel, pas une coquille vide, mais pas la bonne page. **Catégorie
-servie non déterminée dans ce spike** (pas vérifié quel rayon ab-maroc.com
-sert réellement). Reste à faire avant conclusion : trouver la page
-promo/soldes dédiée (comme universparadiscount.ma, jamais la page d'accueil
-brute d'un site généraliste).
+**c.** WordPress/WooCommerce confirmé (déjà su). **API JSON publique
+trouvée sans authentification** : `GET /wp-json/wc/store/v1/products` (Store
+API WooCommerce, activée par défaut, même famille que kiabi.ma/bestmark.ma
+déjà en production). `?on_sale=true` renvoie directement les produits
+remisés, structurés (`prices.regular_price`/`sale_price`, sous-unité
+centimes, `currency_code`). **d.** Appariement vérifié sur un exemple réel :
+549,00 DH / 600,00 DH, 8,5 % (sous le seuil sur cet exemple précis, la
+distribution réelle reste à mesurer par un scraper, pas ici). **e.**
+`X-WP-Total: 544` produits en promotion à l'instant du contrôle — volume
+très supérieur à tout ce qui a été mesuré dans ce lot. **Catégorie servie
+désormais déterminée** : quincaillerie/bricolage/jardinage généraliste
+(ex. `Jardinage & Plein Air`, `Aspirateurs et Souffleurs`, marque INGCO) —
+aucun recoupement avec les rayons déjà servis en production.
 
-### biougnach.ma (Électroménager) — ROUGE, rendu JS requis
+**Verdict : VERT.** Aucun rendu JS ni HTML à parser — API publique
+propre, même gain d'effort que kiabi/bestmark.
 
-**a.** Pas de vrai `robots.txt` (le serveur sert le shell de l'appli pour
-toute route non reconnue — Angular, fallback SPA) — permissif par absence
-de fichier. **b.** Joignable (`200`). **c.** **Application Angular
-confirmée** (`<app-root>`, `ng-version`, spinner de préchargement dans le
-HTML initial) — zéro donnée produit/prix dans le HTML brut, chargement en
-JS après coup. Même catégorie de problème que gamezone.ma (Gaming, spike du
-même jour) : écarté par principe, pas de rendu JS dans ce pipeline
-(cf. electroplanet.ma).
+### biougnach.ma (Électroménager) — RECONTRÔLÉ le 14/08/2026, ROUGE → **catalogue réel confirmé, rendu JS nécessaire**
+
+*Correction : le verdict ROUGE reposait sur le HTML brut vide (`curl`), pas
+sur un test de rendu — exactement la confusion « HTML brut vide = pas de
+catalogue » que le faux négatif carrefour.ma a mise en évidence. Un HTML
+brut vide signifie ici « rendu côté client », pas « rien à scraper ».*
+
+**a.** Pas de vrai `robots.txt` (fallback SPA Angular) — permissif par
+absence de fichier, inchangé. **b.** Joignable (`200`). **c.** Application
+Angular confirmée, HTML brut toujours vide de données (reconfirmé,
+0 occurrence de « DH » dans le `curl` du 14/08). **Mais le bundle JS
+(`main.*.js`) contient une vraie configuration d'API** :
+`baseUrl: "https://www.biougnach.ma/webapigw"`, avec `CatalogUrl: "/api/v1/c/"`,
+`AggegationUrl`, `IdentityUrl`, etc. — un vrai backend, pas une vitrine.
+**Rendu navigateur (Chrome, `claude-in-chrome`) : catalogue massif et
+réel**, une douzaine de rayons rendus après hydratation (climatiseurs,
+smartphones, TV, lavage, air fryer, PC portables, aspirateurs,
+chauffe-eau…), chacun avec des paires prix barré/prix promo explicites
+(ex. « 6.899,00 DH 7.999,00 DH »), et une navigation catégorie réelle à
+identifiants numériques (`/shop/category/{id}/{niveau}`) couvrant toute la
+taxonomie du site. **d/e.** Appariement et volume non chiffrés
+formellement ici (rendu visuel, pas un comptage automatisé), mais le volume
+visible dépasse largement celui de beautymall.ma. L'appel XHR réel vers
+`webapigw` n'a pas été capturé dans cette passe (fenêtre de capture réseau
+ratée), mais la config du bundle + le rendu observé ne laissent aucun doute
+sur l'existence d'un vrai backend.
+
+**Verdict : catalogue réel et volumineux confirmé — le rendu JS est un coût
+d'intégration (Playwright/Puppeteer ou reverse-engineering de l'API
+`webapigw`), pas une absence de contenu.** Plus cher à intégrer que les
+sources `curl`+cheerio existantes ; à chiffrer avant de décider, mais retiré
+de la catégorie « rien à scraper ».
 
 ### beautymall.ma (Beauté) — VERT, meilleur candidat du lot
 
@@ -540,29 +574,55 @@ largement supérieur à tout ce qui a été mesuré dans ce lot. Catégorie
 **Beauté**, aujourd'hui seulement **4 deals publiés** en production — gain
 de diversification réel, pas marginal.
 
-### lemobilier.ma (Maison) — ORANGE, à creuser
+### lemobilier.ma (Maison) — RECONTRÔLÉ le 14/08/2026, ORANGE → **VERT**
 
-**a.** Permissif — seul `Disallow: /reduction` mérite un second regard : en
-PrestaShop c'est typiquement le contrôleur des **codes bons de réduction**
-(panier), pas la liste des produits remisés ; à vérifier avant de conclure
-à un blocage de la page utile. **b.** Joignable (`200`, 946 Ko). **c/d.**
-PrestaShop, 1477 occurrences de classes `price` mais **zéro** `<del>`/`<ins>`
-sur la page d'accueil — la remise n'y est probablement pas affichée
-directement (comme universparadiscount.ma avant reconstat). Reste à faire :
-trouver la vraie page catégorie/promo.
+**a.** `Disallow: /reduction` **résolu** : dans le `robots.txt` réel, il
+siège au milieu de `/panier`, `/connexion`, `/mon-compte`, `/identite`,
+`/commande` — le cluster des pages de compte client PrestaShop. C'est bien
+« Mes bons de réduction » (compte client), jamais la liste des produits
+remisés. Confirmé aussi par le sitemap lui-même, qui liste `/reduction`
+au même titre que `/panier`/`/mon-compte`. Pas un blocage de page utile.
+**b.** Joignable (`200`). **c.** Sitemap PrestaShop trouvé
+(`1_index_sitemap.xml` → `1_fr_0_sitemap.xml`, 1352 URLs) mais **obsolète**
+(tous les `lastmod` datent de mars 2018) — mécanisme de découverte à
+écarter. **Le site est vivant, pas figé** : l'URL produit `#1` du sitemap
+2018 pointe aujourd'hui (redirection 301) vers un produit totalement
+différent — la numérotation a tourné, preuve d'une exploitation active en
+2026. **La vraie page promo, trouvée dans la navigation live** :
+`https://lemobilier.ma/399-promotions` (« Toutes nos promos »). **d.**
+Remise déjà calculée et affichée côté serveur : badges `-10%`/`-15%`/
+`-20%`/`-40%` visibles sur la page, classes `old-price` (prix barré) et
+`price product-price` (prix courant) — pas de calcul à faire côté pipeline.
+**e. 291 produits** sur cette seule page promo (`?id_category=399&n=291`,
+confirmé par la pagination) — volume largement supérieur à beautymall.ma.
 
-### aswakassalam.com — ORANGE, stratégique mais à confirmer
+**Verdict : VERT.** PrestaShop, HTML brut classique (comme
+universparadiscount.ma), page promo dédiée identifiée, remise déjà
+étiquetée. Le sitemap existant est à ignorer, pas à utiliser comme source
+de découverte.
 
-**a.** Permissif. **b.** Joignable (`200`, 401 Ko). **c.**
-WordPress/WooCommerce confirmé, même famille de markup que beautymall.ma et
-mgamesstore.com. **d.** Appariement vérifié à la main : `29,95 → 27,95 Dh`,
-soit **6,7 %** — **sous le seuil des 30 %** sur cet exemple précis. **e.**
-Seulement **9 paires sur la page d'accueil** (contre 87 pour beautymall.ma) —
-volume et taux de remise réels non conclusifs sans une page promo dédiée.
-**Pourquoi retenir malgré ces réserves** : Aswak Assalam est une chaîne de
-supermarché marocaine (même famille que Marjane) — piste quasi unique vers
-**Alimentaire**, catégorie à **0 deal publié** aujourd'hui. À creuser
-spécifiquement pour ce motif, pas pour le volume déjà mesuré.
+### aswakassalam.com — RECONTRÔLÉ le 14/08/2026, ORANGE stratégique → **VERT stratégique confirmé**
+
+**a.** Permissif. **b.** Joignable (`200`). **c.** WordPress/WooCommerce
+confirmé — **même Store API publique que ab-maroc.com** :
+`GET /wp-json/wc/store/v1/products?on_sale=true`. **e. `X-WP-Total: 1053`**
+produits en promotion à l'instant du contrôle — plus du double d'ab-maroc.com.
+**La question stratégique posée (une vraie piste Alimentaire ?) est
+tranchée : OUI.** L'endpoint `/wp-json/wc/store/v1/products/categories`
+liste de vraies sous-catégories alimentaires actives : `BOUCHERIE`,
+`BOULANGERIE`, `CHARCUTERIE & TRAITEUR`, `CRÈMERIE`, `CONSERVES`,
+`BOISSONS`, `BEURRE & MARGARINE`, `BISCUITERIE & CONFISERIE`, etc. — la
+catégorie **Alimentaire** (0 deal publié aujourd'hui) est directement
+filtrable via l'API, en plus de `on_sale=true`. **d.** Appariement mesuré
+sur un exemple hors alimentaire (gourde isotherme, Maison & Cuisine) :
+49,95 DH / 79,95 DH, **37,5 %** — au-dessus du seuil, mais **le taux de
+remise spécifique aux catégories alimentaires n'a pas été mesuré ici** (pas
+supposé identique, à vérifier par un scraper réel avant de s'engager sur le
+volume net Alimentaire).
+
+**Verdict : VERT, la meilleure piste Alimentaire du dépôt.** API JSON
+publique, aucun rendu JS ni HTML à parser, catégories alimentaires réelles
+et interrogeables séparément.
 
 ### cashplus.ma et wafacash.ma — ROUGE, modèle inadapté (pas technique)
 
@@ -579,26 +639,56 @@ depuis un runner : même s'il tombait, il n'y a rien à scraper derrière.
 
 | Cible | robots.txt | Joignable (runner) | Plateforme/rendu | Appariement | Volume mesuré | Catégorie | Verdict |
 |---|---|---|---|---|---|---|---|
+| aswakassalam.com | Permissif | Oui | WooCommerce, **Store API JSON** | Vérifié hors alimentaire (37,5 %) | **1053** en promo (API) | Alimentaire réel, filtrable | **VERT — stratégique confirmé** *(14/08)* |
+| lemobilier.ma | Permissif (`/reduction` = compte client, résolu) | Oui | PrestaShop, page promo dédiée | Pré-calculé (badges -10 à -40 %) | **291** (page `399-promotions`) | Maison | **VERT** *(14/08)* |
+| ab-maroc.com | Permissif | Oui | WooCommerce, **Store API JSON** | Vérifié (8,5 %, un exemple) | **544** en promo (API) | Bricolage/jardinage | **VERT** *(14/08)* |
 | beautymall.ma | Permissif | Oui | WooCommerce, HTML brut | Vérifié (33,3 %) | **87** (accueil seul) | Beauté (4 publiés) | **VERT** |
-| aswakassalam.com | Permissif | Oui | WooCommerce, HTML brut | Vérifié (6,7 %, sous seuil) | 9 (accueil seul) | Alimentaire (0 publié) | **ORANGE — stratégique** |
-| ab-maroc.com | Permissif | Oui | Inconnu (pas de del/ins accueil) | Non conclu | Signaux présents, non chiffrés | Non déterminée | **ORANGE — à creuser** |
-| lemobilier.ma | Permissif | Oui | PrestaShop, HTML brut | Non conclu (0 sur accueil) | Non chiffré | Maison | **ORANGE — à creuser** |
+| biougnach.ma | Permissif (pas de fichier) | Oui | **Angular/CSR, vraie API `webapigw`** | Non chiffré (visuel) | Massif, ~12 rayons rendus | Électroménager | **Catalogue réel — rendu JS requis** *(14/08)* |
 | marjanemall.ma | Permissif (`ClaudeBot: Allow`) | **Non — 403** | — | — | — | — | **ROUGE — technique** |
-| biougnach.ma | Permissif (pas de fichier) | Oui | **Angular/CSR** | Sans objet | 0 dans le HTML brut | Électroménager | **ROUGE — rendu JS requis** |
 | electroplanet.ma | **Refuse** (`Disallow: /`) | — | — | — | — | — | **ROUGE — reconfirmé** |
 | iam.ma | **Refuse ClaudeBot nommément** | — | — | — | — | — | **ROUGE — reconfirmé** |
 | cashplus.ma | Permissif | Sans objet | — | — | **Aucun catalogue** | — | **ROUGE — modèle inadapté** |
 | wafacash.ma | Incohérent (403 ciblé) | Sans objet | — | — | **Aucun catalogue** | — | **ROUGE — modèle inadapté** |
 
-**Classement gain/effort** : (1) **beautymall.ma** — prêt à coder, volume et
-appariement déjà vérifiés, catégorie clairsemée. (2) **aswakassalam.com** —
-un passage de plus sur sa page promo dédiée avant de trancher, valeur
-stratégique (seule piste Alimentaire). (3) **ab-maroc.com** et
-**lemobilier.ma** — même chose, page d'accueil insuffisante, pas
-disqualifiés. (4) marjanemall.ma, biougnach.ma, electroplanet.ma, iam.ma,
-cashplus.ma, wafacash.ma — écartés, pour quatre motifs différents (bloqué
-runner, rendu JS, gouvernance ×2, modèle inadapté ×2) — aucun scraper codé
-pour aucune des dix cibles de ce lot.
+**Classement gain/effort, mis à jour après le recontrôle du 14/08/2026** :
+(1) **ab-maroc.com** et **aswakassalam.com** — API JSON publique
+(WooCommerce Store API), zéro rendu JS, zéro HTML à parser, volumes de
+544 et 1053 en promo ; aswakassalam.com en plus la seule vraie piste
+Alimentaire. (2) **lemobilier.ma** — HTML brut classique, page promo
+dédiée trouvée, remise déjà étiquetée, 291 produits. (3) **beautymall.ma** —
+inchangé, prêt à coder. (4) **biougnach.ma** — catalogue réel et volumineux
+confirmé, mais coût d'intégration plus élevé (rendu JS ou reverse-engineering
+de l'API `webapigw`, non documentée) : à chiffrer avant de développer, pas
+écarté. (5) marjanemall.ma, electroplanet.ma, iam.ma, cashplus.ma,
+wafacash.ma — écartés, motifs inchangés (bloqué runner, gouvernance ×2,
+modèle inadapté ×2), non recontrôlés (voir note ci-dessous). **Aucun
+scraper codé** pour aucune des dix cibles de ce lot.
+
+### Recontrôle du 14/08/2026 — le faux négatif carrefour.ma se généralisait
+
+Le faux négatif corrigé sur carrefour.ma (§10-12) venait d'une méthode
+fautive : conclure « pas de catalogue » sur la seule foi du HTML brut
+(`curl`/`fetch` sans JS), alors qu'un HTML brut vide peut vouloir dire
+« rendu côté client », pas « rien à scraper ». **Cette même méthode fautive
+avait produit quatre autres verdicts optimistes à tort** : ab-maroc.com et
+lemobilier.ma classés « à creuser » faute d'avoir cherché une API ou une
+page promo dédiée, aswakassalam.com sous-mesuré sur la seule page d'accueil,
+biougnach.ma classé ROUGE sur la seule foi du HTML brut Angular vide sans
+tester ni l'API du bundle ni le rendu navigateur. gamezone.ma (`docs/IDEES.md`)
+souffrait du même biais côté Gaming.
+
+**Méthode appliquée pour ce recontrôle, dans l'ordre** : (1) appels réseau
+et API JSON — inspection du bundle JS / test d'endpoints REST publics
+plausibles (WooCommerce Store API, sitemap) ; (2) rendu headless
+(`claude-in-chrome`) quand (1) ne suffit pas ; (3) prospectus PDF en
+dernier recours — **non nécessaire pour aucune des cinq cibles** de ce
+recontrôle, (1) ou (2) ont suffi à chaque fois.
+
+**electroplanet.ma, iam.ma, cashplus.ma et wafacash.ma n'ont pas été
+recontrôlés** — leurs motifs (gouvernance robots.txt pour les deux
+premiers, absence structurelle de catalogue pour les deux derniers) ne
+relèvent pas de la confusion HTML-brut-vide/rendu-JS, donc pas concernés
+par ce biais.
 
 ---
 
