@@ -613,18 +613,42 @@ Candidats identifiés (recherche web, aucun n'avait été évalué dans
 `SPIKE-SOURCES.md`) : zonetech.ma, mediazone.ma, marjanemall.ma,
 mgamesstore.com, boutika.co.ma, setupgame.ma, **gamezone.ma**, playstore.ma.
 
-**gamezone.ma (PrestaShop, même plateforme que decathlon/universparadiscount)
-— pas le gain espéré.** `robots.txt` permissif (aucun `Disallow` pertinent,
-aucun bot IA nommé), mais la page d'accueil est un **coquille vide côté
-données** : 14 `href` seulement dans le HTML brut (assets + connexion), zéro
-lien catégorie, zéro marqueur de prix — la grille produit est chargée par des
-modules PrestaShop custom (`gz_hometab`, `gz_homesearch`) en AJAX après coup.
-Pas de `sitemap.xml` (404) pour contourner par découverte. Testé avec Node
-`fetch` (le client réellement utilisé en prod, pas `curl` — leçon
-mrbricolage), depuis ce réseau, pas depuis un runner GitHub. Verdict :
-**pas cheerio-compatible en l'état** — nécessiterait de retrouver l'endpoint
-AJAX interne (non fait, hors budget de ce spike) ou un rendu JS (écarté par
-principe, cf. electroplanet).
+**gamezone.ma — RECONTRÔLÉ le 14/08/2026 : catalogue réel confirmé, écarté
+à tort.** *Même biais que le faux négatif carrefour.ma
+(`docs/SPIKE-SOURCES.md` §10-12) : « pas de `sitemap.xml` » voulait dire
+« le chemin par défaut `/sitemap.xml` renvoie 404 », jamais vérifié contre
+le `Sitemap:` déclaré dans `robots.txt` lui-même — qui existe et pointe
+ailleurs.*
+
+`robots.txt` (permissif, aucun `Disallow` pertinent, aucun bot IA nommé,
+reconfirmé) déclare `Sitemap: https://gamezone.ma/1_index_sitemap.xml` —
+**atteignable, `200`**, régénéré **le jour même du contrôle**
+(`lastmod` 2026-08-14T04:01:54). Il pointe vers `1_fr_0_sitemap.xml` :
+**449 URLs produit**, catégories réelles (`playstation-4`, `playstation-5`,
+`xbox`, `tous-les-accessoires`, etc.), format PrestaShop standard sitemap
+XML avec image et titre par produit.
+
+**La page d'accueil reste une coquille côté données** (confirmé à nouveau :
+grille produit chargée en AJAX, `TOUTES LES CONSOLES`/`TOP DES JEUX`
+n'exposent aucun lien direct dans le DOM même après rendu navigateur
+`claude-in-chrome`) — **ce constat-là était juste, seule sa généralisation à
+« rien à scraper » était fausse.** Une page produit individuelle
+(`/fr/survie-horreur/2062-silent-hill-2.html`), elle, **contient de vraies
+données structurées côté serveur** : `itemprop="price" content="895"`,
+champ `reduction_percent` (JSON produit standard PrestaShop) — un vrai
+backend produit, pas une vitrine. Les URL de recherche/catégorie
+(`?controller=search`, `/fr/promotions`) renvoient `200` avec
+`Content-Length: 0` au client HTTP simple **et** au navigateur — cohérent
+avec le `Disallow: /*controller=search` du `robots.txt`, sans qu'on puisse
+trancher ici entre limitation applicative et mitigation anti-bot ciblée sur
+ces routes précises ; non élucidé, pas supposé.
+
+**Verdict : catalogue réel, découverte par `1_fr_0_sitemap.xml` (même
+mécanisme que decathlon/universparadiscount, déjà en production), pas par
+la grille AJAX de l'accueil ni par la recherche/catégorie (vides pour un
+client automatisé).** Taux de remise réel non mesuré sur ce lot de 449 URLs
+(le seul produit testé avait `reduction_percent = 0.00`) — à faire sur un
+échantillon avant de développer. Aucun scraper codé.
 
 **mgamesstore.com — spike terminé depuis un vrai runner GitHub (13/08/2026)**,
 exactement le point qui a fait tomber bestmark et decathlon — pas seulement
@@ -693,8 +717,9 @@ les deux.** Joignable depuis un runner (stable), appariement prix fiable
 (pas l'obstacle mrbricolage), volume net utile (18/28 ≥ 30 %, comparable à
 inwi). **Seule inconnue restante : le renouvellement, qui ne peut pas être
 mesuré avant le 15/08/2026** (48h réelles). Aucun scraper codé. Meilleur
-candidat Gaming actuel, au-dessus de gamezone.ma (celui-là écarté : grille
-chargée en AJAX, aucune donnée dans le HTML brut).
+candidat Gaming actuel — **gamezone.ma reste un candidat réel, pas écarté**
+(recontrôlé le 14/08/2026 ci-dessus : catalogue confirmé via sitemap, taux
+de remise non mesuré), pas un second choix disqualifié.
 
 ## Diversification des sources (2026-07-18) — partiellement caduque
 
