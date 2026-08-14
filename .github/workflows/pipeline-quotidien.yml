@@ -11,11 +11,16 @@
 # Automatisé uniquement : scraper-bringo (categories.txt auto-suffisant),
 # scraper-inwi (page unique auto-suffisante), scraper-universparadiscount
 # (homepage auto-suffisante), scraper-decathlon (catégorie /5080-promotions
-# auto-suffisante, pagination bornée) et scraper-kiabi (products.json Shopify,
-# pagination bornée + cap de 120 deals/run) + insert-deals (qui fait lui-même
-# l'extraction de description via fiche-produit.mjs, cf. README). PAS
-# extract-catalogue : ce script attend une URL/chemin de catalogue précis à
-# chaque appel (aucun mécanisme de découverte automatique) — il ne peut pas
+# auto-suffisante, pagination bornée), scraper-kiabi (products.json Shopify,
+# pagination bornée + cap de 120 deals/run), scraper-carrefour (API JSON,
+# pagination bornée, EN PARALLÈLE de bringo — docs/SPIKE-SOURCES.md §10-12,
+# ajouté au cron le 14/08/2026, PR de wiring, jusque-là construit mais jamais
+# appelé automatiquement), scraper-ab-maroc et scraper-aswakassalam (Store
+# API WooCommerce, pagination bornée, ajoutés le 14/08/2026 —
+# docs/SPIKE-SOURCES.md §9, recontrôle du même jour) + insert-deals (qui fait
+# lui-même l'extraction de description via fiche-produit.mjs, cf. README).
+# PAS extract-catalogue : ce script attend une URL/chemin de catalogue précis
+# à chaque appel (aucun mécanisme de découverte automatique) — il ne peut pas
 # tourner sans surveillance, il reste un geste manuel ponctuel.
 #
 # scraper-bestmark RETIRÉ du cron le 13/08/2026 — voir docs/IDEES.md,
@@ -467,6 +472,185 @@ jobs:
             echo "::warning::kiabi — aucun deal retenu après filtrage sur ce run : $resume"
           elif [ "$cause" = "deja_en_base" ]; then
             echo "::warning::kiabi — tout ce qui a été retenu était déjà en base sur ce run : $resume"
+          fi
+
+      # Source secondaire carrefour.ma (docs/SPIKE-SOURCES.md §10-12) — même
+      # pattern que kiabi ci-dessus. EN PARALLÈLE de bringo, PAS EN
+      # REMPLACEMENT (décision du 13/08/2026) : bringo reste la première
+      # source en volume, l'API carrefour.ma vient d'apparaître, sa
+      # stabilité n'est pas prouvée. Les deux tournent sous la MÊME enseigne
+      # ("Carrefour", déjà en base — aucun ajout d'enseigne requis) pour que
+      # le dédoublonnage titre+enseigne+prix d'insert-deals.mjs s'applique
+      # sans amendement entre les deux sources.
+      - name: Scraping carrefour.ma (API JSON)
+        id: scraping_carrefour
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run scraper-carrefour | tee /dev/stderr) && code=0 || code=$?
+
+          fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
+          if [ -z "$fichier_relatif" ]; then
+            echo "::warning::scraper-carrefour n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping carrefour injoignable || true
+            exit 1
+          fi
+
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::scraper-carrefour a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping carrefour injoignable || true
+            exit 1
+          fi
+
+          fichier="apps/pipeline/$fichier_relatif"
+          if [ ! -f "$fichier" ]; then
+            echo "::warning::Fichier annoncé par scraper-carrefour introuvable sur disque : $fichier — source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping carrefour injoignable || true
+            exit 1
+          fi
+
+          nb_deals=$(jq 'length' "$fichier")
+          echo "Deals carrefour extraits : $nb_deals"
+          if [ "$nb_deals" -eq 0 ]; then
+            echo "::warning::0 deal extrait par scraper-carrefour — rien à insérer pour cette source ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping carrefour rien_retenu || true
+            exit 1
+          fi
+
+          echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
+
+      - name: Insertion carrefour.ma en base (validation zod partagée)
+        if: steps.scraping_carrefour.outcome == 'success'
+        continue-on-error: true
+        env:
+          FICHIER_EXTRACTION_CARREFOUR: ${{ steps.scraping_carrefour.outputs.fichier }}
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_CARREFOUR" | tee /dev/stderr)
+          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
+          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
+          if [ "$cause" = "rien_retenu" ]; then
+            echo "::warning::carrefour — aucun deal retenu après filtrage sur ce run : $resume"
+          elif [ "$cause" = "deja_en_base" ]; then
+            echo "::warning::carrefour — tout ce qui a été retenu était déjà en base sur ce run : $resume"
+          fi
+
+      # Source secondaire ab-maroc.com (Store API WooCommerce, mono-domaine
+      # Bricolage & Jardin — docs/SPIKE-SOURCES.md §9). Même pattern que les
+      # sources ci-dessus. Prérequis prod : l'enseigne `ab-maroc` doit
+      # exister en base (docs/RUNBOOK-donnees.md, `ajouter-enseigne`) — sinon
+      # insert-deals rejette proprement chaque deal (enseigne inconnue).
+      - name: Scraping ab-maroc.com (Store API WooCommerce)
+        id: scraping_abmaroc
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run scraper-ab-maroc | tee /dev/stderr) && code=0 || code=$?
+
+          fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
+          if [ -z "$fichier_relatif" ]; then
+            echo "::warning::scraper-ab-maroc n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping ab-maroc injoignable || true
+            exit 1
+          fi
+
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::scraper-ab-maroc a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping ab-maroc injoignable || true
+            exit 1
+          fi
+
+          fichier="apps/pipeline/$fichier_relatif"
+          if [ ! -f "$fichier" ]; then
+            echo "::warning::Fichier annoncé par scraper-ab-maroc introuvable sur disque : $fichier — source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping ab-maroc injoignable || true
+            exit 1
+          fi
+
+          nb_deals=$(jq 'length' "$fichier")
+          echo "Deals ab-maroc extraits : $nb_deals"
+          if [ "$nb_deals" -eq 0 ]; then
+            echo "::warning::0 deal extrait par scraper-ab-maroc — rien à insérer pour cette source ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping ab-maroc rien_retenu || true
+            exit 1
+          fi
+
+          echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
+
+      - name: Insertion ab-maroc.com en base (validation zod partagée)
+        if: steps.scraping_abmaroc.outcome == 'success'
+        continue-on-error: true
+        env:
+          FICHIER_EXTRACTION_ABMAROC: ${{ steps.scraping_abmaroc.outputs.fichier }}
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_ABMAROC" | tee /dev/stderr)
+          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
+          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
+          if [ "$cause" = "rien_retenu" ]; then
+            echo "::warning::ab-maroc — aucun deal retenu après filtrage sur ce run : $resume"
+          elif [ "$cause" = "deja_en_base" ]; then
+            echo "::warning::ab-maroc — tout ce qui a été retenu était déjà en base sur ce run : $resume"
+          fi
+
+      # Source secondaire aswakassalam.com (Store API WooCommerce,
+      # catégorisation par rayon — docs/SPIKE-SOURCES.md §9). Seule vraie
+      # piste Alimentaire du dépôt (0 deal publié à ce jour). Même pattern
+      # que les sources ci-dessus. Prérequis prod : l'enseigne
+      # `aswakassalam` doit exister en base (docs/RUNBOOK-donnees.md,
+      # `ajouter-enseigne`) — sinon insert-deals rejette proprement chaque
+      # deal (enseigne inconnue).
+      - name: Scraping aswakassalam.com (Store API WooCommerce)
+        id: scraping_aswak
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run scraper-aswakassalam | tee /dev/stderr) && code=0 || code=$?
+
+          fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
+          if [ -z "$fichier_relatif" ]; then
+            echo "::warning::scraper-aswakassalam n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping aswakassalam injoignable || true
+            exit 1
+          fi
+
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::scraper-aswakassalam a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping aswakassalam injoignable || true
+            exit 1
+          fi
+
+          fichier="apps/pipeline/$fichier_relatif"
+          if [ ! -f "$fichier" ]; then
+            echo "::warning::Fichier annoncé par scraper-aswakassalam introuvable sur disque : $fichier — source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping aswakassalam injoignable || true
+            exit 1
+          fi
+
+          nb_deals=$(jq 'length' "$fichier")
+          echo "Deals aswakassalam extraits : $nb_deals"
+          if [ "$nb_deals" -eq 0 ]; then
+            echo "::warning::0 deal extrait par scraper-aswakassalam — rien à insérer pour cette source ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping aswakassalam rien_retenu || true
+            exit 1
+          fi
+
+          echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
+
+      - name: Insertion aswakassalam.com en base (validation zod partagée)
+        if: steps.scraping_aswak.outcome == 'success'
+        continue-on-error: true
+        env:
+          FICHIER_EXTRACTION_ASWAK: ${{ steps.scraping_aswak.outputs.fichier }}
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_ASWAK" | tee /dev/stderr)
+          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
+          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
+          if [ "$cause" = "rien_retenu" ]; then
+            echo "::warning::aswakassalam — aucun deal retenu après filtrage sur ce run : $resume"
+          elif [ "$cause" = "deja_en_base" ]; then
+            echo "::warning::aswakassalam — tout ce qui a été retenu était déjà en base sur ce run : $resume"
           fi
 
       - name: Revalidation Next.js (feed, enseignes, sitemap)
