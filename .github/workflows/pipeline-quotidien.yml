@@ -22,14 +22,15 @@
 # surveillance, il reste un geste manuel ponctuel.
 #
 # scraper-bestmark RETIRÉ du cron le 13/08/2026, scraper-decathlon et
-# scraper-ab-maroc RETIRÉS le 15/08/2026 — voir docs/IDEES.md, sections
-# « Bestmark », « Decathlon » et « ab-maroc » — retrait du cron. Motif commun
-# aux trois : blocage par CATÉGORIE d'IP (datacenter) chez le site cible, pas
-# une politique dirigée contre GitHub en particulier — un runner
-# auto-hébergé sur un VPS tomberait dans la même catégorie (décision du
-# 15/08/2026, ne pas rouvrir la question sans fait nouveau). Les trois
-# scripts restent dans le dépôt (exécutables à la main), simplement plus
-# appelés automatiquement.
+# scraper-ab-maroc RETIRÉS le 15/08/2026 — voir docs/IDEES.md, section
+# « Decathlon/ab-maroc — diagnostic isolé ». Les deux échouent (decathlon :
+# challenge Cloudflare confirmé par diagnostic dédié, cause exacte du
+# déclenchement — TLS ou catégorie d'IP — INDÉTERMINÉE ; ab-maroc : cause
+# INDÉTERMINÉE, non reproduite au diagnostic), un runner auto-hébergé n'a
+# pas été construit pour autant (changer d'IP ne réparerait pas
+# nécessairement une cause TLS). Les trois scripts (bestmark compris)
+# restent dans le dépôt, exécutables à la main, simplement plus appelés
+# automatiquement.
 #
 # Pas de continue-on-error sur la chaîne PRINCIPALE (expiration -> Bringo ->
 # insertion -> revalidation) : un échec y fait échouer le job franchement —
