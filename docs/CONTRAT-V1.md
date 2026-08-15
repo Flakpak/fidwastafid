@@ -968,6 +968,19 @@ cloud), le cache edge de la route `/img/deals/[public_id]` est assuré par le CD
 quand le domaine repasse en proxifié. L'esprit du contrat (cache edge, backend interchangeable)
 est inchangé — seul l'opérateur de cache diffère selon la phase d'hébergement.
 
+**Amendement du 15/08/2026 — variante og:image versionnée dans le chemin.**
+`fidwastafid.com/img/deals/[public_id]/[version]/og.jpg` (JPEG, aperçus sociaux uniquement —
+`[public_id]` seul reste le WebP servi au navigateur, inchangé). `[version]` = epoch de
+`deals.updated_at`, JAMAIS une query string (incident du 21/07/2026 : le crawler Meta tronque les
+paramètres de requête) — dans le CHEMIN, il survit à tout crawler. Contenu toujours lu depuis
+l'état actuel de la base, jamais depuis `[version]` : une URL déjà émise devient orpheline après
+un remplacement d'image, jamais servie comme si elle était encore la bonne. Permet un cache d'un
+an, immuable (`Cache-Control: public, max-age=31536000, immutable`) — sûr uniquement parce que
+l'URL change quand le contenu change. Fait générateur : cette variante n'est presque jamais
+visitée par un humain (seul un crawler de partage la demande), son cache restait donc quasi
+toujours froid — Storage + redimensionnement sharp recalculés au moment précis où un partage
+WhatsApp a lieu.
+
 ## 7 — Conventions base de données
 
 - Nommage tables/colonnes en français (continuité de l'existant).

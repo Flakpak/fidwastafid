@@ -79,6 +79,15 @@ const IMAGE_OG_GENERIQUE = { url: new URL("/opengraph-image", SITE_URL).toString
  * route ni le cache Vercel ne perdaient le paramètre) et recevait le WebP
  * servi par défaut sur ce chemin, rejeté à l'affichage.
  *
+ * `[version]` (15/08/2026 — voir `[publicId]/[version]/og.jpg/route.ts` pour
+ * le détail) : epoch de `deal.updatedAt`, dans le CHEMIN, jamais une query
+ * string (même leçon du 21/07 ci-dessus) — permet un cache un an, immuable,
+ * sans jamais servir une image remplacée sous son ancienne URL. Fait
+ * générateur : og.jpg n'est presque jamais visité par un humain (seul un
+ * crawler de partage le demande), son cache restait donc quasi toujours
+ * froid — Storage + redimensionnement sharp recalculés au moment précis où
+ * un partage WhatsApp a lieu, risque de dépasser le délai du crawler.
+ *
  * Dimensions lues à la volée (imageDimensions) plutôt que stockées en base :
  * le resize à l'upload est `fit: "inside"` (ratio préservé, jamais un carré
  * forcé) donc variable par deal — pas de raccourci sans lire l'image.
@@ -93,7 +102,8 @@ async function dealOgImages(deal: Deal): Promise<NonNullable<NonNullable<Metadat
 
   try {
     const { width, height } = await imageDimensions(bytes);
-    const url = new URL(`/img/deals/${deal.publicId}/og.jpg`, SITE_URL).toString();
+    const version = Date.parse(deal.updatedAt);
+    const url = new URL(`/img/deals/${deal.publicId}/${version}/og.jpg`, SITE_URL).toString();
     return [{ url, width, height, type: "image/jpeg" }];
   } catch {
     return [IMAGE_OG_GENERIQUE];

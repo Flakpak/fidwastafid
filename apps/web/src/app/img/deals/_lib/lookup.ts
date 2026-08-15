@@ -2,8 +2,9 @@ import { query } from "@fidwastafid/db";
 
 /**
  * Partagé par les deux routes de service d'image de deal
- * ([publicId]/route.ts — WebP visiteurs, [publicId]/og.jpg/route.ts — JPEG
- * aperçus sociaux) : même résolution public_id -> image_key, une seule fois.
+ * ([publicId]/route.ts — WebP visiteurs, [publicId]/[version]/og.jpg/route.ts
+ * — JPEG aperçus sociaux) : même résolution public_id -> image_key, une
+ * seule fois.
  */
 export const PUBLIC_ID_RE = /^[a-z0-9]{10}$/;
 
