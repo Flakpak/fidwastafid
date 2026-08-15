@@ -1,0 +1,25 @@
+-- 0022 — RLS deny-all sur memoire_curation (docs/INCIDENTS.md, 15/08/2026).
+--
+-- La table (migration 0014) est restée trois semaines sans RLS activé —
+-- seule exception à la convention posée en 0008 et suivie par toutes les
+-- migrations créant une table depuis lors (0011, 0020, 0021). Aucun advisor
+-- Supabase ne l'a signalée (get_advisors, type security, vérifié le
+-- 15/08/2026 : aucune entrée rls_disabled_in_public pour memoire_curation,
+-- seulement le lint rls_enabled_no_policy sur les 13 AUTRES tables) — les
+-- advisors ne sont donc pas une ligne de défense sur laquelle compter seule.
+--
+-- Mesuré avant correctif (15/08/2026) : la table n'était PAS atteignable via
+-- l'API Data publique (clé publiable) — PostgREST refuse avec "Only the
+-- following schemas are exposed: graphql_public" (schéma public retiré de
+-- l'API Data, décision déjà actée en 0008/0011/0021), et l'extension
+-- pg_graphql est désactivée. Le trou était donc réel mais LATENT, protégé
+-- par un seul réglage plateforme — pas par RLS, contrairement aux 13 autres
+-- tables. Ce correctif ferme le trou pour de bon, indépendamment de ce
+-- réglage.
+--
+-- Même convention que 0008 : deny-all (aucune policy), le rôle propriétaire
+-- (DATABASE_URL, identique pipeline/admin/app) continue de tout voir/écrire
+-- normalement — PostgreSQL n'applique jamais RLS au propriétaire d'une
+-- table. SURTOUT PAS de FORCE ROW LEVEL SECURITY, même raison qu'en 0008 :
+-- casserait le pipeline (écriture directe, hors /api/v1) et l'admin.
+alter table public.memoire_curation enable row level security;

@@ -10,6 +10,57 @@ en a appris. Une leçon gravée ici a vocation à être citée depuis le code ou
 
 ---
 
+## 2026-08-15 — `memoire_curation` sans RLS pendant trois semaines, non détectée par les advisors
+
+**Le fait.** La migration 0014 (05/08/2026, mémoire de curation) a créé `memoire_curation`
+sans activer RLS — la seule table du dépôt dans ce cas depuis que la convention existe
+(0008, 21/07/2026 : RLS activé, deny-all, dans le même fichier que chaque `create table`
+suivant, 0011/0020/0021 le confirment). Trouvée par hasard le 15/08/2026 en auditant une
+autre table, pas par une alerte.
+
+**Exposition mesurée, pas supposée.** Testée contre l'API Data publique (clé publiable) :
+non atteignable — PostgREST répond `PGRST106, Only the following schemas are exposed:
+graphql_public` (schéma `public` retiré de l'API Data, décision déjà actée en 0008/0011/0021),
+et l'extension `pg_graphql` est désactivée. Le trou était donc réel mais **latent** —
+protégé par un seul réglage plateforme, pas par RLS comme les 13 autres tables.
+
+**Le motif à retenir n'est pas la ligne manquante, c'est la ligne de défense unique.**
+Treize tables reposaient sur RLS + non-exposition du schéma public (deux lignes de
+défense indépendantes) ; celle-ci ne reposait que sur la seconde. Un correctif de
+configuration plateforme, ailleurs, aurait suffi à l'exposer sans qu'aucune ligne de ce
+dépôt ne change.
+
+**Les advisors Supabase ne l'ont jamais signalée.** `get_advisors(type=security)` liste
+bien le lint `rls_enabled_no_policy` (INFO) sur les 13 tables RLS-sans-policy, mais
+**aucune entrée `rls_disabled_in_public`** pour `memoire_curation` — le lint qui existe
+précisément pour ce cas. Ce n'est donc pas une alerte ignorée : elle n'a jamais été
+émise. Trois semaines de silence, une conformité déjà partielle (advisor déclenché mais
+non lu) aurait au moins laissé une trace à retrouver ; ici il n'y avait rien à lire.
+
+**Correctif** (migration 0022) : `alter table public.memoire_curation enable row level
+security;` — deny-all, même convention que 0008, aucune `FORCE ROW LEVEL SECURITY`.
+Appliquée en production le 15/08/2026 (confirmation nommée, port 5432). Vérifiée par le
+connecteur en lecture seule (`rls_enabled=true`) puis par un aller-retour réel
+lecture/écriture/suppression via le rôle applicatif (`DATABASE_URL`, identique
+pipeline/admin/prod — celui-ci reste propriétaire de la table, jamais soumis à RLS) :
+aucune régression, 896 lignes avant et après.
+
+**Garde-fou ajouté** : `packages/db/src/checkMigrationsRls.ts`, job `quality` (statique,
+aucun secret, actif y compris sur les PR Dependabot, contrairement à `migrations-check`).
+Pour toute table créée par une migration, exige `enable row level security` sur cette
+table dans le MÊME fichier — sinon le job échoue. Éprouvé contre une migration
+volontairement fautive avant intégration : détecté, message nommant le fichier et la
+table. Deux groupes d'exceptions nommées (avant 0008, retrofit assumé de l'époque ;
+0014, l'écart que ce script existe pour ne plus jamais laisser passer) — jamais une
+liste qui s'allonge en silence.
+
+**Leçon.** Un advisor de plateforme est une alerte parmi d'autres, pas une garantie —
+il peut ne jamais se déclencher sur un cas qu'il est censé couvrir. La seule protection
+fiable est structurelle : un contrôle qui vit dans CE dépôt, s'exécute à CHAQUE PR, et
+ne dépend d'aucun fournisseur externe pour se déclencher.
+
+---
+
 ## 2026-08-12 — Contrainte : `alerte-issue` peut dupliquer une issue au lieu de commenter
 
 *Entrée de **contrainte**, pas d'incident : rien n'a cassé en production. Découverte en

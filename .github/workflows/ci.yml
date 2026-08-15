@@ -7,7 +7,10 @@
 #                         Ne dépend JAMAIS des secrets Supabase (décision
 #                         explicite, Phase 3 morceau 9) — un souci sur le
 #                         projet Supabase de dev ne doit jamais bloquer
-#                         cette validation.
+#                         cette validation. Inclut check-migrations-rls
+#                         (statique, aucune connexion base) — toute table
+#                         créée par une migration doit activer RLS dans le
+#                         même fichier (docs/INCIDENTS.md, 15/08/2026).
 #   - docker           : build de l'image apps/web (ne pousse nulle part,
 #                         sert juste à vérifier que le Dockerfile reste
 #                         buildable).
@@ -84,6 +87,13 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+
+      # Statique, aucune connexion base, aucun secret — actif y compris sur
+      # les PR Dependabot, contrairement à `migrations-check`. Fait
+      # générateur : migration 0014 (memoire_curation) a créé une table sans
+      # activer RLS, sans qu'aucun advisor Supabase ne le signale pendant
+      # trois semaines (docs/INCIDENTS.md, 15/08/2026). Aurait bloqué 0014.
+      - run: pnpm --filter @fidwastafid/db check-migrations-rls
 
   # openapi.json est un artefact GÉNÉRÉ mais versionné (servi publiquement sur
   # /openapi.json). Rien ne le vérifiait : le champ `emailIndisponible` ajouté
