@@ -579,51 +579,96 @@ changement de code nécessaire** :
   seuil de décision du 25/08 ci-dessus, qui reste calé sur la première
   occurrence réelle, pas sur ce que la table peut voir.
 
-## Blocage par catégorie d'IP datacenter — runner auto-hébergé écarté, décision de fond (2026-08-15)
+## Decathlon/ab-maroc — diagnostic isolé, cause de decathlon identifiée, ab-maroc indéterminée (2026-08-15)
 
-**Trois sources tombent au même mur, dans les runners GitHub Actions
-uniquement** : Bestmark (§ ci-dessus, retiré le 13/08), Decathlon (`403`
-depuis le 11/08, seuil de retrait posé au 25/08), et **ab-maroc.com**
-(injoignable au run du 15/08 après 544 produits extraits / 79 deals insérés
-la veille — 0 requête préalable dans ce run, seuil 1 req/s au throttle,
-site parfaitement joignable depuis un réseau tiers avec le même User-Agent
-le jour même). Trois occurrences, pas un hasard répété.
+**Correction d'une conclusion gravée à tort.** Une version antérieure de
+cette section affirmait « blocage par catégorie d'IP datacenter » comme un
+fait. Ce n'était pas démontré — seulement une corrélation (marche depuis un
+réseau tiers, échoue depuis les runners GitHub) à qui trois autres causes
+auraient pu produire le même symptôme (en-têtes divergents, empreinte TLS,
+géolocalisation). Isolé ci-dessous, script jetable
+`apps/pipeline/diagnostic-403.mjs` (mêmes appels `fetch()` que les vrais
+scrapers, mêmes en-têtes), exécuté en parallèle depuis ce poste ET depuis un
+run GitHub Actions réel (`ops/spike-diagnostic-403-jetable`, run
+31902788708, supprimé après usage).
 
-**Piste envisagée puis écartée : runner GitHub auto-hébergé sur un VPS
-(OVH/Hetzner).** Raisonnement de Kamel qui tranche la question : les
-protections type Cloudflare/anti-bot bloquent des **catégories** entières
-d'IP datacenter, pas spécifiquement les plages GitHub. Un VPS OVH ou
-Hetzner loue une IP dans la même catégorie (hébergeur cloud identifié) —
-on paierait un abonnement mensuel pour reproduire exactement le même
-blocage. Vérifié nulle part par un test dédié (aucun VPS provisionné pour
-ça), mais cohérent avec ce qui est déjà mesuré : les trois blocages sont
-`fetch failed`/`403` réseau, jamais un signal spécifique à l'infrastructure
-GitHub (pas de `Disallow` nommé, pas d'en-tête ciblant `github`).
+**Decathlon — cause identifiée : Cloudflare Managed Challenge, pas un
+« blocage IP ».**
+- **Corps de la réponse 403** : page Cloudflare `Just a moment...`
+  (challenge JS), pas un message applicatif Decathlon, pas un code d'erreur
+  métier.
+- **En-tête qui identifie le mécanisme** : `cf-mitigated: challenge` +
+  `server: cloudflare` + `cf-ray` présent (`…-CDG` depuis ce poste,
+  `…-DFW` depuis le runner — POP Cloudflare différent, même verdict).
+- **Délai : quasi instantané** (240 ms depuis ce poste, 322 ms depuis le
+  runner) — un rejet différé après analyse comportementale prendrait plus
+  long ; ce timing est cohérent avec une règle statique évaluée dès la
+  poignée de main, pas un profilage.
+- **En-têtes envoyés identiques dans les deux environnements** (vérifié via
+  `https://httpbin.org/headers` en écho, même client `fetch`) — **écarte
+  l'hypothèse d'un en-tête oublié localement**, décathlon échoue à
+  l'identique malgré des en-têtes rigoureusement identiques.
+- **Reproduit DEPUIS CE POSTE aussi, pas seulement depuis les runners** —
+  contredit directement l'ancien constat du 13/08 (« le site répond
+  normalement depuis un réseau tiers »). Soit la protection s'est durcie
+  depuis, soit ce poste tombe dans la même catégorie que les runners.
+- **Ce qui reste indéterminé, faute d'outil pour trancher** : empreinte
+  TLS/JA3 du client `fetch()` de Node (undici) vs. catégorie d'IP
+  datacenter — les deux tests disponibles (ce poste, le runner) sont
+  probablement l'un et l'autre non-résidentiels ; aucun test n'a été fait
+  depuis une IP résidentielle ou un vrai navigateur (exclu par principe,
+  voir plus bas), donc ces deux causes précises restent **indéterminées**,
+  seule la nature Cloudflare/JS-challenge du mécanisme est établie.
+
+**ab-maroc.com — cause : INDÉTERMINÉE, non reproduite.**
+- Le run en échec du 15/08 (`pipeline_runs`, cause `injoignable`) loggait
+  `❌ fetch failed` — une erreur réseau/TLS SANS statut HTTP, jamais un 403
+  (`gh run view 31866854770 --log`) — donc aucun corps de réponse à
+  examiner pour ce run-là, contrairement à decathlon.
+- **Non reproduit ce jour** : `200 OK` depuis ce poste (695 ms) ET depuis un
+  run GitHub Actions réel (739 ms), catalogue complet (544 produits) les
+  deux fois. Le site n'est **pas** derrière Cloudflare (`server: hcdn`,
+  `platform: hostinger`) — l'infrastructure diffère de celle de decathlon,
+  donc l'hypothèse « même mécanisme que decathlon » est déjà fausse en
+  principe, indépendamment de la cause réelle du 15/08.
+- Sans 403 capturé et sans reproduction possible : **indéterminé**. Piste la
+  plus probable (incident ponctuel côté hébergeur, pas un blocage
+  systématique) mais non vérifiée, pas gravée comme telle.
 
 **Proxys résidentiels explicitement exclus, ligne non négociable** :
-masquer l'origine de la requête pour forcer une porte que le site a
-délibérément fermée à une catégorie de trafic n'est pas une solution
-technique retenue ici, c'est une ligne qu'on ne franchit pas.
+masquer l'origine de la requête pour forcer une porte fermée n'est pas une
+solution technique retenue ici, c'est une ligne qu'on ne franchit pas —
+c'est aussi ce qui empêche de trancher entre TLS et catégorie d'IP
+ci-dessus, assumé.
 
-**Décision : ne pas construire de runner auto-hébergé, ne pas migrer
-l'infrastructure de scraping pour ce seul motif.** Conséquence directe :
-le seuil de retrait de Decathlon posé au 25/08/2026 (ci-dessus) devient
-caduc — inutile d'attendre une échéance dont l'issue est déjà connue.
+**Décision inchangée, mais motif reformulé : retrait de decathlon et
+ab-maroc du cron, indépendamment de la cause exacte.** Les deux échouent —
+l'une avec une cause identifiée (challenge Cloudflare, non contournable
+sans les moyens exclus ci-dessus), l'autre avec une cause indéterminée mais
+non reproductible aujourd'hui non plus. **Un runner auto-hébergé n'est pas
+construit pour autant** : la piste TLS/fingerprint, si elle s'avère être la
+vraie cause de decathlon, ne se résoudrait PAS en changeant simplement
+d'adresse IP — changer d'infrastructure sans savoir laquelle des deux causes
+est la bonne serait une dépense qui pourrait ne rien réparer.
 **Decathlon et ab-maroc retirés du cron dès le 15/08/2026**, même geste que
 Bestmark (retrait de `pipeline-quotidien.yml`, scripts conservés dans le
 dépôt, exécutables à la main, retirés aussi de `SOURCES_ATTENDUES` pour ne
 plus produire d'alerte « jamais vue »). Trois échecs quotidiens pour rien
-étaient du bruit, pas un signal.
+étaient du bruit, pas un signal — ce constat-là ne dépendait pas de la cause.
 
-**Ne pas rouvrir cette question sans fait nouveau** : soit un fait change
-la nature du blocage (ex. le site cible lève sa protection anti-datacenter
-de lui-même — à revérifier ponctuellement, pas surveillé activement), soit
-la bascule VPS de la Phase 9 (`docs/fidwastafid-plan-v2.md`) a lieu pour
-ses propres raisons (facture managée, souveraineté) et scraper depuis là
-redevient une option à reconsidérer À CE MOMENT — mais ce n'est pas une
-raison suffisante à elle seule pour déclencher cette bascule, disproportion
-totale entre l'ampleur du chantier (app + base + images) et le problème
-(trois sources secondaires).
+**Ne pas rouvrir cette question sans fait nouveau** : soit decathlon lève
+son challenge Cloudflare de lui-même (à revérifier ponctuellement, pas
+surveillé activement), soit ab-maroc échoue à nouveau ET produit cette
+fois un signal exploitable (statut HTTP, corps de réponse — pas juste
+`fetch failed`), soit la bascule VPS de la Phase 9
+(`docs/fidwastafid-plan-v2.md`) a lieu pour ses propres raisons (facture
+managée, souveraineté) et scraper depuis là redevient une option à
+reconsidérer À CE MOMENT, avec la possibilité de mesurer enfin si un vrai
+changement d'IP suffit — mais ce n'est pas une raison suffisante à elle
+seule pour déclencher cette bascule, disproportion totale entre l'ampleur
+du chantier (app + base + images) et le problème (deux sources
+secondaires, une cause identifiée non contournable légitimement, une cause
+indéterminée non reproductible).
 
 ## Voyages — catégorie vide, réexamen posé à échéance (2026-08-13)
 
