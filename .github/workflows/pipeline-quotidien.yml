@@ -4,28 +4,32 @@
 # -> scraping Bringo -> insertion (validation zod partagée, packages/schemas)
 # -> scraping inwi -> insertion (source secondaire isolée, lot du 23/07/2026)
 # -> scraping universparadiscount -> insertion (source secondaire isolée,
-#    lot du 23/07/2026) -> scraping decathlon -> insertion (source secondaire
-#    isolée, lot du 23/07/2026) -> revalidation Next.js (feed, enseignes,
+#    lot du 23/07/2026) -> ... -> revalidation Next.js (feed, enseignes,
 #    sitemap).
 #
 # Automatisé uniquement : scraper-bringo (categories.txt auto-suffisant),
 # scraper-inwi (page unique auto-suffisante), scraper-universparadiscount
-# (homepage auto-suffisante), scraper-decathlon (catégorie /5080-promotions
-# auto-suffisante, pagination bornée), scraper-kiabi (products.json Shopify,
+# (homepage auto-suffisante), scraper-kiabi (products.json Shopify,
 # pagination bornée + cap de 120 deals/run), scraper-carrefour (API JSON,
 # pagination bornée, EN PARALLÈLE de bringo — docs/SPIKE-SOURCES.md §10-12,
 # ajouté au cron le 14/08/2026, PR de wiring, jusque-là construit mais jamais
-# appelé automatiquement), scraper-ab-maroc et scraper-aswakassalam (Store
-# API WooCommerce, pagination bornée, ajoutés le 14/08/2026 —
-# docs/SPIKE-SOURCES.md §9, recontrôle du même jour) + insert-deals (qui fait
-# lui-même l'extraction de description via fiche-produit.mjs, cf. README).
-# PAS extract-catalogue : ce script attend une URL/chemin de catalogue précis
-# à chaque appel (aucun mécanisme de découverte automatique) — il ne peut pas
-# tourner sans surveillance, il reste un geste manuel ponctuel.
+# appelé automatiquement), scraper-aswakassalam (Store API WooCommerce,
+# pagination bornée, ajouté le 14/08/2026 — docs/SPIKE-SOURCES.md §9,
+# recontrôle du même jour) + insert-deals (qui fait lui-même l'extraction de
+# description via fiche-produit.mjs, cf. README). PAS extract-catalogue : ce
+# script attend une URL/chemin de catalogue précis à chaque appel (aucun
+# mécanisme de découverte automatique) — il ne peut pas tourner sans
+# surveillance, il reste un geste manuel ponctuel.
 #
-# scraper-bestmark RETIRÉ du cron le 13/08/2026 — voir docs/IDEES.md,
-# section « Bestmark — retrait du cron ». Le script reste dans le dépôt
-# (exécutable à la main), simplement plus appelé automatiquement.
+# scraper-bestmark RETIRÉ du cron le 13/08/2026, scraper-decathlon et
+# scraper-ab-maroc RETIRÉS le 15/08/2026 — voir docs/IDEES.md, sections
+# « Bestmark », « Decathlon » et « ab-maroc » — retrait du cron. Motif commun
+# aux trois : blocage par CATÉGORIE d'IP (datacenter) chez le site cible, pas
+# une politique dirigée contre GitHub en particulier — un runner
+# auto-hébergé sur un VPS tomberait dans la même catégorie (décision du
+# 15/08/2026, ne pas rouvrir la question sans fait nouveau). Les trois
+# scripts restent dans le dépôt (exécutables à la main), simplement plus
+# appelés automatiquement.
 #
 # Pas de continue-on-error sur la chaîne PRINCIPALE (expiration -> Bringo ->
 # insertion -> revalidation) : un échec y fait échouer le job franchement —
@@ -346,72 +350,6 @@ jobs:
             echo "::warning::universparadiscount — tout ce qui a été retenu était déjà en base sur ce run : $resume"
           fi
 
-      # Source secondaire decathlon (lot du 23/07/2026) — pattern strictement
-      # identique à inwi/universparadiscount ci-dessus : continue-on-error
-      # (échec isolé, ne casse ni Bringo ni les autres sources ni la
-      # revalidation), ::warning:: au lieu de ::error:: (0 deal = catégorie
-      # promo vide ce jour-là, plausible — signal à surveiller, pas un
-      # incident). Le scraper porte en plus sa garde anti-pollution
-      # inter-tenant (pageEstDecathlon, cf. scraper-decathlon.mjs) : une page
-      # servie qui n'est pas du Decathlon est sautée en amont, jamais parsée.
-      # Prérequis prod : l'enseigne `decathlon` doit exister en base
-      # (docs/RUNBOOK-donnees.md) — sinon insert-deals rejette proprement
-      # chaque deal (enseigne inconnue), sans erreur.
-      - name: Scraping decathlon (catégorie promotions)
-        id: scraping_deca
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-decathlon | tee /dev/stderr) && code=0 || code=$?
-
-          fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
-          if [ -z "$fichier_relatif" ]; then
-            echo "::warning::scraper-decathlon n'a annoncé aucun fichier d'archive — source sautée pour ce run."
-            pnpm --filter pipeline run enregistrer-echec-scraping decathlon injoignable || true
-            exit 1
-          fi
-
-          # Fichier annoncé, mais processus terminé en erreur après coup —
-          # archive potentiellement incomplète, ignorée par précaution.
-          if [ "$code" -ne 0 ]; then
-            echo "::warning::scraper-decathlon a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, source sautée."
-            pnpm --filter pipeline run enregistrer-echec-scraping decathlon injoignable || true
-            exit 1
-          fi
-
-          fichier="apps/pipeline/$fichier_relatif"
-          if [ ! -f "$fichier" ]; then
-            echo "::warning::Fichier annoncé par scraper-decathlon introuvable sur disque : $fichier — source sautée."
-            pnpm --filter pipeline run enregistrer-echec-scraping decathlon injoignable || true
-            exit 1
-          fi
-
-          nb_deals=$(jq 'length' "$fichier")
-          echo "Deals decathlon extraits : $nb_deals"
-          if [ "$nb_deals" -eq 0 ]; then
-            echo "::warning::0 deal extrait par scraper-decathlon — rien à insérer pour cette source ce run."
-            pnpm --filter pipeline run enregistrer-echec-scraping decathlon rien_retenu || true
-            exit 1
-          fi
-
-          echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
-
-      - name: Insertion decathlon en base (validation zod partagée)
-        if: steps.scraping_deca.outcome == 'success'
-        continue-on-error: true
-        env:
-          FICHIER_EXTRACTION_DECA: ${{ steps.scraping_deca.outputs.fichier }}
-        run: |
-          set -o pipefail
-          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_DECA" | tee /dev/stderr)
-          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
-          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
-          if [ "$cause" = "rien_retenu" ]; then
-            echo "::warning::decathlon — aucun deal retenu après filtrage sur ce run : $resume"
-          elif [ "$cause" = "deja_en_base" ]; then
-            echo "::warning::decathlon — tout ce qui a été retenu était déjà en base sur ce run : $resume"
-          fi
-
       # Source secondaire kiabi (lot du 02/08/2026) — même pattern que les
       # trois ci-dessus. Particularité de cette source : ~45 % du catalogue est
       # remisé en permanence (mesuré : 556 deals sur 1250 produits au premier
@@ -535,64 +473,6 @@ jobs:
             echo "::warning::carrefour — tout ce qui a été retenu était déjà en base sur ce run : $resume"
           fi
 
-      # Source secondaire ab-maroc.com (Store API WooCommerce, mono-domaine
-      # Bricolage & Jardin — docs/SPIKE-SOURCES.md §9). Même pattern que les
-      # sources ci-dessus. Prérequis prod : l'enseigne `ab-maroc` doit
-      # exister en base (docs/RUNBOOK-donnees.md, `ajouter-enseigne`) — sinon
-      # insert-deals rejette proprement chaque deal (enseigne inconnue).
-      - name: Scraping ab-maroc.com (Store API WooCommerce)
-        id: scraping_abmaroc
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          sortie=$(pnpm --filter pipeline run scraper-ab-maroc | tee /dev/stderr) && code=0 || code=$?
-
-          fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
-          if [ -z "$fichier_relatif" ]; then
-            echo "::warning::scraper-ab-maroc n'a annoncé aucun fichier d'archive — source sautée pour ce run."
-            pnpm --filter pipeline run enregistrer-echec-scraping ab-maroc injoignable || true
-            exit 1
-          fi
-
-          if [ "$code" -ne 0 ]; then
-            echo "::warning::scraper-ab-maroc a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, source sautée."
-            pnpm --filter pipeline run enregistrer-echec-scraping ab-maroc injoignable || true
-            exit 1
-          fi
-
-          fichier="apps/pipeline/$fichier_relatif"
-          if [ ! -f "$fichier" ]; then
-            echo "::warning::Fichier annoncé par scraper-ab-maroc introuvable sur disque : $fichier — source sautée."
-            pnpm --filter pipeline run enregistrer-echec-scraping ab-maroc injoignable || true
-            exit 1
-          fi
-
-          nb_deals=$(jq 'length' "$fichier")
-          echo "Deals ab-maroc extraits : $nb_deals"
-          if [ "$nb_deals" -eq 0 ]; then
-            echo "::warning::0 deal extrait par scraper-ab-maroc — rien à insérer pour cette source ce run."
-            pnpm --filter pipeline run enregistrer-echec-scraping ab-maroc rien_retenu || true
-            exit 1
-          fi
-
-          echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
-
-      - name: Insertion ab-maroc.com en base (validation zod partagée)
-        if: steps.scraping_abmaroc.outcome == 'success'
-        continue-on-error: true
-        env:
-          FICHIER_EXTRACTION_ABMAROC: ${{ steps.scraping_abmaroc.outputs.fichier }}
-        run: |
-          set -o pipefail
-          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_ABMAROC" | tee /dev/stderr)
-          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
-          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
-          if [ "$cause" = "rien_retenu" ]; then
-            echo "::warning::ab-maroc — aucun deal retenu après filtrage sur ce run : $resume"
-          elif [ "$cause" = "deja_en_base" ]; then
-            echo "::warning::ab-maroc — tout ce qui a été retenu était déjà en base sur ce run : $resume"
-          fi
-
       # Source secondaire aswakassalam.com (Store API WooCommerce,
       # catégorisation par rayon — docs/SPIKE-SOURCES.md §9). Seule vraie
       # piste Alimentaire du dépôt (0 deal publié à ce jour). Même pattern
@@ -695,8 +575,9 @@ jobs:
 
             La chaîne principale (expiration → Bringo → insertion → revalidation) est
             sans `continue-on-error` : l'échec vient de l'une de ces étapes. Les sources
-            secondaires (inwi, universparadiscount, decathlon) ne peuvent pas faire échouer
-            le run — leurs incidents se lisent en annotations `::warning::`.
+            secondaires (inwi, universparadiscount, kiabi, carrefour, aswakassalam) ne
+            peuvent pas faire échouer le run — leurs incidents se lisent en annotations
+            `::warning::`.
 
             Cause déjà rencontrée : le secret `SUPABASE_DB_URL` périmé après une rotation
             du mot de passe de la base (il alimente **aussi** ce workflow, pas seulement le
@@ -810,8 +691,8 @@ jobs:
           # "Casablanca" de l'étape "Scraping Bringo" ci-dessus), toutes les
           # autres sources partagent leur nom avec leur script scraper-*.
           SOURCES_ATTENDUES: >-
-            bringo-casablanca,inwi,universparadiscount,decathlon,kiabi,
-            carrefour,ab-maroc,aswakassalam
+            bringo-casablanca,inwi,universparadiscount,kiabi,
+            carrefour,aswakassalam
         run: |
           set -o pipefail
           sortie=$(pnpm --filter pipeline run verifier-sources-mortes | tee /dev/stderr)
