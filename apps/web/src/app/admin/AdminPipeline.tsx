@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CATEGORIES, type DealAdmin, type DealStatut, type Enseigne } from "@fidwastafid/schemas";
 import type { DoublonInfo } from "../api/v1/_lib/deals.js";
@@ -182,6 +182,18 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   const [deals, setDeals] = useState<DealAdminAvecDoublon[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [chargementPage, setChargementPage] = useState(false);
+  /** Vrai pendant qu'une nouvelle page (onglet/filtre/tri) est en vol —
+   *  distinct de `deals === null` (lot du 15/08/2026, friction filtre) :
+   *  `deals` n'est plus jamais remis à `null` après le premier chargement,
+   *  la liste déjà affichée reste visible (légèrement atténuée) pendant le
+   *  chargement suivant plutôt que de disparaître puis réapparaître. */
+  const [chargementListe, setChargementListe] = useState(false);
+  /** Incrémenté à chaque appel de `fetchOnglet` — une réponse dont le
+   *  numéro ne correspond plus au plus récent est périmée (l'utilisateur a
+   *  changé de filtre entretemps) et n'écrit rien : sans ce garde-fou,
+   *  appliquer un filtre au changement (plus de clic « Appliquer ») peut
+   *  faire partir plusieurs requêtes qui reviennent dans le désordre. */
+  const requeteListeRef = useRef(0);
   // Comptes par onglet — TOUJOURS un count(*) en base
   // (`GET /api/v1/admin/deals/compte`), jamais la longueur de `deals` : cette
   // liste est paginée, elle ne peut pas se compter elle-même sans mentir sur
@@ -297,8 +309,15 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
    *  sur les onglets où l'action groupée par filtre est offerte — inutile
    *  ailleurs. */
   const fetchOnglet = useCallback(async (o: Onglet, f: Filtres, t: string) => {
+    const requeteId = ++requeteListeRef.current;
     setError(null);
+    setChargementListe(true);
     const res = await fetch(urlApi(o, f, t));
+    // Une requête plus récente est déjà partie (nouveau changement de
+    // filtre/onglet/tri pendant que celle-ci était en vol) : cette réponse
+    // périmée n'écrit rien — la requête la plus récente gère seule l'état
+    // (y compris `chargementListe`, qu'elle finira par repasser à `false`).
+    if (requeteListeRef.current !== requeteId) return;
     if (!res.ok) {
       const body = (await res.json()) as ApiErrorBody;
       if (body.error?.code === "UNAUTHENTICATED" || body.error?.code === "FORBIDDEN") {
@@ -309,6 +328,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       setDeals(null);
       setCursor(null);
       setCompteFiltre(null);
+      setChargementListe(false);
       return;
     }
     const body = (await res.json()) as { data: DealAdminAvecDoublon[]; nextCursor: string | null };
@@ -321,6 +341,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     const compteFiltreApplicable = o === "supprime" || ONGLET_ACTIONS[o as DealStatut].length > 0;
     if (compteFiltreApplicable) {
       const resCompte = await fetch(urlCompteFiltre(o, f));
+      if (requeteListeRef.current !== requeteId) return;
       if (resCompte.ok) {
         const bodyCompte = (await resCompte.json()) as { total: number };
         setCompteFiltre(bodyCompte.total);
@@ -330,6 +351,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     } else {
       setCompteFiltre(null);
     }
+    setChargementListe(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- urlApi/urlCompteFiltre sont des fonctions pures du composant, pas des dépendances réactives distinctes de (o, f, t) déjà passés en paramètres
   }, []);
 
@@ -397,7 +419,6 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     setFiltres(f);
     setFiltresBrouillon(f);
     setTri(t);
-    setDeals(null);
     setCursor(null);
     setSelected(new Set());
     setDemandeMotifLot(false);
@@ -428,7 +449,10 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     setOnglet(o);
     setFiltres(f);
     setTri(t);
-    setDeals(null);
+    // PAS de `setDeals(null)` (retiré le 15/08/2026, friction filtre) : la
+    // liste déjà affichée reste visible pendant que `fetchOnglet` charge la
+    // suivante (`chargementListe` l'atténue), au lieu de disparaître
+    // derrière « Chargement… » à chaque changement de filtre.
     setCursor(null);
     setSelected(new Set());
     // Sinon le panneau de motif reste ouvert au-dessus d'une sélection vidée.
@@ -475,8 +499,17 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     }
   }
 
-  function appliquerFiltres() {
-    appliquerNavigation(onglet, filtresBrouillon, tri);
+  /** Filtres à sélection fermée (menu, date) — s'appliquent AU CHANGEMENT,
+   *  comme le tri (corrigé le 15/08/2026 : l'incohérence entre un tri
+   *  immédiat et un filtre qui exigeait un clic « Appliquer » coûtait un
+   *  geste à chaque changement, des dizaines de fois par session). Un menu
+   *  ou un `<input type=date>` complet ne déclenche qu'UN `onChange` par
+   *  choix — pas de risque de rafale, contrairement aux champs numériques
+   *  ci-dessous (débounce dédié). */
+  function appliquerFiltreImmediat(patch: Partial<Filtres>) {
+    const next = { ...filtresBrouillon, ...patch };
+    setFiltresBrouillon(next);
+    appliquerNavigation(onglet, next, tri);
   }
 
   function reinitialiserFiltres() {
@@ -487,6 +520,40 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   function changerTri(t: string) {
     appliquerNavigation(onglet, filtres, t);
   }
+
+  /**
+   * Débounce des QUATRE champs numériques (remise/prix min/max) — seuls
+   * champs de ce panneau où chaque frappe déclenche `onChange` (contraire
+   * aux menus/dates ci-dessus) : sans délai, taper "150" partirait en trois
+   * requêtes (1, 15, 150) pour un filtre qui n'a de sens qu'à la dernière.
+   * Se déclenche à chaque frappe (dépendances = les quatre champs du
+   * brouillon), compare au dernier filtre RÉELLEMENT appliqué — si rien n'a
+   * changé depuis (ex. la frappe précédente vient d'être appliquée), ne
+   * relance rien. `clearTimeout` en nettoyage : chaque nouvelle frappe
+   * annule le délai précédent, seul le dernier survit — un débounce
+   * classique.
+   */
+  const DEBOUNCE_FILTRES_NUMERIQUES_MS = 400;
+  useEffect(() => {
+    const brouillonNum = {
+      remiseMin: filtresBrouillon.remiseMin,
+      remiseMax: filtresBrouillon.remiseMax,
+      prixMin: filtresBrouillon.prixMin,
+      prixMax: filtresBrouillon.prixMax,
+    };
+    const appliqueNum = {
+      remiseMin: filtres.remiseMin,
+      remiseMax: filtres.remiseMax,
+      prixMin: filtres.prixMin,
+      prixMax: filtres.prixMax,
+    };
+    if (JSON.stringify(brouillonNum) === JSON.stringify(appliqueNum)) return;
+    const timer = setTimeout(() => {
+      appliquerNavigation(onglet, filtresBrouillon, tri);
+    }, DEBOUNCE_FILTRES_NUMERIQUES_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ne réagit qu'aux quatre champs numériques du brouillon ; onglet/tri/filtres sont lus au moment du déclenchement, pas des dépendances (sinon un changement d'onglet relancerait ce débounce sans qu'aucun champ numérique n'ait bougé)
+  }, [filtresBrouillon.remiseMin, filtresBrouillon.remiseMax, filtresBrouillon.prixMin, filtresBrouillon.prixMax]);
 
   function toggle(publicId: string) {
     setSelected((prev) => {
@@ -528,20 +595,24 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
 
   /**
    * Pendant de `retirerDesListe` pour l'onglet Supprimés (lot du 15/08/2026,
-   * « tout sélectionner ») — restaurer n'a qu'UNE cible de comptage
-   * (`comptesSupprimes`, qui décroît), mais la DESTINATION varie par ligne :
-   * chaque deal revient dans son propre statut D'ORIGINE (`deal.statut`,
-   * jamais deviné, cf. AdminDealSupprime), pas un statut commun au lot.
+   * « tout sélectionner », étendu le même jour à la restauration PAR FILTRE
+   * — friction « ramène en page 1 ») — restaurer n'a qu'UNE cible de
+   * comptage (`comptesSupprimes`, qui décroît), mais la DESTINATION varie
+   * par ligne : chaque deal revient dans son propre statut D'ORIGINE.
+   * `entries` vient du SERVEUR (`LigneRestauree[]`, `_lib/
+   * adminDealsRestaurerBulk.ts`), jamais relu depuis `deals` chargé — au
+   * niveau filtre, une ligne restaurée peut ne jamais avoir été chargée à
+   * l'écran, son statut d'origine n'existe donc nulle part côté client
+   * avant cette réponse.
    */
-  function retirerDesListeSupprimee(publicIds: string[]) {
-    if (publicIds.length === 0 || !deals) return;
-    const ids = new Set(publicIds);
-    const partants = deals.filter((d) => ids.has(d.publicId));
+  function retirerDesListeSupprimee(entries: { publicId: string; statutOrigine: DealStatut }[]) {
+    if (entries.length === 0) return;
+    const ids = new Set(entries.map((e) => e.publicId));
     setDeals((prev) => (prev ? prev.filter((d) => !ids.has(d.publicId)) : prev));
-    setComptesSupprimes((c) => Math.max(0, c - partants.length));
+    setComptesSupprimes((c) => Math.max(0, c - entries.length));
     setComptes((prev) => {
       const next = { ...prev };
-      for (const d of partants) next[d.statut] = (next[d.statut] ?? 0) + 1;
+      for (const e of entries) next[e.statutOrigine] = (next[e.statutOrigine] ?? 0) + 1;
       return next;
     });
     setCompteFiltre((prev) => (prev === null ? prev : Math.max(0, prev - ids.size)));
@@ -757,6 +828,18 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
    * filtres vivent dans l'URL de l'appel (`urlBulkFiltre`), jamais un
    * `publicIds` transmis : le serveur résout lui-même les lignes touchées,
    * avec le MÊME prédicat que ce que l'écran affiche.
+   *
+   * Retrait LOCAL (`retirerDesListe`), pas un `rafraichir()` (corrigé le
+   * 15/08/2026 — même friction que #141 pour la sélection manuelle, restée
+   * sur ce chemin) : `body.updated` porte TOUS les id réellement touchés,
+   * qu'ils aient été chargés à l'écran ou non. `retirerDesListe` filtre déjà
+   * `deals` par appartenance à cet ensemble — une ligne jamais chargée n'y
+   * est simplement jamais présente, rien à en retirer visuellement, mais
+   * les COMPTEURS (`comptes`, `compteFiltre`) se mettent à jour sur la
+   * taille réelle de `updated`, pas sur ce qui était visible. Le verbe est
+   * unique pour tout l'appel (contrairement à la restauration ci-dessous),
+   * `retirerDesListe(ids, verbe)` suffit sans donnée supplémentaire du
+   * serveur.
    */
   async function bulkFiltre(verbe: DealStatut, motifRejet?: string) {
     setPending(true);
@@ -772,9 +855,10 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         setError(body.error?.message ?? "Action groupée impossible.");
         return;
       }
+      const body = (await res.json()) as { updated: string[]; lot: string; touched: number };
+      retirerDesListe(body.updated, verbe);
       setDemandeMotifLotFiltre(false);
       setConfirmationLotFiltre(null);
-      await rafraichir();
     } finally {
       setPending(false);
     }
@@ -800,7 +884,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         setError(body.error?.message ?? "Restauration groupée impossible.");
         return;
       }
-      const body = (await res.json()) as { restaures: string[]; lot: string };
+      const body = (await res.json()) as { restaures: { publicId: string; statutOrigine: DealStatut }[]; lot: string };
       retirerDesListeSupprimee(body.restaures);
       setSelected(new Set());
     } finally {
@@ -810,8 +894,12 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
 
   /** Restauration groupée PAR FILTRE (onglet Supprimés) — pendant de
    *  `bulkFiltre()`, un seul verbe possible (restaurer), donc pas de corps
-   *  JSON à construire ; refetch complet comme `bulkFiltre()`, pas de
-   *  retrait local (le lot peut dépasser ce qui est chargé à l'écran). */
+   *  JSON à construire. Retrait LOCAL (corrigé le 15/08/2026, même friction
+   *  que `bulkFiltre()`) : `body.restaures` porte, PAR LIGNE, le statut
+   *  d'origine (`LigneRestauree`) — c'est précisément ce qui manque pour
+   *  mettre à jour `comptes` sans deviner, y compris pour les lignes jamais
+   *  chargées à l'écran (la destination varie ligne à ligne, contrairement
+   *  à `bulkFiltre` où un seul verbe vaut pour tout l'appel). */
   async function restaurerBulkFiltre() {
     setPending(true);
     setError(null);
@@ -822,8 +910,13 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         setError(body.error?.message ?? "Restauration groupée impossible.");
         return;
       }
+      const body = (await res.json()) as {
+        restaures: { publicId: string; statutOrigine: DealStatut }[];
+        lot: string;
+        touched: number;
+      };
+      retirerDesListeSupprimee(body.restaures);
       setConfirmationRestaurerFiltre(false);
-      await rafraichir();
     } finally {
       setPending(false);
     }
@@ -977,17 +1070,19 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       {!vueLots && (
         <>
       {/* Filtres — combinables en AND avec l'onglet, filtrés/triés EN BASE
-          (voir `urlApi`/`route.ts`, jamais côté client). Appliqués
-          explicitement (bouton), pas à chaque frappe : un champ numérique
-          déclencherait une requête par chiffre tapé pour un filtre qui n'a
-          de sens qu'une fois complet. */}
+          (voir `urlApi`/`route.ts`, jamais côté client). S'appliquent AU
+          CHANGEMENT, comme le tri (corrigé le 15/08/2026 — plus de clic
+          « Appliquer » séparé, incohérence avec le tri déjà immédiat).
+          Seuls les quatre champs numériques (remise/prix) sont débounced :
+          un menu ou une date complète ne déclenche qu'un `onChange`, un
+          champ numérique un par chiffre tapé. */}
       <div className="bg-surface-subtle border border-border rounded-xl p-3 flex flex-col gap-2">
         <div className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-0.5 text-xs font-bold text-ink-muted">
             Enseigne
             <select
               value={filtresBrouillon.enseigne}
-              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, enseigne: e.target.value }))}
+              onChange={(e) => appliquerFiltreImmediat({ enseigne: e.target.value })}
               className="rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
             >
               <option value="">Toutes</option>
@@ -1007,7 +1102,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
             Source (site)
             <select
               value={filtresBrouillon.source}
-              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, source: e.target.value }))}
+              onChange={(e) => appliquerFiltreImmediat({ source: e.target.value })}
               className="rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
             >
               <option value="">Toutes</option>
@@ -1023,7 +1118,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
             Catégorie
             <select
               value={filtresBrouillon.categorie}
-              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, categorie: e.target.value }))}
+              onChange={(e) => appliquerFiltreImmediat({ categorie: e.target.value })}
               className="rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
             >
               <option value="">Toutes</option>
@@ -1081,7 +1176,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
             <input
               type="date"
               value={filtresBrouillon.dateMin}
-              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, dateMin: e.target.value }))}
+              onChange={(e) => appliquerFiltreImmediat({ dateMin: e.target.value })}
               className="rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
             />
           </label>
@@ -1090,7 +1185,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
             <input
               type="date"
               value={filtresBrouillon.dateMax}
-              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, dateMax: e.target.value }))}
+              onChange={(e) => appliquerFiltreImmediat({ dateMax: e.target.value })}
               className="rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
             />
           </label>
@@ -1108,12 +1203,12 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
               ))}
             </select>
           </label>
-          <Button variant="primary" size="sm" onClick={appliquerFiltres}>
-            Appliquer les filtres
-          </Button>
           <Button variant="secondary" size="sm" onClick={reinitialiserFiltres}>
             Réinitialiser
           </Button>
+          {/* Indicateur discret — remplace la disparition complète de la
+              liste pendant un chargement (corrigé le 15/08/2026). */}
+          {chargementListe && <span className="text-xs text-ink-subtle self-center">Mise à jour…</span>}
         </div>
       </div>
 
@@ -1309,7 +1404,17 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         </p>
       )}
 
-      <ul className="flex flex-col gap-2">
+      {/* `opacity-60`/`pointer-events-none` pendant `chargementListe`
+          (15/08/2026) — la liste précédente reste visible et lisible, elle
+          ne disparaît plus derrière « Chargement… » à chaque changement de
+          filtre/onglet/tri ; verrouillée le temps du remplacement pour
+          éviter un clic sur une ligne sur le point de partir. */}
+      <ul
+        className={`flex flex-col gap-2 transition-opacity duration-150 motion-reduce:transition-none ${
+          chargementListe ? "opacity-60 pointer-events-none" : ""
+        }`}
+        aria-busy={chargementListe}
+      >
         {modeSupprimes
           ? deals.map((deal) => (
               <AdminDealSupprime

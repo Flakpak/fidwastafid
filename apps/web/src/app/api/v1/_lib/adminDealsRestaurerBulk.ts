@@ -1,6 +1,18 @@
 import type { PoolClient } from "@fidwastafid/db";
 import type { AuthUser } from "@fidwastafid/auth";
+import type { DealStatut } from "@fidwastafid/schemas";
 import { logAudit } from "./audit.js";
+
+/** Une ligne restaurée + son statut D'ORIGINE — nécessaire côté client
+ *  (lot du 15/08/2026, friction « rejet du résultat filtré ramène en page
+ *  1 ») pour mettre à jour les compteurs par statut SANS recharger la
+ *  liste : la restauration par filtre peut toucher des lignes jamais
+ *  chargées à l'écran, dont le client ne connaît pas le statut d'origine
+ *  autrement que par cette réponse. */
+export interface LigneRestauree {
+  publicId: string;
+  statutOrigine: DealStatut;
+}
 
 export interface OptionsRestaurerLot {
   client: PoolClient;
@@ -31,8 +43,8 @@ export async function appliquerLotRestauration({
   admin,
   publicIds,
   lot,
-}: OptionsRestaurerLot): Promise<string[]> {
-  const done: string[] = [];
+}: OptionsRestaurerLot): Promise<LigneRestauree[]> {
+  const done: LigneRestauree[] = [];
   for (const publicId of publicIds) {
     const before = await client.query<{ id: string; statut: string; titre: string; supprime_le: string | null }>(
       "select id, statut, titre, supprime_le from deals where public_id = $1 for update",
@@ -53,7 +65,7 @@ export async function appliquerLotRestauration({
       },
       client
     );
-    done.push(publicId);
+    done.push({ publicId, statutOrigine: deal.statut as DealStatut });
   }
   return done;
 }

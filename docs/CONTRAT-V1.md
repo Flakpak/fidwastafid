@@ -686,6 +686,30 @@ distincts, partout où une action groupée a un sens :
   n'en touche aucun). Défaire une restauration groupée reste, pour l'instant, un geste par ligne
   (re-supprimer).
 
+**Révision du 15/08/2026 (même amendement) — deux frictions corrigées, un léger changement de
+forme sur `restaurer-bulk`/`restaurer-bulk-filtre`.**
+
+- **Filtre appliqué AU CHANGEMENT, comme le tri** — le bouton « Appliquer les filtres » est
+  retiré ; seuls les quatre champs numériques (remise/prix min/max) restent débounced (400 ms),
+  parce que ce sont les seuls où chaque frappe déclenche `onChange`. Un menu ou une date complète
+  ne déclenche qu'un `onChange` par choix, aucun débounce n'y est nécessaire.
+- **Plus de reload brutal** — `deals` n'est plus jamais remis à `null` après le premier
+  chargement : la liste déjà affichée reste visible (légèrement atténuée) pendant qu'une nouvelle
+  page charge, au lieu de disparaître derrière « Chargement… » à chaque changement de
+  filtre/onglet/tri. Un compteur de requête (`requeteListeRef`) ignore toute réponse qui n'est
+  plus la plus récente — nécessaire dès qu'un filtre peut partir sans confirmation explicite.
+- **`bulk-filtre` et `restaurer-bulk-filtre` retirent désormais les lignes touchées EN LOCAL**
+  (comme `bulk` depuis #141), au lieu d'un `rafraichir()` complet qui ramenait en page 1 et
+  perdait « Charger plus ». Une ligne touchée mais jamais chargée à l'écran n'a simplement rien à
+  retirer visuellement, mais les compteurs (`comptes`, `compteFiltre`) se mettent à jour sur le
+  nombre RÉEL de lignes touchées (`touched`), jamais sur ce qui était visible.
+- **`restaures` change de forme** (`restaurer-bulk`, `restaurer-bulk-filtre`) :
+  `LigneRestauree[]` (`{ publicId, statutOrigine }`), plus une simple `string[]`. Nécessaire
+  seulement pour `restaurer-bulk-filtre` — contrairement à `bulk-filtre` (un seul verbe pour tout
+  l'appel, `retirerDesListe` s'en sort sans donnée supplémentaire), la restauration renvoie
+  chaque ligne à son statut D'ORIGINE, qui varie ligne à ligne et que le client ne peut pas
+  deviner pour une ligne jamais chargée.
+
 **Amendement du 05/08/2026 — la file admin filtre en base, pas côté client (neuvième
 amendement conscient de la liste fermée).** `GET /api/v1/admin/deals` chargeait tous
 statuts confondus (`LIMIT 1000` global, tri `auto_draft` d'abord puis `score desc,
