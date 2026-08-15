@@ -10,6 +10,39 @@ en a appris. Une leçon gravée ici a vocation à être citée depuis le code ou
 
 ---
 
+## 2026-08-15 — Contrainte : un aperçu OG raté reste en cache chez Meta après correction
+
+*Entrée de **contrainte**, pas d'incident : rien n'a cassé côté serveur. Ce fichier consigne un
+piège de diagnostic, pas une panne — voir aussi l'entrée du même jour ci-dessous sur `og.jpg`
+(le correctif technique concerné).*
+
+**Le fait.** Un premier essai de partage WhatsApp d'un deal réel a échoué (ni image, ni titre,
+ni domaine dans l'aperçu) alors que toutes les mesures serveur — balises OG dans le HTML initial,
+`og:image` en `200` avec un JPEG valide, en-têtes identiques pour les UA `WhatsApp/2.x` et
+`facebookexternalhit/1.1`, aucune redirection, aucun cookie, aucune protection Vercel — étaient
+correctes, y compris APRÈS le correctif de cache versionné (`[version]/og.jpg`). Un second essai,
+sur un deal **jamais partagé auparavant**, a fonctionné du premier coup, sans changement de code
+entre les deux essais.
+
+**Cause.** Le premier deal avait déjà été testé avant le correctif de cache (`og.jpg` sans
+version, alors sujet à un cache froid systémique — voir l'entrée dédiée). L'échec initial a été
+mis en cache par l'infrastructure de partage de Meta (partagée entre WhatsApp et Facebook), et ce
+cache négatif a persisté après la correction du serveur — le crawler de Meta ne revient pas
+spontanément sur une URL qu'il a déjà classée « sans aperçu », indépendamment de ce que l'origine
+sert désormais.
+
+**Piège de diagnostic.** Tester la MÊME URL après un correctif ne prouve rien si Meta l'a déjà
+en cache négatif — un échec persistant peut être un fantôme du premier essai, pas un signe que le
+correctif ne marche pas. Le remède habituel (Sharing Debugger de Meta, bouton « Scrape Again »,
+qui invalide ce cache) **exige un compte Facebook**, indisponible ici.
+
+**Règle retenue.** Tout test d'aperçu de lien (WhatsApp, Facebook, Instagram) doit porter sur une
+URL **jamais partagée auparavant** — un deal jamais testé, ou une URL réellement neuve. Un échec
+sur une URL déjà testée avant un correctif ne permet aucune conclusion sur l'état actuel du
+serveur.
+
+---
+
 ## 2026-08-15 — Contrainte : appliquer une migration avant de fusionner sa PR met le dépôt en incohérence jusqu'à la fusion
 
 *Entrée de **contrainte**, pas d'incident : rien n'a cassé en production. La règle
