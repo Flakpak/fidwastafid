@@ -11,8 +11,8 @@ import { fetchDealImageBytes } from "../../../../lib/dealImageStorage.js";
  * reste la porte d'entrée unique pour tout le reste (CONTRAT-V1 §4).
  *
  * Sert exclusivement le WebP d'origine — la variante JPEG des aperçus
- * sociaux vit sur un chemin dédié (./og.jpg/route.ts), pas un `?format=`
- * ici : incident du 21/07/2026, le crawler Meta a fetché cette URL SANS le
+ * sociaux vit sur un chemin dédié (./[version]/og.jpg/route.ts), pas un
+ * `?format=` ici : incident du 21/07/2026, le crawler Meta a fetché cette URL SANS le
  * `?format=jpeg` alors présent dans og:image (tronqué côté crawler, vérifié
  * par curl — ni la route ni le cache Vercel ne perdaient le paramètre), et
  * reçu le WebP par défaut, rejeté à l'affichage. Un chemin sans query
