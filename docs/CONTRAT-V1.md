@@ -711,6 +711,18 @@ les 646 `auto_draft`, silencieusement (docs/INCIDENTS.md, 04/08/2026).
 - L'avertissement de troncature (« la limite serveur a tronqué le résultat ») est retiré du
   back-office : sans `LIMIT` global, il n'a plus d'objet, et un avertissement permanent
   qu'on apprend à ignorer est pire qu'aucun avertissement.
+- **`enseigne`/`categorie`/`remiseMin`/`remiseMax`/`prixMin`/`prixMax`/`dateMin`/`dateMax`**
+  (lot filtres/tri du 12/08/2026) puis **`source`** (15/08/2026, `_lib/adminDealsFilters.ts`,
+  `lib/sourcesAdmin.ts`) s'ajoutent en paramètres de requête optionnels, combinables en AND
+  avec `statut` — même endpoint, pas un nouvel amendement numéroté : ce sont des filtres sur
+  un endpoint déjà dans la liste fermée, pas un nouvel endpoint ni un nouveau champ exposé
+  sur `Deal`. `source` est **dérivé du domaine de `deals.lien`**, jamais une colonne
+  supplémentaire : carrefour.ma et bringo.ma partagent délibérément la même `enseigne`
+  ("Carrefour", pour que le dédoublonnage titre+enseigne+prix s'applique entre les deux
+  sources — docs/SPIKE-SOURCES.md §12) et restaient jusqu'ici indistinguables dans la file
+  admin. `GET /api/v1/admin/deals/compte-filtre` et `POST /api/v1/admin/deals/bulk-filtre`
+  (mêmes filtres, `conditionsFiltresAdmin()` — source unique) manquaient déjà de cette
+  liste fermée avant ce jour ; non corrigé ici, hors périmètre de ce lot.
 
 **Révision du 02/08/2026 (même journée) — le canal passe DANS le chemin.** La première
 rédaction exposait `/diffuser` sans canal, Telegram étant le seul. Dès le second canal

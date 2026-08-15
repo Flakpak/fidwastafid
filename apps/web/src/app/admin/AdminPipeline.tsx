@@ -21,6 +21,7 @@ import { AdminDiffusionLot } from "./AdminDiffusionLot.js";
 import { MotifRejet } from "./MotifRejet.js";
 import { Button } from "../../components/Button.js";
 import { ONGLET_ACTIONS, type ActionOnglet } from "../api/v1/_lib/adminDealsActions.js";
+import { SOURCES_ADMIN, SOURCE_INCONNUE_SLUG } from "../../lib/sourcesAdmin.js";
 
 /** Deal admin enrichi de l'info de doublon produit (visibilité seule, lot du
  *  23/07/2026) — `doublon` vit hors du modèle de domaine (cf. _lib/deals.ts),
@@ -81,6 +82,10 @@ const DIFFUSION_ONGLETS = new Set<DealStatut>(["publie"]);
  */
 interface Filtres {
   enseigne: string;
+  /** Site scrapé (dérivé de `lien`, jamais une colonne — lib/sourcesAdmin.ts).
+   *  Distinct d'`enseigne` : carrefour.ma et bringo.ma partagent la même
+   *  enseigne "Carrefour" sans partager de domaine. */
+  source: string;
   categorie: string;
   remiseMin: string;
   remiseMax: string;
@@ -94,6 +99,7 @@ interface Filtres {
 
 const FILTRES_VIDES: Filtres = {
   enseigne: "",
+  source: "",
   categorie: "",
   remiseMin: "",
   remiseMax: "",
@@ -116,6 +122,7 @@ const TRI_OPTIONS: { value: string; label: string }[] = [
 function filtresDepuisParams(params: URLSearchParams): Filtres {
   return {
     enseigne: params.get("enseigne") ?? "",
+    source: params.get("source") ?? "",
     categorie: params.get("categorie") ?? "",
     remiseMin: params.get("remiseMin") ?? "",
     remiseMax: params.get("remiseMax") ?? "",
@@ -150,6 +157,7 @@ function paramsCommuns(onglet: Onglet, filtres: Filtres, tri: string): URLSearch
   const params = new URLSearchParams();
   if (onglet !== "en_attente") params.set("onglet", onglet);
   if (filtres.enseigne) params.set("enseigne", filtres.enseigne);
+  if (filtres.source) params.set("source", filtres.source);
   if (filtres.categorie) params.set("categorie", filtres.categorie);
   if (filtres.remiseMin) params.set("remiseMin", filtres.remiseMin);
   if (filtres.remiseMax) params.set("remiseMax", filtres.remiseMax);
@@ -833,7 +841,14 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     const parts: string[] = [];
     if (f.enseigne) {
       const nom = enseignes.find((e) => e.slug === f.enseigne)?.nom ?? f.enseigne;
-      parts.push(`Source : ${nom}`);
+      parts.push(`Enseigne : ${nom}`);
+    }
+    if (f.source) {
+      const label =
+        f.source === SOURCE_INCONNUE_SLUG
+          ? "inconnue"
+          : (SOURCES_ADMIN.find((s) => s.slug === f.source)?.label ?? f.source);
+      parts.push(`Source : ${label}`);
     }
     if (f.categorie) parts.push(`Catégorie : ${f.categorie}`);
     if (f.remiseMin) parts.push(`Remise ≥ ${f.remiseMin}%`);
@@ -969,7 +984,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       <div className="bg-surface-subtle border border-border rounded-xl p-3 flex flex-col gap-2">
         <div className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-0.5 text-xs font-bold text-ink-muted">
-            Source
+            Enseigne
             <select
               value={filtresBrouillon.enseigne}
               onChange={(e) => setFiltresBrouillon((f) => ({ ...f, enseigne: e.target.value }))}
@@ -981,6 +996,27 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
                   {ens.nom}
                 </option>
               ))}
+            </select>
+          </label>
+          {/* Distinct de l'enseigne (lot du 15/08/2026) : carrefour.ma et
+              bringo.ma partagent la même enseigne "Carrefour" (dédoublonnage
+              délibéré, docs/SPIKE-SOURCES.md §12) mais restaient
+              indistinguables dans la file — ce filtre dérive le site du
+              domaine de `lien`, jamais une colonne (lib/sourcesAdmin.ts). */}
+          <label className="flex flex-col gap-0.5 text-xs font-bold text-ink-muted">
+            Source (site)
+            <select
+              value={filtresBrouillon.source}
+              onChange={(e) => setFiltresBrouillon((f) => ({ ...f, source: e.target.value }))}
+              className="rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink"
+            >
+              <option value="">Toutes</option>
+              {SOURCES_ADMIN.map((s) => (
+                <option key={s.slug} value={s.slug}>
+                  {s.label}
+                </option>
+              ))}
+              <option value={SOURCE_INCONNUE_SLUG}>Inconnue (inwi, catalogue PDF…)</option>
             </select>
           </label>
           <label className="flex flex-col gap-0.5 text-xs font-bold text-ink-muted">
