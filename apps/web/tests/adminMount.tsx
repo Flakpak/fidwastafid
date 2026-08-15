@@ -94,10 +94,21 @@ globalThis.fetch = (async (input: RequestInfo | URL) => {
 // `next/navigation` simulé — URL vide, comme un premier accès à `/admin`
 // sans paramètres : c'est exactement le cas qui a régressé (état initial
 // dérivé d'une URL vide, indistinguable de l'URL au moment de l'effet).
+//
+// Instance UNIQUE, créée une fois hors du hook (pas `() => new
+// URLSearchParams("")` inline) : le vrai `useSearchParams()` de Next.js
+// renvoie une référence STABLE tant que l'URL ne change pas réellement —
+// un mock qui recrée un objet à chaque rendu casse la garde de l'effet
+// réactif à `searchParams` (`[searchParams]` en dépendance), qui le
+// verrait alors « changé » à chaque re-rendu et écraserait les filtres
+// appliqués en repartant de cette URL vide (constaté en écrivant le test
+// « filtre appliqué au changement » du 15/08/2026 : les filtres revenaient
+// à vide entre deux rendus, sans qu'aucun clic ne l'ait demandé).
+const searchParamsVides = new URLSearchParams("");
 mock.module("next/navigation", {
   namedExports: {
     useRouter: () => ({ replace: () => {}, push: () => {} }),
-    useSearchParams: () => new URLSearchParams(""),
+    useSearchParams: () => searchParamsVides,
   },
 });
 
@@ -415,6 +426,173 @@ console.log("\nAdminPipeline — « Tout sélectionner (visible) » : périmètr
 
   act(() => {
     root4.unmount();
+  });
+  document.body.removeChild(div);
+}
+
+/**
+ * Friction 1 (15/08/2026) — le filtre exigeait un clic « Appliquer » alors
+ * que le tri s'appliquait déjà au changement. Corrigé : les filtres à
+ * sélection fermée (menu, date) s'appliquent AU CHANGEMENT, sans bouton, et
+ * la liste précédemment affichée reste visible pendant le chargement de la
+ * suivante — plus de « Chargement… » qui efface tout à chaque changement.
+ */
+console.log("\nAdminPipeline — filtre appliqué au changement, sans clic « Appliquer », sans reload brutal");
+{
+  const dealA = dealFixture({ publicId: "gggggggggg", titre: "Septième deal en attente" });
+  const dealB = dealFixture({ publicId: "hhhhhhhhhh", titre: "Huitième deal en attente" });
+  const dealFiltre = dealFixture({ publicId: "iiiiiiiiii", titre: "Neuvième deal filtré" });
+
+  let resoudreAppelFiltre: (() => void) | null = null;
+  const appelsListe: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/admin/deals/compte-filtre")) return reponseJson({ total: 2 });
+    if (url.includes("/admin/deals/compte")) {
+      return reponseJson({ comptes: { auto_draft: 0, en_attente: 2, publie: 0, rejete: 0, expire: 0 }, supprimes: 0 });
+    }
+    if (url.includes("/admin/deals?") && url.includes("statut=")) {
+      appelsListe.push(url);
+      if (url.includes("categorie=")) {
+        // Requête tenue EN SUSPENS pour observer le DOM pendant qu'elle vole
+        // — c'est exactement le moment où l'ancien code effaçait tout.
+        await new Promise<void>((resolve) => {
+          resoudreAppelFiltre = resolve;
+        });
+        return reponseJson({ data: [dealFiltre], nextCursor: null });
+      }
+      return reponseJson({ data: [dealA, dealB], nextCursor: null });
+    }
+    return reponseJson({ data: [], nextCursor: null });
+  }) as typeof fetch;
+
+  const div = document.createElement("div");
+  document.body.appendChild(div);
+  const root5 = createRoot(div);
+  await act(async () => {
+    root5.render(createElement(AdminPipeline, { enseignes: [] }));
+  });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  check("les deux deals initiaux sont affichés", document.body.textContent?.includes("Septième deal en attente") === true);
+
+  const boutons = Array.from(document.querySelectorAll("button")).map((b) => b.textContent?.trim() ?? "");
+  check("aucun bouton « Appliquer les filtres » n'existe plus", !boutons.some((t) => t.startsWith("Appliquer")));
+
+  const selectCategorie = Array.from(document.querySelectorAll("select")).find((s) =>
+    s.closest("label")?.textContent?.includes("Catégorie")
+  ) as HTMLSelectElement | undefined;
+  if (!selectCategorie) throw new Error("Select « Catégorie » introuvable.");
+
+  await act(async () => {
+    selectCategorie.value = "Mode";
+    selectCategorie.dispatchEvent(new window.Event("change", { bubbles: true }));
+  });
+
+  check(
+    "le changement de filtre part SANS clic — une requête liste porte le filtre",
+    appelsListe.some((u) => u.includes("categorie="))
+  );
+  check(
+    "PENDANT la requête, l'ancienne liste reste affichée (pas de reload brutal)",
+    document.body.textContent?.includes("Septième deal en attente") === true
+  );
+
+  await act(async () => {
+    resoudreAppelFiltre?.();
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  check(
+    "une fois la réponse arrivée, la nouvelle liste remplace l'ancienne",
+    document.body.textContent?.includes("Neuvième deal filtré") === true &&
+      document.body.textContent?.includes("Septième deal en attente") === false
+  );
+
+  act(() => {
+    root5.unmount();
+  });
+  document.body.removeChild(div);
+}
+
+/**
+ * Friction 2 (15/08/2026) — « Rejeter tout le résultat filtré » (niveau 2)
+ * rafraîchissait toute la liste (retour page 1, « Charger plus »
+ * réinitialisé), défaut déjà corrigé pour la sélection manuelle (#141) mais
+ * resté sur ce chemin. Corrigé : retrait LOCAL comme la sélection manuelle.
+ * `touched` peut dépasser ce qui est chargé à l'écran (ici 2 id touchés,
+ * 1 seul réellement affiché) — les compteurs doivent refléter les DEUX,
+ * jamais seulement ce qui était visible.
+ */
+console.log("\nAdminPipeline — rejet du résultat filtré (niveau 2) : retrait local, aucun reload");
+{
+  const dealVisible = dealFixture({ publicId: "jjjjjjjjjj", titre: "Dixième deal visible" });
+  let corpsBulkFiltre: unknown = null;
+  let appelsListeApresMontage = 0;
+  let montageTermine = false;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    const method = init?.method ?? "GET";
+    if (url.includes("/admin/deals/compte-filtre")) return reponseJson({ total: 2 });
+    if (url.includes("/admin/deals/compte")) {
+      return reponseJson({ comptes: { auto_draft: 0, en_attente: 2, publie: 0, rejete: 0, expire: 0 }, supprimes: 0 });
+    }
+    // `bulk-filtre` vérifié AVANT `bulk` seul (préfixe partagé).
+    if (method === "POST" && url.includes("/admin/deals/bulk-filtre")) {
+      corpsBulkFiltre = init?.body ? JSON.parse(init.body as string) : null;
+      // Deux lignes touchées côté serveur, une seule jamais chargée à
+      // l'écran — c'est précisément le cas que ce test couvre.
+      return reponseJson({ updated: ["jjjjjjjjjj", "kkkkkkkkkk"], lot: "lot-filtre-test", touched: 2 });
+    }
+    if (url.includes("/admin/deals?") && url.includes("statut=")) {
+      if (montageTermine) appelsListeApresMontage++;
+      return reponseJson({ data: [dealVisible], nextCursor: null });
+    }
+    return reponseJson({ data: [], nextCursor: null });
+  }) as typeof fetch;
+
+  const div = document.createElement("div");
+  document.body.appendChild(div);
+  const root6 = createRoot(div);
+  await act(async () => {
+    root6.render(createElement(AdminPipeline, { enseignes: [] }));
+  });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
+  montageTermine = true;
+
+  const rejeterTout = bouton("Rejeter tout");
+  await act(async () => {
+    cliquer(rejeterTout);
+  });
+  // Motif requis pour rejeter — raccourci préenregistré (MotifRejet.tsx).
+  await act(async () => {
+    cliquer(bouton("Doublon"));
+  });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  check(
+    "bulk-filtre appelé avec le motif choisi",
+    (corpsBulkFiltre as { motifRejet?: string } | null)?.motifRejet === "Doublon"
+  );
+  check("AUCUN rechargement de la liste après l'action filtrée (friction corrigée le 15/08/2026)", appelsListeApresMontage === 0);
+  check("la ligne visible traitée disparaît du DOM", document.body.textContent?.includes("Dixième deal visible") === false);
+  check(
+    "le badge « En attente » reflète les DEUX lignes touchées, pas seulement la visible",
+    bouton("En attente").textContent?.includes("(0)") === true
+  );
+  check(
+    "le bloc « Traiter TOUT le résultat filtré » disparaît (compteFiltre retombé à 0)",
+    document.body.textContent?.includes("Traiter TOUT le résultat filtré") === false
+  );
+
+  act(() => {
+    root6.unmount();
   });
   document.body.removeChild(div);
 }
