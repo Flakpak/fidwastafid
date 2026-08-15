@@ -13,22 +13,26 @@
 # pagination bornée + cap de 120 deals/run), scraper-carrefour (API JSON,
 # pagination bornée, EN PARALLÈLE de bringo — docs/SPIKE-SOURCES.md §10-12,
 # ajouté au cron le 14/08/2026, PR de wiring, jusque-là construit mais jamais
-# appelé automatiquement), scraper-aswakassalam (Store API WooCommerce,
-# pagination bornée, ajouté le 14/08/2026 — docs/SPIKE-SOURCES.md §9,
-# recontrôle du même jour) + insert-deals (qui fait lui-même l'extraction de
-# description via fiche-produit.mjs, cf. README). PAS extract-catalogue : ce
-# script attend une URL/chemin de catalogue précis à chaque appel (aucun
-# mécanisme de découverte automatique) — il ne peut pas tourner sans
-# surveillance, il reste un geste manuel ponctuel.
+# appelé automatiquement), scraper-ab-maroc et scraper-aswakassalam (Store
+# API WooCommerce, pagination bornée, ajoutés le 14/08/2026 —
+# docs/SPIKE-SOURCES.md §9, recontrôle du même jour) + insert-deals (qui fait
+# lui-même l'extraction de description via fiche-produit.mjs, cf. README).
+# PAS extract-catalogue : ce script attend une URL/chemin de catalogue précis
+# à chaque appel (aucun mécanisme de découverte automatique) — il ne peut pas
+# tourner sans surveillance, il reste un geste manuel ponctuel.
 #
-# scraper-bestmark RETIRÉ du cron le 13/08/2026, scraper-decathlon et
-# scraper-ab-maroc RETIRÉS le 15/08/2026 — voir docs/IDEES.md, section
-# « Decathlon/ab-maroc — diagnostic isolé ». Les deux échouent (decathlon :
-# challenge Cloudflare confirmé par diagnostic dédié, cause exacte du
-# déclenchement — TLS ou catégorie d'IP — INDÉTERMINÉE ; ab-maroc : cause
-# INDÉTERMINÉE, non reproduite au diagnostic), un runner auto-hébergé n'a
-# pas été construit pour autant (changer d'IP ne réparerait pas
-# nécessairement une cause TLS). Les trois scripts (bestmark compris)
+# scraper-bestmark RETIRÉ du cron le 13/08/2026, scraper-decathlon RETIRÉ le
+# 15/08/2026 — voir docs/IDEES.md, section « Decathlon retiré (cause
+# indéterminée), ab-maroc conservé ». Decathlon : challenge Cloudflare confirmé par
+# diagnostic dédié (cf-mitigated: challenge, rejet quasi instantané), cause
+# exacte du déclenchement — empreinte TLS ou catégorie d'IP — INDÉTERMINÉE,
+# un runner auto-hébergé n'a pas été construit pour autant (changer d'IP ne
+# réparerait pas nécessairement une cause TLS). scraper-ab-maroc RETIRÉ
+# BRIÈVEMENT le même jour puis RÉINTÉGRÉ (voir sa note dédiée plus bas) :
+# son échec du 15/08 était un incident isolé (`fetch failed`, jamais
+# reproduit), pas une série — le mécanisme de séries d'échecs consécutifs
+# (verification-sources ci-dessous) est le bon outil pour ce cas, pas un
+# retrait sur un seul run. Les deux scripts retirés (bestmark, decathlon)
 # restent dans le dépôt, exécutables à la main, simplement plus appelés
 # automatiquement.
 #
@@ -474,6 +478,71 @@ jobs:
             echo "::warning::carrefour — tout ce qui a été retenu était déjà en base sur ce run : $resume"
           fi
 
+      # Source secondaire ab-maroc.com (Store API WooCommerce, mono-domaine
+      # Bricolage & Jardin — docs/SPIKE-SOURCES.md §9). RÉINTÉGRÉE le
+      # 15/08/2026 après un retrait de quelques heures, revenu sur décision :
+      # l'échec `fetch failed` du run du 15/08 (05:29) était un incident
+      # isolé (aucun statut HTTP, jamais reproduit au diagnostic dédié la
+      # même journée — docs/IDEES.md), et le site a produit 79 deals la
+      # veille. Le mécanisme de séries d'échecs consécutifs
+      # (verification-sources ci-dessous) existe précisément pour ce cas —
+      # un incident unique ne justifie pas un retrait, seule une série le
+      # justifierait. Prérequis prod : l'enseigne `ab-maroc` doit exister en
+      # base (docs/RUNBOOK-donnees.md, `ajouter-enseigne`) — sinon
+      # insert-deals rejette proprement chaque deal (enseigne inconnue).
+      - name: Scraping ab-maroc.com (Store API WooCommerce)
+        id: scraping_abmaroc
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run scraper-ab-maroc | tee /dev/stderr) && code=0 || code=$?
+
+          fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
+          if [ -z "$fichier_relatif" ]; then
+            echo "::warning::scraper-ab-maroc n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping ab-maroc injoignable || true
+            exit 1
+          fi
+
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::scraper-ab-maroc a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping ab-maroc injoignable || true
+            exit 1
+          fi
+
+          fichier="apps/pipeline/$fichier_relatif"
+          if [ ! -f "$fichier" ]; then
+            echo "::warning::Fichier annoncé par scraper-ab-maroc introuvable sur disque : $fichier — source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping ab-maroc injoignable || true
+            exit 1
+          fi
+
+          nb_deals=$(jq 'length' "$fichier")
+          echo "Deals ab-maroc extraits : $nb_deals"
+          if [ "$nb_deals" -eq 0 ]; then
+            echo "::warning::0 deal extrait par scraper-ab-maroc — rien à insérer pour cette source ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping ab-maroc rien_retenu || true
+            exit 1
+          fi
+
+          echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
+
+      - name: Insertion ab-maroc.com en base (validation zod partagée)
+        if: steps.scraping_abmaroc.outcome == 'success'
+        continue-on-error: true
+        env:
+          FICHIER_EXTRACTION_ABMAROC: ${{ steps.scraping_abmaroc.outputs.fichier }}
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_ABMAROC" | tee /dev/stderr)
+          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
+          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
+          if [ "$cause" = "rien_retenu" ]; then
+            echo "::warning::ab-maroc — aucun deal retenu après filtrage sur ce run : $resume"
+          elif [ "$cause" = "deja_en_base" ]; then
+            echo "::warning::ab-maroc — tout ce qui a été retenu était déjà en base sur ce run : $resume"
+          fi
+
       # Source secondaire aswakassalam.com (Store API WooCommerce,
       # catégorisation par rayon — docs/SPIKE-SOURCES.md §9). Seule vraie
       # piste Alimentaire du dépôt (0 deal publié à ce jour). Même pattern
@@ -576,9 +645,9 @@ jobs:
 
             La chaîne principale (expiration → Bringo → insertion → revalidation) est
             sans `continue-on-error` : l'échec vient de l'une de ces étapes. Les sources
-            secondaires (inwi, universparadiscount, kiabi, carrefour, aswakassalam) ne
-            peuvent pas faire échouer le run — leurs incidents se lisent en annotations
-            `::warning::`.
+            secondaires (inwi, universparadiscount, kiabi, carrefour, ab-maroc,
+            aswakassalam) ne peuvent pas faire échouer le run — leurs incidents se
+            lisent en annotations `::warning::`.
 
             Cause déjà rencontrée : le secret `SUPABASE_DB_URL` périmé après une rotation
             du mot de passe de la base (il alimente **aussi** ce workflow, pas seulement le
@@ -693,7 +762,7 @@ jobs:
           # autres sources partagent leur nom avec leur script scraper-*.
           SOURCES_ATTENDUES: >-
             bringo-casablanca,inwi,universparadiscount,kiabi,
-            carrefour,aswakassalam
+            carrefour,ab-maroc,aswakassalam
         run: |
           set -o pipefail
           sortie=$(pnpm --filter pipeline run verifier-sources-mortes | tee /dev/stderr)
