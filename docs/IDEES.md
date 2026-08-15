@@ -836,7 +836,22 @@ Architecture décidée :
 - Discord : automatisé (webhook entrant, embed image/prix/lien).
 - WhatsApp : semi-manuel assumé (message formaté prêt à coller) — l'API
   officielle Meta ne poste pas dans les groupes ; libs non officielles =
-  risque de ban du numéro, refusé.
+  risque de ban du numéro, refusé. **Livré le 15/08/2026** : bouton
+  « Partager WhatsApp » dans l'admin (onglet Publiés, ligne du deal —
+  même emplacement que Telegram/Discord), `POST .../partage-whatsapp`
+  génère le texte (`*gras*`/`~barré~`, UTM `whatsapp`) et le journalise
+  (`whatsapp_message_genere`, jamais un état « diffusé » — le collage
+  réel n'est pas vérifiable). **Sélection multiple écartée pour ce
+  lot** : WhatsApp se colle un message à la fois, générer N textes
+  séparés risque la confusion de collage et une cadence qui ressemble
+  à un bot dans un groupe.
+  - **Piste « récap »** (non construite) : un mode optionnel
+    concaténant plusieurs deals sélectionnés en UN SEUL bloc de texte à
+    coller (un digest, pas N messages séparés) — distinct de la
+    diffusion automatisée par lot (Telegram/Discord). Déclencheur : un
+    besoin réel de digest qui se confirme (ex. demande explicite d'un
+    format « top 5 du jour » à partager d'un coup), pas une extension
+    par habitude du mécanisme par-deal déjà livré.
 - Traçabilité : table `diffusions` (`deal_id`, `canal`, `diffuse_at`) —
   anti-double-publication + historique.
 - Mesure : tout lien diffusé porte

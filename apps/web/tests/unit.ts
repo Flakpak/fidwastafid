@@ -6,6 +6,7 @@ import { dealOgDescription, truncateOgTitle, dealJsonLd } from "../src/app/deal/
 import { buildShareText } from "../src/components/shareText.js";
 import {
   buildLegendeTelegram,
+  buildLegendeWhatsapp,
   lienDiffusion,
   UTM_MEDIUM,
   UTM_CAMPAIGN,
@@ -1042,6 +1043,36 @@ console.log("\nDiffusion — légende Telegram : jamais de remise devinée");
 
   const injection = buildLegendeTelegram({ titre: "Chaise <b>&</b>", prixPromo: 10, lien: "https://x.io/d" });
   check("HTML du titre échappé (parse_mode HTML)", injection.includes("&lt;b&gt;&amp;&lt;/b&gt;"));
+}
+
+console.log("\nDiffusion — légende WhatsApp : syntaxe légère, jamais de remise devinée");
+{
+  const avecRemise = buildLegendeWhatsapp({
+    titre: "Chaise",
+    prixPromo: 300,
+    prixNormal: 600,
+    enseigneNom: "Kiabi",
+    lien: "https://x.io/d",
+  });
+  check("titre en *gras* (syntaxe WhatsApp, pas HTML)", avecRemise.includes("*Chaise*") && !avecRemise.includes("<b>"));
+  check("enseigne présente", avecRemise.includes("Kiabi"));
+  check("prix ~barré~ et pourcentage réel", avecRemise.includes("~600 DH~") && avecRemise.includes("50%"));
+  check("lien présent, brut (pas de lien markdown)", avecRemise.includes("https://x.io/d") && !avecRemise.includes("["));
+
+  const sansNormal = buildLegendeWhatsapp({ titre: "Chaise", prixPromo: 300, prixNormal: null, lien: "https://x.io/d" });
+  check("sans prix normal : aucun pourcentage inventé", !sansNormal.includes("%") && !sansNormal.includes("~"));
+
+  const incoherent = buildLegendeWhatsapp({ titre: "Chaise", prixPromo: 300, prixNormal: 200, lien: "https://x.io/d" });
+  check("prix normal sous le promo : aucune remise affichée", !incoherent.includes("%"));
+
+  // Un titre portant lui-même les caractères de syntaxe casserait la mise
+  // en forme du reste du message (astérisque non refermé) — retirés, pas
+  // échappés (WhatsApp n'a pas d'échappement).
+  const casse = buildLegendeWhatsapp({ titre: "Combo * 3 ~promo~ _spéciale_", prixPromo: 10, lien: "https://x.io/d" });
+  check(
+    "caractères de syntaxe retirés du titre, jamais échappés",
+    casse.startsWith("*Combo  3 promo spéciale*") && !casse.includes("\\*")
+  );
 }
 
 console.log("\nDiffusion — destination : mode EXPLICITE, jamais un repli (CONTRAT-V1 §4, dix-septième amendement)");

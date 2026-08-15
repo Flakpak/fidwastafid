@@ -13,6 +13,7 @@ import {
   type AnnulationResult,
   type CanalDiffusion,
   type ModeDiffusion,
+  type PartageWhatsappResult,
   type SuppressionResult,
 } from "./AdminDealItem.js";
 import { AdminDealSupprime, type RestaurationResult } from "./AdminDealSupprime.js";
@@ -750,6 +751,20 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     return { ok: true };
   }
 
+  /** Partage WhatsApp manuel (lot du 15/08/2026) — pas de `rafraichir()` :
+   *  cette action n'écrit rien sur le deal lui-même (ni statut, ni
+   *  `diffusions`), seulement `journal_audit` côté serveur. Rien à
+   *  refléter dans la liste affichée. */
+  async function partagerWhatsapp(publicId: string): Promise<PartageWhatsappResult> {
+    const res = await fetch(`/api/v1/admin/deals/${publicId}/partage-whatsapp`, { method: "POST" });
+    if (!res.ok) {
+      const body = (await res.json()) as ApiErrorBody;
+      return { ok: false, message: body.error?.message ?? "Génération du message impossible." };
+    }
+    const body = (await res.json()) as { message: string };
+    return { ok: true, message: body.message };
+  }
+
   /** Suppression DOUCE (lot 1) — pose `supprime_le`, jamais un DELETE réel
    *  (voir DELETE /api/v1/admin/deals/:publicId). Rafraîchit l'onglet
    *  courant (la ligne en sort) et les comptes (elle quitte son badge,
@@ -1443,6 +1458,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
                 onUploadImage={(file) => uploadImage(deal.publicId, file)}
                 onDiffuser={(canal, mode) => diffuser(deal.publicId, canal, mode)}
                 onAnnulerDiffusion={(canal) => annulerDiffusion(deal.publicId, canal)}
+                onPartagerWhatsapp={() => partagerWhatsapp(deal.publicId)}
                 onSupprimer={() => supprimer(deal.publicId)}
               />
             ))}

@@ -58,6 +58,12 @@ export type DiffusionResult = { ok: true; canalTest: boolean } | { ok: false; me
  *  laisse les deux en place — l'étiquette « Diffusé ✓ » reste alors vraie. */
 export type AnnulationResult = { ok: true } | { ok: false; message: string };
 
+/** Partage WhatsApp manuel (lot du 15/08/2026) — le serveur renvoie le
+ *  texte prêt à coller, jamais un état "diffusé" : aucune API WhatsApp
+ *  gratuite et conforme n'existe (docs/IDEES.md), le collage réel n'est
+ *  pas vérifiable depuis ce dépôt. */
+export type PartageWhatsappResult = { ok: true; message: string } | { ok: false; message: string };
+
 /** Suppression DOUCE (lot 1) — jamais un DELETE réel, voir DELETE
  *  /api/v1/admin/deals/:publicId. Réversible depuis l'onglet Supprimés. */
 export type SuppressionResult = { ok: true } | { ok: false; message: string };
@@ -169,6 +175,94 @@ function BoutonDiffusion({
       {erreur && <p className="text-warn text-xs font-bold max-w-[14rem]">{erreur}</p>}
       {info && <p className="text-accent text-xs font-bold max-w-[14rem]">{info}</p>}
     </>
+  );
+}
+
+/**
+ * Partage WhatsApp manuel (lot du 15/08/2026) — aucune API WhatsApp
+ * gratuite et conforme n'existe (docs/IDEES.md § « WhatsApp / Facebook /
+ * Instagram gratuits — étude fermée ») : ce bouton ne poste nulle part, il
+ * génère le texte prêt à coller (`*gras*`/`~barré~`, UTM `whatsapp`) et
+ * l'affiche pour copie manuelle — jamais d'état « diffusé », ce collage
+ * n'est pas vérifiable depuis ce dépôt.
+ */
+function BoutonPartageWhatsapp({
+  pending,
+  onPartager,
+}: {
+  pending: boolean;
+  onPartager: () => Promise<PartageWhatsappResult>;
+}) {
+  const [etat, setEtat] = useState<"idle" | "pending">("idle");
+  const [message, setMessage] = useState<string | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [copie, setCopie] = useState(false);
+
+  async function generer() {
+    setEtat("pending");
+    setErreur(null);
+    setCopie(false);
+    const r = await onPartager();
+    setEtat("idle");
+    if (r.ok) setMessage(r.message);
+    else setErreur(r.message);
+  }
+
+  async function copier() {
+    if (!message) return;
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopie(true);
+    } catch {
+      // Presse-papiers indisponible (permission refusée, contexte non
+      // sécurisé) — le texte reste affiché et sélectionnable à la main,
+      // rien à copier ne fait pas silencieusement rien du tout.
+      setErreur("Copie automatique indisponible — sélectionne le texte à la main.");
+    }
+  }
+
+  if (message) {
+    return (
+      <div className="flex flex-col gap-1 items-end">
+        <textarea
+          readOnly
+          value={message}
+          rows={4}
+          className="w-56 rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-xs text-ink font-normal"
+        />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void copier()}
+            className="rounded-lg px-3 py-1.5 text-xs font-bold cursor-pointer border border-border-strong bg-surface text-ink hover:bg-surface-subtle transition-colors duration-[130ms] motion-reduce:transition-none"
+          >
+            {copie ? "Copié ✓" : "Copier"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMessage(null)}
+            className="text-xs font-bold text-ink-muted hover:text-ink cursor-pointer"
+          >
+            Fermer
+          </button>
+        </div>
+        {erreur && <p className="text-warn text-xs font-bold max-w-[14rem] text-right">{erreur}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1 items-end">
+      <button
+        type="button"
+        onClick={() => void generer()}
+        disabled={pending || etat === "pending"}
+        className="rounded-lg px-3 py-1.5 text-xs font-bold cursor-pointer border border-border-strong bg-surface text-ink hover:bg-surface-subtle disabled:opacity-50 transition-colors duration-[130ms] motion-reduce:transition-none"
+      >
+        {etat === "pending" ? "Génération..." : "Partager WhatsApp"}
+      </button>
+      {erreur && <p className="text-warn text-xs font-bold max-w-[14rem] text-right">{erreur}</p>}
+    </div>
   );
 }
 
@@ -343,6 +437,7 @@ export function AdminDealItem({
   onUploadImage,
   onDiffuser,
   onAnnulerDiffusion,
+  onPartagerWhatsapp,
   onSupprimer,
 }: {
   deal: DealAdmin;
@@ -361,6 +456,7 @@ export function AdminDealItem({
   onUploadImage: (file: File) => Promise<ImageFetchResult>;
   onDiffuser: (canal: CanalDiffusion, mode: ModeDiffusion) => Promise<DiffusionResult>;
   onAnnulerDiffusion: (canal: CanalDiffusion) => Promise<AnnulationResult>;
+  onPartagerWhatsapp: () => Promise<PartageWhatsappResult>;
   onSupprimer: () => Promise<SuppressionResult>;
 }) {
   const [fields, setFields] = useState<DealEditFields>(() => toEditFields(deal));
@@ -573,6 +669,11 @@ export function AdminDealItem({
                 onDiffuser={(mode) => onDiffuser("discord", mode)}
                 onAnnuler={() => onAnnulerDiffusion("discord")}
               />
+              {/* Partage WhatsApp manuel — même garde `publie`, mais un
+                  mécanisme entièrement différent : pas d'API, pas d'état
+                  "diffusé", juste un texte généré à coller à la main
+                  (docs/IDEES.md § « WhatsApp gratuit — étude fermée »). */}
+              <BoutonPartageWhatsapp pending={pending} onPartager={onPartagerWhatsapp} />
             </>
           )}
 
