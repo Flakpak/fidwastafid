@@ -863,6 +863,41 @@ Architecture décidée :
 - Secrets futurs (token bot Telegram, URL webhook Discord) : variables
   d'environnement uniquement.
 
+### WhatsApp / Facebook / Instagram gratuits — étude fermée, pas un chantier différé (15/08/2026)
+
+Recherche documentaire demandée pour trancher « v2 » ci-dessus, une solution payante étant
+exclue d'emblée. **Conclusion : aucune voie gratuite et conforme n'existe aujourd'hui**, sur
+aucun des trois canaux.
+
+- **WhatsApp Channels** : aucune API officielle Meta de publication — geste manuel
+  uniquement. Les « API Chaînes » commerciales (Whapi.Cloud, Maytapi…) sont des wrappers non
+  officiels du protocole, même catégorie que Baileys/whatsapp-web.js ci-dessous.
+- **WhatsApp Cloud API, envoi business-initié (broadcast)** : jamais gratuit. Le palier
+  gratuit ne couvre que les réponses dans une fenêtre service ouverte par le client, ou les
+  fenêtres « Free Entry Point » (pub Click-to-WhatsApp) — un broadcast de deals est par nature
+  business-initié, donc systématiquement facturé.
+- **Groupes WhatsApp (API officielle)** : existe, mais plafonnée à 8 participants par groupe —
+  structurellement inutilisable pour un canal d'audience, indépendamment du coût.
+- **Bibliothèques non officielles (Baileys, whatsapp-web.js)** : violent explicitement les CGU
+  WhatsApp (déclaré par leurs propres mainteneurs) — **écartées, non discutable**, même motif
+  que le refus déjà acté ci-dessus.
+- **Facebook Marketplace** : aucune API publique de publication. Seul un programme partenaire
+  « Commerce Platform API » existe, en alpha fermée, réservé aux partenaires approuvés — pas une
+  voie self-service.
+- **Facebook Page et Instagram (Graph API)** : gratuits en soi (App Review, limites dynamiques),
+  mais exigent la **vérification d'entreprise Meta** — documents d'immatriculation légale à
+  l'appui.
+
+**Le blocage commun aux trois voies légitimes (WhatsApp Cloud API, Facebook Page, Instagram) est
+la vérification d'entreprise Meta**, qui exige une identité juridique déclarée — **exactement le
+même blocage que celui déjà consigné pour `/confidentialite`** (`docs/SUIVI.md` § « Conformité de
+la collecte » : raison sociale, forme, adresse du responsable de traitement, absentes). Les deux
+se lèveraient d'un coup, par le même geste — pas deux chantiers séparés.
+
+**Déclencheur de réexamen : la déclaration d'une entité juridique pour Fidwastafid.** Avant ça,
+rouvrir la question ne changerait rien au verdict — ce n'est pas une question de code ni
+d'effort d'intégration, c'est un prérequis administratif absent.
+
 ## Taxonomie — réserve v3 (2026-07-21)
 
 Suite à l'extension 8→12 catégories (`CONTRAT-V1` §3, cinquième amendement
