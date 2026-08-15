@@ -17,6 +17,7 @@ import {
 } from "./AdminDealItem.js";
 import { AdminDealSupprime, type RestaurationResult } from "./AdminDealSupprime.js";
 import { AdminLots, type LotResume, type AnnulerLotResult } from "./AdminLots.js";
+import { AdminDiffusionLot } from "./AdminDiffusionLot.js";
 import { MotifRejet } from "./MotifRejet.js";
 import { Button } from "../../components/Button.js";
 
@@ -82,6 +83,13 @@ const ONGLET_ACTIONS: Record<DealStatut, Action[]> = {
 
 /** Sélection groupée réservée aux deux onglets de modération initiale (v1 : idem). */
 const BULK_ONGLETS = new Set<DealStatut>(["auto_draft", "en_attente"]);
+
+/** Sélection groupée pour la diffusion (lot du 15/08/2026, dix-neuvième
+ *  amendement conscient) — distincte de BULK_ONGLETS : ne change jamais le
+ *  statut d'un deal, ne s'applique donc qu'aux deals déjà publiés. Partage
+ *  le même état `selected`, jamais actif en même temps qu'un autre onglet
+ *  (la sélection est vidée à chaque changement d'onglet). */
+const DIFFUSION_ONGLETS = new Set<DealStatut>(["publie"]);
 
 /**
  * Filtres de la file (lot du 12/08/2026) — mêmes clés que les paramètres
@@ -229,6 +237,13 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
    *  réellement vide). */
   const [vueLots, setVueLots] = useState(false);
   const [lots, setLots] = useState<LotResume[] | null>(null);
+  /** Panneau de diffusion en masse (lot du 15/08/2026) — ouvert par un des
+   *  deux boutons « Diffuser la sélection », fermé par son propre bouton
+   *  Fermer. `null` = fermé. La liste `publicIds` est figée à l'ouverture,
+   *  comme le lot lui-même côté serveur. */
+  const [panelDiffusion, setPanelDiffusion] = useState<{ canal: "telegram" | "discord"; publicIds: string[] } | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -1048,6 +1063,38 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         </div>
       )}
 
+      {/* Diffusion en masse (lot du 15/08/2026) — réservée à l'onglet
+          Publiés, sur la sélection MANUELLE (jamais un filtre : la
+          diffusion reste un geste de curation sur des deals précis, comme
+          la diffusion unitaire déjà existante par ligne). */}
+      {!modeSupprimes && DIFFUSION_ONGLETS.has(onglet as DealStatut) && deals.length > 0 && !panelDiffusion && (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setPanelDiffusion({ canal: "telegram", publicIds: Array.from(selected) })}
+            disabled={pending || selected.size === 0}
+          >
+            Diffuser la sélection → Telegram ({selected.size})
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setPanelDiffusion({ canal: "discord", publicIds: Array.from(selected) })}
+            disabled={pending || selected.size === 0}
+          >
+            Diffuser la sélection → Discord ({selected.size})
+          </Button>
+        </div>
+      )}
+      {panelDiffusion && (
+        <AdminDiffusionLot
+          canal={panelDiffusion.canal}
+          publicIds={panelDiffusion.publicIds}
+          onClose={() => setPanelDiffusion(null)}
+        />
+      )}
+
       {deals.length === 0 && (
         <p className="text-center text-ink-muted py-16">
           {modeSupprimes ? "Aucun deal supprimé." : "Rien dans cet onglet."}
@@ -1071,7 +1118,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
                 doublon={deal.doublon}
                 actions={ONGLET_ACTIONS[onglet as DealStatut]}
                 enseignes={enseignes}
-                showCheckbox={BULK_ONGLETS.has(onglet as DealStatut)}
+                showCheckbox={BULK_ONGLETS.has(onglet as DealStatut) || DIFFUSION_ONGLETS.has(onglet as DealStatut)}
                 checked={selected.has(deal.publicId)}
                 onToggle={() => toggle(deal.publicId)}
                 pending={pending}

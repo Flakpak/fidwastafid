@@ -563,7 +563,68 @@ DELETE /api/v1/admin/deals/:publicId/diffuser/discord
                                              `?mode=` REQUIS sur POST depuis le 08/08/2026,
                                              dix-septième amendement conscient (voir §3) : jamais de
                                              repli automatique vers la production
+POST   /api/v1/admin/deals/diffuser-lot?canal=telegram|discord&mode=production|test
+                                             crée un lot de diffusion en masse (`publicIds` transmis
+                                             par le client — sélection manuelle sur l'onglet Publiés,
+                                             jamais un filtre) et fige sa liste cible côté serveur —
+                                             ajouté le 15/08/2026, dix-neuvième amendement conscient
+GET    /api/v1/admin/deals/diffuser-lot/:lot
+                                             état complet du lot (un par un) — même amendement
+POST   /api/v1/admin/deals/diffuser-lot/:lot/suivant
+                                             traite le prochain deal `en_attente` du lot et persiste
+                                             le résultat ; `{ termine: true }` en fin de lot — même
+                                             amendement
+POST   /api/v1/admin/deals/diffuser-lot/:lot/relancer
+                                             remet en file les deals `echoue` du lot (jamais `envoye`
+                                             ni `deja_diffuse`) — même amendement
 ```
+
+**Amendement du 15/08/2026 — diffusion en masse (dix-neuvième amendement conscient,
+migration 0021).** La diffusion unitaire (huitième amendement) reste inchangée ; ce lot ajoute
+un envoi PAR LOT, sur l'onglet Publiés, sélection manuelle de deals précis (jamais un filtre —
+contrairement à `bulk-filtre`, diffuser reste un geste de curation ciblé, pas « tout ce qui
+matche X »). `publicIds` figé côté serveur à la création du lot (`creerLot`,
+`_lib/diffusionLots.ts`) : un rechargement de la liste affichée ensuite ne change jamais ce
+qu'un lot déjà lancé traite.
+
+- **Deux tables neuves** (`diffusion_lots`, `diffusion_lot_deals`, migration 0021), PAS une
+  extension de `diffusions` : un lot est un événement d'INTENTION (« diffuser ces N deals, sur
+  ce canal, dans ce mode »), distinct de la diffusion individuelle elle-même. La brique
+  `diffuser()`/`annuler()` (`_lib/diffusion.ts`) reste l'unique chemin d'écriture réelle dans
+  `diffusions` — le lot l'appelle deal par deal, ne duplique jamais ses gardes.
+- **Pourquoi une table de progression et pas `journal_audit` comme le rejet en masse** : le
+  rejet en masse est synchrone (une seule transaction, borné, terminé avant la réponse HTTP).
+  Une diffusion en masse ne peut pas l'être — l'étalement demandé entre deux envois dépasserait
+  le délai d'exécution d'une fonction serverless pour un lot de taille réaliste. Le rythme est
+  donc tenu **côté client** (l'admin garde l'onglet ouvert, chaque appel à `/suivant` attend le
+  délai configuré avant le suivant) ; l'état persiste en base, pas seulement en mémoire du
+  navigateur — un rechargement de page ne perd rien et ne renvoie rien de déjà réussi.
+- **Statuts explicites** (`en_attente`/`deja_diffuse`/`envoye`/`echoue`), pas un booléen —
+  `deja_diffuse` posé à la création du lot, avant tout appel réseau, distingue « déjà diffusé
+  en production avant même ce lot » (jamais retraité, jamais un appel réseau superflu) de
+  `envoye` (diffusé PAR ce lot). Ne s'applique jamais en mode test.
+- **Reprise sans renvoi** : `/suivant` choisit toujours le premier `en_attente` restant, quel
+  que soit le nombre d'appels précédents réussis ou de rechargements de page survenus entre
+  temps — un deal `envoye`/`deja_diffuse` n'est plus jamais retraité par ce lot.
+- **Plancher de l'intervalle mesuré, pas supposé** : Telegram documente explicitement (FAQ
+  officielle) au plus 1 message/seconde dans un même chat — notre cas exact, un seul canal
+  cible par diffusion. C'est la contrainte la plus stricte des deux plateformes : 1000 ms est
+  donc le plancher appliqué côté interface. Discord ne publie aucun chiffre officiel par
+  webhook (seulement une limite globale de 50 req/s tous endpoints confondus) ; la pratique
+  couramment observée (5 req/2 s par webhook) reste au-dessus de ce plancher. Défaut proposé à
+  l'admin : 3 s, large des deux côtés, resserrable jusqu'au plancher sans changement de code.
+- **429 détecté sur le texte de l'erreur** (`traiterEchec()` inclut déjà `HTTP {statut}` dans
+  le message renvoyé par `diffuser()`) — pas une donnée structurée, aucune des deux plateformes
+  n'exposant `Retry-After` jusqu'ici dans `DiffusionRefusError`. Un 429 arrête la boucle côté
+  client plutôt que de marteler une plateforme qui vient de refuser pour cette raison ; le
+  deal concerné reste `echoue`, relançable comme n'importe quel autre échec.
+- **Mode test distinct, ne marque rien** (huitième/dix-septième amendements, inchangés) :
+  `diffuser()` n'écrit jamais dans `diffusions` en mode test, donc `deja_diffuse` ne compte
+  jamais un envoi de test — un lot de test peut être relancé indéfiniment sans jamais se
+  bloquer sur lui-même.
+- **Confirmation nommant le nombre de messages, le canal et le mode** avant tout envoi — le
+  bouton de lancement porte lui-même ce texte, pas une case à cocher séparée (même principe
+  que la confirmation de lot par filtre, neuvième amendement).
 
 **Amendement du 05/08/2026 — la file admin filtre en base, pas côté client (neuvième
 amendement conscient de la liste fermée).** `GET /api/v1/admin/deals` chargeait tous
