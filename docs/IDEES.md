@@ -528,7 +528,7 @@ de lui-même (à revérifier ponctuellement, pas activement surveillé), soit
 Bestmark ouvre de vraies opérations commerciales qui changeraient le
 rendement — l'un des deux, pas une réintroduction par habitude.
 
-## Decathlon — seuil de retrait posé, pas une surveillance indéfinie (2026-08-13) — **RETIRÉ le 15/08/2026, voir section « Blocage par catégorie d'IP » plus bas**
+## Decathlon — seuil de retrait posé, pas une surveillance indéfinie (2026-08-13) — **RETIRÉ le 15/08/2026, voir section « Decathlon retiré (cause indéterminée), ab-maroc conservé » plus bas**
 
 **`HTTP 403` sur `/5080-promotions` depuis le 11/08/2026** (le 10/08 fonctionnait
 encore, 24 offres extraites) — 3 jours consécutifs au moment de ce constat.
@@ -538,6 +538,17 @@ normal et catalogue complet (1415 produits, promos jusqu'à -70 %) vérifié
 depuis un réseau tiers le 13/08. Pas un refus déclaré — une détection
 anti-bot probable côté runners GitHub, qui a évolué du simple marquage
 (`x-bot: YES`, sans blocage, constaté au spike du 22/07) vers un vrai 403.
+
+> ⚠️ **Constat du 13/08 CORRIGÉ le 15/08/2026 : FAUX.** « Le site répond
+> normalement depuis un réseau tiers » ne tenait plus au 15/08 — le
+> diagnostic dédié (section ci-dessous) reproduit le même `403` (Cloudflare
+> Managed Challenge) DEPUIS UN AUTRE RÉSEAU TIERS, pas seulement les
+> runners GitHub. C'est ce constat erroné qui a fondé toute l'hypothèse
+> « blocage IP GitHub » et a failli motiver l'achat d'un VPS pour un runner
+> auto-hébergé — écarté depuis, voir plus bas. Que la protection se soit
+> durcie entre le 13 et le 15/08, ou qu'elle ait toujours visé une
+> catégorie plus large que « GitHub » sans que le test du 13/08 l'ait
+> couverte, n'est pas tranché.
 
 **Différence avec Bestmark qui justifie de garder la source active pour
 l'instant** : Decathlon produit réellement (62 `auto_draft` en attente + 22
@@ -579,7 +590,7 @@ changement de code nécessaire** :
   seuil de décision du 25/08 ci-dessus, qui reste calé sur la première
   occurrence réelle, pas sur ce que la table peut voir.
 
-## Decathlon/ab-maroc — diagnostic isolé, cause de decathlon identifiée, ab-maroc indéterminée (2026-08-15)
+## Decathlon retiré (cause indéterminée), ab-maroc conservé — diagnostic isolé (2026-08-15)
 
 **Correction d'une conclusion gravée à tort.** Une version antérieure de
 cette section affirmait « blocage par catégorie d'IP datacenter » comme un
@@ -612,63 +623,62 @@ run GitHub Actions réel (`ops/spike-diagnostic-403-jetable`, run
   contredit directement l'ancien constat du 13/08 (« le site répond
   normalement depuis un réseau tiers »). Soit la protection s'est durcie
   depuis, soit ce poste tombe dans la même catégorie que les runners.
-- **Ce qui reste indéterminé, faute d'outil pour trancher** : empreinte
-  TLS/JA3 du client `fetch()` de Node (undici) vs. catégorie d'IP
-  datacenter — les deux tests disponibles (ce poste, le runner) sont
-  probablement l'un et l'autre non-résidentiels ; aucun test n'a été fait
-  depuis une IP résidentielle ou un vrai navigateur (exclu par principe,
-  voir plus bas), donc ces deux causes précises restent **indéterminées**,
-  seule la nature Cloudflare/JS-challenge du mécanisme est établie.
+- **Cause exacte du déclenchement : INDÉTERMINÉE.** Empreinte TLS/JA3 du
+  client `fetch()` de Node (undici) vs. catégorie d'IP datacenter — les
+  deux tests disponibles (ce poste, le runner) sont probablement l'un et
+  l'autre non-résidentiels ; aucun test n'a été fait depuis une IP
+  résidentielle ou un vrai navigateur (exclu par principe, voir plus bas),
+  donc ces deux causes précises restent **indéterminées**. Seule la nature
+  du mécanisme (Cloudflare Managed Challenge, pas un blocage IP brut, pas
+  un refus applicatif) est établie — **c'est la réponse retenue : « cause
+  du challenge : indéterminée », pas une hypothèse gravée en fait.**
 
-**ab-maroc.com — cause : INDÉTERMINÉE, non reproduite.**
-- Le run en échec du 15/08 (`pipeline_runs`, cause `injoignable`) loggait
-  `❌ fetch failed` — une erreur réseau/TLS SANS statut HTTP, jamais un 403
-  (`gh run view 31866854770 --log`) — donc aucun corps de réponse à
-  examiner pour ce run-là, contrairement à decathlon.
-- **Non reproduit ce jour** : `200 OK` depuis ce poste (695 ms) ET depuis un
-  run GitHub Actions réel (739 ms), catalogue complet (544 produits) les
-  deux fois. Le site n'est **pas** derrière Cloudflare (`server: hcdn`,
-  `platform: hostinger`) — l'infrastructure diffère de celle de decathlon,
-  donc l'hypothèse « même mécanisme que decathlon » est déjà fausse en
-  principe, indépendamment de la cause réelle du 15/08.
-- Sans 403 capturé et sans reproduction possible : **indéterminé**. Piste la
-  plus probable (incident ponctuel côté hébergeur, pas un blocage
-  systématique) mais non vérifiée, pas gravée comme telle.
+**ab-maroc.com — reste dans le cron.** Le run en échec du 15/08
+(`pipeline_runs`, cause `injoignable`) loggait `❌ fetch failed` — une
+erreur réseau/TLS SANS statut HTTP (`gh run view 31866854770 --log`), donc
+aucun corps de réponse à examiner, contrairement à decathlon. **Non
+reproduit** : `200 OK` depuis ce poste (695 ms) ET depuis un run GitHub
+Actions réel (739 ms), catalogue complet (544 produits) les deux fois. Le
+site n'est **pas** derrière Cloudflare (`server: hcdn`, `platform:
+hostinger`) — infrastructure différente de decathlon, l'hypothèse « même
+mécanisme » était déjà fausse en principe. Cause du run du 15/08 :
+**indéterminée**, mais **décision : incident isolé, pas un retrait.**
+Un seul run en échec, jamais reproduit, après un run précédent qui a inséré
+79 deals — c'est exactement le cas que couvre `verification-sources`
+(seuil de 2 runs consécutifs pour la cause `injoignable`,
+`verifier-sources-mortes.mjs`). Retirer sur un incident unique court-circuite
+un mécanisme construit précisément pour ça. **ab-maroc reste dans
+`pipeline-quotidien.yml` et dans `SOURCES_ATTENDUES`** ; si la série
+atteint 2, l'alerte `alerte-source-ab-maroc` partira d'elle-même.
 
 **Proxys résidentiels explicitement exclus, ligne non négociable** :
 masquer l'origine de la requête pour forcer une porte fermée n'est pas une
 solution technique retenue ici, c'est une ligne qu'on ne franchit pas —
-c'est aussi ce qui empêche de trancher entre TLS et catégorie d'IP
-ci-dessus, assumé.
+c'est aussi ce qui empêche de trancher entre TLS et catégorie d'IP pour
+decathlon, assumé.
 
-**Décision inchangée, mais motif reformulé : retrait de decathlon et
-ab-maroc du cron, indépendamment de la cause exacte.** Les deux échouent —
-l'une avec une cause identifiée (challenge Cloudflare, non contournable
-sans les moyens exclus ci-dessus), l'autre avec une cause indéterminée mais
-non reproductible aujourd'hui non plus. **Un runner auto-hébergé n'est pas
-construit pour autant** : la piste TLS/fingerprint, si elle s'avère être la
-vraie cause de decathlon, ne se résoudrait PAS en changeant simplement
-d'adresse IP — changer d'infrastructure sans savoir laquelle des deux causes
-est la bonne serait une dépense qui pourrait ne rien réparer.
-**Decathlon et ab-maroc retirés du cron dès le 15/08/2026**, même geste que
-Bestmark (retrait de `pipeline-quotidien.yml`, scripts conservés dans le
-dépôt, exécutables à la main, retirés aussi de `SOURCES_ATTENDUES` pour ne
-plus produire d'alerte « jamais vue »). Trois échecs quotidiens pour rien
-étaient du bruit, pas un signal — ce constat-là ne dépendait pas de la cause.
+**Décision : decathlon retiré, ab-maroc conservé.** Decathlon échoue avec
+un mécanisme identifié (Cloudflare Managed Challenge) mais une cause de
+fond indéterminée et non contournable sans les moyens exclus ci-dessus —
+retiré du cron. **Un runner auto-hébergé n'est pas construit pour
+autant** : si la vraie cause est l'empreinte TLS, changer d'adresse IP ne
+réparerait rien — dépense qui pourrait ne rien résoudre, sur une cause
+qu'on ne connaît pas. **Decathlon retiré du cron le 15/08/2026**, même
+geste que Bestmark (retrait de `pipeline-quotidien.yml`, script conservé
+dans le dépôt, exécutable à la main, retiré de `SOURCES_ATTENDUES`).
+ab-maroc reste actif : un incident unique n'est pas une série, et le
+mécanisme d'alerte existant est le bon outil si ça se reproduit.
 
-**Ne pas rouvrir cette question sans fait nouveau** : soit decathlon lève
-son challenge Cloudflare de lui-même (à revérifier ponctuellement, pas
-surveillé activement), soit ab-maroc échoue à nouveau ET produit cette
-fois un signal exploitable (statut HTTP, corps de réponse — pas juste
-`fetch failed`), soit la bascule VPS de la Phase 9
+**Ne pas rouvrir la question de decathlon sans fait nouveau** : soit le
+challenge Cloudflare se lève de lui-même (à revérifier ponctuellement, pas
+surveillé activement), soit la bascule VPS de la Phase 9
 (`docs/fidwastafid-plan-v2.md`) a lieu pour ses propres raisons (facture
 managée, souveraineté) et scraper depuis là redevient une option à
 reconsidérer À CE MOMENT, avec la possibilité de mesurer enfin si un vrai
 changement d'IP suffit — mais ce n'est pas une raison suffisante à elle
 seule pour déclencher cette bascule, disproportion totale entre l'ampleur
-du chantier (app + base + images) et le problème (deux sources
-secondaires, une cause identifiée non contournable légitimement, une cause
-indéterminée non reproductible).
+du chantier (app + base + images) et le problème (une source secondaire,
+cause indéterminée, non contournable légitimement).
 
 ## Voyages — catégorie vide, réexamen posé à échéance (2026-08-13)
 

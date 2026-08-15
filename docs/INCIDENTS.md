@@ -10,6 +10,50 @@ en a appris. Une leçon gravée ici a vocation à être citée depuis le code ou
 
 ---
 
+## 2026-08-15 — Deux sources rangées sous une même cause présumée, sans que rien ne le justifie
+
+*Entrée de **méthode**, pas de panne technique : la cause du premier constat, ci-dessous, n'a
+jamais été prouvée fausse en soi — c'est sa généralisation à une seconde source qui l'était.*
+
+**Le fait.** Decathlon (`403`) et ab-maroc.com (`fetch failed`, 0 requête réussie sur un run) ont
+échoué le même jour, tous deux dans le pipeline quotidien, tous deux classés cause `injoignable`
+dans `pipeline_runs`. Un premier diagnostic a conclu à un motif commun — « blocage par catégorie
+d'IP datacenter chez les runners GitHub » — et consigné cette conclusion comme un fait dans
+`docs/IDEES.md`, avant qu'un diagnostic isolé (demandé explicitement, script jetable
+`apps/pipeline/diagnostic-403.mjs`, exécuté en parallèle depuis un poste tiers et un run GitHub
+Actions réel) ne le contredise : **les deux sources n'ont rien en commun.**
+
+**Ce que le diagnostic isolé a montré.**
+- **Decathlon** : derrière Cloudflare, échec avec un vrai code `403` et un corps de réponse
+  identifiable (`cf-mitigated: challenge`, page `Just a moment...`) — un **challenge Cloudflare**,
+  reproduit à l'identique depuis les deux réseaux testés.
+- **ab-maroc.com** : derrière l'infrastructure Hostinger (`server: hcdn`), pas Cloudflare — l'échec
+  du run n'avait produit **aucun statut HTTP**, seulement `fetch failed` (erreur réseau/TLS avant
+  réponse). Non reproduit du tout au diagnostic (`200 OK` des deux côtés, catalogue complet).
+
+Une seule des deux avait un mécanisme identifiable ; l'autre pas d'infrastructure commune avec la
+première, pas de corps de réponse, pas de reproduction. Le seul point commun réel était le
+symptôme observé en aval (`pipeline_runs.cause = 'injoignable'`) — la même colonne peut recevoir
+des causes sans aucun rapport entre elles, `injoignable` désignant « aucun contenu exploitable »,
+jamais un mécanisme précis.
+
+**Cause de l'erreur de diagnostic.** Une corrélation de surface (deux sources échouent le même
+jour, dans le même environnement) a été promue en cause commune sans qu'aucun élément distinctif
+— corps de réponse, en-têtes, infrastructure hébergeante — n'ait été comparé entre les deux
+sources avant d'écrire la conclusion. La conclusion fausse a failli motiver une dépense réelle
+(runner auto-hébergé sur VPS) avant d'être corrigée sur demande explicite d'isoler chaque source
+séparément.
+
+**Règle retenue.** Deux échecs qui partagent un symptôme (même colonne `cause` en base, même jour,
+même environnement d'exécution) ne partagent pas nécessairement un mécanisme. Avant d'écrire une
+cause commune à plusieurs sources en échec, comparer ce qui est vérifiable indépendamment pour
+chacune — statut HTTP, corps de réponse, en-têtes, infrastructure hébergeante — et écrire
+« indéterminé » plutôt qu'une hypothèse non comparée, même si elle est plausible et même si elle
+expliquerait tout d'un coup. Voir `docs/IDEES.md`, section « Decathlon retiré (cause
+indéterminée), ab-maroc conservé ».
+
+---
+
 ## 2026-08-15 — Contrainte : un aperçu OG raté reste en cache chez Meta après correction
 
 *Entrée de **contrainte**, pas d'incident : rien n'a cassé côté serveur. Ce fichier consigne un
