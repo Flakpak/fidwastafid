@@ -15,6 +15,18 @@
 # Ce garde-fou n'auto-ferme rien : comme `alerte-backup` et `alerte-pipeline`,
 # l'issue reste ouverte jusqu'à ce qu'un humain la referme après avoir
 # rattrapé docs/SUIVI.md.
+#
+# `if: failure()` AJOUTÉ le 15/08/2026 (fait générateur : le seul run
+# programmé de ce workflow, le 10/08/2026, a échoué — SHA introuvable dans
+# l'en-tête — et n'a alerté PERSONNE, faute de cette étape). Jusque-là,
+# l'unique déclencheur d'alerte était `steps.ecart.outputs.alerte == 'oui'`,
+# qui suppose que la mesure elle-même a réussi — aucun filet si la mesure
+# plante avant de produire cette sortie. `db-backup.yml` et
+# `pipeline-quotidien.yml` ont ce filet depuis leur création (fait générateur
+# du 27/07/2026, RUNBOOK-securite.md) ; ce fichier ne l'avait jamais eu.
+# Même mécanisme réutilisé tel quel, dans le MÊME run — pas un workflow
+# séparé qui surveillerait celui-ci (ce qui redemanderait à son tour un
+# surveillant).
 
 name: Fraîcheur de docs/SUIVI.md
 
@@ -107,3 +119,28 @@ jobs:
             Une fois `docs/SUIVI.md` rattrapé (SHA d'en-tête, chiffres, lots livrés), **referme
             cette issue à la main** — ce garde-fou n'auto-ferme rien, comme `alerte-backup` et
             `alerte-pipeline`.
+
+      - name: Alerte — le contrôle de fraîcheur lui-même a échoué
+        if: failure()
+        uses: ./.github/actions/alerte-issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          label: alerte-suivi-perime
+          depot: ${{ github.repository }}
+          assignes: Flakpak
+          labels-supplementaires: urgent
+          titre: "Le contrôle de fraîcheur de docs/SUIVI.md a échoué (pas une simple péremption)"
+          corps: |
+            Le workflow **Fraîcheur de docs/SUIVI.md** a **échoué avant d'avoir pu mesurer
+            l'écart** — pas un cas d'alerte normale (`docs/SUIVI.md` périmé), un plantage de
+            la mesure elle-même (format d'en-tête changé, SHA introuvable dans l'historique
+            de `main`, etc.).
+
+            | | |
+            |---|---|
+            | Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
+            | Déclencheur | `${{ github.event_name }}` |
+
+            Fait générateur (15/08/2026) : ce filet n'existait pas avant cette date — le seul
+            run programmé (10/08/2026) a échoué exactement ainsi, et personne n'a été prévenu.

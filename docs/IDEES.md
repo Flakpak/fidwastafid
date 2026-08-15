@@ -528,7 +528,7 @@ de lui-même (à revérifier ponctuellement, pas activement surveillé), soit
 Bestmark ouvre de vraies opérations commerciales qui changeraient le
 rendement — l'un des deux, pas une réintroduction par habitude.
 
-## Decathlon — seuil de retrait posé, pas une surveillance indéfinie (2026-08-13)
+## Decathlon — seuil de retrait posé, pas une surveillance indéfinie (2026-08-13) — **RETIRÉ le 15/08/2026, voir section « Blocage par catégorie d'IP » plus bas**
 
 **`HTTP 403` sur `/5080-promotions` depuis le 11/08/2026** (le 10/08 fonctionnait
 encore, 24 offres extraites) — 3 jours consécutifs au moment de ce constat.
@@ -578,6 +578,52 @@ changement de code nécessaire** :
   vers le 14/08), pas immédiatement — elle sert de rappel régulier avant le
   seuil de décision du 25/08 ci-dessus, qui reste calé sur la première
   occurrence réelle, pas sur ce que la table peut voir.
+
+## Blocage par catégorie d'IP datacenter — runner auto-hébergé écarté, décision de fond (2026-08-15)
+
+**Trois sources tombent au même mur, dans les runners GitHub Actions
+uniquement** : Bestmark (§ ci-dessus, retiré le 13/08), Decathlon (`403`
+depuis le 11/08, seuil de retrait posé au 25/08), et **ab-maroc.com**
+(injoignable au run du 15/08 après 544 produits extraits / 79 deals insérés
+la veille — 0 requête préalable dans ce run, seuil 1 req/s au throttle,
+site parfaitement joignable depuis un réseau tiers avec le même User-Agent
+le jour même). Trois occurrences, pas un hasard répété.
+
+**Piste envisagée puis écartée : runner GitHub auto-hébergé sur un VPS
+(OVH/Hetzner).** Raisonnement de Kamel qui tranche la question : les
+protections type Cloudflare/anti-bot bloquent des **catégories** entières
+d'IP datacenter, pas spécifiquement les plages GitHub. Un VPS OVH ou
+Hetzner loue une IP dans la même catégorie (hébergeur cloud identifié) —
+on paierait un abonnement mensuel pour reproduire exactement le même
+blocage. Vérifié nulle part par un test dédié (aucun VPS provisionné pour
+ça), mais cohérent avec ce qui est déjà mesuré : les trois blocages sont
+`fetch failed`/`403` réseau, jamais un signal spécifique à l'infrastructure
+GitHub (pas de `Disallow` nommé, pas d'en-tête ciblant `github`).
+
+**Proxys résidentiels explicitement exclus, ligne non négociable** :
+masquer l'origine de la requête pour forcer une porte que le site a
+délibérément fermée à une catégorie de trafic n'est pas une solution
+technique retenue ici, c'est une ligne qu'on ne franchit pas.
+
+**Décision : ne pas construire de runner auto-hébergé, ne pas migrer
+l'infrastructure de scraping pour ce seul motif.** Conséquence directe :
+le seuil de retrait de Decathlon posé au 25/08/2026 (ci-dessus) devient
+caduc — inutile d'attendre une échéance dont l'issue est déjà connue.
+**Decathlon et ab-maroc retirés du cron dès le 15/08/2026**, même geste que
+Bestmark (retrait de `pipeline-quotidien.yml`, scripts conservés dans le
+dépôt, exécutables à la main, retirés aussi de `SOURCES_ATTENDUES` pour ne
+plus produire d'alerte « jamais vue »). Trois échecs quotidiens pour rien
+étaient du bruit, pas un signal.
+
+**Ne pas rouvrir cette question sans fait nouveau** : soit un fait change
+la nature du blocage (ex. le site cible lève sa protection anti-datacenter
+de lui-même — à revérifier ponctuellement, pas surveillé activement), soit
+la bascule VPS de la Phase 9 (`docs/fidwastafid-plan-v2.md`) a lieu pour
+ses propres raisons (facture managée, souveraineté) et scraper depuis là
+redevient une option à reconsidérer À CE MOMENT — mais ce n'est pas une
+raison suffisante à elle seule pour déclencher cette bascule, disproportion
+totale entre l'ampleur du chantier (app + base + images) et le problème
+(trois sources secondaires).
 
 ## Voyages — catégorie vide, réexamen posé à échéance (2026-08-13)
 
