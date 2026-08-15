@@ -10,6 +10,40 @@ en a appris. Une leçon gravée ici a vocation à être citée depuis le code ou
 
 ---
 
+## 2026-08-15 — Contrainte : appliquer une migration avant de fusionner sa PR met le dépôt en incohérence jusqu'à la fusion
+
+*Entrée de **contrainte**, pas d'incident : rien n'a cassé en production. La règle
+permanente vit désormais dans `docs/CONTRAT-V1.md` §7 (amendement du 15/08/2026) —
+cette entrée grave le fait générateur et la leçon, pas la procédure.*
+
+**Le fait.** Les migrations 0021 (diffusion en masse) et 0022 (`memoire_curation`, RLS)
+ont chacune été appliquées en production pendant que leur PR était encore ouverte —
+nécessaire pour que la préversion Vercel de la PR soit vérifiable de bout en bout, faute
+d'environnement de recette (Preview pointe sur la **même** base que la production).
+Effet observé juste après : `migrations-check` est passé **rouge sur une autre PR
+ouverte**, sans rapport, partie de `main` avant la fusion de la première — la prod
+portait une entrée `schema_migrations` qu'aucune branche partie de `main` ne pouvait
+encore avoir dans `packages/db/migrations/`. Résolu en fusionnant la première PR puis en
+rebasant la seconde.
+
+**Ce n'est pas un défaut de `migrations-check` : c'est exactement l'écart qu'il existe
+pour détecter.** Le geste (appliquer avant de fusionner) le crée consciemment, pour une
+fenêtre bornée à « jusqu'à la fusion ».
+
+**Règle retenue** (CONTRAT-V1 §7) : **par défaut, fusionner la PR puis appliquer la
+migration** — aucun écart possible tant qu'une seule PR touche les migrations à la fois.
+Appliquer avant fusion reste légitime, mais reste une **exception consciente, par
+opération** : dans ce dépôt, elle se justifiera systématiquement tant qu'aucun
+environnement de recette séparé n'existe, puisque la seule façon de faire réviser une
+préversion à Kamel est de la faire tourner contre des données réelles.
+
+**Leçon.** Un effet de bord constaté sur du travail sans rapport n'est pas forcément une
+régression de ce travail-là — vérifier d'abord si la cause vient d'ailleurs (ici, d'une
+opération antérieure sur une PR sœur) avant de chercher le défaut dans le diff qu'on a
+sous les yeux.
+
+---
+
 ## 2026-08-15 — `memoire_curation` sans RLS pendant trois semaines, non détectée par les advisors
 
 **Le fait.** La migration 0014 (05/08/2026, mémoire de curation) a créé `memoire_curation`

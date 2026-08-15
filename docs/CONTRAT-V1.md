@@ -967,6 +967,32 @@ contourne par lassitude n'en est pas un.
   est rétrocompatible (ajout de colonne avec défaut, que le code courant
   ignore). L'inverse déploie du code qui lit une colonne inexistante.
 
+**Amendement du 15/08/2026 — le prix d'appliquer avant de fusionner, et l'ordre par
+défaut.** Fait générateur : les migrations 0021 (diffusion en masse) et 0022
+(`memoire_curation`, RLS) ont toutes deux été appliquées en production pendant que leur
+PR respective était encore ouverte — nécessaire pour que la préversion Vercel de cette
+PR fonctionne (elle pointe sur la **même** base de production, faute d'environnement de
+recette, `docs/IDEES.md` § « Staging Supabase »). Effet observé : `migrations-check`
+est passé rouge sur une **autre** PR ouverte, non liée, partie de `main` avant la
+fusion — la base de production porte alors une entrée `schema_migrations` qu'aucune
+branche partie de `main` ne peut encore avoir dans `packages/db/migrations/`. Corrigé en
+rebasant cette autre branche sur `main` une fois la première PR fusionnée.
+
+- **Ce n'est pas un bug de `migrations-check` : c'est exactement ce qu'il est censé
+  détecter** — un écart entre le repo et la prod. Le geste (appliquer avant de fusionner)
+  crée cet écart consciemment, pour une fenêtre de temps bornée à « jusqu'à la fusion de
+  cette PR ».
+- **Ordre par défaut, dorénavant explicite : fusionner la PR, PUIS appliquer la
+  migration.** Aucun autre écart possible entre branches tant qu'aucune autre PR n'est
+  ouverte en parallèle sur `packages/db/migrations/`.
+- **Exception consciente, par opération** (même discipline que la confirmation
+  ci-dessus) : appliquer avant fusion reste légitime quand la PR a besoin d'une
+  préversion vérifiable de bout en bout AVANT la revue de Kamel — c'est-à-dire dans ce
+  dépôt, systématiquement, tant qu'aucun environnement de recette séparé n'existe. Dans
+  ce cas, un `migrations-check` rouge sur une PR SŒUR non liée, ouverte au même moment,
+  est un effet de bord attendu, pas une régression à corriger autrement qu'en fusionnant
+  puis en rebasant.
+
 ## 8 — Design tokens (déjà tranchés, non-négociables)
 
 **Amendement du 2026-07-24 — abandon de la palette rouge/or/crème pour la direction « Tadelakt ».**
