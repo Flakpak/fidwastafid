@@ -15,7 +15,10 @@
 # ajouté au cron le 14/08/2026, PR de wiring, jusque-là construit mais jamais
 # appelé automatiquement), scraper-ab-maroc et scraper-aswakassalam (Store
 # API WooCommerce, pagination bornée, ajoutés le 14/08/2026 —
-# docs/SPIKE-SOURCES.md §9, recontrôle du même jour) + insert-deals (qui fait
+# docs/SPIKE-SOURCES.md §9, recontrôle du même jour), scraper-lemobilier
+# (page promo PrestaShop, pas de plafond posé — le total réel est lu puis
+# récupéré en une seule requête, docs/SPIKE-SOURCES.md, recontrôle du
+# 14/08/2026, ajouté au cron le 15/08/2026) + insert-deals (qui fait
 # lui-même l'extraction de description via fiche-produit.mjs, cf. README).
 # PAS extract-catalogue : ce script attend une URL/chemin de catalogue précis
 # à chaque appel (aucun mécanisme de découverte automatique) — il ne peut pas
@@ -355,6 +358,68 @@ jobs:
             echo "::warning::universparadiscount — tout ce qui a été retenu était déjà en base sur ce run : $resume"
           fi
 
+      # Source secondaire lemobilier.ma (Maison — docs/SPIKE-SOURCES.md,
+      # recontrôle du 14/08/2026, ORANGE -> VERT). Même pattern que les
+      # sources ci-dessus. Pas de plafond posé (contrairement à kiabi) : le
+      # scraper lit lui-même le total réel de la page promo et le récupère
+      # en une seule requête (voir scraper-lemobilier.mjs pour le détail de
+      # cette mesure, `?page=N` étant ignoré par ce thème). Prérequis prod :
+      # l'enseigne `lemobilier` doit exister en base
+      # (docs/RUNBOOK-donnees.md, `ajouter-enseigne`) — sinon insert-deals
+      # rejette proprement chaque deal (enseigne inconnue).
+      - name: Scraping lemobilier.ma (page promo)
+        id: scraping_lemobilier
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run scraper-lemobilier | tee /dev/stderr) && code=0 || code=$?
+
+          fichier_relatif=$(printf '%s\n' "$sortie" | sed -n 's/^→ Archive : //p' | tail -n1)
+          if [ -z "$fichier_relatif" ]; then
+            echo "::warning::scraper-lemobilier n'a annoncé aucun fichier d'archive — source sautée pour ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping lemobilier injoignable || true
+            exit 1
+          fi
+
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::scraper-lemobilier a annoncé un fichier d'archive MAIS le processus s'est terminé en erreur (code $code) — archive ignorée par précaution, source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping lemobilier injoignable || true
+            exit 1
+          fi
+
+          fichier="apps/pipeline/$fichier_relatif"
+          if [ ! -f "$fichier" ]; then
+            echo "::warning::Fichier annoncé par scraper-lemobilier introuvable sur disque : $fichier — source sautée."
+            pnpm --filter pipeline run enregistrer-echec-scraping lemobilier injoignable || true
+            exit 1
+          fi
+
+          nb_deals=$(jq 'length' "$fichier")
+          echo "Deals lemobilier extraits : $nb_deals"
+          if [ "$nb_deals" -eq 0 ]; then
+            echo "::warning::0 deal extrait par scraper-lemobilier — rien à insérer pour cette source ce run."
+            pnpm --filter pipeline run enregistrer-echec-scraping lemobilier rien_retenu || true
+            exit 1
+          fi
+
+          echo "fichier=$fichier_relatif" >> "$GITHUB_OUTPUT"
+
+      - name: Insertion lemobilier.ma en base (validation zod partagée)
+        if: steps.scraping_lemobilier.outcome == 'success'
+        continue-on-error: true
+        env:
+          FICHIER_EXTRACTION_LEMOBILIER: ${{ steps.scraping_lemobilier.outputs.fichier }}
+        run: |
+          set -o pipefail
+          sortie=$(pnpm --filter pipeline run insert-deals "$FICHIER_EXTRACTION_LEMOBILIER" | tee /dev/stderr)
+          resume=$(printf '%s\n' "$sortie" | sed -n 's/^RESUME_JSON=//p' | tail -n1)
+          cause=$(printf '%s' "$resume" | jq -r '.cause // empty')
+          if [ "$cause" = "rien_retenu" ]; then
+            echo "::warning::lemobilier — aucun deal retenu après filtrage sur ce run : $resume"
+          elif [ "$cause" = "deja_en_base" ]; then
+            echo "::warning::lemobilier — tout ce qui a été retenu était déjà en base sur ce run : $resume"
+          fi
+
       # Source secondaire kiabi (lot du 02/08/2026) — même pattern que les
       # trois ci-dessus. Particularité de cette source : ~45 % du catalogue est
       # remisé en permanence (mesuré : 556 deals sur 1250 produits au premier
@@ -646,8 +711,8 @@ jobs:
             La chaîne principale (expiration → Bringo → insertion → revalidation) est
             sans `continue-on-error` : l'échec vient de l'une de ces étapes. Les sources
             secondaires (inwi, universparadiscount, kiabi, carrefour, ab-maroc,
-            aswakassalam) ne peuvent pas faire échouer le run — leurs incidents se
-            lisent en annotations `::warning::`.
+            aswakassalam, lemobilier) ne peuvent pas faire échouer le run — leurs
+            incidents se lisent en annotations `::warning::`.
 
             Cause déjà rencontrée : le secret `SUPABASE_DB_URL` périmé après une rotation
             du mot de passe de la base (il alimente **aussi** ce workflow, pas seulement le
@@ -762,7 +827,7 @@ jobs:
           # autres sources partagent leur nom avec leur script scraper-*.
           SOURCES_ATTENDUES: >-
             bringo-casablanca,inwi,universparadiscount,kiabi,
-            carrefour,ab-maroc,aswakassalam
+            carrefour,ab-maroc,aswakassalam,lemobilier
         run: |
           set -o pipefail
           sortie=$(pnpm --filter pipeline run verifier-sources-mortes | tee /dev/stderr)
