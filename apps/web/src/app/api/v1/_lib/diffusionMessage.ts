@@ -34,6 +34,47 @@ function echapper(texte: string): string {
 }
 
 /**
+ * WhatsApp n'a pas de mode HTML ni d'échappement — sa syntaxe légère
+ * (`*gras*`, `~barré~`) EST le texte brut envoyé. Un titre ou un nom
+ * d'enseigne portant l'un de ces trois caractères casserait la mise en
+ * forme du reste du message (astérisque non refermé, etc.) : retirés ici
+ * plutôt que risqué, un titre garde son sens sans eux.
+ */
+function nettoyerMarkupWhatsapp(texte: string): string {
+  return texte.replace(/[*_~]/g, "");
+}
+
+/**
+ * Légende WhatsApp — même contenu et même ordre que `buildLegendeTelegram`
+ * (titre, enseigne, prix, lien), syntaxe adaptée (partage manuel, lot du
+ * 15/08/2026, docs/IDEES.md § « Diffusion communautaire ») : `*gras*` au
+ * lieu de `<b>`, `~barré~` au lieu de `<s>`, aucun lien markdown (WhatsApp
+ * n'en interprète pas — une URL brute s'auto-lie déjà côté client).
+ */
+export function buildLegendeWhatsapp(params: {
+  titre: string;
+  prixPromo: number;
+  prixNormal?: number | null;
+  enseigneNom?: string | null;
+  lien: string;
+}): string {
+  const { titre, prixPromo, prixNormal, enseigneNom, lien } = params;
+  const pct = prixNormal && prixNormal > prixPromo ? Math.round((1 - prixPromo / prixNormal) * 100) : null;
+
+  const lignes: string[] = [`*${nettoyerMarkupWhatsapp(titre)}*`];
+  if (enseigneNom) lignes.push(nettoyerMarkupWhatsapp(enseigneNom));
+
+  const prix =
+    prixNormal && prixNormal > prixPromo
+      ? `${prixPromo} DH  ~${prixNormal} DH~${pct !== null ? `  −${pct}%` : ""}`
+      : `${prixPromo} DH`;
+  lignes.push(prix);
+  lignes.push(lien);
+
+  return lignes.join("\n");
+}
+
+/**
  * Légende du message : titre, prix, lien.
  *
  * Le pourcentage n'est affiché que s'il est RÉELLEMENT calculable

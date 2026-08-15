@@ -592,6 +592,12 @@ POST   /api/v1/admin/deals/diffuser-lot/:lot/suivant
 POST   /api/v1/admin/deals/diffuser-lot/:lot/relancer
                                              remet en file les deals `echoue` du lot (jamais `envoye`
                                              ni `deja_diffuse`) — même amendement
+POST   /api/v1/admin/deals/:publicId/partage-whatsapp
+                                             ne poste nulle part (aucune API WhatsApp gratuite et
+                                             conforme n'existe, docs/IDEES.md) — génère le texte prêt
+                                             à coller et journalise sa génération, jamais un état
+                                             « diffusé » — ajouté le 15/08/2026, vingt-et-unième
+                                             amendement conscient
 ```
 
 **Amendement du 15/08/2026 — diffusion en masse (dix-neuvième amendement conscient,
@@ -709,6 +715,32 @@ forme sur `restaurer-bulk`/`restaurer-bulk-filtre`.**
   l'appel, `retirerDesListe` s'en sort sans donnée supplémentaire), la restauration renvoie
   chaque ligne à son statut D'ORIGINE, qui varie ligne à ligne et que le client ne peut pas
   deviner pour une ligne jamais chargée.
+
+**Amendement du 15/08/2026 — partage WhatsApp manuel (vingt-et-unième amendement conscient).**
+Suite de l'étude fermée (`docs/IDEES.md` § « WhatsApp / Facebook / Instagram gratuits ») :
+aucune API gratuite et conforme n'existe pour publier sur WhatsApp. `POST
+/api/v1/admin/deals/:publicId/partage-whatsapp` (requireAdmin, deal `publie` requis — même garde
+que la diffusion automatisée) ne poste nulle part : il construit le texte prêt à coller
+(`buildLegendeWhatsapp`, syntaxe légère WhatsApp — `*gras*`/`~barré~`, aucun HTML, aucun lien
+markdown) et journalise sa génération.
+
+- **Aperçu du lien vérifié en production avant construction**, pas supposé : `curl` sur une
+  fiche deal publiée réelle confirme `og:title`, `og:description` et `og:image` (photo réelle du
+  deal, `480×480`, `image/jpeg`, `200 OK`) déjà corrects — deux incidents antérieurs (20/07 image
+  manquante, 21/07 troncature de la query string par le crawler Meta) avaient déjà réglé
+  exactement ce que WhatsApp affiche en aperçu. Aucun changement OG nécessaire pour ce lot.
+- **`whatsapp_message_genere` (`journal_audit`), jamais `diffuser_whatsapp`** — nommé
+  distinctement pour ne jamais laisser croire qu'un envoi a été confirmé : le collage manuel
+  n'est pas vérifiable depuis ce dépôt. N'écrit jamais dans `diffusions`, ne lit jamais
+  `deja_diffuse` : aucune interférence avec Telegram/Discord, générer un message WhatsApp ne
+  bloque ni ne simule une diffusion sur ces deux canaux. Nom absent de la liste probante de
+  `deals_protection` (migration 0015) — repli protecteur automatique, aucune migration requise.
+- **Placement** : bouton « Partager WhatsApp » sur la ligne du deal dans la file admin, onglet
+  Publiés — même emplacement et même garde (`statut === "publie"`) que les boutons de diffusion
+  Telegram/Discord déjà existants. Pas de page « fiche deal » admin dédiée dans ce dépôt (l'admin
+  est une file unique) : la ligne EST la fiche.
+- **Sélection multiple écartée pour ce lot**, consciemment — voir `docs/IDEES.md` pour la piste
+  « récap » (un seul bloc de texte concaténant plusieurs deals) et son déclencheur de réexamen.
 
 **Amendement du 05/08/2026 — la file admin filtre en base, pas côté client (neuvième
 amendement conscient de la liste fermée).** `GET /api/v1/admin/deals` chargeait tous
