@@ -535,6 +535,10 @@ GET    /api/v1/admin/deals                  file d'UN statut (paramètre requis)
                                              suppression décroissante
 GET    /api/v1/admin/deals/compte           compte par statut (neuvième amendement) + `supprimes`,
                                              compte des lignes supprimées (dixième amendement)
+GET    /api/v1/admin/deals/compte-filtre    compte EXACT pour un (statut ou `?supprime=true`) +
+                                             filtres donnés — lot filtres/tri du 12/08/2026,
+                                             manquait de cette liste avant le 15/08/2026, corrigé
+                                             au passage du vingtième amendement conscient (voir §3)
 PATCH  /api/v1/admin/deals/:publicId        édition complète du deal + statut (voir §3, amendement du 19/07/2026)
 DELETE /api/v1/admin/deals/:publicId        suppression DOUCE (pose `supprime_le`, jamais de DELETE
                                              SQL) — dixième amendement conscient, voir §3
@@ -542,7 +546,18 @@ POST   /api/v1/admin/deals/:publicId/restaurer
                                              efface `supprime_le` ; renvoie le deal dans son statut
                                              d'origine, jamais touché par la suppression — même
                                              amendement
-POST   /api/v1/admin/deals/bulk             actions groupées
+POST   /api/v1/admin/deals/bulk             actions groupées, sélection manuelle (max 100)
+POST   /api/v1/admin/deals/bulk-filtre?statut=...
+                                             actions groupées PAR FILTRE, `verbe` limité à
+                                             `verbesAutorises(statut)` — lot filtres/tri du
+                                             12/08/2026, étendu aux cinq onglets de statut le
+                                             15/08/2026 (vingtième amendement conscient, voir §3) ;
+                                             manquait de cette liste avant ce jour, corrigé au passage
+POST   /api/v1/admin/deals/restaurer-bulk   restauration groupée, sélection manuelle (max 100) —
+                                             vingtième amendement conscient, voir §3
+POST   /api/v1/admin/deals/restaurer-bulk-filtre
+                                             restauration groupée PAR FILTRE (`?supprime=true` +
+                                             mêmes filtres que `GET /admin/deals`) — même amendement
 GET    /api/v1/admin/memoire-curation       décisions actives (rejete, non levées), plus récentes
                                              d'abord — onzième amendement conscient, voir §3
 POST   /api/v1/admin/memoire-curation/:id/lever
@@ -625,6 +640,51 @@ qu'un lot déjà lancé traite.
 - **Confirmation nommant le nombre de messages, le canal et le mode** avant tout envoi — le
   bouton de lancement porte lui-même ce texte, pas une case à cocher séparée (même principe
   que la confirmation de lot par filtre, neuvième amendement).
+
+**Amendement du 15/08/2026 — « tout sélectionner », généralisé (vingtième amendement
+conscient).** La sélection groupée (`bulk`/`bulk-filtre`, neuvième amendement du 12/08/2026)
+n'existait que sur `auto_draft`/`en_attente`. Ce lot l'étend, à deux niveaux
+distincts, partout où une action groupée a un sens :
+
+- **Niveau 1 — les lignes CHARGÉES** (peut dépasser une page, via « Charger plus »). Une case
+  « Tout sélectionner (visible) — N » bascule (jamais une union) : coche tout ce qui est chargé,
+  ou décoche tout. Reste une sélection MANUELLE, envoyée par liste de `public_id` (`POST
+  /admin/deals/bulk`, plafond 100 déjà en vigueur) — le périmètre est exactement ce que
+  l'admin a sous les yeux, jamais plus.
+- **Niveau 2 — TOUT le résultat filtré**, explicite dans son libellé, nombre EXACT issu de `GET
+  /admin/deals/compte-filtre`, jamais déduit d'une liste chargée. Mécanisme filtre + verbe
+  (`POST /admin/deals/bulk-filtre`), jamais une liste d'identifiants — c'est précisément parce
+  que `bulk` (niveau 1) est plafonné à 100 que ce niveau ne peut pas être une liste : au-delà de
+  100 deals filtrés, il faudrait fragmenter l'appel, exactement ce que `bulk-filtre` (plafond
+  2000, neuvième amendement) évite en résolvant les id côté serveur.
+- **`verbesAutorises(statut)`** (`_lib/adminDealsActions.ts`) — SOURCE UNIQUE, partagée entre les
+  boutons affichés (client) et la validation serveur (`bulk-filtre`) : une action sans objet pour
+  l'onglet visé (« expirer » un `rejete`) est un `VALIDATION_ERROR`, jamais acceptée. Étendue aux
+  cinq onglets de statut : `auto_draft`/`en_attente` → publier/rejeter (inchangé) ; `publie` →
+  expirer/retirer ; `rejete` → republier/remettre en attente ; `expire` → republier.
+- **Onglet Supprimés — inclus, avec sa propre paire d'endpoints** (`restaurer-bulk`,
+  `restaurer-bulk-filtre`) : un seul verbe possible (restaurer), pas de motif. `GET
+  /admin/deals/compte-filtre` étendu au mode `?supprime=true` (même bascule exclusive que `GET
+  /admin/deals`) pour lui donner un compte exact. La restauration groupée par filtre réutilise
+  `conditionsFiltresAdmin` avec `d.supprime_le is not null` au lieu de `d.statut = $1` — même
+  source, prédicat différent.
+- **Onglet Lots récents — EXCLU, délibérément.** Ce n'est pas un statut de deal ni une liste de
+  deals : chaque ligne y est déjà elle-même un lot d'action groupée passé. Sélectionner puis
+  annuler plusieurs lots à la fois multiplierait le rayon d'effet de façon imprévisible (des
+  lots différents peuvent toucher des deals qui se chevauchent, porter des motifs différents,
+  ou avoir déjà été partiellement défaits) — pas un verbe cohérent à appliquer en masse. Annuler
+  reste un geste par lot, un par un.
+- **Seuil de confirmation (>20) réservé au niveau 2** — le niveau 1 reste un geste direct dès la
+  sélection cochée, comme avant ce lot : borné par ce qui est visible et déjà plafonné à 100 par
+  `bulk`, il ne porte pas le même risque qu'une action sur un total invisible.
+- **Actions groupées par restauration tracées sous `bulk_restaurer_deal`** (`journal_audit`),
+  distinct de `restaurer_deal` (individuel) — nom absent de la liste probante de
+  `deals_protection` (migration 0015) : bascule automatiquement en repli protecteur, aucune
+  migration nécessaire pour ce lot.
+- **Limite assumée, pas construite ici** : un lot de restauration groupée n'apparaît pas dans
+  « Lots récents » (qui ne lit que `bulk_update_statut`, une transition de STATUT — restaurer
+  n'en touche aucun). Défaire une restauration groupée reste, pour l'instant, un geste par ligne
+  (re-supprimer).
 
 **Amendement du 05/08/2026 — la file admin filtre en base, pas côté client (neuvième
 amendement conscient de la liste fermée).** `GET /api/v1/admin/deals` chargeait tous

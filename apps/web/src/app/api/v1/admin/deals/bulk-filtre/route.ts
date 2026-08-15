@@ -9,28 +9,28 @@ import { parseJsonBody } from "../../../_lib/validation.js";
 import { DEAL_FROM } from "../../../_lib/deals.js";
 import { lireFiltresAdmin, conditionsFiltresAdmin } from "../../../_lib/adminDealsFilters.js";
 import { appliquerLotStatut } from "../../../_lib/adminDealsBulk.js";
+import { verbesAutorises } from "../../../_lib/adminDealsActions.js";
 
 export const runtime = "nodejs";
 
 /**
  * POST /api/v1/admin/deals/bulk-filtre — requireAdmin. L'action s'exprime
  * comme FILTRE + VERBE, jamais une liste de public_id transmise par le
- * client (lot du 12/08/2026) : `statut` et les filtres (`enseigne`,
- * `categorie`, `remiseMin`/`Max`, `prixMin`/`Max`, `dateMin`/`Max`) sont
- * des PARAMÈTRES D'URL — exactement ceux déjà utilisés par `GET
- * /admin/deals` et `GET /admin/deals/compte-filtre` (SOURCE UNIQUE,
- * `conditionsFiltresAdmin`) : le résultat qui s'affiche EST le résultat
- * qui agit, aucune divergence possible entre ce que l'admin voit et ce
- * qui est modifié.
+ * client (lot du 12/08/2026, étendu le 15/08/2026 aux cinq onglets de
+ * statut — « tout sélectionner », niveau 2) : `statut` et les filtres
+ * (`enseigne`, `source`, `categorie`, `remiseMin`/`Max`, `prixMin`/`Max`,
+ * `dateMin`/`Max`) sont des PARAMÈTRES D'URL — exactement ceux déjà
+ * utilisés par `GET /admin/deals` et `GET /admin/deals/compte-filtre`
+ * (SOURCE UNIQUE, `conditionsFiltresAdmin`) : le résultat qui s'affiche EST
+ * le résultat qui agit, aucune divergence possible entre ce que l'admin
+ * voit et ce qui est modifié.
  *
  * `{ verbe, motifRejet }` dans le corps — le seul choix propre à
- * l'ÉCRITURE, pas à la lecture.
- *
- * Réservé aux DEUX onglets de modération initiale (`auto_draft`,
- * `en_attente`) — même périmètre que `bulk` (sélection manuelle) : élargir
- * un rejet de masse à `publie`/`rejete`/`expire` n'a pas été demandé, et
- * `ONGLET_ACTIONS` (AdminPipeline.tsx) n'expose ces verbes que sur ces deux
- * onglets.
+ * l'ÉCRITURE, pas à la lecture. `verbe` doit appartenir à
+ * `verbesAutorises(statut)` (`_lib/adminDealsActions.ts`, SOURCE UNIQUE
+ * partagée avec les boutons affichés côté client) : une transition qui n'a
+ * pas de sens pour l'onglet visé (ex. "expirer" un `rejete`) est un
+ * `VALIDATION_ERROR`, jamais acceptée en silence.
  *
  * PLAFOND DE SÉCURITÉ (2000) : une action qui touche un nombre non borné
  * de lignes n'est jamais un simple clic — au-delà, l'appelant doit affiner
@@ -41,11 +41,9 @@ export const runtime = "nodejs";
  */
 const MAX_LOT = 2000;
 
-const VERBES = new Set(["publie", "rejete"]);
-
 const bulkFiltreSchema = z
   .object({
-    verbe: z.enum(["publie", "rejete"]),
+    verbe: dealStatutSchema,
     motifRejet: z.string().trim().min(3).max(500).optional(),
   })
   .superRefine((val, ctx) => {
@@ -58,8 +56,6 @@ const bulkFiltreSchema = z
     }
   });
 
-const ONGLETS_AUTORISES = new Set(["auto_draft", "en_attente"]);
-
 export const POST = withAuthErrors(async (request: Request): Promise<NextResponse> => {
   const admin = await requireAdmin(request);
 
@@ -69,15 +65,12 @@ export const POST = withAuthErrors(async (request: Request): Promise<NextRespons
     return apiError("VALIDATION_ERROR", "Paramètre statut requis, parmi les statuts connus.");
   }
   const statut = statutParsed.data;
-  if (!ONGLETS_AUTORISES.has(statut)) {
-    return apiError("VALIDATION_ERROR", "Action groupée par filtre réservée aux onglets Pipeline et En attente.");
-  }
 
   const parsed = await parseJsonBody(request, bulkFiltreSchema);
   if (!parsed.success) return parsed.response;
   const { verbe, motifRejet } = parsed.data;
-  if (!VERBES.has(verbe)) {
-    return apiError("VALIDATION_ERROR", "Verbe inconnu.");
+  if (!verbesAutorises(statut).has(verbe)) {
+    return apiError("VALIDATION_ERROR", `Action "${verbe}" sans objet depuis l'onglet "${statut}".`);
   }
 
   const filtres = lireFiltresAdmin(searchParams);

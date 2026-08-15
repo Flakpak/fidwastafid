@@ -20,10 +20,18 @@ export type RestaurationResult = { ok: true } | { ok: false; message: string };
 export function AdminDealSupprime({
   deal,
   pending,
+  checked,
+  onToggle,
   onRestaurer,
 }: {
   deal: DealAdmin;
   pending: boolean;
+  /** Case à cocher pour la restauration groupée (lot du 15/08/2026, « tout
+   *  sélectionner ») — toujours affichée ici, contrairement à
+   *  `AdminDealItem` où elle dépend de l'onglet : cette liste n'affiche
+   *  jamais que des deals supprimés, une seule action de masse est possible. */
+  checked: boolean;
+  onToggle: () => void;
   onRestaurer: () => Promise<RestaurationResult>;
 }) {
   const [etat, setEtat] = useState<"idle" | "pending">("idle");
@@ -39,6 +47,7 @@ export function AdminDealSupprime({
 
   return (
     <li className="bg-surface border border-border rounded-xl p-4 flex items-center gap-3">
+      <input type="checkbox" checked={checked} onChange={onToggle} className="accent-accent flex-shrink-0" />
       {/* `opacity-60` : cette photo n'est plus servie par le proxy public
           (lookup.ts exclut supprime_le is not null) — elle ne s'affiche
           donc que tant que le cache navigateur/CDN la garde. Pas un bug :
