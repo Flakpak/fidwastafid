@@ -20,6 +20,7 @@ import { AdminLots, type LotResume, type AnnulerLotResult } from "./AdminLots.js
 import { AdminDiffusionLot } from "./AdminDiffusionLot.js";
 import { MotifRejet } from "./MotifRejet.js";
 import { Button } from "../../components/Button.js";
+import { ONGLET_ACTIONS, type ActionOnglet } from "../api/v1/_lib/adminDealsActions.js";
 
 /** Deal admin enrichi de l'info de doublon produit (visibilité seule, lot du
  *  23/07/2026) — `doublon` vit hors du modèle de domaine (cf. _lib/deals.ts),
@@ -54,41 +55,21 @@ const COMPTES_INITIAUX: Record<DealStatut, number> = {
   expire: 0,
 };
 
-interface Action {
-  label: string;
-  statut: DealStatut;
-  variant: "primaire" | "danger" | "neutre";
-}
-
-/** Actions contextuelles par onglet — parité v1 (index.html AdminPage, machine à états statut). */
-const ONGLET_ACTIONS: Record<DealStatut, Action[]> = {
-  auto_draft: [
-    { label: "Valider", statut: "publie", variant: "primaire" },
-    { label: "Rejeter", statut: "rejete", variant: "danger" },
-  ],
-  en_attente: [
-    { label: "Valider", statut: "publie", variant: "primaire" },
-    { label: "Rejeter", statut: "rejete", variant: "danger" },
-  ],
-  publie: [
-    { label: "Expirer", statut: "expire", variant: "neutre" },
-    { label: "Retirer", statut: "rejete", variant: "danger" },
-  ],
-  rejete: [
-    { label: "Republier", statut: "publie", variant: "primaire" },
-    { label: "Remettre en attente", statut: "en_attente", variant: "neutre" },
-  ],
-  expire: [{ label: "Republier", statut: "publie", variant: "primaire" }],
+/** `ActionOnglet["variant"]` (français) → `Button["variant"]` (anglais, le
+ *  composant partagé) — deux vocabulaires distincts, jamais fusionnés :
+ *  `ActionOnglet` est aussi consommé par le serveur (`bulk-filtre/route.ts`),
+ *  qui n'a rien à faire d'un nom de classe Tailwind. */
+const BOUTON_VARIANT: Record<ActionOnglet["variant"], "primary" | "danger" | "secondary"> = {
+  primaire: "primary",
+  danger: "danger",
+  neutre: "secondary",
 };
 
-/** Sélection groupée réservée aux deux onglets de modération initiale (v1 : idem). */
-const BULK_ONGLETS = new Set<DealStatut>(["auto_draft", "en_attente"]);
-
 /** Sélection groupée pour la diffusion (lot du 15/08/2026, dix-neuvième
- *  amendement conscient) — distincte de BULK_ONGLETS : ne change jamais le
- *  statut d'un deal, ne s'applique donc qu'aux deals déjà publiés. Partage
- *  le même état `selected`, jamais actif en même temps qu'un autre onglet
- *  (la sélection est vidée à chaque changement d'onglet). */
+ *  amendement conscient) — distincte des actions de statut ci-dessus : ne
+ *  change jamais le statut d'un deal, ne s'applique donc qu'aux deals déjà
+ *  publiés. Partage le même état `selected`, jamais actif en même temps
+ *  qu'un autre onglet (la sélection est vidée à chaque changement d'onglet). */
 const DIFFUSION_ONGLETS = new Set<DealStatut>(["publie"]);
 
 /**
@@ -228,9 +209,13 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   /** Confirmation nommant le nombre exact + les filtres appliqués — posée
    *  au-delà du seuil (voir `SEUIL_CONFIRMATION`), quel que soit le verbe. */
   const [confirmationLotFiltre, setConfirmationLotFiltre] = useState<{
-    verbe: "publie" | "rejete";
+    verbe: DealStatut;
     motifRejet?: string;
   } | null>(null);
+  /** Pendant de `confirmationLotFiltre` pour la restauration (onglet
+   *  Supprimés, un seul verbe possible — pas de `motifRejet`, un booléen
+   *  suffit). */
+  const [confirmationRestaurerFiltre, setConfirmationRestaurerFiltre] = useState(false);
   /** Onglet « Lots récents » (lot du 12/08/2026) — vue INDÉPENDANTE de
    *  `onglet`/`filtres`/`tri` : pas un statut de deal, une catégorie
    *  d'action admin. `null` tant que non chargé (distinct de `[]`, liste
@@ -261,13 +246,17 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
 
   /** Paramètres onglet+filtres SEULS (pas de tri, pas de curseur — hors
    *  sujet pour un compte ou une action groupée) — communs à
-   *  `compte-filtre` et `bulk-filtre`, garantit que les DEUX visent
-   *  exactement le même jeu de lignes que la liste affichée. */
+   *  `compte-filtre`, `bulk-filtre` et `restaurer-bulk-filtre`, garantit
+   *  que TOUS visent exactement le même jeu de lignes que la liste
+   *  affichée. `o === "supprime"` bascule sur `?supprime=true` plutôt que
+   *  `?statut=` — même exclusivité que `GET /admin/deals` (lot du
+   *  15/08/2026, « tout sélectionner », étendu à l'onglet Supprimés). */
   function paramsFiltreSeul(o: Onglet, f: Filtres): URLSearchParams {
     const params = paramsCommuns(o, f, "");
     params.delete("onglet");
     params.delete("tri");
-    params.set("statut", o);
+    if (o === "supprime") params.set("supprime", "true");
+    else params.set("statut", o);
     if (f.dateMax) params.set("dateMax", finDeJournee(f.dateMax));
     return params;
   }
@@ -278,6 +267,10 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
 
   function urlBulkFiltre(o: Onglet, f: Filtres): string {
     return `/api/v1/admin/deals/bulk-filtre?${paramsFiltreSeul(o, f).toString()}`;
+  }
+
+  function urlRestaurerBulkFiltre(f: Filtres): string {
+    return `/api/v1/admin/deals/restaurer-bulk-filtre?${paramsFiltreSeul("supprime", f).toString()}`;
   }
 
   /** Pose l'état courant dans l'URL — `replace` (pas `push`) : chaque
@@ -314,7 +307,11 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     setDeals(body.data);
     setCursor(body.nextCursor);
 
-    if (o !== "supprime" && BULK_ONGLETS.has(o)) {
+    // Chargé pour l'onglet Supprimés (une seule action, restaurer) et pour
+    // tout onglet de statut portant au moins une action (les cinq, à ce
+    // jour — `ONGLET_ACTIONS`, source unique avec les boutons affichés).
+    const compteFiltreApplicable = o === "supprime" || ONGLET_ACTIONS[o as DealStatut].length > 0;
+    if (compteFiltreApplicable) {
       const resCompte = await fetch(urlCompteFiltre(o, f));
       if (resCompte.ok) {
         const bodyCompte = (await resCompte.json()) as { total: number };
@@ -521,6 +518,27 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     setCompteFiltre((prev) => (prev === null ? prev : Math.max(0, prev - ids.size)));
   }
 
+  /**
+   * Pendant de `retirerDesListe` pour l'onglet Supprimés (lot du 15/08/2026,
+   * « tout sélectionner ») — restaurer n'a qu'UNE cible de comptage
+   * (`comptesSupprimes`, qui décroît), mais la DESTINATION varie par ligne :
+   * chaque deal revient dans son propre statut D'ORIGINE (`deal.statut`,
+   * jamais deviné, cf. AdminDealSupprime), pas un statut commun au lot.
+   */
+  function retirerDesListeSupprimee(publicIds: string[]) {
+    if (publicIds.length === 0 || !deals) return;
+    const ids = new Set(publicIds);
+    const partants = deals.filter((d) => ids.has(d.publicId));
+    setDeals((prev) => (prev ? prev.filter((d) => !ids.has(d.publicId)) : prev));
+    setComptesSupprimes((c) => Math.max(0, c - partants.length));
+    setComptes((prev) => {
+      const next = { ...prev };
+      for (const d of partants) next[d.statut] = (next[d.statut] ?? 0) + 1;
+      return next;
+    });
+    setCompteFiltre((prev) => (prev === null ? prev : Math.max(0, prev - ids.size)));
+  }
+
   async function updateStatut(publicId: string, statut: DealStatut, motifRejet?: string) {
     setPending(true);
     setError(null);
@@ -698,7 +716,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
    * motiver. Le motif est commun au lot, ce qui correspond au geste réel :
    * rejeter d'un coup vingt `auto_draft` pour la même raison.
    */
-  async function bulk(statut: "publie" | "rejete", motifRejet?: string) {
+  async function bulk(statut: DealStatut, motifRejet?: string) {
     if (selected.size === 0) return;
     setPending(true);
     setError(null);
@@ -732,7 +750,7 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
    * `publicIds` transmis : le serveur résout lui-même les lignes touchées,
    * avec le MÊME prédicat que ce que l'écran affiche.
    */
-  async function bulkFiltre(verbe: "publie" | "rejete", motifRejet?: string) {
+  async function bulkFiltre(verbe: DealStatut, motifRejet?: string) {
     setPending(true);
     setError(null);
     try {
@@ -748,6 +766,55 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       }
       setDemandeMotifLotFiltre(false);
       setConfirmationLotFiltre(null);
+      await rafraichir();
+    } finally {
+      setPending(false);
+    }
+  }
+
+  /** Restauration groupée, sélection MANUELLE (onglet Supprimés) — pendant
+   *  de `bulk()`, appelle `restaurer-bulk` plutôt que `bulk`, retire les
+   *  lignes localement (`retirerDesListeSupprimee`) plutôt qu'un refetch
+   *  complet — même motif que `bulk()` : ne pas perdre la position de
+   *  défilement pour une action qui peut toucher jusqu'à 100 lignes. */
+  async function restaurerBulk() {
+    if (selected.size === 0) return;
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/v1/admin/deals/restaurer-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicIds: Array.from(selected) }),
+      });
+      if (!res.ok) {
+        const body = (await res.json()) as ApiErrorBody;
+        setError(body.error?.message ?? "Restauration groupée impossible.");
+        return;
+      }
+      const body = (await res.json()) as { restaures: string[]; lot: string };
+      retirerDesListeSupprimee(body.restaures);
+      setSelected(new Set());
+    } finally {
+      setPending(false);
+    }
+  }
+
+  /** Restauration groupée PAR FILTRE (onglet Supprimés) — pendant de
+   *  `bulkFiltre()`, un seul verbe possible (restaurer), donc pas de corps
+   *  JSON à construire ; refetch complet comme `bulkFiltre()`, pas de
+   *  retrait local (le lot peut dépasser ce qui est chargé à l'écran). */
+  async function restaurerBulkFiltre() {
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch(urlRestaurerBulkFiltre(filtres), { method: "POST" });
+      if (!res.ok) {
+        const body = (await res.json()) as ApiErrorBody;
+        setError(body.error?.message ?? "Restauration groupée impossible.");
+        return;
+      }
+      setConfirmationRestaurerFiltre(false);
       await rafraichir();
     } finally {
       setPending(false);
@@ -778,24 +845,28 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
     return parts.length > 0 ? parts.join(" · ") : "Aucun filtre — tout l'onglet";
   }
 
-  /** Point d'entrée « Valider tout le résultat filtré » — pas de motif à
-   *  demander pour ce verbe, directement le seuil de confirmation. */
-  function demanderValidationFiltre() {
+  /**
+   * Point d'entrée générique « <Action> tout le résultat filtré » — UNE
+   * fonction pour les cinq onglets de statut (lot du 15/08/2026, « tout
+   * sélectionner »), plutôt qu'une paire par verbe : `ONGLET_ACTIONS`
+   * (source unique, partagée avec le serveur) dit déjà quelles actions
+   * existent sur quel onglet, ce point d'entrée n'a qu'à les brancher sur
+   * le même mécanisme motif-d'abord / seuil-ensuite déjà éprouvé pour
+   * Valider/Rejeter. Un onglet ne porte jamais deux actions "rejete" à la
+   * fois (vérifié sur `ONGLET_ACTIONS`) — le motif demandé reste donc non
+   * ambigu même généralisé.
+   */
+  function demanderActionFiltre(action: ActionOnglet) {
     if (compteFiltre === null) return;
-    if (compteFiltre > SEUIL_CONFIRMATION) {
-      setConfirmationLotFiltre({ verbe: "publie" });
-    } else {
-      void bulkFiltre("publie");
+    if (action.statut === "rejete") {
+      setDemandeMotifLotFiltre(true);
+      return;
     }
-  }
-
-  /** Point d'entrée « Rejeter tout le résultat filtré » — motif d'abord
-   *  (`demandeMotifLotFiltre`), le seuil de confirmation se pose APRÈS
-   *  le motif choisi (`onMotifChoisiFiltre`), jamais avant : les deux
-   *  exigences sont indépendantes, chacune couvre un risque différent. */
-  function demanderRejetFiltre() {
-    if (compteFiltre === null) return;
-    setDemandeMotifLotFiltre(true);
+    if (compteFiltre > SEUIL_CONFIRMATION) {
+      setConfirmationLotFiltre({ verbe: action.statut });
+    } else {
+      void bulkFiltre(action.statut);
+    }
   }
 
   function onMotifChoisiFiltre(motif: string) {
@@ -804,6 +875,17 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
       setConfirmationLotFiltre({ verbe: "rejete", motifRejet: motif });
     } else {
       void bulkFiltre("rejete", motif);
+    }
+  }
+
+  /** Restaurer tout le résultat filtré — un seul verbe possible, pas de
+   *  motif à demander : directement le seuil de confirmation. */
+  function demanderRestaurerFiltre() {
+    if (compteFiltre === null) return;
+    if (compteFiltre > SEUIL_CONFIRMATION) {
+      setConfirmationRestaurerFiltre(true);
+    } else {
+      void restaurerBulkFiltre();
     }
   }
 
@@ -816,6 +898,25 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
   }
 
   const modeSupprimes = onglet === "supprime";
+  /** Actions de statut valides sur l'onglet courant — vide pour Supprimés
+   *  (traité à part, une seule action possible : restaurer). */
+  const actionsOnglet: ActionOnglet[] = modeSupprimes ? [] : ONGLET_ACTIONS[onglet as DealStatut];
+
+  /** « Tout sélectionner » niveau 1 — les lignes actuellement CHARGÉES
+   *  (peut dépasser une seule page, via « Charger plus »), jamais le
+   *  résultat filtré entier (ça, c'est le niveau 2 ci-dessous, par filtre +
+   *  verbe). Toggle : si tout ce qui est visible est déjà coché, décoche
+   *  tout ; sinon coche tout ce qui est chargé — jamais une union avec une
+   *  sélection précédente, plus simple à lire à l'écran. */
+  const tousVisiblesCoches = deals.length > 0 && deals.every((d) => selected.has(d.publicId));
+  // Capturé dans une variable locale : `deals` est narrowed non-null à CE
+  // point (après le early-return ci-dessus), mais TS ne propage pas ce
+  // narrowing dans une fonction imbriquée fermant sur l'état — la capturer
+  // ici, une fois, évite un `deals!` répété.
+  const dealsCharges = deals;
+  function toggleTousVisibles() {
+    setSelected(tousVisiblesCoches ? new Set() : new Set(dealsCharges.map((d) => d.publicId)));
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -980,24 +1081,44 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         </div>
       </div>
 
-      {!modeSupprimes && BULK_ONGLETS.has(onglet) && deals.length > 0 && (
+      {/* « Tout sélectionner », niveau 1 : les lignes CHARGÉES (lot du
+          15/08/2026). Sélection manuelle — agit sur ce qui est COCHÉ,
+          jamais un filtre, jamais une liste au-delà de ce qui est déjà à
+          l'écran. */}
+      {!modeSupprimes && actionsOnglet.length > 0 && deals.length > 0 && (
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <Button variant="primary" size="sm" onClick={() => void bulk("publie")} disabled={pending || selected.size === 0}>
-              Valider la sélection ({selected.size})
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => setDemandeMotifLot(true)}
-              disabled={pending || selected.size === 0}
-            >
-              Rejeter la sélection
-            </Button>
+          <label className="flex items-center gap-2 text-xs font-bold text-ink-muted w-fit cursor-pointer">
+            <input type="checkbox" checked={tousVisiblesCoches} onChange={toggleTousVisibles} className="accent-accent" />
+            Tout sélectionner (visible) — {deals.length}
+          </label>
+          <div className="flex items-center gap-2 flex-wrap">
+            {actionsOnglet.map((action) =>
+              action.statut === "rejete" ? (
+                <Button
+                  key={action.statut}
+                  variant="danger"
+                  size="sm"
+                  onClick={() => setDemandeMotifLot(true)}
+                  disabled={pending || selected.size === 0}
+                >
+                  {action.label} la sélection
+                </Button>
+              ) : (
+                <Button
+                  key={action.statut}
+                  variant={BOUTON_VARIANT[action.variant]}
+                  size="sm"
+                  onClick={() => void bulk(action.statut)}
+                  disabled={pending || selected.size === 0}
+                >
+                  {action.label} la sélection ({selected.size})
+                </Button>
+              )
+            )}
           </div>
           {demandeMotifLot && selected.size > 0 && (
             <MotifRejet
-              libelleConfirmation={`Rejeter les ${selected.size}`}
+              libelleConfirmation={`${actionsOnglet.find((a) => a.statut === "rejete")?.label ?? "Rejeter"} les ${selected.size}`}
               pending={pending}
               onAnnuler={() => setDemandeMotifLot(false)}
               onRejeter={(motif) => bulk("rejete", motif)}
@@ -1006,27 +1127,32 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
         </div>
       )}
 
-      {/* Action groupée PAR FILTRE (lot du 12/08/2026) — « tout Kiabi sous
-          30 % » se traite d'un bloc, pas coche par coche. Séparée visuellement
-          de la sélection manuelle ci-dessus : celle-ci agit sur ce qui est
-          COCHÉ, celle-là sur TOUT ce que le filtre actif désigne — deux
-          portées différentes, jamais confondues à l'écran. */}
-      {!modeSupprimes && BULK_ONGLETS.has(onglet) && compteFiltre !== null && compteFiltre > 0 && (
+      {/* « Tout sélectionner », niveau 2 : TOUT le résultat filtré (lot du
+          12/08/2026, généralisé le 15/08/2026 aux cinq onglets de statut) —
+          filtre + verbe, jamais une liste d'identifiants, nombre EXACT issu
+          du compte serveur. Séparée visuellement de la sélection manuelle
+          ci-dessus : deux portées différentes, jamais confondues à l'écran. */}
+      {!modeSupprimes && actionsOnglet.length > 0 && compteFiltre !== null && compteFiltre > 0 && (
         <div className="border-t border-border pt-3 flex flex-col gap-2">
           <p className="text-xs font-bold text-ink-muted">
             Traiter TOUT le résultat filtré — {compteFiltre} deal{compteFiltre > 1 ? "s" : ""} ({resumeFiltres(filtres)})
           </p>
-          <div className="flex items-center gap-2">
-            <Button variant="primary" size="sm" onClick={demanderValidationFiltre} disabled={pending}>
-              Valider tout ({compteFiltre})
-            </Button>
-            <Button variant="danger" size="sm" onClick={demanderRejetFiltre} disabled={pending}>
-              Rejeter tout ({compteFiltre})
-            </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {actionsOnglet.map((action) => (
+              <Button
+                key={action.statut}
+                variant={BOUTON_VARIANT[action.variant]}
+                size="sm"
+                onClick={() => demanderActionFiltre(action)}
+                disabled={pending}
+              >
+                {action.label} tout ({compteFiltre})
+              </Button>
+            ))}
           </div>
           {demandeMotifLotFiltre && (
             <MotifRejet
-              libelleConfirmation={`Rejeter les ${compteFiltre}`}
+              libelleConfirmation={`${actionsOnglet.find((a) => a.statut === "rejete")?.label ?? "Rejeter"} les ${compteFiltre}`}
               pending={pending}
               onAnnuler={() => setDemandeMotifLotFiltre(false)}
               onRejeter={onMotifChoisiFiltre}
@@ -1038,8 +1164,8 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
           {confirmationLotFiltre && (
             <div className="bg-warn-soft border border-warn/40 rounded-xl p-3 flex flex-col gap-2">
               <p className="text-sm font-bold text-ink">
-                {confirmationLotFiltre.verbe === "rejete" ? "Rejeter" : "Valider"} précisément {compteFiltre} deal
-                {compteFiltre > 1 ? "s" : ""} ?
+                {actionsOnglet.find((a) => a.statut === confirmationLotFiltre.verbe)?.label ?? confirmationLotFiltre.verbe}{" "}
+                précisément {compteFiltre} deal{compteFiltre > 1 ? "s" : ""} ?
               </p>
               <p className="text-xs text-ink-muted">Filtre appliqué : {resumeFiltres(filtres)}</p>
               {confirmationLotFiltre.motifRejet && (
@@ -1055,6 +1181,52 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
                   Confirmer
                 </Button>
                 <Button variant="secondary" size="sm" onClick={() => setConfirmationLotFiltre(null)} disabled={pending}>
+                  Annuler
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Onglet Supprimés — « tout sélectionner » à deux niveaux, mais une
+          seule action possible (restaurer), pas de choix de verbe ni de
+          motif. */}
+      {modeSupprimes && deals.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-xs font-bold text-ink-muted w-fit cursor-pointer">
+            <input type="checkbox" checked={tousVisiblesCoches} onChange={toggleTousVisibles} className="accent-accent" />
+            Tout sélectionner (visible) — {deals.length}
+          </label>
+          <Button variant="primary" size="sm" onClick={() => void restaurerBulk()} disabled={pending || selected.size === 0}>
+            Restaurer la sélection ({selected.size})
+          </Button>
+        </div>
+      )}
+      {modeSupprimes && compteFiltre !== null && compteFiltre > 0 && (
+        <div className="border-t border-border pt-3 flex flex-col gap-2">
+          <p className="text-xs font-bold text-ink-muted">
+            Restaurer TOUT le résultat filtré — {compteFiltre} deal{compteFiltre > 1 ? "s" : ""} ({resumeFiltres(filtres)})
+          </p>
+          <Button variant="primary" size="sm" onClick={demanderRestaurerFiltre} disabled={pending}>
+            Restaurer tout ({compteFiltre})
+          </Button>
+          {confirmationRestaurerFiltre && (
+            <div className="bg-warn-soft border border-warn/40 rounded-xl p-3 flex flex-col gap-2">
+              <p className="text-sm font-bold text-ink">
+                Restaurer précisément {compteFiltre} deal{compteFiltre > 1 ? "s" : ""} ?
+              </p>
+              <p className="text-xs text-ink-muted">Filtre appliqué : {resumeFiltres(filtres)}</p>
+              <div className="flex items-center gap-2">
+                <Button variant="primary" size="sm" onClick={() => void restaurerBulkFiltre()} disabled={pending}>
+                  Confirmer
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setConfirmationRestaurerFiltre(false)}
+                  disabled={pending}
+                >
                   Annuler
                 </Button>
               </div>
@@ -1108,6 +1280,8 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
                 key={deal.publicId}
                 deal={deal}
                 pending={pending}
+                checked={selected.has(deal.publicId)}
+                onToggle={() => toggle(deal.publicId)}
                 onRestaurer={() => restaurer(deal.publicId)}
               />
             ))
@@ -1116,9 +1290,9 @@ export function AdminPipeline({ enseignes }: { enseignes: Enseigne[] }) {
                 key={deal.publicId}
                 deal={deal}
                 doublon={deal.doublon}
-                actions={ONGLET_ACTIONS[onglet as DealStatut]}
+                actions={actionsOnglet}
                 enseignes={enseignes}
-                showCheckbox={BULK_ONGLETS.has(onglet as DealStatut) || DIFFUSION_ONGLETS.has(onglet as DealStatut)}
+                showCheckbox={actionsOnglet.length > 0 || DIFFUSION_ONGLETS.has(onglet as DealStatut)}
                 checked={selected.has(deal.publicId)}
                 onToggle={() => toggle(deal.publicId)}
                 pending={pending}

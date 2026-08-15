@@ -296,18 +296,20 @@ console.log("\nAdminPipeline — rejet en masse (sélection multiple) : retrait 
     await new Promise((r) => setTimeout(r, 0));
   });
 
-  // Filtre les checkboxes de sélection (une par ligne, hors du panneau
-  // <details>) de celle de `whatsappPublic` dans le panneau "Éditer le deal"
-  // — un <details> replié laisse quand même ses enfants dans le DOM jsdom
-  // (seul l'affichage CSS change), `querySelectorAll` sans filtre les
-  // trouve toutes les deux.
-  const cases = Array.from(document.querySelectorAll('input[type="checkbox"]')).filter((c) => !c.closest("details"));
-  check("deux cases à cocher (sélection multiple, onglet En attente)", cases.length === 2);
+  // Cases de sélection de LIGNE (dans <ul>, une par deal), distinctes de la
+  // case « Tout sélectionner (visible) » (dans l'en-tête, hors <ul> — lot du
+  // 15/08/2026) et de celle de `whatsappPublic` dans le panneau <details>
+  // "Éditer le deal" (repliée mais toujours dans le DOM jsdom, seul
+  // l'affichage CSS change).
+  const casesLigne = Array.from(document.querySelectorAll('ul input[type="checkbox"]')).filter(
+    (c) => !c.closest("details")
+  );
+  check("deux cases à cocher (sélection multiple, onglet En attente)", casesLigne.length === 2);
   // `.click()` (pas un `change` synthétique) : jsdom applique lui-même
   // l'algorithme natif — bascule `checked` PUIS émet `click`/`input`/`change`,
   // exactement ce que `onChange={onToggle}` attend d'un vrai clic utilisateur.
   await act(async () => {
-    for (const c of cases) (c as HTMLInputElement).click();
+    for (const c of casesLigne) (c as HTMLInputElement).click();
   });
 
   appels = [];
@@ -329,6 +331,90 @@ console.log("\nAdminPipeline — rejet en masse (sélection multiple) : retrait 
 
   act(() => {
     root3.unmount();
+  });
+  document.body.removeChild(div);
+}
+
+/**
+ * « Tout sélectionner », niveau 1 (lot du 15/08/2026) — la case d'en-tête
+ * coche/décoche TOUT ce qui est CHARGÉ, jamais plus : périmètre vérifié
+ * explicitement (le corps envoyé au serveur ne porte QUE les deux id
+ * chargés, jamais un troisième deviné ou un filtre).
+ */
+console.log("\nAdminPipeline — « Tout sélectionner (visible) » : périmètre et bascule");
+{
+  const dealA = dealFixture({ publicId: "eeeeeeeeee", titre: "Cinquième deal en attente" });
+  const dealB = dealFixture({ publicId: "ffffffffff", titre: "Sixième deal en attente" });
+  let corpsBulk: unknown = null;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    const method = init?.method ?? "GET";
+    if (url.includes("/admin/deals/compte-filtre")) return reponseJson({ total: 2 });
+    if (url.includes("/admin/deals/compte")) {
+      return reponseJson({ comptes: { auto_draft: 0, en_attente: 2, publie: 0, rejete: 0, expire: 0 }, supprimes: 0 });
+    }
+    if (method === "POST" && url.includes("/admin/deals/bulk")) {
+      corpsBulk = init?.body ? JSON.parse(init.body as string) : null;
+      return reponseJson({ updated: ["eeeeeeeeee", "ffffffffff"], lot: "lot-test-2" });
+    }
+    if (url.includes("/admin/deals?")) return reponseJson({ data: [dealA, dealB], nextCursor: null });
+    return reponseJson({ data: [], nextCursor: null });
+  }) as typeof fetch;
+
+  const div = document.createElement("div");
+  document.body.appendChild(div);
+  const root4 = createRoot(div);
+  await act(async () => {
+    root4.render(createElement(AdminPipeline, { enseignes: [] }));
+  });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  const toutSelectionner = Array.from(document.querySelectorAll('input[type="checkbox"]')).find((c) =>
+    c.closest("label")?.textContent?.includes("Tout sélectionner (visible)")
+  ) as HTMLInputElement | undefined;
+  if (!toutSelectionner) throw new Error("Case « Tout sélectionner (visible) » introuvable.");
+  check(
+    "le libellé annonce le compte CHARGÉ, pas le total filtré",
+    toutSelectionner.closest("label")?.textContent?.includes("— 2") === true
+  );
+
+  const casesLigne = () =>
+    Array.from(document.querySelectorAll('ul input[type="checkbox"]')).filter(
+      (c) => !c.closest("details")
+    ) as HTMLInputElement[];
+
+  await act(async () => {
+    toutSelectionner.click();
+  });
+  check("coche l'en-tête sélectionne les DEUX lignes chargées", casesLigne().every((c) => c.checked));
+
+  await act(async () => {
+    toutSelectionner.click();
+  });
+  check("recocher l'en-tête décoche tout (bascule, pas une union)", casesLigne().every((c) => !c.checked));
+
+  await act(async () => {
+    toutSelectionner.click();
+  });
+  await act(async () => {
+    cliquer(bouton("Valider la sélection"));
+  });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  check(
+    "la sélection totale envoie EXACTEMENT les deux id chargés, rien d'autre",
+    Array.isArray((corpsBulk as { publicIds?: unknown })?.publicIds) &&
+      (corpsBulk as { publicIds: string[] }).publicIds.length === 2 &&
+      (corpsBulk as { publicIds: string[] }).publicIds.includes("eeeeeeeeee") &&
+      (corpsBulk as { publicIds: string[] }).publicIds.includes("ffffffffff")
+  );
+
+  act(() => {
+    root4.unmount();
   });
   document.body.removeChild(div);
 }
