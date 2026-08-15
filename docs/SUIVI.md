@@ -1,7 +1,10 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-08-14, sur `main` après fusion de #133, #134 (carrefour.ma, source de
-scraping en parallèle de bringo — voir §1 et §2 ci-dessous).*
+*Dernière mise à jour : 2026-08-15, sur `main` à `cd1cb3b`. Rattrape onze lots fusionnés le
+15/08 : filtre source dans la file admin, diffusion en masse Telegram/Discord, RLS
+`memoire_curation` + garde-fou CI, « tout sélectionner » (deux niveaux, cinq onglets + Supprimés),
+frictions de filtre corrigées, partage WhatsApp manuel, cache `og:image` versionné, cron de
+fraîcheur de ce document remis en état — voir §1 et §3.*
 
 Ce document est le **point d'entrée pour reprendre le travail sans contexte préalable**. Il dit
 ce qui tourne, ce qui reste ouvert, et par quoi continuer. Il ne remplace aucun autre document :
@@ -158,6 +161,8 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| Cron de fraîcheur du SUIVI, remis en état | #152 | 15/08 | `.github/workflows/suivi-perime.yml` (#86, 05/08) échouait sur CHAQUE run planifié depuis sa création : l'en-tête de ce document n'a jamais porté le format `sur \`main\` à \`<sha>\`.` attendu par le `sed` du workflow — un seul run réel (10/08), conclusion `failure`, jamais remarqué (un run planifié en échec ne notifie personne). Corrigé en donnant à l'en-tête ci-dessus le format attendu ; éprouvé réellement (`workflow_dispatch`, seuil forcé à 0) — issue créée puis refermée, voir `docs/INCIDENTS.md`. |
+| Fixes du jour (11 lots) | #142–#151 | 15/08 | Filtre source (domaine du lien, distingue bringo/carrefour.ma) ; diffusion en masse Telegram/Discord (migration 0021, sélection manuelle, étalement côté client) ; RLS `memoire_curation` + garde-fou CI `check-migrations-rls` (migration 0022) ; ordre migration/fusion documenté ; « tout sélectionner » deux niveaux sur les cinq onglets de statut + Supprimés (`verbesAutorises`, restauration groupée) ; étude WhatsApp/Facebook/Instagram gratuits (conclusion fermée, aucune voie sans compte Meta) ; frictions de filtre corrigées (application au changement, pas de reload brutal, retrait local sur action filtrée) ; partage WhatsApp manuel (texte prêt à coller, `whatsapp_message_genere`) ; cache `og:image` versionné dans le chemin (`[version]/og.jpg`, immuable) ; incident cache négatif Meta consigné. Détail : `docs/CONTRAT-V1.md` (vingtième et vingt-et-unième amendements), `docs/INCIDENTS.md`, `docs/IDEES.md`. |
 | Scraper carrefour.ma | #134 | 14/08 | Septième source, API JSON `/api/products`, en parallèle de bringo (voir « Fonctionnel livré » ci-dessus). `date_fin` réelle via `promotionEndDate`. |
 | Spike carrefour.ma | #133 | 14/08 | `docs/SPIKE-SOURCES.md` §11-12 : correction du faux négatif initial (vitrine crue statique), API JSON confirmée, recoupement bringo mesuré à blanc (0 doublon), prospectus PDF non comparé faute d'outillage (`pdftoppm`/clé Vision absents ici). |
 | File admin — filtre serveur | #83 | 05/08 | `GET /api/v1/admin/deals` : `statut` requis, filtre en base, pagination par curseur (neuvième amendement conscient, CONTRAT-V1 §4) — corrige le défaut diagnostiqué le 04/08 (`docs/INCIDENTS.md`) : une soumission `en_attente` invisible derrière un `LIMIT` global tranché côté client. `en_attente` trie `created_at` croissant ; nouvel endpoint `GET /api/v1/admin/deals/compte` pour les badges. Vérifié en production (ci-dessus). |
@@ -178,8 +183,9 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 ### Pull requests
 
-**Aucune PR ouverte au 14/08/2026** — #133 et #134 (spike + scraper carrefour.ma) fusionnées ce
-jour, #98 (retrait de vote) fusionnée le 08/08. Aucune PR Dependabot en attente de tri à date.
+**Aucune PR ouverte au 15/08/2026** (hors celle-ci, en cours) — #142 à #151 (onze lots, voir
+tableau ci-dessus) fusionnées ce jour, #133 et #134 (spike + scraper carrefour.ma) la veille.
+Aucune PR Dependabot en attente de tri à date.
 Un délai de refroidissement de 2 jours reste configuré (`.github/dependabot.yml`), aligné sur la
 politique pnpm `minimumReleaseAge` de 24 h — les mises à jour de **sécurité** en sont exemptées et
 ne sont jamais retardées.
@@ -454,9 +460,16 @@ message, parce qu'il reste alors **vivant dans le canal** sans que l'API puisse 
 > portée. **À faire avant de cliquer : poser les deux `_TEST` sur un canal jetable, et confirmer
 > par le champ `canalTest` de la réponse lequel des deux vient de se produire.**
 
-**WhatsApp reste entier**, et reste semi-manuel par décision : l'API officielle Meta ne poste pas
-dans les groupes, les bibliothèques non officielles risquent le ban du numéro (refusé). Le
-message formaté prêt à coller n'est pas écrit.
+**Mise à jour 15/08/2026 — diffusion en masse et WhatsApp, tous deux livrés :**
+
+| Ce qui existe | Détail |
+|---|---|
+| Diffusion en masse | #143 — sélection manuelle de deals publiés, envoi Telegram/Discord étalé côté client (throttle configurable), état fiable en cas d'échec en cours de lot (jamais de faux « diffusé »), reprise sans redoublon (migration `0021`) |
+| Partage WhatsApp manuel | #149 — reste semi-manuel par décision (même raison qu'avant : API officielle Meta ne poste pas dans les groupes, bibliothèques non officielles refusées). Bouton sur la fiche deal admin et dans la file pour un deal publié ; génère un texte prêt à coller (`buildLegendeWhatsapp`) et trace `whatsapp_message_genere` dans `journal_audit` sans toucher `deja_diffuse` ni les marqueurs Telegram/Discord. Aperçu de lien vérifié fonctionnel en production (image, titre, prix, enseigne) — voir l'incident de cache négatif Meta, `docs/INCIDENTS.md`. |
+
+**WhatsApp reste entier** pour tout ce qui dépasse le partage manuel : pas de canal officiel
+automatisé (diffusion groupée façon Telegram/Discord), pas de sélection multiple (le mode
+« récap » envisagé reste une note dans `docs/IDEES.md`, non construit).
 
 **Où.** `docs/IDEES.md`, section « Diffusion communautaire » — liens d'invitation officiels et
 architecture. `config/community.ts` reste à créer (liens en clair, ce ne sont pas des secrets).
