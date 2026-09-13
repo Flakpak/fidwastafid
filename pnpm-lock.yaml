@@ -52,11 +52,11 @@ importers:
         version: 1.62.1
       sharp:
         specifier: ^0.35.3
-        version: 0.35.3(@types/node@22.20.1)
+        version: 0.35.3(@types/node@22.20.2)
     devDependencies:
       '@types/node':
-        specifier: ^22.10.0
-        version: 22.20.1
+        specifier: ^22.20.2
+        version: 22.20.2
       tsx:
         specifier: ^4.23.12
         version: 4.23.12
@@ -92,7 +92,7 @@ importers:
         version: 19.2.8(react@19.2.8)
       sharp:
         specifier: ^0.35.3
-        version: 0.35.3(@types/node@22.20.1)
+        version: 0.35.3(@types/node@22.20.2)
       zod:
         specifier: ^3.23.8
         version: 3.25.76
@@ -104,8 +104,8 @@ importers:
         specifier: ^30.0.0
         version: 30.0.0
       '@types/node':
-        specifier: ^22.10.0
-        version: 22.20.1
+        specifier: ^22.20.2
+        version: 22.20.2
       '@types/react':
         specifier: ^19.2.18
         version: 19.2.18
@@ -138,8 +138,8 @@ importers:
         version: 2.112.2
     devDependencies:
       '@types/node':
-        specifier: ^22.10.0
-        version: 22.20.1
+        specifier: ^22.20.2
+        version: 22.20.2
       tsx:
         specifier: ^4.23.12
         version: 4.23.12
@@ -176,8 +176,8 @@ importers:
         version: 3.25.76
     devDependencies:
       '@types/node':
-        specifier: ^22.10.0
-        version: 22.20.1
+        specifier: ^22.20.2
+        version: 22.20.2
       tsx:
         specifier: ^4.23.12
         version: 4.23.12
@@ -1064,6 +1064,9 @@ packages:
   '@types/node@22.20.1':
     resolution: {integrity: sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q==}
 
+  '@types/node@22.20.2':
+    resolution: {integrity: sha512-xlvWf4Vs9n1PEVYwP1n4vvG07M6y8WgvJ2t0vbrWTmijsIHp1cS+uJ2kMIRdY3nHZK0nCYKrPeD171+SzF4/zw==}
+
   '@types/pg@8.20.4':
     resolution: {integrity: sha512-Jz7UDOlIiFJuacC0TlBoLyNtmwlA/wpIyPDd3tvUqlRM+HzkWy2xUgpFpaXtbfTAFF6sIGq5lsCDBdJnhky1Xg==}
 
@@ -1368,6 +1371,7 @@ packages:
   eslint@9.39.5:
     resolution: {integrity: sha512-DgZS62aPLXKlnxILS/AYCoRvHaZeXceIzlXPkkGGzJWSow1aEk0lbTlxUSlyjC8jcaKxAdOnTDz+o1JFSBsyjw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -2721,7 +2725,7 @@ snapshots:
 
   '@types/jsdom@30.0.0':
     dependencies:
-      '@types/node': 22.20.1
+      '@types/node': 22.20.2
       '@types/tough-cookie': 4.0.5
       parse5: 8.0.1
       undici-types: 8.10.0
@@ -2729,6 +2733,10 @@ snapshots:
   '@types/json-schema@7.0.15': {}
 
   '@types/node@22.20.1':
+    dependencies:
+      undici-types: 6.21.0
+
+  '@types/node@22.20.2':
     dependencies:
       undici-types: 6.21.0
 
@@ -3559,7 +3567,7 @@ snapshots:
       '@img/sharp-win32-x64': 0.34.5
     optional: true
 
-  sharp@0.35.3(@types/node@22.20.1):
+  sharp@0.35.3(@types/node@22.20.2):
     dependencies:
       '@img/colour': 1.1.0
       detect-libc: 2.1.2
@@ -3590,7 +3598,7 @@ snapshots:
       '@img/sharp-win32-arm64': 0.35.3
       '@img/sharp-win32-ia32': 0.35.3
       '@img/sharp-win32-x64': 0.35.3
-      '@types/node': 22.20.1
+      '@types/node': 22.20.2
 
   shebang-command@2.0.0:
     dependencies:
