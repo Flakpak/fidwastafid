@@ -60,7 +60,19 @@ une page qui a existé publiquement, potentiellement partagée — pas un brouil
 /deal/[slug]-[public_id]       page deal
 /enseigne/[slug]               page enseigne   (slug humain stable, curé à la main)
 /ville/[slug]                  page ville      (réservé, non actif en v1)
-/categorie/[slug]               page catégorie  (réservé, non actif en v1)
+/categorie/[slug]              page catégorie  (acté le 22/11/2026, non construit — 13 slugs
+                               fixes, indexable dès 8 deals publiés actifs, §3 vingt-deuxième
+                               amendement ; « Autre » sans page)
+/categorie/[slug]/[sous-slug]  sous-catégorie  (réservé, non actif — amendement ultérieur sur
+                               données Search Console)
+/bons-plans/[evenement]        page événement  (acté le 22/11/2026, non construit — liste
+                               fermée : black-friday, ramadan, aid, rentree, soldes-ete,
+                               soldes-hiver ; URL sans année, 200 hors saison)
+/guides/[slug]                 guide           (acté le 22/11/2026, non construit — rédigé ou
+                               relu par un humain)
+/sitemap-hubs.xml              sitemap hubs    (acté le 22/11/2026, non construit — accueil,
+                               catégories indexables, événements, guides)
+/sitemap-deals.xml             sitemap deals   (acté le 22/11/2026, non construit)
 /membre/[pseudo]-[public_id]   profil public   (réservé, PAS construit en v1)
 /soumettre                     soumission communautaire (noindex)
 /connexion  /inscription       auth (noindex)
@@ -190,6 +202,42 @@ catégorie reste hors schéma d'URL en v1 (`/categorie/[slug]` demeure réservé
 extension purement applicative, zéro impact SEO structurel. Décision produit du 21/07/2026 —
 explicitement bornée à ces 4 valeurs, pas de catégorie `Enfants`/`Famille` (pas sans données,
 voir `IDEES.md`).
+
+**Amendement du 22/11/2026 — pages hub SEO et taxonomie v3 (vingt-deuxième amendement conscient
+de la liste fermée).** Fait générateur : audit SEO du 22/11/2026 (lots SEO-1 à SEO-2c). 49 deals
+publiés étaient rangés sous `Autre`, dont 17 fournitures scolaires et 6 jouets ou articles pour
+enfants. La réserve du cinquième amendement (« pas de catégorie `Enfants` sans données ») est
+levée : ces données existent désormais. **Statut : la taxonomie (enum `categorie`) est en
+vigueur dès ce lot. Les routes, les règles d'indexation et le découpage du sitemap ci-dessous
+sont actés mais pas encore construits** : chaque point sera livré par un lot dédié, et le §2
+les marque « acté, non construit » jusque-là.
+
+- **`/categorie/[slug]` passe en actif.** Slugs fixes : `maison`, `electromenager`, `mode`,
+  `sport`, `high-tech`, `beaute`, `bricolage-jardin`, `alimentaire`, `telephonie-internet`,
+  `gaming`, `voyages`, `fournitures-scolaires`, `enfants-jouets`. `Autre` n'a pas de page.
+- **Indexation conditionnelle.** Une page catégorie est indexable à partir de **8 deals
+  publiés actifs**. En dessous : `noindex, follow`, et absente du sitemap. La bascule est
+  automatique dans les deux sens.
+- **`/categorie/[slug]/[sous-slug]`** : réservé, non actif. Son activation passera par un
+  amendement ultérieur, fondé sur les données Search Console.
+- **`/bons-plans/[evenement]`** est créé, avec une liste fermée : `black-friday`, `ramadan`,
+  `aid`, `rentree`, `soldes-ete`, `soldes-hiver`. L'URL ne porte pas l'année et sert à chaque
+  édition. Hors saison : HTTP 200, annonce de la prochaine édition et meilleurs deals de la
+  précédente. Jamais de 404.
+- **`/guides/[slug]`** est créé : contenu rédigé ou relu par un humain, aucune génération en
+  masse.
+- **Langue.** Les pages sont en français. Des blocs en darija ou en arabe sont autorisés dans le
+  sous-titre, l'introduction et la FAQ des pages hub, avec `lang` et `dir` posés sur le bloc.
+  `/ar` reste réservé (§2).
+- **Sitemap découpé** en `sitemap-hubs` (accueil, catégories indexables, événements, guides) et
+  `sitemap-deals`. `lastmod` = date de la vraie modification du contenu, jamais une date
+  recalculée.
+- **Enum `categorie`** : ajout de `Fournitures scolaires` et `Enfants & Jouets` (14 valeurs).
+  Comme au cinquième amendement, `categorie` est une colonne `text not null` sans contrainte
+  DB : seule la liste zod change (`packages/schemas/src/enums.ts`), aucune migration de schéma.
+  Ordre imposé : le code qui connaît les nouvelles valeurs est déployé **avant** toute ligne
+  qui les porte. `toDeal()` (`_lib/deals.ts`) valide `categorie` par `dealSchema.parse` : une
+  valeur inconnue du code déployé ferait échouer la lecture du deal.
 
 **Amendement du 18/07/2026 — consentement WhatsApp public** : la règle "`whatsapp_contact`
 n'apparaît jamais hors admin" (ci-dessous, §4) est remplacée par une règle conditionnée au

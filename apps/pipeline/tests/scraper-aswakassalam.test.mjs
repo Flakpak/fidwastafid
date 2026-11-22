@@ -107,7 +107,11 @@ console.log("\nparseProduits — rayons Électroménager/High-Tech/Sport (ajout�
       categories: [{ name: "PLEIN AIR, JOUETS & LOISIRS" }, { name: "SPORT" }],
     }),
     produit({
-      name: "COFFRET CREATIF BRACELETS ET COLLIERS",
+      // Titre neutre (aucun mot-clé) : ce cas teste le RAYON ambigu seul.
+      // Le titre réel d'origine (« COFFRET CREATIF BRACELETS ET COLLIERS »)
+      // est désormais classé par son titre (Enfants & Jouets, taxonomie v3,
+      // tests/categoriser-v3.test.mjs).
+      name: "LOT DE 3 ARTICLES PLEIN AIR",
       salePrice: "4900",
       regularPrice: "7900",
       categories: [{ name: "PLEIN AIR, JOUETS & LOISIRS" }],

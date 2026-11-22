@@ -36,6 +36,8 @@ export const CAT_ICONS: Record<string, string> = {
   Gaming: "🎮",
   "Bricolage & Jardin": "🛠️",
   Voyages: "✈️",
+  "Fournitures scolaires": "✏️",
+  "Enfants & Jouets": "🧸",
 };
 export function categorieIcon(categorie: string): string {
   return CAT_ICONS[categorie] ?? "🛍️";

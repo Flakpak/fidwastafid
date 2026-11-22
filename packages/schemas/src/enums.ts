@@ -52,6 +52,9 @@ export const CATEGORIES = [
   "Gaming",
   "Bricolage & Jardin",
   "Voyages",
+  // Vingt-deuxième amendement (22/11/2026, CONTRAT-V1 §3) : taxonomie v3.
+  "Fournitures scolaires",
+  "Enfants & Jouets",
 ] as const;
 
 export const categorieSchema = z.enum(CATEGORIES);
@@ -71,6 +74,8 @@ export const CATEGORIE_SLUGS: Record<Categorie, string> = {
   Gaming: "gaming",
   "Bricolage & Jardin": "bricolage-jardin",
   Voyages: "voyages",
+  "Fournitures scolaires": "fournitures-scolaires",
+  "Enfants & Jouets": "enfants-jouets",
 };
 
 /** Couleurs d'avatar — espace membre (CONTRAT-V1 §4, amendement 16/07/2026).
