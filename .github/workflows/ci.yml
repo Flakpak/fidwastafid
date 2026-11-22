@@ -146,7 +146,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:17
         env:
           POSTGRES_USER: fidwastafid
           POSTGRES_PASSWORD: fidwastafid
@@ -189,9 +189,6 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-
-      - name: DIAGNOSTIC TEMPORAIRE fuseau
-        run: psql "$DATABASE_URL" -c "SELECT version(), current_setting('TimeZone'), ('2026-11-22T23:30:00Z'::timestamptz AT TIME ZONE 'Africa/Casablanca');"
 
       - run: pnpm --filter @fidwastafid/db migrate
       - run: pnpm --filter @fidwastafid/web test:integration
