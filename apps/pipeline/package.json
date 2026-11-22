@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Pipeline de scraping/extraction de deals (Bringo/Carrefour, catalogues) — Phase 7A, rejoint le monorepo.",
   "scripts": {
-    "test": "tsx tests/validation.test.mjs && tsx tests/remise.test.mjs && tsx tests/expiration.test.mjs && tsx tests/schema-guard.test.mjs && tsx tests/public-id.test.mjs && tsx tests/argv.test.mjs && tsx tests/scraper-inwi.test.mjs && tsx tests/scraper-universparadiscount.test.mjs && tsx tests/scraper-decathlon.test.mjs && tsx tests/scraper-kiabi.test.mjs && tsx tests/scraper-bestmark.test.mjs && tsx tests/scraper-carrefour.test.mjs && tsx tests/scraper-ab-maroc.test.mjs && tsx tests/scraper-aswakassalam.test.mjs",
+    "test": "tsx tests/entites-html.test.mjs && tsx tests/validation.test.mjs && tsx tests/remise.test.mjs && tsx tests/expiration.test.mjs && tsx tests/schema-guard.test.mjs && tsx tests/public-id.test.mjs && tsx tests/argv.test.mjs && tsx tests/scraper-inwi.test.mjs && tsx tests/scraper-universparadiscount.test.mjs && tsx tests/scraper-decathlon.test.mjs && tsx tests/scraper-kiabi.test.mjs && tsx tests/scraper-bestmark.test.mjs && tsx tests/scraper-carrefour.test.mjs && tsx tests/scraper-ab-maroc.test.mjs && tsx tests/scraper-aswakassalam.test.mjs",
     "discover-site": "tsx discover-site.mjs",
     "scraper-bringo": "tsx scraper-bringo.mjs",
     "scraper-carrefour": "tsx scraper-carrefour.mjs",
@@ -28,6 +28,7 @@
   "dependencies": {
     "@fidwastafid/schemas": "workspace:*",
     "cheerio": "^1.2.0",
+    "entities": "^6.0.1",
     "pg": "^8.22.0",
     "playwright": "^1.62.1",
     "sharp": "^0.35.3"
