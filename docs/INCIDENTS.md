@@ -10,6 +10,47 @@ en a appris. Une leçon gravée ici a vocation à être citée depuis le code ou
 
 ---
 
+## 2026-11-22 — Contrainte : migration 0023 appliquée avant la fusion de sa PR (exception CONTRAT-V1 §7)
+
+*Entrée de **contrainte**, pas d'incident : rien n'a cassé en production. Application
+consciente de l'exception prévue par CONTRAT-V1 §7 (amendement du 15/08/2026), consignée
+pour la traçabilité de l'écart temporaire entre le dépôt et la prod.*
+
+**Le fait.** La migration `0023_decodage_entites_titres.sql` (lot SEO-2, PR #188) corrige
+29 titres de deals portant des entités HTML brutes (`&rsquo;` ×26, `&#038;` ×5, venues des
+API WooCommerce d'aswakassalam.com et ab-maroc.com). Sur la PR, `migrations-check` était
+rouge : « migration(s) du repo non appliquée(s) sur la cible : 0023 ». Ce check compare
+le dépôt à la prod dans les deux sens ; il ne pouvait donc pas passer au vert sur une PR
+qui ajoute une migration, tant que celle-ci n'était pas appliquée.
+
+**Geste.** Sur confirmation explicite de Kamel pour cette seule migration, 0023 a été
+appliquée en prod le 22/11/2026 à 18:24:44 UTC (horodatage `schema_migrations`), depuis la
+branche de la PR. Commande : `pnpm --filter @fidwastafid/db migrate`, sur le port 5432
+(`packages/db/.env.migration.local`). Aucun run de `pipeline-quotidien.yml` n'était en
+cours (dernier run terminé à 13:05 UTC). Seule 0023 était en attente.
+
+**Vérifications.**
+- Par le connecteur Supabase, un autre chemin que celui de l'écriture : 0 titre ne
+  correspond à `&(#[0-9]+|#x[0-9a-fA-F]+|[a-zA-Z]+);`.
+- `migrations-check` relancé puis vert ; PR fusionnée en squash (`a10871d`).
+- En prod, après le déploiement Vercel : l'ancienne URL `...-d-rsquo-...` répond 308 vers
+  le nouveau slug, et `<title>` affiche « D’OUTILS ». Même chose pour `...-038-...` :
+  308, puis « & » dans le titre.
+
+**Justification de l'exception.** La migration ne fait que réécrire des données, sans
+changer le schéma : le code déjà en production lit `titre` de la même façon avant et
+après. Appliquer avant la fusion ne créait donc aucune incompatibilité. Les deux sens
+étaient sûrs, mais seul celui-ci permettait de passer `migrations-check` au vert, ce que
+le lot exigeait avant toute fusion.
+
+**Leçon.** Pour toute PR qui ajoute une migration, `migrations-check` est rouge par
+construction tant qu'elle n'est pas appliquée. « Fusionner puis appliquer », l'ordre par
+défaut du §7, impose donc de fusionner avec ce check rouge. Le lot interdisant de
+fusionner sur un check rouge, appliquer avant la fusion est la seule voie : à prévoir
+d'emblée dans tout lot qui contient une migration, pas à découvrir en cours de route.
+
+---
+
 ## 2026-08-15 — Deux sources rangées sous une même cause présumée, sans que rien ne le justifie
 
 *Entrée de **méthode**, pas de panne technique : la cause du premier constat, ci-dessous, n'a
