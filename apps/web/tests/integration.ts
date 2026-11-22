@@ -2,6 +2,7 @@ import { withTransaction, closePool, query, getPool } from "@fidwastafid/db";
 import { generatePublicId } from "@fidwastafid/schemas";
 import { purgerImages, DELAI_JOURS_PURGE_IMAGES, UTILISATEUR_SYSTEME_ID } from "../../pipeline/purger-images.mjs";
 import { purgerLignes, DELAI_JOURS_PURGE_LIGNES } from "../../pipeline/purger-lignes.mjs";
+import { expirerPublies } from "../../pipeline/_lib/expirerPublies.mjs";
 import { PUBLIC_IDS_FIXTURES, PUBLIC_ID_INEXISTANT } from "./fixtures.js";
 import { POST as postDeal, GET as getDealsList } from "../src/app/api/v1/deals/route.js";
 import { GET as getCompte } from "../src/app/api/v1/deals/compte/route.js";
@@ -2028,6 +2029,70 @@ async function main() {
     );
   } finally {
     await query("delete from deals where public_id = any($1::text[])", [[ACCENT_ACCENTUE, ACCENT_NON_ACCENTUE]]);
+  }
+
+  // ----------------------------------------------------------------
+  // Expiration des deals publiés (lot SEO-2b) — même requête que la prod
+  // (`expirerPublies`, apps/pipeline/_lib/expirerPublies.mjs), instants
+  // fixes, jour calculé par CE Postgres à Africa/Casablanca. Chaque cas
+  // tourne dans sa propre transaction, annulée à la fin : la requête touche
+  // TOUS les `publie` de la base, les fixtures des autres blocs ne doivent
+  // pas en garder la trace.
+  // ----------------------------------------------------------------
+  console.log("\nexpiration des deals publiés — jour de Casablanca calculé par Postgres");
+  {
+    async function casExpiration(
+      instant: string,
+      deals: { statut: string; dateFin: string }[]
+    ): Promise<{ expires: string[]; statuts: string[] }> {
+      const ids = deals.map(() => generatePublicId());
+      const client = await getPool().connect();
+      try {
+        await client.query("begin");
+        for (const [i, d] of deals.entries()) {
+          await client.query(
+            `insert into deals (public_id, titre, categorie, type, prix_promo, statut, score, date_fin)
+             values ($1, 'Expiration publiés — test', 'Autre', 'physique', 10, $2, 0, $3)`,
+            [ids[i], d.statut, d.dateFin]
+          );
+        }
+        const expires = await expirerPublies(client, instant);
+        const { rows } = await client.query<{ public_id: string; statut: string }>(
+          "select public_id, statut from deals where public_id = any($1::text[])",
+          [ids]
+        );
+        const parId = new Map(rows.map((r) => [r.public_id, r.statut]));
+        return { expires: expires.filter((id) => ids.includes(id)), statuts: ids.map((id) => parId.get(id) ?? "?") };
+      } finally {
+        await client.query("rollback");
+        client.release();
+      }
+    }
+
+    // Instants volontairement éloignés de minuit : le décalage UTC de
+    // Africa/Casablanca diffère entre les données de fuseau du Postgres de
+    // CI et celles de la prod (docs/IDEES.md, 22/11/2026) — un cas à 23:30
+    // UTC testerait la base de fuseaux, pas la requête.
+    const lendemain = await casExpiration("2026-11-23T12:00:00Z", [{ statut: "publie", dateFin: "2026-11-22" }]);
+    check("12:00 UTC le 23, date_fin 22 → expire", lendemain.statuts[0] === "expire" && lendemain.expires.length === 1);
+
+    const memeJour = await casExpiration("2026-11-22T12:00:00Z", [{ statut: "publie", dateFin: "2026-11-22" }]);
+    check("12:00 UTC le 22, date_fin 22 → reste publie (le jour de fin reste publié)", memeJour.statuts[0] === "publie" && memeJour.expires.length === 0);
+
+    const veille = await casExpiration("2026-11-22T22:30:00Z", [{ statut: "publie", dateFin: "2026-11-22" }]);
+    check("22:30 UTC (23:30 le 22 à Casablanca), date_fin 22 → reste publie", veille.statuts[0] === "publie" && veille.expires.length === 0);
+
+    const avant = await casExpiration("2026-11-22T10:00:00Z", [{ statut: "publie", dateFin: "2026-11-23" }]);
+    check("10:00 UTC le 22, date_fin 23 → reste publie", avant.statuts[0] === "publie" && avant.expires.length === 0);
+
+    const autres = await casExpiration("2026-11-22T23:30:00Z", [
+      { statut: "auto_draft", dateFin: "2026-11-01" },
+      { statut: "rejete", dateFin: "2026-11-01" },
+    ]);
+    check(
+      "auto_draft et rejete à date_fin passée → non touchés",
+      autres.statuts[0] === "auto_draft" && autres.statuts[1] === "rejete" && autres.expires.length === 0
+    );
   }
 
   console.log(

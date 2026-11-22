@@ -22,6 +22,7 @@
     "verifier-sources-mortes": "tsx verifier-sources-mortes.mjs",
     "rattrapage-descriptions": "tsx rattrapage-descriptions.mjs",
     "expirer-auto-draft": "tsx expirer-auto-draft.mjs",
+    "expirer-publies": "tsx expirer-publies.mjs",
     "purger-images": "tsx purger-images.mjs",
     "purger-lignes": "tsx purger-lignes.mjs"
   },

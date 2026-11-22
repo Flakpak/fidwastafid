@@ -143,6 +143,15 @@ jobs:
       - name: Expiration des deals auto_draft (> 14 jours)
         run: pnpm --filter pipeline run expirer-auto-draft
 
+      # Lot SEO-2b (22/11/2026) : publie → expire quand date_fin est
+      # strictement antérieure au jour de Casablanca. Même discipline que
+      # l'étape précédente : un échec fait échouer le job. Pas de
+      # revalidation dédiée : la page d'accueil, les fiches deal, les pages
+      # enseigne et le sitemap sont toutes `force-dynamic`, et l'étape
+      # « Revalidation Next.js » en fin de job couvre déjà / et /sitemap.xml.
+      - name: Expiration des deals publiés (date de fin passée)
+        run: pnpm --filter pipeline run expirer-publies
+
       # Incident du 20/07/2026 : `pnpm --filter pipeline run <script> -- <args>`
       # transmet le "--" LITTÉRALEMENT au script sous-jacent (constaté
       # empiriquement) — argv[2] devenait "--" au lieu du premier argument
