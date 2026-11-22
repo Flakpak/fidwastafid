@@ -5,8 +5,14 @@ import { dealUrlSlug } from "@fidwastafid/schemas";
 import { SITE_URL } from "./siteUrl.js";
 import { estActifSeo } from "../app/api/v1/_lib/deals.js";
 import { HUBS_EVENEMENTS } from "../../content/hubs.js";
-import { etatEvenement, REMISE_MIN_EVENEMENT } from "./hubs.js";
-import { aujourdhuiCasablanca, categoriesIndexables, derniereMajRemise } from "../app/api/v1/_lib/hubs.js";
+import { etatEvenement, estCategorieIndexable, REMISE_MIN_EVENEMENT } from "./hubs.js";
+import {
+  aujourdhuiCasablanca,
+  categoriesIndexables,
+  compterEnseignes,
+  derniereMajEdition,
+  derniereMajRemise,
+} from "../app/api/v1/_lib/hubs.js";
 
 /**
  * Sitemap découpé (lot SEO-3, CONTRAT-V1 §3 vingt-deuxième amendement) :
@@ -136,19 +142,18 @@ export async function entreesHubs(): Promise<UrlEntry[]> {
     ),
     categoriesIndexables(),
     aujourdhuiCasablanca(),
-    query<{ slug: string; derniere_maj: string | null }>(
-      `select e.slug, max(d.updated_at) as derniere_maj
-         from enseignes e
-         left join deals d on d.enseigne_id = e.id and d.supprime_le is null and d.statut = 'publie'
-        group by e.slug`
-    ),
+    compterEnseignes(),
   ]);
 
   const evenements: UrlEntry[] = [];
   for (const evenement of HUBS_EVENEMENTS) {
     const { edition, indexable } = etatEvenement(evenement, aujourdhui);
     if (!indexable) continue;
-    const derniere = await derniereMajRemise(edition ? REMISE_MIN_EVENEMENT : undefined);
+    // Même jeu de deals que la page : édition en cours → deals publiés dans
+    // la fenêtre ; hors saison → meilleures remises du moment.
+    const derniere = edition
+      ? await derniereMajEdition(edition, REMISE_MIN_EVENEMENT)
+      : await derniereMajRemise();
     evenements.push({
       loc: abs(`/bons-plans/${evenement.slug}`),
       lastmod: iso(derniere),
@@ -166,9 +171,11 @@ export async function entreesHubs(): Promise<UrlEntry[]> {
       priority: "0.8",
     })),
     ...evenements,
-    ...enseignes.map((e) => ({
+    // Enseignes : même seuil que les catégories (lot SEO-3) — sous le seuil,
+    // la page est `noindex, follow` et n'a rien à faire dans le sitemap.
+    ...enseignes.filter((e) => estCategorieIndexable(e.nombre)).map((e) => ({
       loc: abs(`/enseigne/${e.slug}`),
-      lastmod: iso(e.derniere_maj),
+      lastmod: iso(e.derniereMaj),
       changefreq: "weekly",
       priority: "0.5",
     })),

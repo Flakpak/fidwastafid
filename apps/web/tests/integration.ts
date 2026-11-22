@@ -6,6 +6,7 @@ import { expirerPublies } from "../../pipeline/_lib/expirerPublies.mjs";
 import { GET as getSitemapIndex } from "../src/app/sitemap.xml/route.js";
 import { GET as getSitemapHubs } from "../src/app/sitemap-hubs.xml/route.js";
 import { GET as getSitemapDeals } from "../src/app/sitemap-deals.xml/route.js";
+import { fetchDealsEdition } from "../src/app/api/v1/_lib/hubs.js";
 import { PUBLIC_IDS_FIXTURES, PUBLIC_ID_INEXISTANT } from "./fixtures.js";
 import { POST as postDeal, GET as getDealsList } from "../src/app/api/v1/deals/route.js";
 import { GET as getCompte } from "../src/app/api/v1/deals/compte/route.js";
@@ -2093,6 +2094,71 @@ async function main() {
       check("sitemap-deals ne contient aucun hub", !deals.includes("/categorie/") && !deals.includes("/enseigne/"));
     } finally {
       await query("delete from deals where public_id = any($1::text[])", [idsVoyages]);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Black Friday : fenêtre de PREMIÈRE PUBLICATION (journal_audit), pas de
+  // création. Deux deals créés avant la fenêtre ; l'un publié avant (exclu),
+  // l'autre publié pendant (inclus, malgré un created_at antérieur).
+  // ----------------------------------------------------------------
+  console.log("\nBlack Friday — deals publiés pour la première fois dans la fenêtre");
+  {
+    const PUBLIE_AVANT = generatePublicId();
+    const PUBLIE_PENDANT = generatePublicId();
+    try {
+      for (const [id, creation, publication] of [
+        [PUBLIE_AVANT, "2026-10-10T10:00:00Z", "2026-10-15T10:00:00Z"],
+        [PUBLIE_PENDANT, "2026-10-20T10:00:00Z", "2026-11-10T10:00:00Z"],
+      ] as const) {
+        await query(
+          `insert into deals (public_id, titre, categorie, type, prix_promo, prix_normal, statut, score, created_at)
+           values ($1, 'Black Friday — test fenêtre', 'Maison', 'en_ligne', 50, 100, 'publie', 0, $2)`,
+          [id, creation]
+        );
+        await query(
+          `insert into journal_audit (admin_id, action, cible_type, cible_id, details, created_at)
+           values ($1, 'update_statut', 'deal', $2, '{"apres":"publie"}', $3)`,
+          [userId, id, publication]
+        );
+      }
+      const ids = (await fetchDealsEdition({ debut: "2026-11-01", fin: "2026-11-30" }, 0.2, 1000)).map((d) => d.publicId);
+      check("publié le 15/10 (avant la fenêtre) → exclu", !ids.includes(PUBLIE_AVANT));
+      check("créé le 20/10 mais publié le 10/11 → inclus (date de publication, pas de création)", ids.includes(PUBLIE_PENDANT));
+    } finally {
+      await query("delete from journal_audit where cible_type = 'deal' and cible_id = any($1::text[])", [[PUBLIE_AVANT, PUBLIE_PENDANT]]);
+      await query("delete from deals where public_id = any($1::text[])", [[PUBLIE_AVANT, PUBLIE_PENDANT]]);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Enseigne sous le seuil : hors sitemap-hubs à 7 deals actifs, présente à 8.
+  // ----------------------------------------------------------------
+  console.log("\nenseigne — seuil d'indexation (sitemap-hubs)");
+  {
+    const SLUG = "test-seuil-seo3";
+    const ids = Array.from({ length: 8 }, () => generatePublicId());
+    try {
+      await query("insert into enseignes (slug, nom) values ($1, 'Test seuil SEO-3') on conflict (slug) do nothing", [SLUG]);
+      for (const id of ids.slice(0, 7)) {
+        await query(
+          `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, prix_normal, statut, score)
+           values ($1, 'Enseigne seuil — test', (select id from enseignes where slug = $2), 'Maison', 'en_ligne', 50, 100, 'publie', 0)`,
+          [id, SLUG]
+        );
+      }
+      const a7 = await (await getSitemapHubs(new Request("http://localhost/sitemap-hubs.xml"))).text();
+      check("7 deals actifs → enseigne absente de sitemap-hubs", !a7.includes(`/enseigne/${SLUG}</loc>`));
+      await query(
+        `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, prix_normal, statut, score)
+         values ($1, 'Enseigne seuil — test', (select id from enseignes where slug = $2), 'Maison', 'en_ligne', 50, 100, 'publie', 0)`,
+        [ids[7], SLUG]
+      );
+      const a8 = await (await getSitemapHubs(new Request("http://localhost/sitemap-hubs.xml"))).text();
+      check("8 deals actifs → enseigne présente dans sitemap-hubs", a8.includes(`/enseigne/${SLUG}</loc>`));
+    } finally {
+      await query("delete from deals where public_id = any($1::text[])", [ids]);
+      await query("delete from enseignes where slug = $1", [SLUG]);
     }
   }
 

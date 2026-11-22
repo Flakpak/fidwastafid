@@ -127,9 +127,13 @@ export interface EditionEvenement {
   fin: string;
   jourJ: string;
   title: string;
+  /** Meta description dédiée (jamais l'intro). */
+  description: string;
   h1: string;
   intro: string;
   darija: string | null;
+  /** Affiché sous l'intro quand l'édition compte moins de SEUIL_INDEXATION_CATEGORIE deals. */
+  messagePeuDeDeals: string;
 }
 
 export interface HubEvenement {
@@ -158,6 +162,9 @@ export const HUBS_EVENEMENTS: readonly HubEvenement[] = [
         fin: "2026-11-30",
         jourJ: "2026-11-27",
         title: "Black Friday Maroc 2026 : les vraies promos",
+        description:
+          "Les promos Black Friday au Maroc avec le prix d'origine affiché, triées par remise. Mis à jour chaque jour jusqu'au 30 novembre.",
+        messagePeuDeDeals: "Les offres arrivent au fil du mois : revenez avant le 27 novembre.",
         h1: "Black Friday Maroc 2026 : les vraies promos",
         intro:
           "Le Black Friday tombe le vendredi 27 novembre 2026, mais au Maroc les promotions s'étalent sur tout le mois de novembre. On ne garde ici que les offres avec un prix d'origine affiché par l'enseigne, triées par remise. Une remise sans prix d'origine ne prouve rien.",

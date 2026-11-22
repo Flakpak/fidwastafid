@@ -1,4 +1,4 @@
-import { hubParSlug, hubParCategorie, robotsCategorie, estCategorieIndexable, titreCategorie, descriptionCategorie, evenementParSlug, etatEvenement, breadcrumbJsonLd } from "../src/lib/hubs.js";
+import { hubParSlug, hubParCategorie, robotsCategorie, robotsEnseigne, noteEdition, estCategorieIndexable, titreCategorie, descriptionCategorie, evenementParSlug, etatEvenement, breadcrumbJsonLd } from "../src/lib/hubs.js";
 import { HUBS_CATEGORIES } from "../content/hubs.js";
 import { CATEGORIE_SLUGS } from "@fidwastafid/schemas";
 import { indexXml, plusRecent } from "../src/lib/sitemap.js";
@@ -1287,6 +1287,21 @@ function checkHubs() {
     "title Black Friday",
     etatEvenement(bf, "2026-11-22").edition?.title === "Black Friday Maroc 2026 : les vraies promos"
   );
+
+  const editionBf = etatEvenement(bf, "2026-11-22").edition!;
+  check(
+    "meta description Black Friday dédiée (≠ intro)",
+    editionBf.description ===
+      "Les promos Black Friday au Maroc avec le prix d'origine affiché, triées par remise. Mis à jour chaque jour jusqu'au 30 novembre." &&
+      editionBf.description !== editionBf.intro
+  );
+  check(
+    "Black Friday sous 8 deals → phrase d'attente",
+    noteEdition(editionBf, 7) === "Les offres arrivent au fil du mois : revenez avant le 27 novembre."
+  );
+  check("Black Friday à 8 deals → pas de phrase", noteEdition(editionBf, 8) === null);
+  check("enseigne à 7 deals actifs → noindex, follow", JSON.stringify(robotsEnseigne(7)) === JSON.stringify({ robots: { index: false, follow: true } }));
+  check("enseigne à 8 deals actifs → indexable", JSON.stringify(robotsEnseigne(8)) === "{}");
 
   const ariane = breadcrumbJsonLd([{ nom: "Accueil", chemin: "/" }, { nom: "Maison", chemin: "/categorie/maison" }, { nom: "Un deal" }]);
   check("BreadcrumbList : 3 maillons numérotés 1..3", ariane.itemListElement.map((m) => m.position).join(",") === "1,2,3");

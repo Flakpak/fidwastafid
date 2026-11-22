@@ -78,6 +78,16 @@ export function etatEvenement(evenement: HubEvenement, aujourdhui: string): Etat
   };
 }
 
+/** Phrase sous l'intro d'une édition en cours qui compte encore peu de deals ; null sinon. */
+export function noteEdition(edition: EditionEvenement, nombreDeals: number): string | null {
+  return nombreDeals < SEUIL_INDEXATION_CATEGORIE ? edition.messagePeuDeDeals : null;
+}
+
+/** Même seuil que les catégories (vingt-deuxième amendement, lot SEO-3). */
+export function robotsEnseigne(nombreDealsActifs: number): { robots?: { index: false; follow: true } } {
+  return robotsCategorie(nombreDealsActifs);
+}
+
 export interface MaillonAriane {
   nom: string;
   /** Chemin absolu sur le site ; absent pour le dernier maillon (page courante). */

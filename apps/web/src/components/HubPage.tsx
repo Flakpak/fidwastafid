@@ -27,11 +27,14 @@ export async function HubPage({
   vide,
   liens,
   titreLiens,
+  note,
 }: {
   maillons: readonly MaillonAriane[];
   h1: string;
   intro: string;
   darija: string | null;
+  /** Phrase affichée sous l'intro (ex. édition qui démarre). */
+  note?: string | null;
   deals: Deal[];
   vide: string;
   liens: LienHub[];
@@ -59,6 +62,7 @@ export async function HubPage({
           </p>
         )}
         <p className="text-ink-muted leading-relaxed">{intro}</p>
+        {note && <p className="font-bold text-ink">{note}</p>}
 
         {deals.length === 0 && <p className="text-center text-ink-muted py-16">{vide}</p>}
         {deals.map((deal) => (

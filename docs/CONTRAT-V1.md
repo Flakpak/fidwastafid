@@ -225,6 +225,8 @@ construit.*
 - **Indexation conditionnelle.** Une page catégorie est indexable à partir de **8 deals
   publiés actifs**. En dessous : `noindex, follow`, et absente du sitemap. La bascule est
   automatique dans les deux sens.
+- **Même seuil pour `/enseigne/[slug]`** : moins de 8 deals publiés actifs → `noindex, follow`
+  et exclusion de `sitemap-hubs`, bascule automatique (ajout du 22/11/2026, lot SEO-3).
 - **`/categorie/[slug]/[sous-slug]`** : réservé, non actif. Son activation passera par un
   amendement ultérieur, fondé sur les données Search Console.
 - **`/bons-plans/[evenement]`** est créé, avec une liste fermée : `black-friday`, `ramadan`,
