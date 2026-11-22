@@ -1,16 +1,14 @@
 import type { Metadata } from "next";
-import type { Deal } from "@fidwastafid/schemas";
-import { GET as getDealsHandler } from "./api/v1/deals/route.js";
-import { GET as getCompteHandler } from "./api/v1/deals/compte/route.js";
 import { SiteHeader } from "../components/SiteHeader.js";
 import { SiteFooter } from "../components/SiteFooter.js";
 import { Ticker } from "../components/Ticker.js";
 import { HeroBand } from "../components/HeroBand.js";
-import { BlocCategories } from "../components/BlocCategories.js";
 import { Feed } from "./Feed.js";
-import { construireParamsCompte, construireParamsFeed } from "../lib/feedPagination.js";
-import { lireFiltresUrl, type EtatFiltres } from "../lib/filtresFeed.js";
+import { lireFiltresUrl } from "../lib/filtresFeed.js";
 import { resolveCurrentUser } from "../lib/currentUser.js";
+import { fetchFeed, fetchTotal, versSearchParams } from "../lib/feedServeur.js";
+import { evenementParSlug, etatEvenement } from "../lib/hubs.js";
+import { aujourdhuiCasablanca, categoriesFiltre } from "./api/v1/_lib/hubs.js";
 
 
 const DESCRIPTION = "Les meilleurs bons plans et promotions au Maroc, votés par la communauté : alimentaire, high-tech, mode et plus.";
@@ -35,60 +33,35 @@ export const metadata: Metadata = {
  */
 export const dynamic = "force-dynamic";
 
-interface DealsPage {
-  data: Deal[];
-  nextCursor: string | null;
-}
-
-/**
- * Appel direct des handlers de route plutôt qu'un fetch HTTP vers soi-même :
- * pas de base URL à deviner (dev/Docker/Vercel ont des origines
- * différentes), et ça reste la même API que le web/mobile consommeront
- * plus tard (CONTRAT-V1 : une seule porte d'entrée /api/v1).
- *
- * Les DEUX appels partent des mêmes filtres, lus dans l'URL : un feed filtré
- * partagé s'ouvre déjà filtré, avec son compteur de résultats déjà juste —
- * sans passe client ni valeur qui change sous les yeux après hydratation.
- */
-async function fetchFeed(filtres: EtatFiltres): Promise<DealsPage> {
-  const params = construireParamsFeed(filtres);
-  const response = await getDealsHandler(new Request(`http://localhost/api/v1/deals?${params.toString()}`));
-  const body = (await response.json()) as DealsPage;
-  return { data: body.data, nextCursor: body.nextCursor };
-}
-
-async function fetchTotal(filtres: EtatFiltres): Promise<number | null> {
-  const params = construireParamsCompte(filtres);
-  const response = await getCompteHandler(new Request(`http://localhost/api/v1/deals/compte?${params.toString()}`));
-  if (!response.ok) return null;
-  return ((await response.json()) as { total: number }).total;
-}
-
 type PageParams = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
-/** Les valeurs répétées (`?ville=A&ville=B`) sont réduites à la première :
- *  l'interface ne peut en produire qu'une, et les filtres restent à choix
- *  unique. */
-function versSearchParams(brut: Record<string, string | string[] | undefined>): URLSearchParams {
-  const params = new URLSearchParams();
-  for (const [cle, valeur] of Object.entries(brut)) {
-    const premiere = Array.isArray(valeur) ? valeur[0] : valeur;
-    if (typeof premiere === "string") params.set(cle, premiere);
-  }
-  return params;
+/**
+ * Entrée Black Friday du filtre (lot SEO-3b) : présente uniquement pendant la
+ * fenêtre de l'édition, jour fourni par Postgres. Remplace le bloc séparé du
+ * lot SEO-3.
+ */
+async function lienBlackFriday() {
+  const evenement = evenementParSlug("black-friday");
+  if (!evenement) return null;
+  const { edition } = etatEvenement(evenement, await aujourdhuiCasablanca());
+  return edition ? { href: `/bons-plans/${evenement.slug}`, libelle: evenement.nom } : null;
 }
 
 export default async function Home({ searchParams }: PageParams) {
   const brut = await searchParams;
+  // Les DEUX appels (liste et compteur) partent des mêmes filtres, lus dans
+  // l'URL : un feed filtré partagé s'ouvre déjà filtré (src/lib/feedServeur.ts).
   const filtres = lireFiltresUrl(versSearchParams(brut));
   // `resolveCurrentUser()` est déjà appelé par SiteHeader ci-dessous —
   // dédupliqué par requête (cache(), React) : ce troisième appel ne coûte
   // rien de plus. Seul un booléen part vers Feed (CONTRAT-V1 §4, seizième
   // amendement conscient) — jamais l'identité elle-même.
-  const [premierePage, total, utilisateurCourant] = await Promise.all([
+  const [premierePage, total, utilisateurCourant, liensCategories, lienEvenement] = await Promise.all([
     fetchFeed(filtres),
     fetchTotal(filtres),
     resolveCurrentUser(),
+    categoriesFiltre(),
+    lienBlackFriday(),
   ]);
 
   const compte = typeof brut.compte === "string" ? brut.compte : undefined;
@@ -116,13 +89,9 @@ export default async function Home({ searchParams }: PageParams) {
       )}
       <Ticker />
       <Feed
-        hero={
-          <>
-            <HeroBand />
-            {/* Maillage SEO-3 : catégories indexables + Black Friday en saison. */}
-            <BlocCategories />
-          </>
-        }
+        hero={<HeroBand />}
+        liensCategories={liensCategories}
+        lienEvenement={lienEvenement}
         initialDeals={premierePage.data}
         initialCursor={premierePage.nextCursor}
         initialFiltres={filtres}

@@ -16,7 +16,6 @@ import { SITE_URL } from "./siteUrl.js";
 export const SEUIL_INDEXATION_CATEGORIE = 8;
 
 /** Plafonds de liste (amendement + lot SEO-3). */
-export const LIMITE_DEALS_CATEGORIE = 48;
 export const LIMITE_DEALS_EVENEMENT_EN_COURS = 60;
 export const LIMITE_DEALS_HORS_SAISON = 12;
 /** Remise minimale d'un deal listé pendant la fenêtre d'un événement. */
@@ -43,6 +42,11 @@ export function robotsCategorie(nombreDealsActifs: number): { robots?: { index: 
 
 export function nomMinuscule(hub: HubCategorie): string {
   return hub.categorie.toLowerCase();
+}
+
+/** Canonical d'une page catégorie : le chemin seul, jamais de paramètre (tri, ville, recherche). */
+export function canonicalCategorie(hub: HubCategorie): string {
+  return `/categorie/${hub.slug}`;
 }
 
 export function titreCategorie(hub: HubCategorie): string {

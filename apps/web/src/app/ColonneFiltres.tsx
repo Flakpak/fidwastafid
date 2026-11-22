@@ -5,13 +5,17 @@ import {
   OU_ACHETER,
   RAISON_VILLE_SANS_OBJET,
   TRIS,
+  cheminCategorieFiltre,
   villeSansObjet,
   type EtatFiltres,
+  type LienCategorieFiltre,
+  type LienEvenementFiltre,
   type TriFeed,
   type TypeAchat,
 } from "../lib/filtresFeed.js";
 import Link from "next/link";
 import { Brand } from "../components/Brand.js";
+import { LienFiltre } from "../components/LienFiltre.js";
 import { CADRE, NEUTRE } from "./controlesFiltres.js";
 
 /**
@@ -54,11 +58,15 @@ const TITRE = "px-4 pt-3 pb-1 text-[9px] font-extrabold tracking-wider uppercase
 
 export function ColonneFiltres({
   filtres,
+  liensCategories,
+  lienEvenement,
   nbActifs,
   onChange,
   onReinitialiser,
 }: {
   filtres: EtatFiltres;
+  liensCategories: LienCategorieFiltre[];
+  lienEvenement: LienEvenementFiltre | null;
   nbActifs: number;
   onChange: (patch: Partial<EtatFiltres>) => void;
   onReinitialiser: () => void;
@@ -101,15 +109,31 @@ export function ColonneFiltres({
              une colonne à moitié morte. Une catégorie sans deal se choisit
              donc normalement, et l'état vide du feed dit ce qui s'est passé
              et propose d'élargir — plus honnête qu'un grisé muet. ── */}
+      {/* Lot SEO-3b : chaque catégorie est un LIEN vers sa page
+          (/categorie/[slug]), rendu côté serveur, et « Toutes les
+          catégories » un lien vers « / ». Même classe qu'avant : le style ne
+          change pas. Seules les catégories ayant au moins 1 deal actif sont
+          listées (calcul serveur, `categoriesFiltre`). */}
       <p className={TITRE}>Catégories</p>
       <div className="px-4 flex flex-col gap-0.5">
-        <button type="button" onClick={() => onChange({ categorie: "" })} className={catBtnClass(filtres.categorie === "")}>
+        <LienFiltre href={cheminCategorieFiltre(null)} filtres={filtres} className={catBtnClass(filtres.categorie === "")}>
           {DIMENSIONS.categorie.neutre}
-        </button>
-        {DIMENSIONS.categorie.valeurs.map((c) => (
-          <button key={c} type="button" onClick={() => onChange({ categorie: c })} className={catBtnClass(filtres.categorie === c)}>
-            {c}
-          </button>
+        </LienFiltre>
+        {lienEvenement && (
+          <Link href={lienEvenement.href} className={catBtnClass(false)}>
+            {lienEvenement.libelle}
+          </Link>
+        )}
+        {liensCategories.map((c) => (
+          <LienFiltre
+            key={c.slug}
+            href={cheminCategorieFiltre(c.slug)}
+            filtres={filtres}
+            actif={filtres.categorie === c.categorie}
+            className={catBtnClass(filtres.categorie === c.categorie)}
+          >
+            {c.categorie}
+          </LienFiltre>
         ))}
       </div>
 

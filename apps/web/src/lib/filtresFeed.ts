@@ -143,3 +143,40 @@ export function resumeFiltres(e: EtatFiltres): string[] {
 }
 
 
+
+/**
+ * Navigation par catégorie (lot SEO-3b) : dans le filtre, une catégorie
+ * n'est plus un état client mais un LIEN vers sa page `/categorie/[slug]`,
+ * rendu côté serveur. Les autres dimensions (tri, ville, où acheter,
+ * recherche) suivent en paramètres d'URL.
+ */
+export interface LienCategorieFiltre {
+  categorie: string;
+  slug: string;
+}
+
+/** Entrée ponctuelle du filtre (ex. Black Friday pendant sa fenêtre). */
+export interface LienEvenementFiltre {
+  href: string;
+  libelle: string;
+}
+
+/**
+ * Chemin d'un lien du filtre : la page de la catégorie (`slug`) ou l'accueil
+ * (`null`). JAMAIS de paramètre dans un href interne (lot SEO-3b, correctif) :
+ * Google suit les liens, et chaque variante `?tri=…` serait une URL de plus
+ * à explorer pour un même contenu.
+ */
+export function cheminCategorieFiltre(slug: string | null): string {
+  return slug ? `/categorie/${slug}` : "/";
+}
+
+/**
+ * Cible d'un CLIC sur un lien du filtre (côté client uniquement) : le chemin
+ * propre, plus les choix actifs de l'utilisateur (tri, ville, où acheter,
+ * recherche). La catégorie n'est jamais en paramètre : elle est dans le
+ * chemin.
+ */
+export function cibleNavigationFiltre(chemin: string, e: EtatFiltres): string {
+  return `${chemin}${ecrireFiltresUrl({ ...e, categorie: "" })}`;
+}

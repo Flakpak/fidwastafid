@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { query } from "@fidwastafid/db";
-import type { Deal } from "@fidwastafid/schemas";
+import { CATEGORIES, type Deal } from "@fidwastafid/schemas";
 import { DEAL_SELECT, DEAL_FROM, toDeal, type DealRow } from "./deals.js";
 import type { HubCategorie } from "../../../../../content/hubs.js";
 import { hubParCategorie, estCategorieIndexable } from "../../../../lib/hubs.js";
@@ -75,16 +75,19 @@ export const categoriesIndexables = cache(async (): Promise<CategorieIndexable[]
   return resultat.sort((a, b) => b.nombre - a.nombre || a.hub.slug.localeCompare(b.hub.slug));
 });
 
-export async function fetchDealsCategorie(categorie: string, limite: number): Promise<Deal[]> {
-  const rows = await query<DealRow>(
-    `select ${DEAL_SELECT} ${DEAL_FROM}
-      where ${CONDITION_ACTIF} and d.categorie = $1
-      ${ORDRE_REMISE}
-      limit $2`,
-    [categorie, limite]
-  );
-  return rows.map(toDeal);
-}
+/**
+ * Entrées « catégorie » du filtre de navigation (lot SEO-3b) : catégories
+ * ayant une page et AU MOINS 1 deal publié actif, dans l'ordre de l'enum
+ * (celui du filtre avant ce lot). « Autre » n'a pas de page : jamais listée.
+ */
+export const categoriesFiltre = cache(async (): Promise<{ categorie: string; slug: string }[]> => {
+  const comptes = await compterCategories();
+  const actives = new Set(comptes.filter((c) => c.nombre > 0).map((c) => c.categorie));
+  return CATEGORIES.filter((c) => actives.has(c))
+    .map((c) => hubParCategorie(c))
+    .filter((h): h is HubCategorie => h !== null)
+    .map((h) => ({ categorie: h.categorie, slug: h.slug }));
+});
 
 /**
  * Meilleures remises du moment, toutes catégories. `remiseMin` (fraction)
