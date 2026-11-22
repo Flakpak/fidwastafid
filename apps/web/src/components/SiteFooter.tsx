@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Brand } from "./Brand.js";
 import { GererConsentement } from "./GererConsentement.js";
+import { categoriesIndexables } from "../app/api/v1/_lib/hubs.js";
 
 /** Chrome minimal — CONTRAT-V1 §8. Exception consciente (espace membre,
  *  amendement 16/07/2026) : les liens vers /confidentialite et /contact sont
@@ -21,9 +22,30 @@ import { GererConsentement } from "./GererConsentement.js";
  *  « Cookies » (lot consentement) fait exception à dessein : ce n'est pas une
  *  route, c'est l'unique accès permanent pour revenir sur son choix de
  *  mesure d'audience — sans lui, un refus initial serait définitif. */
-export function SiteFooter() {
+export async function SiteFooter() {
+  // Lot SEO-3 (vingt-deuxième amendement) : les routes catégorie et
+  // événement existent désormais — la réserve ci-dessus (« pointeraient vers
+  // des routes inexistantes ») ne vaut plus pour elles. Seules les
+  // catégories INDEXABLES sont liées, jamais une page `noindex`.
+  const indexables = await categoriesIndexables();
   return (
     <footer className="bg-surface border-t border-border py-8 px-4 flex flex-col items-center gap-2">
+      <nav aria-label="Catégories" className="max-w-2xl mb-3">
+        <ul className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-sm text-ink-muted">
+          {indexables.map((c) => (
+            <li key={c.hub.slug}>
+              <Link href={`/categorie/${c.hub.slug}`} className="hover:text-ink">
+                {c.hub.categorie}
+              </Link>
+            </li>
+          ))}
+          <li>
+            <Link href="/bons-plans/black-friday" className="font-bold hover:text-ink">
+              Black Friday
+            </Link>
+          </li>
+        </ul>
+      </nav>
       {/* Zone de protection : le `gap-2` du conteneur et le `py-8` laissent
           au moins une hauteur de capitale libre autour du logotype (§8). */}
       <Brand forme="full" hauteur={44} className="max-w-full h-auto" />

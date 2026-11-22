@@ -6,6 +6,7 @@ import { SiteHeader } from "../components/SiteHeader.js";
 import { SiteFooter } from "../components/SiteFooter.js";
 import { Ticker } from "../components/Ticker.js";
 import { HeroBand } from "../components/HeroBand.js";
+import { BlocCategories } from "../components/BlocCategories.js";
 import { Feed } from "./Feed.js";
 import { construireParamsCompte, construireParamsFeed } from "../lib/feedPagination.js";
 import { lireFiltresUrl, type EtatFiltres } from "../lib/filtresFeed.js";
@@ -115,7 +116,13 @@ export default async function Home({ searchParams }: PageParams) {
       )}
       <Ticker />
       <Feed
-        hero={<HeroBand />}
+        hero={
+          <>
+            <HeroBand />
+            {/* Maillage SEO-3 : catégories indexables + Black Friday en saison. */}
+            <BlocCategories />
+          </>
+        }
         initialDeals={premierePage.data}
         initialCursor={premierePage.nextCursor}
         initialFiltres={filtres}

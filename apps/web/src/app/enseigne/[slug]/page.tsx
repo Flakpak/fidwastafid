@@ -8,6 +8,8 @@ import { SiteFooter } from "../../../components/SiteFooter.js";
 import { DealCard } from "../../../components/DealCard.js";
 import { resolveCurrentUser } from "../../../lib/currentUser.js";
 import { fetchMesVotes } from "../../api/v1/_lib/votes.js";
+import { compterEnseignes } from "../../api/v1/_lib/hubs.js";
+import { robotsEnseigne } from "../../../lib/hubs.js";
 
 /** SSR par requête — mêmes raisons que le feed (voir app/page.tsx). */
 export const dynamic = "force-dynamic";
@@ -40,10 +42,16 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
   const description = `Tous les bons plans et promotions ${enseigne.nom} au Maroc, votés par la communauté.`;
   const canonical = `/enseigne/${enseigne.slug}`;
 
+  // Même seuil que les catégories (lot SEO-3, vingt-deuxième amendement) :
+  // sous 8 deals publiés actifs, `noindex, follow` et hors sitemap-hubs.
+  const comptes = await compterEnseignes();
+  const nombre = comptes.find((c) => c.slug === enseigne.slug)?.nombre ?? 0;
+
   return {
     title: enseigne.nom,
     description,
     alternates: { canonical },
+    ...robotsEnseigne(nombre),
     openGraph: { title: enseigne.nom, description, url: canonical, type: "website" },
   };
 }
