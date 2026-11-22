@@ -176,6 +176,9 @@ try {
   let inseres = 0, doublons = 0, rejetes = 0, rejetesEnseigne = 0;
   let rejetesRemise = 0, remisesNonMesurables = 0, rejetesMemoire = 0;
   let descriptionsObtenues = 0, descriptionsEchouees = 0;
+  // Repli « Autre » (lot SEO-2c) : toujours possible, jamais muet — compté
+  // et listé à chaque run, parmi les deals réellement insérés.
+  const inseresAutre = [];
   console.log(`📉 Seuil de remise minimum : ${SEUIL_REMISE_MIN_PCT} % (règle partagée, remise.mjs).`);
 
   for (const raw of deals) {
@@ -301,6 +304,7 @@ try {
       ]
     );
     inseres++;
+    if (d.categorie === "Autre") inseresAutre.push(d.titre);
 
     // Après insertion réussie uniquement — jamais sur un doublon (cf. le
     // `continue` plus haut, qui saute cette section). Périmètre Bringo
@@ -315,6 +319,8 @@ try {
       `${rejetes} rejetés (validation) | ${rejetesRemise} rejetés (remise < ${SEUIL_REMISE_MIN_PCT} %) | ` +
       `${rejetesEnseigne} rejetés (enseigne inconnue) | ${rejetesMemoire} rejetés (mémoire de curation)`
   );
+  console.log(`🗂️  Catégorie « Autre » (repli) : ${inseresAutre.length} inséré(s) sur ${inseres}.`);
+  for (const titre of inseresAutre) console.log(`   - ${titre}`);
 
   // Supervision du pipeline (lot du 12/08/2026) — les quatre chiffres qui
   // comptent pour distinguer « rien d'assez remisé » de « tout déjà en
@@ -330,7 +336,7 @@ try {
   await enregistrerRun(client, { source, cause, extraits, retenus, inseres, doublons });
   // Ligne structurée, capturée par le workflow après cette étape — pour que
   // l'annotation du run reflète la CAUSE réelle plutôt qu'un succès muet.
-  console.log(`RESUME_JSON=${JSON.stringify({ source, cause, extraits, retenus, inseres, doublons })}`);
+  console.log(`RESUME_JSON=${JSON.stringify({ source, cause, extraits, retenus, inseres, doublons, autre: inseresAutre.length })}`);
   if (remisesNonMesurables > 0) {
     console.log(
       `📉 ${remisesNonMesurables} deal(s) insérable(s) sans remise mesurable (prix barré absent) — ` +

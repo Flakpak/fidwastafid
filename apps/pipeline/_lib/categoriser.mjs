@@ -45,10 +45,25 @@ export function mapCategorie(listName = "", titre = "", rayon = "") {
   // (constaté sur les titres carrefour.ma, 13/08/2026 : "SHAMPOOING GRAPE
   // MOISTURE" et "SHAMPOING FULL RESIST" cohabitent dans le même catalogue).
   if (/beauté|hygiène|parfum|shampo?oing/.test(l)) return "Beauté";
-  // "Enfants" est absent de l'enum canonique (packages/schemas/src/enums.ts) —
-  // comportement inchangé par ce lot (insert-deals.mjs, commentaire Phase 7A) :
-  // ces deals sont rejetés en aval plutôt qu'insérés sous une catégorie corrigée.
-  if (/bébé|enfant|jouet/.test(l)) return "Enfants";
+  // Taxonomie v3 (CONTRAT-V1 §3, vingt-deuxième amendement, 22/11/2026) —
+  // mots-clés tirés des 23 titres réels classés « Autre » (audit SEO-2).
+  // Titres souvent en majuscules sans accents : [eé] partout. Fournitures
+  // AVANT jouets : « PUZZLE PEINTURE A L'AQUARELLE » est une fourniture,
+  // pas un jouet. `\bcolle\b` et non `colle` : « COLLIERS » est un jouet.
+  if (
+    /crayon|stylo|feutre|cahier|classeur|trousse|cartable|gomme|taille-crayon|agrafe|punaise|ruban adh[eé]sif|presse-papiers?|\bcolle\b|aquarelle|peinture aux doigts|fourniture/.test(
+      l
+    )
+  )
+    return "Fournitures scolaires";
+  // Remplace l'ancien retour "Enfants" (absent de l'enum, donc rejeté en
+  // aval par validateDeal) par la valeur canonique.
+  if (
+    /b[eé]b[eé]|enfant|jouet|poup[eé]e|peluche|bou[eé]e|[eé]ducati|cr[eé]atif|blocs? de construction|fisher-price|spider-man|play pool|lego|barbie/.test(
+      l
+    )
+  )
+    return "Enfants & Jouets";
 
   // Le rayon scrapé sert de dernier repli, pas de premier critère : un mot-clé
   // trouvé dans le titre est toujours plus précis qu'une catégorie déduite du
