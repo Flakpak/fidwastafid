@@ -1,9 +1,10 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-11-22, sur `main` à `53c2e50`. Rattrape les lots SEO du 22/11 :
+*Dernière mise à jour : 2026-11-22, sur `main` à `c64c52c`. Rattrape les lots SEO du 22/11 :
 entités HTML des titres décodées (0023/0024), expiration automatique des deals publiés,
 taxonomie v3 et reclassement de « Autre » (0026), **pages hub SEO livrées** (`/categorie`,
-`/bons-plans`, maillage, sitemap découpé) — voir §1 et « Derniers lots livrés ». La section
+`/bons-plans`, maillage, sitemap découpé), puis une seule navigation par catégorie (SEO-3b)
+— voir §1 et « Derniers lots livrés ». La section
 « Chiffres réels » date toujours du 05/08 et n'a pas été remesurée.*
 
 Ce document est le **point d'entrée pour reprendre le travail sans contexte préalable**. Il dit
@@ -163,17 +164,26 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
     avril. Un deal expiré ainsi reste dans le sitemap, sans `noindex` (`deals_protection`
     le garde protégé par son historique de publication, CONTRAT-V1 §1). Toute erreur fait
     échouer le job.
-- **Pages hub SEO** (lot SEO-3, #193, 22/11/2026 — CONTRAT-V1 §3, vingt-deuxième amendement) :
-  - `/categorie/[slug]` : 13 slugs fixes (`apps/web/content/hubs.ts`), « autre » → 404. Deals
-    publiés actifs triés par remise (48 max), bloc darija `lang="ar-MA" dir="rtl"`. Une page
-    sous 8 deals passe en `noindex, follow` et sort du sitemap.
+- **Pages hub SEO** (lots SEO-3 #193 et SEO-3b #195, 22/11/2026 — CONTRAT-V1 §3,
+  vingt-deuxième amendement) :
+  - `/categorie/[slug]` : 13 slugs fixes (`apps/web/content/hubs.ts`), « autre » → 404. Même
+    feed et même filtre que l'accueil (SEO-3b), catégorie courante active ; tri, ville, où
+    acheter et recherche en paramètres d'URL, canonical sans paramètre. Bloc darija
+    `lang="ar-MA" dir="rtl"`. Une page sous 8 deals passe en `noindex, follow` et sort du
+    sitemap.
+  - **Une seule navigation par catégorie** (SEO-3b) : dans le filtre (colonne desktop, feuille
+    mobile), chaque catégorie est un lien `/categorie/[slug]` rendu serveur, « Toutes » → `/`.
+    Seules les catégories ayant au moins 1 deal actif sont listées. **Aucun lien interne ne
+    porte de paramètre** : les choix actifs ne suivent qu'au clic, côté client
+    (`components/LienFiltre.tsx`).
   - `/bons-plans/[evenement]` : liste fermée de six événements. Black Friday 2026 (01–30/11) :
     deals **publiés pour la première fois** dans la fenêtre (`journal_audit`), remise ≥ 20 %,
     60 max. Hors fenêtre : 200, meilleures remises du moment. Événements sans édition
     configurée (ramadan, aid, rentree, soldes-ete, soldes-hiver) : `noindex, follow`.
   - `/enseigne/[slug]` : même seuil de 8 deals (en `noindex` au 22/11 : Bim, Lemobilier).
-  - Maillage : bloc « Catégories » et lien Black Friday (en saison) sur l'accueil, catégories
-    indexables au pied de page, fil d'Ariane avec BreadcrumbList sur les hubs et la fiche deal.
+  - Maillage : entrée Black Friday dans le filtre de l'accueil (en saison seulement ; le bloc
+    « Catégories » de SEO-3 a été retiré par SEO-3b), catégories indexables et Black Friday au
+    pied de page, fil d'Ariane avec BreadcrumbList sur les hubs et la fiche deal.
   - Sitemap : `/sitemap.xml` est un index vers `/sitemap-hubs.xml` et `/sitemap-deals.xml`.
   - `/guides/[slug]` reste acté, non construit.
 - **API** (`/api/v1/*`) — liste fermée, documentée au CONTRAT-V1 §4, spec générée
@@ -183,6 +193,7 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| SEO-3b — navigation par catégorie | #195 | 22/11 | Filtre en liens `/categorie/[slug]` rendus serveur, sans paramètre (choix reportés au clic) ; même filtre sur les pages catégorie ; bloc « Catégories » retiré ; Black Friday dans le filtre en saison. |
 | SEO-3 — pages hub | #193 | 22/11 | `/categorie/[slug]`, `/bons-plans/[evenement]`, seuil d'indexation de 8 deals (catégories et enseignes), maillage, fil d'Ariane, sitemap découpé (index + hubs + deals). |
 | SEO-2c — taxonomie v3 | #191, #192 | 22/11 | Vingt-deuxième amendement ; catégories `Fournitures scolaires` et `Enfants & Jouets` ; repli « Autre » compté à chaque run ; 0026 reclasse les 49 deals « Autre ». |
 | SEO-2b — expiration des publiés | #190 | 22/11 | `expirer-publies.mjs` (jour de Casablanca calculé par Postgres) ; CI sur `postgres:17` ; 0024. |
