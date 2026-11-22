@@ -1,3 +1,7 @@
+import { hubParSlug, hubParCategorie, robotsCategorie, estCategorieIndexable, titreCategorie, descriptionCategorie, evenementParSlug, etatEvenement, breadcrumbJsonLd } from "../src/lib/hubs.js";
+import { HUBS_CATEGORIES } from "../content/hubs.js";
+import { CATEGORIE_SLUGS } from "@fidwastafid/schemas";
+import { indexXml, plusRecent } from "../src/lib/sitemap.js";
 import { isPrivateOrReservedIp, assertPublicUrl, SsrfGuardError } from "../src/app/api/v1/_lib/ssrf.js";
 import { extractImageUrl } from "../src/app/api/v1/_lib/ogImage.js";
 import { sniffImageMime } from "../src/app/api/v1/_lib/dealImage.js";
@@ -162,6 +166,7 @@ async function runAsyncChecks() {
   await checkTurnstile();
   await checkCommentaires();
   await checkCurseurFiltres();
+  checkHubs();
 
   console.log(`\n${pass} passés, ${fail} échoués`);
   if (fail > 0) process.exit(1);
@@ -1237,3 +1242,65 @@ console.log("\nDiffusion Discord — configuration et mode explicite (dix-septi�
 }
 
 void runAsyncChecks();
+
+/**
+ * Pages hub (lot SEO-3, CONTRAT-V1 §3 vingt-deuxième amendement) — règles
+ * pures : résolution des slugs (404), seuil d'indexation, fenêtre Black
+ * Friday, sitemap index.
+ */
+function checkHubs() {
+  console.log("\nPages hub — slugs, seuil d'indexation, fenêtre Black Friday, sitemap index");
+
+  check("/categorie/inconnu → aucun hub (404)", hubParSlug("inconnu") === null);
+  check("/categorie/autre → aucun hub (404, « Autre » n'a pas de page)", hubParSlug("autre") === null);
+  check("/categorie/electromenager → hub Électroménager (200)", hubParSlug("electromenager")?.categorie === "Électroménager");
+  check("13 slugs de catégorie", HUBS_CATEGORIES.length === 13);
+  check(
+    "chaque slug de hub = CATEGORIE_SLUGS de l'enum (source unique des slugs)",
+    HUBS_CATEGORIES.every((h) => CATEGORIE_SLUGS[h.categorie] === h.slug)
+  );
+  check("catégorie « Autre » → pas de maillon catégorie dans le fil d'Ariane", hubParCategorie("Autre") === null);
+
+  check("7 deals actifs → noindex, follow", JSON.stringify(robotsCategorie(7)) === JSON.stringify({ robots: { index: false, follow: true } }));
+  check("8 deals actifs → indexable (pas de directive robots)", JSON.stringify(robotsCategorie(8)) === "{}");
+  check("0 deal actif → noindex", estCategorieIndexable(0) === false);
+
+  const hubElec = hubParSlug("electromenager")!;
+  check("title catégorie imposé", titreCategorie(hubElec) === "Promo électroménager au Maroc : bons plans du jour");
+  check(
+    "meta description catégorie",
+    descriptionCategorie(hubElec, 54) ===
+      "54 promos électroménager en cours au Maroc, avec prix d'origine et remise. Mis à jour chaque jour."
+  );
+
+  check("/bons-plans/inconnu → aucun événement (404)", evenementParSlug("inconnu") === null);
+  const bf = evenementParSlug("black-friday")!;
+  check("Black Friday avant la fenêtre (31/10) → hors saison", etatEvenement(bf, "2026-10-31").edition === null);
+  check("Black Friday premier jour (01/11) → édition 2026", etatEvenement(bf, "2026-11-01").edition?.annee === 2026);
+  check("Black Friday jour J (27/11) → édition 2026", etatEvenement(bf, "2026-11-27").edition?.annee === 2026);
+  check("Black Friday dernier jour (30/11) → édition 2026", etatEvenement(bf, "2026-11-30").edition?.annee === 2026);
+  check("Black Friday après la fenêtre (01/12) → hors saison", etatEvenement(bf, "2026-12-01").edition === null);
+  check("Black Friday indexable en et hors fenêtre", etatEvenement(bf, "2026-12-01").indexable && etatEvenement(bf, "2026-11-15").indexable);
+  const ramadan = evenementParSlug("ramadan")!;
+  check("Ramadan sans édition configurée → noindex", etatEvenement(ramadan, "2026-11-22").indexable === false);
+  check(
+    "title Black Friday",
+    etatEvenement(bf, "2026-11-22").edition?.title === "Black Friday Maroc 2026 : les vraies promos"
+  );
+
+  const ariane = breadcrumbJsonLd([{ nom: "Accueil", chemin: "/" }, { nom: "Maison", chemin: "/categorie/maison" }, { nom: "Un deal" }]);
+  check("BreadcrumbList : 3 maillons numérotés 1..3", ariane.itemListElement.map((m) => m.position).join(",") === "1,2,3");
+  check("BreadcrumbList : dernier maillon sans URL", !("item" in ariane.itemListElement[2]!));
+
+  const index = indexXml([
+    { loc: "https://fidwastafid.com/sitemap-hubs.xml", lastmod: "2026-11-22T10:00:00.000Z" },
+    { loc: "https://fidwastafid.com/sitemap-deals.xml" },
+  ]);
+  check("sitemap index : balise sitemapindex", index.includes("<sitemapindex xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">"));
+  check("sitemap index : renvoie vers les deux sous-sitemaps", index.includes("/sitemap-hubs.xml</loc>") && index.includes("/sitemap-deals.xml</loc>"));
+  check("sitemap index : lastmod seulement quand il existe", (index.match(/<lastmod>/g) ?? []).length === 1);
+  check(
+    "plusRecent : date maximale, ignore les absentes",
+    plusRecent(["2026-11-01T00:00:00Z", undefined, "2026-11-20T00:00:00Z"]) === "2026-11-20T00:00:00.000Z"
+  );
+}

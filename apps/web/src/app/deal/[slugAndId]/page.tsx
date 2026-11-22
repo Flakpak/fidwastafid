@@ -16,6 +16,8 @@ import { fetchMesVotes } from "../../api/v1/_lib/votes.js";
 import { fetchDealsLies } from "../../api/v1/_lib/dealsLies.js";
 import { estActifSeo, fetchProtege } from "../../api/v1/_lib/deals.js";
 import { DealCardMini } from "../../../components/DealCardMini.js";
+import { FilAriane } from "../../../components/FilAriane.js";
+import { hubParCategorie } from "../../../lib/hubs.js";
 import { CommentForm } from "./CommentForm.js";
 import { CommentairesErreur } from "./CommentairesErreur.js";
 import { lireCommentaires, type ResultatCommentaires } from "./commentaires.js";
@@ -158,6 +160,7 @@ export default async function DealPage({ params }: PageParams) {
   }
 
   const dealHref = `/deal/${canonical}`;
+  const hubCategorie = hubParCategorie(deal.categorie);
   // État voté persistant (CONTRAT-V1 §4, seizième amendement conscient) —
   // résolu en SSR direct, jamais un appel client : resolveCurrentUser() est
   // déjà appelé par SiteHeader sur cette page, dédupliqué par requête
@@ -195,9 +198,16 @@ export default async function DealPage({ params }: PageParams) {
       <SiteHeader />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <main className="max-w-6xl mx-auto p-4 flex flex-col gap-4">
-        <Link href="/" className="self-start text-sm font-bold text-ink-muted hover:text-ink">
-          ← Retour au feed
-        </Link>
+        {/* Fil d'Ariane (lot SEO-3) : Accueil › Catégorie › Deal. Le maillon
+            catégorie est omis pour « Autre » (pas de page). Il remplace le
+            lien « ← Retour au feed », que le maillon Accueil couvre. */}
+        <FilAriane
+          maillons={[
+            { nom: "Accueil", chemin: "/" },
+            ...(hubCategorie ? [{ nom: hubCategorie.categorie, chemin: `/categorie/${hubCategorie.slug}` }] : []),
+            { nom: deal.titre },
+          ]}
+        />
 
         {/* CARTE 1 — hero du deal, référence structure Dealabs (2 colonnes,
             jamais ses couleurs — charte fidwastafid). */}

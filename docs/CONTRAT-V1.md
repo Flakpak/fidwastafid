@@ -60,19 +60,24 @@ une page qui a existé publiquement, potentiellement partagée — pas un brouil
 /deal/[slug]-[public_id]       page deal
 /enseigne/[slug]               page enseigne   (slug humain stable, curé à la main)
 /ville/[slug]                  page ville      (réservé, non actif en v1)
-/categorie/[slug]              page catégorie  (acté le 22/11/2026, non construit — 13 slugs
-                               fixes, indexable dès 8 deals publiés actifs, §3 vingt-deuxième
-                               amendement ; « Autre » sans page)
+/categorie/[slug]              page catégorie  (actif depuis le lot SEO-3 — 13 slugs fixes,
+                               indexable dès 8 deals publiés actifs, sinon noindex, follow ;
+                               §3 vingt-deuxième amendement ; « Autre » sans page → 404)
 /categorie/[slug]/[sous-slug]  sous-catégorie  (réservé, non actif — amendement ultérieur sur
                                données Search Console)
-/bons-plans/[evenement]        page événement  (acté le 22/11/2026, non construit — liste
-                               fermée : black-friday, ramadan, aid, rentree, soldes-ete,
-                               soldes-hiver ; URL sans année, 200 hors saison)
+/bons-plans/[evenement]        page événement  (actif depuis le lot SEO-3 — liste fermée :
+                               black-friday, ramadan, aid, rentree, soldes-ete, soldes-hiver ;
+                               URL sans année, 200 hors saison ; noindex tant qu'aucune
+                               édition n'est configurée)
 /guides/[slug]                 guide           (acté le 22/11/2026, non construit — rédigé ou
                                relu par un humain)
-/sitemap-hubs.xml              sitemap hubs    (acté le 22/11/2026, non construit — accueil,
-                               catégories indexables, événements, guides)
-/sitemap-deals.xml             sitemap deals   (acté le 22/11/2026, non construit)
+/sitemap.xml                   index de sitemaps (actif depuis le lot SEO-3 — renvoie vers
+                               les deux suivants ; robots.txt pointe ici)
+/sitemap-hubs.xml              sitemap hubs    (actif depuis le lot SEO-3 — accueil,
+                               catégories indexables, événements indexables, enseignes,
+                               pages statiques ; guides à leur construction)
+/sitemap-deals.xml             sitemap deals   (actif depuis le lot SEO-3 — règles de
+                               l'ancien sitemap unique, inchangées)
 /membre/[pseudo]-[public_id]   profil public   (réservé, PAS construit en v1)
 /soumettre                     soumission communautaire (noindex)
 /connexion  /inscription       auth (noindex)
@@ -210,7 +215,9 @@ enfants. La réserve du cinquième amendement (« pas de catégorie `Enfants` sa
 levée : ces données existent désormais. **Statut : la taxonomie (enum `categorie`) est en
 vigueur dès ce lot. Les routes, les règles d'indexation et le découpage du sitemap ci-dessous
 sont actés mais pas encore construits** : chaque point sera livré par un lot dédié, et le §2
-les marque « acté, non construit » jusque-là.
+les marque « acté, non construit » jusque-là. *Mise à jour (lot SEO-3) : `/categorie/[slug]`,
+`/bons-plans/[evenement]` et le sitemap découpé sont actifs ; `/guides/[slug]` reste acté, non
+construit.*
 
 - **`/categorie/[slug]` passe en actif.** Slugs fixes : `maison`, `electromenager`, `mode`,
   `sport`, `high-tech`, `beaute`, `bricolage-jardin`, `alimentaire`, `telephonie-internet`,

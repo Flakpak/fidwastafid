@@ -3,6 +3,9 @@ import { generatePublicId } from "@fidwastafid/schemas";
 import { purgerImages, DELAI_JOURS_PURGE_IMAGES, UTILISATEUR_SYSTEME_ID } from "../../pipeline/purger-images.mjs";
 import { purgerLignes, DELAI_JOURS_PURGE_LIGNES } from "../../pipeline/purger-lignes.mjs";
 import { expirerPublies } from "../../pipeline/_lib/expirerPublies.mjs";
+import { GET as getSitemapIndex } from "../src/app/sitemap.xml/route.js";
+import { GET as getSitemapHubs } from "../src/app/sitemap-hubs.xml/route.js";
+import { GET as getSitemapDeals } from "../src/app/sitemap-deals.xml/route.js";
 import { PUBLIC_IDS_FIXTURES, PUBLIC_ID_INEXISTANT } from "./fixtures.js";
 import { POST as postDeal, GET as getDealsList } from "../src/app/api/v1/deals/route.js";
 import { GET as getCompte } from "../src/app/api/v1/deals/compte/route.js";
@@ -2039,6 +2042,60 @@ async function main() {
   // TOUS les `publie` de la base, les fixtures des autres blocs ne doivent
   // pas en garder la trace.
   // ----------------------------------------------------------------
+  // ----------------------------------------------------------------
+  // Sitemap découpé + seuil d'indexation des catégories (lot SEO-3) — base
+  // réelle. Catégorie « Voyages » : on la porte exactement à 8 deals actifs
+  // (seuil), puis à 7, et on vérifie sa présence puis son absence dans
+  // /sitemap-hubs.xml. Bascule automatique, sans aucune configuration.
+  // ----------------------------------------------------------------
+  console.log("\nsitemap découpé — index, hubs, seuil d'indexation des catégories");
+  {
+    const lireXml = async (handler: (r: Request) => Promise<Response>, chemin: string) =>
+      (await handler(new Request(`http://localhost${chemin}`))).text();
+
+    const index = await lireXml(getSitemapIndex, "/sitemap.xml");
+    check("/sitemap.xml est un sitemapindex", index.includes("<sitemapindex"));
+    check(
+      "/sitemap.xml renvoie vers sitemap-hubs et sitemap-deals",
+      index.includes("/sitemap-hubs.xml</loc>") && index.includes("/sitemap-deals.xml</loc>")
+    );
+
+    const deja = await query<{ n: number }>(
+      `select count(*)::int as n from deals
+        where categorie = 'Voyages' and statut = 'publie' and supprime_le is null
+          and (date_fin is null or date_fin >= (now() at time zone 'Africa/Casablanca')::date)`
+    );
+    const aCreer = Math.max(0, 8 - (deja[0]?.n ?? 0));
+    const idsVoyages = Array.from({ length: aCreer }, () => generatePublicId());
+    try {
+      for (const id of idsVoyages) {
+        await query(
+          `insert into deals (public_id, titre, categorie, type, prix_promo, prix_normal, statut, score)
+           values ($1, 'Sitemap hubs — test seuil', 'Voyages', 'en_ligne', 50, 100, 'publie', 0)`,
+          [id]
+        );
+      }
+      const hubsA8 = await lireXml(getSitemapHubs, "/sitemap-hubs.xml");
+      check("8 deals actifs → /categorie/voyages dans sitemap-hubs", hubsA8.includes("/categorie/voyages</loc>"));
+      check("sitemap-hubs contient l'accueil", hubsA8.includes("<loc>https://") && hubsA8.includes("<priority>1</priority>"));
+      check("sitemap-hubs contient /bons-plans/black-friday (édition configurée)", hubsA8.includes("/bons-plans/black-friday</loc>"));
+      check("sitemap-hubs ne contient pas /bons-plans/ramadan (aucune édition → noindex)", !hubsA8.includes("/bons-plans/ramadan</loc>"));
+      check("sitemap-hubs ne contient jamais /categorie/autre", !hubsA8.includes("/categorie/autre</loc>"));
+
+      if (idsVoyages.length > 0) {
+        await query("delete from deals where public_id = $1", [idsVoyages[0]]);
+        const hubsA7 = await lireXml(getSitemapHubs, "/sitemap-hubs.xml");
+        check("7 deals actifs → /categorie/voyages retirée de sitemap-hubs", !hubsA7.includes("/categorie/voyages</loc>"));
+      }
+
+      const deals = await lireXml(getSitemapDeals, "/sitemap-deals.xml");
+      check("sitemap-deals est un urlset de fiches /deal/", deals.includes("<urlset") && deals.includes("/deal/"));
+      check("sitemap-deals ne contient aucun hub", !deals.includes("/categorie/") && !deals.includes("/enseigne/"));
+    } finally {
+      await query("delete from deals where public_id = any($1::text[])", [idsVoyages]);
+    }
+  }
+
   console.log("\nexpiration des deals publiés — jour de Casablanca calculé par Postgres");
   {
     async function casExpiration(
