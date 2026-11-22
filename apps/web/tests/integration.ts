@@ -6,7 +6,7 @@ import { expirerPublies } from "../../pipeline/_lib/expirerPublies.mjs";
 import { GET as getSitemapIndex } from "../src/app/sitemap.xml/route.js";
 import { GET as getSitemapHubs } from "../src/app/sitemap-hubs.xml/route.js";
 import { GET as getSitemapDeals } from "../src/app/sitemap-deals.xml/route.js";
-import { fetchDealsEdition } from "../src/app/api/v1/_lib/hubs.js";
+import { fetchDealsEdition, categoriesFiltre } from "../src/app/api/v1/_lib/hubs.js";
 import { PUBLIC_IDS_FIXTURES, PUBLIC_ID_INEXISTANT } from "./fixtures.js";
 import { POST as postDeal, GET as getDealsList } from "../src/app/api/v1/deals/route.js";
 import { GET as getCompte } from "../src/app/api/v1/deals/compte/route.js";
@@ -2159,6 +2159,38 @@ async function main() {
     } finally {
       await query("delete from deals where public_id = any($1::text[])", [ids]);
       await query("delete from enseignes where slug = $1", [SLUG]);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Filtre de navigation (lot SEO-3b) : une catégorie n'est listée qu'avec
+  // au moins 1 deal publié actif. « Gaming » à 0, puis à 1.
+  // ----------------------------------------------------------------
+  console.log("\nfiltre de navigation — catégories ayant au moins 1 deal actif");
+  {
+    const actifsGaming = await query<{ n: number }>(
+      `select count(*)::int as n from deals
+        where categorie = 'Gaming' and statut = 'publie' and supprime_le is null
+          and (date_fin is null or date_fin >= (now() at time zone 'Africa/Casablanca')::date)`
+    );
+    if ((actifsGaming[0]?.n ?? 0) === 0) {
+      const avant = await categoriesFiltre();
+      check("Gaming à 0 deal actif → absente du filtre", !avant.some((c) => c.slug === "gaming"));
+      check("« Autre » jamais dans le filtre (pas de page)", !avant.some((c) => c.categorie === "Autre"));
+      const ID_GAMING = generatePublicId();
+      try {
+        await query(
+          `insert into deals (public_id, titre, categorie, type, prix_promo, prix_normal, statut, score)
+           values ($1, 'Filtre — test Gaming', 'Gaming', 'en_ligne', 50, 100, 'publie', 0)`,
+          [ID_GAMING]
+        );
+        const apres = await categoriesFiltre();
+        check("Gaming à 1 deal actif → présente, slug gaming", apres.some((c) => c.slug === "gaming"));
+      } finally {
+        await query("delete from deals where public_id = $1", [ID_GAMING]);
+      }
+    } else {
+      check("(base avec des deals Gaming : cas 0 deal non testable ici)", true);
     }
   }
 

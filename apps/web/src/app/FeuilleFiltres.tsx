@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Button } from "../components/Button.js";
 import {
   ANCRE_RESULTATS,
@@ -8,9 +9,12 @@ import {
   RAISON_VILLE_SANS_OBJET,
   TRIS,
   FILTRES_PAR_DEFAUT,
+  hrefCategorieFiltre,
   normaliserFiltres,
   villeSansObjet,
   type EtatFiltres,
+  type LienCategorieFiltre,
+  type LienEvenementFiltre,
   type TypeAchat,
   type TriFeed,
 } from "../lib/filtresFeed.js";
@@ -71,6 +75,26 @@ function Option({
       />
       <span className="min-w-0 flex-1 truncate">{label}</span>
     </label>
+  );
+}
+
+/**
+ * Entrée catégorie de la feuille, en LIEN (lot SEO-3b) — mêmes classes que
+ * `Option` à l'état non désactivé : le style ne change pas. Elle navigue
+ * immédiatement vers la page de la catégorie (le reste du brouillon suit en
+ * paramètres), au lieu d'attendre « Voir les résultats ».
+ */
+function OptionLien({ href, label, choisi }: { href: string; label: string; choisi: boolean }) {
+  return (
+    <Link
+      href={href}
+      aria-current={choisi ? "page" : undefined}
+      className={`flex min-h-11 items-center gap-3 rounded-[9px] px-3 text-sm cursor-pointer ${
+        choisi ? "bg-accent-soft font-bold text-accent" : "text-ink hover:bg-surface-subtle"
+      } focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent`}
+    >
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+    </Link>
   );
 }
 
@@ -146,10 +170,14 @@ export function FeuilleFiltres({
   section,
   declencheur,
   filtres,
+  liensCategories,
+  lienEvenement,
   totalInitial,
   onFermer,
   onAppliquer,
 }: {
+  liensCategories: LienCategorieFiltre[];
+  lienEvenement: LienEvenementFiltre | null;
   section: SectionFeuille;
   /** Élément qui a ouvert la feuille, fourni par l'appelant : il ne peut PAS
    *  être déduit ici de `document.activeElement`, que `showModal()` a déjà
@@ -260,21 +288,18 @@ export function FeuilleFiltres({
 
         <div ref={corpsRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <Section id="categorie" titre={DIMENSIONS.categorie.nom}>
-            <Option
-              name="feuille-categorie"
+            <OptionLien
+              href={hrefCategorieFiltre(null, brouillon)}
               label={DIMENSIONS.categorie.neutre}
-              valeur=""
               choisi={brouillon.categorie === ""}
-              onChoisir={(v) => modifier({ categorie: v })}
             />
-            {DIMENSIONS.categorie.valeurs.map((c) => (
-              <Option
-                key={c}
-                name="feuille-categorie"
-                label={c}
-                valeur={c}
-                choisi={brouillon.categorie === c}
-                onChoisir={(v) => modifier({ categorie: v })}
+            {lienEvenement && <OptionLien href={lienEvenement.href} label={lienEvenement.libelle} choisi={false} />}
+            {liensCategories.map((c) => (
+              <OptionLien
+                key={c.slug}
+                href={hrefCategorieFiltre(c.slug, brouillon)}
+                label={c.categorie}
+                choisi={brouillon.categorie === c.categorie}
               />
             ))}
           </Section>

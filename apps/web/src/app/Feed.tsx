@@ -14,6 +14,8 @@ import {
   normaliserFiltres,
   resumeFiltres,
   type EtatFiltres,
+  type LienCategorieFiltre,
+  type LienEvenementFiltre,
 } from "../lib/filtresFeed.js";
 import { BarreFiltres } from "./BarreFiltres.js";
 import { ColonneFiltres } from "./ColonneFiltres.js";
@@ -34,7 +36,19 @@ export function Feed({
   initialTotal,
   hero,
   estConnecte,
+  liensCategories,
+  categorieFigee = "",
+  lienEvenement = null,
 }: {
+  /** Catégories du filtre, rendues en liens `/categorie/[slug]` (lot
+   *  SEO-3b) — calculées serveur : celles qui ont au moins 1 deal actif. */
+  liensCategories: LienCategorieFiltre[];
+  /** Page catégorie : la catégorie vient du chemin, pas de l'URL ni de
+   *  l'état client. Elle reste appliquée quoi qu'il arrive (réinitialiser,
+   *  retour arrière) et n'est jamais écrite en paramètre. "" = accueil. */
+  categorieFigee?: string;
+  /** Entrée ponctuelle du filtre (Black Friday en saison, accueil). */
+  lienEvenement?: LienEvenementFiltre | null;
   initialDeals: Deal[];
   /** Curseur de la page suivante, tel que renvoyé par l'API — `null` si la
    *  première page épuise déjà la liste. */
@@ -101,12 +115,18 @@ export function Feed({
    * charge explicitement pour ce cas, et il évite un aller-retour RSC complet
    * alors que la liste est déjà rechargée en fetch ci-dessous.
    */
-  const appliquer = useCallback((next: EtatFiltres) => {
-    const normalise = normaliserFiltres(next);
-    setFiltres(normalise);
-    setSaisie(normalise.q);
-    window.history.pushState(null, "", `${window.location.pathname}${ecrireFiltresUrl(normalise)}`);
-  }, []);
+  const appliquer = useCallback(
+    (next: EtatFiltres) => {
+      // Page catégorie : la catégorie du chemin s'impose, et ne s'écrit pas
+      // en paramètre (la canonical reste /categorie/[slug] sans paramètre).
+      const normalise = normaliserFiltres(categorieFigee ? { ...next, categorie: categorieFigee } : next);
+      setFiltres(normalise);
+      setSaisie(normalise.q);
+      const pourUrl = categorieFigee ? { ...normalise, categorie: "" } : normalise;
+      window.history.pushState(null, "", `${window.location.pathname}${ecrireFiltresUrl(pourUrl)}`);
+    },
+    [categorieFigee]
+  );
 
   /** La sentinelle sort du cadre par le haut <=> la barre est collée. */
   useEffect(() => {
@@ -123,13 +143,14 @@ export function Feed({
   /** Retour/avance du navigateur : l'URL redevient la source de vérité. */
   useEffect(() => {
     const onPop = () => {
-      const depuisUrl = lireFiltresUrl(new URLSearchParams(window.location.search));
+      const lu = lireFiltresUrl(new URLSearchParams(window.location.search));
+      const depuisUrl = categorieFigee ? { ...lu, categorie: categorieFigee } : lu;
       setFiltres(depuisUrl);
       setSaisie(depuisUrl.q);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, []);
+  }, [categorieFigee]);
 
   /** Frappe -> filtre serveur, après un temps de pause. */
   useEffect(() => {
@@ -283,9 +304,14 @@ export function Feed({
     []
   );
 
-  const nbActifs = nbFiltresActifs(filtres);
+  // La catégorie d'une page catégorie n'est pas un filtre « actif » au sens
+  // du badge ni de « Réinitialiser » : c'est la page elle-même.
+  const nbActifs = nbFiltresActifs(categorieFigee ? { ...filtres, categorie: "" } : filtres);
   const resume = resumeFiltres(filtres);
-  const parDefaut = filtresParDefaut(filtres);
+  // Même raison que nbActifs : sur une page catégorie vide sans autre filtre,
+  // « Élargir » ramènerait à la même page — c'est un feed vide, pas une
+  // recherche infructueuse.
+  const parDefaut = filtresParDefaut(categorieFigee ? { ...filtres, categorie: "" } : filtres);
 
 
   return (
@@ -313,6 +339,8 @@ export function Feed({
         <aside className="hidden md:flex md:flex-col md:sticky md:top-0 md:h-screen md:overflow-y-auto bg-surface border-r border-border py-5">
           <ColonneFiltres
             filtres={filtres}
+            liensCategories={liensCategories}
+            lienEvenement={lienEvenement}
             nbActifs={nbActifs}
             onChange={(patch) => appliquer({ ...filtres, ...patch })}
             onReinitialiser={reinitialiser}
@@ -471,6 +499,8 @@ export function Feed({
           section={feuille.section}
           declencheur={feuille.declencheur}
           filtres={filtres}
+          liensCategories={liensCategories}
+          lienEvenement={lienEvenement}
           totalInitial={total}
           onFermer={fermerFeuille}
           onAppliquer={appliquer}
