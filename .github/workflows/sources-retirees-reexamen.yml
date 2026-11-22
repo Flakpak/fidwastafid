@@ -1,0 +1,168 @@
+# .github/workflows/sources-retirees-reexamen.yml
+#
+# Fait générateur (15/08/2026, objection de Kamel) : bestmark et decathlon
+# ont été retirées du cron sur une cause qualifiée d'INDÉTERMINÉE (voir
+# docs/IDEES.md) — un Managed Challenge Cloudflare ou un blocage réseau sont
+# des réglages, pas des décisions définitives. Abandonner une piste qui se
+# réactiverait quelques jours plus tard serait une perte silencieuse.
+#
+# CE QUE CE WORKFLOW FAIT : une seule requête HTTP par source retirée,
+# hebdomadaire, JAMAIS d'insertion en base, JAMAIS de scraping complet — une
+# vérification de joignabilité, pas un contournement par insistance (même
+# fréquence que db-backup/pipeline : ce n'est pas un rythme choisi pour
+# maximiser les chances de passer, c'est un rythme d'observation).
+#
+# CE QUE CE WORKFLOW NE FAIT PAS : il ne remet AUCUNE source dans le cron —
+# ça reste un geste humain, informé par l'issue ouverte ci-dessous si une
+# source redevient joignable.
+#
+# `if: failure()` dès la construction (pas ajouté après coup) — l'angle mort
+# exact de suivi-perime.yml (docs/INCIDENTS.md, 15/08/2026 : un mécanisme
+# jamais éprouvé n'est pas un mécanisme) ne doit pas se reproduire ici.
+
+name: Réexamen hebdomadaire des sources retirées
+
+on:
+  schedule:
+    # Dimanche 06:00 UTC — après purge-images (04:00) et purge-lignes
+    # (04:30), avant qu'aucun autre cron ne tourne ce jour-là.
+    - cron: "0 6 * * 0"
+  workflow_dispatch:
+    inputs:
+      simuler_echec:
+        description: "Éprouver le chemin d'alerte du filet if: failure() : fait échouer le job exprès, AVANT toute requête réseau."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  reexamen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Échec simulé (test du chemin d'alerte)
+        if: ${{ inputs.simuler_echec }}
+        run: |
+          echo "::error::Échec simulé — test du chemin d'alerte. Aucune requête réseau."
+          exit 1
+
+      # bestmark — retirée le 13/08/2026 (docs/IDEES.md, « Bestmark — retrait
+      # du cron ») sur 10 échecs `fetch failed` consécutifs. Même requête
+      # minimale que scraper-bestmark.mjs (pageSize=1), jamais le balayage
+      # complet.
+      - name: bestmark.ma — une requête GraphQL
+        id: bestmark
+        run: |
+          set -o pipefail
+          code=$(curl -s -o /tmp/bestmark.json -w "%{http_code}" --max-time 15 \
+            -X POST "https://www.bestmark.ma/graphql" \
+            -H "Content-Type: application/json" \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36" \
+            -H "Accept-Language: fr-FR,fr;q=0.9" \
+            -d '{"query":"{ products(filter: {price: {from: \"1\"}}, pageSize: 1, currentPage: 1) { total_count } }"}') || code="000"
+          echo "bestmark.ma -> HTTP $code"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" = "200" ] && grep -q "total_count" /tmp/bestmark.json 2>/dev/null; then
+            echo "joignable=oui" >> "$GITHUB_OUTPUT"
+          else
+            echo "joignable=non" >> "$GITHUB_OUTPUT"
+          fi
+
+      # decathlon — retirée le 15/08/2026 (docs/IDEES.md, « Decathlon retiré
+      # (cause indéterminée) »). Une requête sur la page promo réelle ;
+      # « joignable » exige à la fois un 200 ET l'absence de la page de
+      # challenge Cloudflare — un 200 sur la page de challenge elle-même ne
+      # prouve rien.
+      - name: decathlon.ma — une requête HTML
+        id: decathlon
+        run: |
+          set -o pipefail
+          code=$(curl -s -o /tmp/decathlon.html -w "%{http_code}" --max-time 15 \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36" \
+            -H "Accept-Language: fr-FR,fr;q=0.9" \
+            "https://www.decathlon.ma/5080-promotions") || code="000"
+          echo "decathlon.ma -> HTTP $code"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" = "200" ] && ! grep -q "Just a moment" /tmp/decathlon.html 2>/dev/null; then
+            echo "joignable=oui" >> "$GITHUB_OUTPUT"
+          else
+            echo "joignable=non" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Alerte — bestmark.ma redevenue joignable
+        if: steps.bestmark.outputs.joignable == 'oui'
+        uses: ./.github/actions/alerte-issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          label: source-reactivable-bestmark
+          depot: ${{ github.repository }}
+          assignes: Flakpak
+          titre: "bestmark.ma répond de nouveau depuis un runner GitHub Actions"
+          corps: |
+            Vérification hebdomadaire (une requête, aucune insertion) : bestmark.ma a répondu
+            `${{ steps.bestmark.outputs.code }}` avec un contenu exploitable, depuis le run
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}.
+
+            Retirée du cron le 13/08/2026 sur 10 échecs `fetch failed` consécutifs — cause jamais
+            déterminée avec certitude (`docs/IDEES.md`). Si ce n'est pas un aléa isolé (revérifier
+            une semaine avant de trancher), envisager la réintégration au cron — geste humain,
+            ce workflow ne réintègre rien tout seul.
+
+            **Rappel indépendant du réseau** : au dernier balayage complet (02/08/2026), le
+            catalogue ne comptait qu'1 seul produit remisé sur 865 — le rendement reste à
+            reconfirmer avant de réintégrer, la joignabilité seule ne suffit pas.
+
+            Cette issue se referme manuellement une fois traitée.
+
+      - name: Alerte — decathlon.ma redevenue joignable
+        if: steps.decathlon.outputs.joignable == 'oui'
+        uses: ./.github/actions/alerte-issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          label: source-reactivable-decathlon
+          depot: ${{ github.repository }}
+          assignes: Flakpak
+          titre: "decathlon.ma ne renvoie plus de challenge Cloudflare depuis un runner GitHub Actions"
+          corps: |
+            Vérification hebdomadaire (une requête, aucune insertion) : decathlon.ma a répondu
+            `${{ steps.decathlon.outputs.code }}` sans page de challenge Cloudflare, depuis le run
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}.
+
+            Retirée du cron le 15/08/2026 — cause du challenge jamais déterminée avec certitude
+            (empreinte TLS vs catégorie d'IP, `docs/IDEES.md`). Si ce n'est pas un aléa isolé
+            (revérifier une semaine avant de trancher), envisager la réintégration au cron —
+            geste humain, ce workflow ne réintègre rien tout seul.
+
+            Cette issue se referme manuellement une fois traitée.
+
+      # Voir l'en-tête : cette étape existe DÈS la construction, pas ajoutée
+      # après un premier échec silencieux (contrairement à suivi-perime.yml).
+      - name: Alerte — le réexamen lui-même a échoué
+        if: failure()
+        uses: ./.github/actions/alerte-issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          label: alerte-sources-retirees-reexamen
+          depot: ${{ github.repository }}
+          assignes: Flakpak
+          labels-supplementaires: urgent
+          titre: "Le réexamen hebdomadaire des sources retirées a échoué"
+          corps: |
+            Le workflow **Réexamen hebdomadaire des sources retirées** a échoué avant d'avoir pu
+            conclure sur bestmark.ma et/ou decathlon.ma.
+
+            | | |
+            |---|---|
+            | Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
+            | Déclencheur | `${{ github.event_name }}` |
+
+            Sans ce filet, un plantage du réexamen lui-même (et non des sources vérifiées)
+            passerait inaperçu — exactement le défaut corrigé sur `suivi-perime.yml` le 15/08/2026.

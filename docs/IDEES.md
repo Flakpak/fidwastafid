@@ -822,6 +822,58 @@ candidat Gaming actuel — **gamezone.ma reste un candidat réel, pas écarté**
 (recontrôlé le 14/08/2026 ci-dessus : catalogue confirmé via sitemap, taux
 de remise non mesuré), pas un second choix disqualifié.
 
+### gamezone.ma — taux de remise mesuré le 15/08/2026 : ARRÊT, catalogue sans promotion active
+
+**Ce que le recontrôle du 14/08 n'avait pas mesuré** : le sitemap confirmait
+449 URLs produit réelles, mais aucun taux de remise n'avait été vérifié —
+seul un produit testé avait `reduction_percent = 0.00`.
+
+**Mesure du 15/08/2026** : 41 fiches produit échantillonnées sur les 449 du
+sitemap (une sur onze, répartition couvrant tout l'éventail — des URLs au
+`lastmod` 2023 jusqu'à des titres tout récents comme *Battlefield 6* et *EA
+Sports FC 27*, donc pas un biais sur du contenu figé). **`reduction_percent`
+= 0,00 % sur 41 fiches sur 41.** Aucun mécanisme de remise visuel
+alternatif trouvé (aucune classe `old-price`/`discount`, aucun second champ
+de prix dans le JSON produit).
+
+**Verdict : ARRÊT, aucun scraper codé.** Le volume utile n'est pas
+« faible », il est nul — ce n'est pas un problème de seuil (30 %) mais
+l'absence totale de promotion active mesurable sur l'échantillon. **Gaming
+reste sans source pipeline** (0 deal, comme au 13/08). **Ne pas rouvrir
+cette piste sans fait nouveau** : soit gamezone.ma active de vraies
+promotions (à revérifier ponctuellement, pas surveillé activement), soit
+une autre source Gaming apparaît (mgamesstore.com reste le candidat réel,
+voir ci-dessus — sa propre inconnue de renouvellement, elle, est mesurable
+dès maintenant).
+
+### biougnach.ma — effort chiffré le 15/08/2026, non engagé
+
+**Coût technique, deux voies, aucune bon marché** : (1) rendu JS réel
+(Playwright/Puppeteer) — la dépendance `playwright` existe déjà dans
+`apps/pipeline/package.json` mais **n'est utilisée par AUCUN des huit
+scrapers en production** (seulement par `discover-site.mjs`, l'outil de
+spike manuel) ; l'introduire dans le cron quotidien en ferait le PREMIER
+scraper à navigateur réel du dépôt — plus lent (lancement navigateur à
+chaque run), plus lourd en CPU/mémoire sur le runner, plus fragile
+(surface de panne plus large qu'un `fetch()` + cheerio). (2)
+Reverse-engineering de l'API `webapigw` (`baseUrl`/`CatalogUrl` identifiés
+dans le bundle JS) — l'appel XHR réel n'a jamais été capturé au spike
+(fenêtre de capture ratée), c'est un chantier d'exploration à part entière
+avant même de pouvoir écrire un scraper, pas un simple wiring.
+
+**Valeur, mesurée le 15/08/2026** : Électroménager compte déjà **31 deals
+publiés** — 2ème catégorie la mieux fournie du catalogue (derrière Maison,
+42). Le gain marginal de diversification est structurellement plus faible
+ici que pour une catégorie sans aucune source dédiée (Maison avant
+lemobilier.ma) ou vide (Gaming).
+
+**Décision : non engagé.** Effort le plus élevé du lot de trois (lemobilier/
+gamezone/biougnach) pour la valeur ajoutée la plus faible. Pas écarté
+définitivement — si le rendu JS devient nécessaire pour une AUTRE source à
+plus forte valeur, le coût d'entrée (première intégration Playwright dans
+le cron) serait amorti différemment ; ne pas rouvrir biougnach seul sans
+ce fait nouveau.
+
 ## Diversification des sources (2026-07-18) — partiellement caduque
 
 **« Le pipeline ne scrape que Bringo » n'est plus vrai** : six sources tournent
