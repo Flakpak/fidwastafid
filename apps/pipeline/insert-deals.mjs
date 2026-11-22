@@ -29,6 +29,7 @@ import { traiterImage, storageDisponible } from "./images.mjs";
 import { extraireDescription } from "./fiche-produit.mjs";
 import { validateDeal } from "./validation.mjs";
 import { estRemiseSuffisante, SEUIL_REMISE_MIN_PCT } from "./remise.mjs";
+import { decoderEntitesHtml } from "./entites-html.mjs";
 import { resoudreFichierArgument } from "./argv.mjs";
 import { sourceDepuisFichier, classifierCause, enregistrerRun } from "./_lib/pipelineRuns.mjs";
 
@@ -125,7 +126,9 @@ async function chargerEnseignes(pgClient) {
 // qu'insérés sous une catégorie corrigée à la volée.
 function mapDeal(d) {
   return {
-    titre: d.titre?.trim().slice(0, 200),
+    // Décodage des entités HTML (lot SEO-2) AVANT trim/slice : une entité
+    // coupée par le slice resterait à moitié dans le titre.
+    titre: d.titre == null ? d.titre : decoderEntitesHtml(d.titre).trim().slice(0, 200),
     enseigneRaw: d.enseigne?.trim(),
     ville: d.ville || VILLE_DEFAUT,
     categorie: d.categorie,

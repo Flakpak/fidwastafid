@@ -73,7 +73,9 @@ export function parseProduits(produits) {
   let dateFinManquante = 0;
 
   for (const p of produits || []) {
-    const titre = (p?.name || "").replace(/&#8211;/g, "-").trim();
+    // Entités HTML (`&#8211;`, `&rsquo;`…) décodées dans insert-deals.mjs
+    // (mapDeal → entites-html.mjs), point commun à tous les scrapers.
+    const titre = (p?.name || "").trim();
     if (titre.length < 3) {
       rejets.push({ nom: p?.slug || "(sans titre)", raison: "titre absent ou trop court" });
       continue;
