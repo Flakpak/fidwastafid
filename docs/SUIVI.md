@@ -1,10 +1,10 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-08-15, sur `main` à `cd1cb3b`. Rattrape onze lots fusionnés le
-15/08 : filtre source dans la file admin, diffusion en masse Telegram/Discord, RLS
-`memoire_curation` + garde-fou CI, « tout sélectionner » (deux niveaux, cinq onglets + Supprimés),
-frictions de filtre corrigées, partage WhatsApp manuel, cache `og:image` versionné, cron de
-fraîcheur de ce document remis en état — voir §1 et §3.*
+*Dernière mise à jour : 2026-11-22, sur `main` à `53c2e50`. Rattrape les lots SEO du 22/11 :
+entités HTML des titres décodées (0023/0024), expiration automatique des deals publiés,
+taxonomie v3 et reclassement de « Autre » (0026), **pages hub SEO livrées** (`/categorie`,
+`/bons-plans`, maillage, sitemap découpé) — voir §1 et « Derniers lots livrés ». La section
+« Chiffres réels » date toujours du 05/08 et n'a pas été remesurée.*
 
 Ce document est le **point d'entrée pour reprendre le travail sans contexte préalable**. Il dit
 ce qui tourne, ce qui reste ouvert, et par quoi continuer. Il ne remplace aucun autre document :
@@ -163,6 +163,19 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
     avril. Un deal expiré ainsi reste dans le sitemap, sans `noindex` (`deals_protection`
     le garde protégé par son historique de publication, CONTRAT-V1 §1). Toute erreur fait
     échouer le job.
+- **Pages hub SEO** (lot SEO-3, #193, 22/11/2026 — CONTRAT-V1 §3, vingt-deuxième amendement) :
+  - `/categorie/[slug]` : 13 slugs fixes (`apps/web/content/hubs.ts`), « autre » → 404. Deals
+    publiés actifs triés par remise (48 max), bloc darija `lang="ar-MA" dir="rtl"`. Une page
+    sous 8 deals passe en `noindex, follow` et sort du sitemap.
+  - `/bons-plans/[evenement]` : liste fermée de six événements. Black Friday 2026 (01–30/11) :
+    deals **publiés pour la première fois** dans la fenêtre (`journal_audit`), remise ≥ 20 %,
+    60 max. Hors fenêtre : 200, meilleures remises du moment. Événements sans édition
+    configurée (ramadan, aid, rentree, soldes-ete, soldes-hiver) : `noindex, follow`.
+  - `/enseigne/[slug]` : même seuil de 8 deals (en `noindex` au 22/11 : Bim, Lemobilier).
+  - Maillage : bloc « Catégories » et lien Black Friday (en saison) sur l'accueil, catégories
+    indexables au pied de page, fil d'Ariane avec BreadcrumbList sur les hubs et la fiche deal.
+  - Sitemap : `/sitemap.xml` est un index vers `/sitemap-hubs.xml` et `/sitemap-deals.xml`.
+  - `/guides/[slug]` reste acté, non construit.
 - **API** (`/api/v1/*`) — liste fermée, documentée au CONTRAT-V1 §4, spec générée
   (`apps/web/public/openapi.json`) et vérifiée en CI par `openapi-check`.
 
@@ -170,6 +183,10 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| SEO-3 — pages hub | #193 | 22/11 | `/categorie/[slug]`, `/bons-plans/[evenement]`, seuil d'indexation de 8 deals (catégories et enseignes), maillage, fil d'Ariane, sitemap découpé (index + hubs + deals). |
+| SEO-2c — taxonomie v3 | #191, #192 | 22/11 | Vingt-deuxième amendement ; catégories `Fournitures scolaires` et `Enfants & Jouets` ; repli « Autre » compté à chaque run ; 0026 reclasse les 49 deals « Autre ». |
+| SEO-2b — expiration des publiés | #190 | 22/11 | `expirer-publies.mjs` (jour de Casablanca calculé par Postgres) ; CI sur `postgres:17` ; 0024. |
+| SEO-2 — entités HTML | #188, #189 | 22/11 | Décodage `entities` dans `insert-deals.mjs` ; 0023 corrige 29 titres. |
 | Cron de fraîcheur du SUIVI, remis en état | #152 | 15/08 | `.github/workflows/suivi-perime.yml` (#86, 05/08) échouait sur CHAQUE run planifié depuis sa création : l'en-tête de ce document n'a jamais porté le format `sur \`main\` à \`<sha>\`.` attendu par le `sed` du workflow — un seul run réel (10/08), conclusion `failure`, jamais remarqué (un run planifié en échec ne notifie personne). Corrigé en donnant à l'en-tête ci-dessus le format attendu ; éprouvé réellement (`workflow_dispatch`, seuil forcé à 0) — issue créée puis refermée, voir `docs/INCIDENTS.md`. |
 | Fixes du jour (11 lots) | #142–#151 | 15/08 | Filtre source (domaine du lien, distingue bringo/carrefour.ma) ; diffusion en masse Telegram/Discord (migration 0021, sélection manuelle, étalement côté client) ; RLS `memoire_curation` + garde-fou CI `check-migrations-rls` (migration 0022) ; ordre migration/fusion documenté ; « tout sélectionner » deux niveaux sur les cinq onglets de statut + Supprimés (`verbesAutorises`, restauration groupée) ; étude WhatsApp/Facebook/Instagram gratuits (conclusion fermée, aucune voie sans compte Meta) ; frictions de filtre corrigées (application au changement, pas de reload brutal, retrait local sur action filtrée) ; partage WhatsApp manuel (texte prêt à coller, `whatsapp_message_genere`) ; cache `og:image` versionné dans le chemin (`[version]/og.jpg`, immuable) ; incident cache négatif Meta consigné. Détail : `docs/CONTRAT-V1.md` (vingtième et vingt-et-unième amendements), `docs/INCIDENTS.md`, `docs/IDEES.md`. |
 | Scraper carrefour.ma | #134 | 14/08 | Septième source, API JSON `/api/products`, en parallèle de bringo (voir « Fonctionnel livré » ci-dessus). `date_fin` réelle via `promotionEndDate`. |
