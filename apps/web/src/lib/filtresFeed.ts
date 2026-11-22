@@ -162,11 +162,21 @@ export interface LienEvenementFiltre {
 }
 
 /**
- * Lien du filtre vers une catégorie (`slug`) ou vers « Tout » (`null` → `/`),
- * en conservant les autres dimensions de `e`. La catégorie elle-même n'est
- * jamais en paramètre : elle est dans le chemin.
+ * Chemin d'un lien du filtre : la page de la catégorie (`slug`) ou l'accueil
+ * (`null`). JAMAIS de paramètre dans un href interne (lot SEO-3b, correctif) :
+ * Google suit les liens, et chaque variante `?tri=…` serait une URL de plus
+ * à explorer pour un même contenu.
  */
-export function hrefCategorieFiltre(slug: string | null, e: EtatFiltres): string {
-  const qs = ecrireFiltresUrl({ ...e, categorie: "" });
-  return `${slug ? `/categorie/${slug}` : "/"}${qs}`;
+export function cheminCategorieFiltre(slug: string | null): string {
+  return slug ? `/categorie/${slug}` : "/";
+}
+
+/**
+ * Cible d'un CLIC sur un lien du filtre (côté client uniquement) : le chemin
+ * propre, plus les choix actifs de l'utilisateur (tri, ville, où acheter,
+ * recherche). La catégorie n'est jamais en paramètre : elle est dans le
+ * chemin.
+ */
+export function cibleNavigationFiltre(chemin: string, e: EtatFiltres): string {
+  return `${chemin}${ecrireFiltresUrl({ ...e, categorie: "" })}`;
 }

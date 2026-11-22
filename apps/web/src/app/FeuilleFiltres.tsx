@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Button } from "../components/Button.js";
+import { LienFiltre } from "../components/LienFiltre.js";
 import {
   ANCRE_RESULTATS,
   DIMENSIONS,
   RAISON_VILLE_SANS_OBJET,
   TRIS,
   FILTRES_PAR_DEFAUT,
-  hrefCategorieFiltre,
+  cheminCategorieFiltre,
   normaliserFiltres,
   villeSansObjet,
   type EtatFiltres,
@@ -84,17 +84,28 @@ function Option({
  * immédiatement vers la page de la catégorie (le reste du brouillon suit en
  * paramètres), au lieu d'attendre « Voir les résultats ».
  */
-function OptionLien({ href, label, choisi }: { href: string; label: string; choisi: boolean }) {
+function OptionLien({
+  href,
+  filtres,
+  label,
+  choisi,
+}: {
+  href: string;
+  filtres: EtatFiltres;
+  label: string;
+  choisi: boolean;
+}) {
   return (
-    <Link
+    <LienFiltre
       href={href}
-      aria-current={choisi ? "page" : undefined}
+      filtres={filtres}
+      actif={choisi}
       className={`flex min-h-11 items-center gap-3 rounded-[9px] px-3 text-sm cursor-pointer ${
         choisi ? "bg-accent-soft font-bold text-accent" : "text-ink hover:bg-surface-subtle"
       } focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent`}
     >
       <span className="min-w-0 flex-1 truncate">{label}</span>
-    </Link>
+    </LienFiltre>
   );
 }
 
@@ -289,15 +300,20 @@ export function FeuilleFiltres({
         <div ref={corpsRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <Section id="categorie" titre={DIMENSIONS.categorie.nom}>
             <OptionLien
-              href={hrefCategorieFiltre(null, brouillon)}
+              href={cheminCategorieFiltre(null)}
+              filtres={brouillon}
               label={DIMENSIONS.categorie.neutre}
               choisi={brouillon.categorie === ""}
             />
-            {lienEvenement && <OptionLien href={lienEvenement.href} label={lienEvenement.libelle} choisi={false} />}
+            {lienEvenement && (
+              // Page événement : pas de filtre à y reporter — lien simple.
+              <OptionLien href={lienEvenement.href} filtres={FILTRES_PAR_DEFAUT} label={lienEvenement.libelle} choisi={false} />
+            )}
             {liensCategories.map((c) => (
               <OptionLien
                 key={c.slug}
-                href={hrefCategorieFiltre(c.slug, brouillon)}
+                href={cheminCategorieFiltre(c.slug)}
+                filtres={brouillon}
                 label={c.categorie}
                 choisi={brouillon.categorie === c.categorie}
               />

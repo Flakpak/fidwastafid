@@ -1,12 +1,14 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { ColonneFiltres } from "../src/app/ColonneFiltres.js";
-import { FILTRES_PAR_DEFAUT, hrefCategorieFiltre, type EtatFiltres } from "../src/lib/filtresFeed.js";
+import { FILTRES_PAR_DEFAUT, cibleNavigationFiltre, type EtatFiltres } from "../src/lib/filtresFeed.js";
 import { canonicalCategorie, hubParSlug } from "../src/lib/hubs.js";
 
 /**
  * Navigation par catégorie (lot SEO-3b) — HTML SERVEUR du filtre, rendu hors
  * navigateur (`renderToStaticMarkup`, comme tests/primitives.ts) : ce que
- * Google reçoit avant toute hydratation.
+ * Google reçoit avant toute hydratation. Correctif : aucun href interne ne
+ * porte de paramètre ; les choix actifs ne suivent qu'au clic (côté client,
+ * tests/navigationClic.tsx).
  */
 
 let pass = 0;
@@ -41,6 +43,10 @@ function rendre(filtres: EtatFiltres, lienEvenement: { href: string; libelle: st
   );
 }
 
+function hrefsInternes(html: string): string[] {
+  return [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1] ?? "").filter((h) => h.startsWith("/"));
+}
+
 console.log("Filtre — accueil (HTML serveur)");
 {
   const html = rendre(FILTRES_PAR_DEFAUT);
@@ -59,29 +65,30 @@ console.log("Filtre — accueil pendant la fenêtre Black Friday");
   check("entrée Black Friday = lien, même liste que les catégories", /<a[^>]*href="\/bons-plans\/black-friday"[^>]*>Black Friday<\/a>/.test(html));
 }
 
-console.log("Filtre — page catégorie, tri différent");
+console.log("Filtre — page catégorie avec ?tri=recent (+ ville, recherche) : aucun href interne avec paramètre");
 {
-  const filtres: EtatFiltres = { ...FILTRES_PAR_DEFAUT, categorie: "Électroménager", tri: "score" };
-  const html = rendre(filtres);
-  // Ordre des attributs non garanti : on isole la balise <a> de la
-  // catégorie courante, puis on y cherche aria-current et la classe active.
-  const baliseActive = html.match(/<a[^>]*href="\/categorie\/electromenager\?tri=score"[^>]*>/)?.[0] ?? "";
+  const filtres: EtatFiltres = { ...FILTRES_PAR_DEFAUT, categorie: "Électroménager", tri: "recent", ville: "Rabat", q: "four" };
+  const html = rendre(filtres, { href: "/bons-plans/black-friday", libelle: "Black Friday" });
+  const internes = hrefsInternes(html);
+  check("des liens internes sont bien rendus", internes.length >= 4);
+  check("aucun href interne ne contient « ? »", internes.every((h) => !h.includes("?")));
+  // Ordre des attributs non garanti : on isole la balise <a> concernée.
+  const baliseActive = html.match(/<a[^>]*href="\/categorie\/electromenager"[^>]*>/)?.[0] ?? "";
   check("catégorie courante à l'état actif (aria-current)", baliseActive.includes('aria-current="page"'));
   check("catégorie courante avec la classe active du filtre", baliseActive.includes("bg-accent-soft text-accent border border-accent"));
-  const baliseMaison = html.match(/<a[^>]*href="\/categorie\/maison\?tri=score"[^>]*>/)?.[0] ?? "";
+  const baliseMaison = html.match(/<a[^>]*href="\/categorie\/maison"[^>]*>/)?.[0] ?? "";
   check("une autre catégorie n'est pas active", baliseMaison !== "" && !baliseMaison.includes("aria-current"));
-  check("les autres catégories gardent le tri en paramètre", html.includes('href="/categorie/maison?tri=score"'));
-  check("« Toutes les catégories » garde le tri : /?tri=score", html.includes('href="/?tri=score"'));
-  check("la catégorie n'est jamais en paramètre", !html.includes("categorie="));
+  check("« Toutes les catégories » → / sans paramètre", /<a[^>]*href="\/"[^>]*>Toutes les catégories<\/a>/.test(html));
 }
 
-console.log("Liens et canonical");
+console.log("Cible du clic et canonical");
 {
   check(
-    "hrefCategorieFiltre garde ville/type/recherche, jamais la catégorie",
-    hrefCategorieFiltre("maison", { ...FILTRES_PAR_DEFAUT, categorie: "Mode", ville: "Rabat", q: "four" }) ===
+    "cible du clic : chemin propre + choix actifs, jamais la catégorie",
+    cibleNavigationFiltre("/categorie/maison", { ...FILTRES_PAR_DEFAUT, categorie: "Mode", ville: "Rabat", q: "four" }) ===
       "/categorie/maison?ville=Rabat&q=four"
   );
+  check("sans choix actif, la cible est le chemin propre", cibleNavigationFiltre("/", FILTRES_PAR_DEFAUT) === "/");
   check("canonical de la page catégorie sans paramètre", canonicalCategorie(hubParSlug("electromenager")!) === "/categorie/electromenager");
 }
 

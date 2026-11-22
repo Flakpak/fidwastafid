@@ -5,7 +5,7 @@ import {
   OU_ACHETER,
   RAISON_VILLE_SANS_OBJET,
   TRIS,
-  hrefCategorieFiltre,
+  cheminCategorieFiltre,
   villeSansObjet,
   type EtatFiltres,
   type LienCategorieFiltre,
@@ -15,6 +15,7 @@ import {
 } from "../lib/filtresFeed.js";
 import Link from "next/link";
 import { Brand } from "../components/Brand.js";
+import { LienFiltre } from "../components/LienFiltre.js";
 import { CADRE, NEUTRE } from "./controlesFiltres.js";
 
 /**
@@ -115,23 +116,24 @@ export function ColonneFiltres({
           listées (calcul serveur, `categoriesFiltre`). */}
       <p className={TITRE}>Catégories</p>
       <div className="px-4 flex flex-col gap-0.5">
-        <Link href={hrefCategorieFiltre(null, filtres)} className={catBtnClass(filtres.categorie === "")}>
+        <LienFiltre href={cheminCategorieFiltre(null)} filtres={filtres} className={catBtnClass(filtres.categorie === "")}>
           {DIMENSIONS.categorie.neutre}
-        </Link>
+        </LienFiltre>
         {lienEvenement && (
           <Link href={lienEvenement.href} className={catBtnClass(false)}>
             {lienEvenement.libelle}
           </Link>
         )}
         {liensCategories.map((c) => (
-          <Link
+          <LienFiltre
             key={c.slug}
-            href={hrefCategorieFiltre(c.slug, filtres)}
-            aria-current={filtres.categorie === c.categorie ? "page" : undefined}
+            href={cheminCategorieFiltre(c.slug)}
+            filtres={filtres}
+            actif={filtres.categorie === c.categorie}
             className={catBtnClass(filtres.categorie === c.categorie)}
           >
             {c.categorie}
-          </Link>
+          </LienFiltre>
         ))}
       </div>
 
