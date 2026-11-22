@@ -14,6 +14,22 @@
   dur dans `ci.yml` et `pipeline-quotidien.yml`, et la version Vercel n'a pas été
   vérifiée. Tout code qui dépend des données de fuseau ou d'ICU peut se comporter
   différemment selon l'environnement.
+- **`Africa/Casablanca` : décalage UTC différent entre le Postgres de CI et la prod** —
+  constat du 22/11/2026 (PR #190). Même requête
+  `SELECT version(), current_setting('TimeZone'), ('2026-11-22T23:30:00Z'::timestamptz AT TIME ZONE 'Africa/Casablanca');`
+
+  | Base | version | TimeZone | Résultat |
+  |---|---|---|---|
+  | CI `postgres:16-alpine` | PostgreSQL 16.16 on x86_64-pc-linux-musl (Alpine) | UTC | `2026-11-22 23:30:00` (UTC+0) |
+  | Prod Supabase | PostgreSQL 17.6 on x86_64-pc-linux-gnu | UTC | `2026-11-23 00:30:00` (UTC+1) |
+
+  Le passage à `postgres:17` (Debian) dans `ci.yml` n'a pas suffi : le cas d'intégration à
+  23:30 UTC échouait encore. Le test vérifie donc la règle avec des instants éloignés de
+  minuit (12:00 UTC), et non la bascule de jour elle-même. **Impact en prod jugé nul pour
+  l'instant** : `expirer-publies.mjs` tourne dans le cron de 05:00 UTC (06:00 au Maroc),
+  loin de minuit. Le seul jour concerné est celui de la bascule, que l'heure d'exécution
+  évite. À revoir si le job venait à tourner près de minuit, ou si une autre logique se met
+  à dépendre de la bascule de jour à Casablanca.
 
 - **Diffusion — deux constats trouvés en préparant la reprise (08/08/2026),
   jamais construits, à garder en tête au premier test réel :**

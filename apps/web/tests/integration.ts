@@ -2069,8 +2069,15 @@ async function main() {
       }
     }
 
-    const tard = await casExpiration("2026-11-22T23:30:00Z", [{ statut: "publie", dateFin: "2026-11-22" }]);
-    check("23:30 UTC (00:30 le 23 à Casablanca), date_fin 22 → expire", tard.statuts[0] === "expire" && tard.expires.length === 1);
+    // Instants volontairement éloignés de minuit : le décalage UTC de
+    // Africa/Casablanca diffère entre les données de fuseau du Postgres de
+    // CI et celles de la prod (docs/IDEES.md, 22/11/2026) — un cas à 23:30
+    // UTC testerait la base de fuseaux, pas la requête.
+    const lendemain = await casExpiration("2026-11-23T12:00:00Z", [{ statut: "publie", dateFin: "2026-11-22" }]);
+    check("12:00 UTC le 23, date_fin 22 → expire", lendemain.statuts[0] === "expire" && lendemain.expires.length === 1);
+
+    const memeJour = await casExpiration("2026-11-22T12:00:00Z", [{ statut: "publie", dateFin: "2026-11-22" }]);
+    check("12:00 UTC le 22, date_fin 22 → reste publie (le jour de fin reste publié)", memeJour.statuts[0] === "publie" && memeJour.expires.length === 0);
 
     const veille = await casExpiration("2026-11-22T22:30:00Z", [{ statut: "publie", dateFin: "2026-11-22" }]);
     check("22:30 UTC (23:30 le 22 à Casablanca), date_fin 22 → reste publie", veille.statuts[0] === "publie" && veille.expires.length === 0);
