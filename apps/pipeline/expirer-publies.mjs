@@ -10,21 +10,20 @@
 // CONTRAT-V1 §1 : un deal expiré garde son URL à vie (HTTP 200, jamais de
 // suppression). Un deal passé par `publie` reste un actif SEO
 // (`deals_protection.protege` = true via son historique d'audit) : il
-// reste dans le sitemap, sans noindex — l'expiration n'est qu'un changement
-// de statut.
+// reste dans le sitemap, sans noindex.
 //
-// `date_fin` est de type `date` : comparée au jour calendaire de
-// Casablanca, pas à l'UTC (prédicat pur équivalent : estPublieExpirable,
-// expiration.mjs). Strictement antérieure : le jour de fin reste publié.
+// La requête et la règle de date vivent dans _lib/expirerPublies.mjs. Ici :
+// lecture de `now()` et UPDATE dans la MÊME transaction, sans aucun calcul
+// de date côté Node.
 //
-// Aucun repli silencieux : toute erreur fait sortir en code 1 et échouer le
-// job.
+// Aucun repli silencieux : toute erreur annule la transaction et fait
+// sortir en code 1 (échec du job).
 //
 // Prérequis : variable d'env DATABASE_URL (connection string Postgres).
 // ============================================================
 
 import pg from "pg";
-import { FUSEAU_EXPIRATION } from "./expiration.mjs";
+import { expirerPublies } from "./_lib/expirerPublies.mjs";
 
 if (!process.env.DATABASE_URL) {
   console.error("Erreur : variable d'environnement DATABASE_URL manquante.");
@@ -37,28 +36,26 @@ const client = new pg.Client({
   ssl: process.env.DATABASE_URL.includes("supabase.co") ? { rejectUnauthorized: false } : false,
 });
 
+let exitCode = 0;
 try {
   await client.connect();
   console.log("🔌 Connecté à la base.");
 
-  // supprime_le IS NULL : même garde que expirer-auto-draft.mjs — un deal
-  // soft-supprimé ne change pas de statut pendant qu'il est invisible, pour
-  // que sa restauration le renvoie à son vrai statut d'origine.
-  const { rows } = await client.query(
-    `update deals
-       set statut = 'expire', updated_at = now()
-     where statut = 'publie'
-       and supprime_le is null
-       and date_fin < (now() at time zone $1)::date
-     returning public_id`,
-    [FUSEAU_EXPIRATION]
-  );
+  await client.query("begin");
+  // now()::text : la valeur reste celle de Postgres, transmise telle quelle,
+  // sans passer par un objet Date Node.
+  const { rows } = await client.query("select now()::text as instant");
+  const instant = rows[0].instant;
+  const expires = await expirerPublies(client, instant);
+  await client.query("commit");
 
-  console.log(`✅ ${rows.length} deal(s) publié(s) expiré(s) (date de fin antérieure au jour, ${FUSEAU_EXPIRATION}).`);
-  for (const r of rows) console.log(`   - ${r.public_id}`);
+  console.log(`✅ ${expires.length} deal(s) publié(s) expiré(s) (instant de référence ${instant}, jour calculé à Africa/Casablanca par Postgres).`);
+  for (const publicId of expires) console.log(`   - ${publicId}`);
 } catch (err) {
+  await client.query("rollback").catch(() => {});
   console.error("❌ Échec :", err.message);
-  process.exit(1);
+  exitCode = 1;
 } finally {
   await client.end();
 }
+process.exit(exitCode);

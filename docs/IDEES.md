@@ -4,6 +4,17 @@
 
 ## Dette technique temporaire
 
+- **CI en Node 22, poste local en Node 24 ; aligner la version (engines, .nvmrc,
+  setup-node, version Vercel)** — constat du 22/11/2026 (PR #190). Pour un même
+  instant (22/11/2026 23:30 UTC), le Node 22.23.5 du runner et le Node 24.14.0 local
+  (tz 2025c) ne calculaient pas le même jour à `Africa/Casablanca`. Le test JS est passé
+  en local et a échoué en CI. Contourné en calculant la date uniquement en SQL
+  (`apps/pipeline/_lib/expirerPublies.mjs`), mais la cause reste : rien ne fixe la
+  version de Node. Pas de `engines`, pas de `.nvmrc` ; `node-version: 22` est codé en
+  dur dans `ci.yml` et `pipeline-quotidien.yml`, et la version Vercel n'a pas été
+  vérifiée. Tout code qui dépend des données de fuseau ou d'ICU peut se comporter
+  différemment selon l'environnement.
+
 - **Diffusion — deux constats trouvés en préparant la reprise (08/08/2026),
   jamais construits, à garder en tête au premier test réel :**
   - `diffuser()` (`_lib/diffusion.ts`) écrit la ligne `diffusions` (donc

@@ -27,39 +27,3 @@ export function estExpirable(deal, maintenant = new Date(), seuilJours = SEUIL_J
   const seuilMs = seuilJours * 24 * 60 * 60 * 1000;
   return maintenant.getTime() - new Date(deal.createdAt).getTime() > seuilMs;
 }
-
-// ============================================================
-// Expiration des deals PUBLIÉS dont la date de fin est passée (lot SEO-2b)
-//
-// Reflète exactement la clause WHERE de expirer-publies.mjs :
-//   statut = 'publie' AND supprime_le IS NULL
-//   AND date_fin < (now() at time zone 'Africa/Casablanca')::date
-// `date_fin` est une colonne `date` (sans fuseau) : elle se compare au
-// JOUR CALENDAIRE de Casablanca, pas à l'UTC. Le jour de fin lui-même reste
-// publié ; le deal expire le lendemain.
-// ============================================================
-
-export const FUSEAU_EXPIRATION = "Africa/Casablanca";
-
-/** Date du jour (YYYY-MM-DD) dans le fuseau donné. */
-export function dateDuJour(maintenant = new Date(), fuseau = FUSEAU_EXPIRATION) {
-  // en-CA formate en YYYY-MM-DD, comparable lexicographiquement à date_fin.
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: fuseau,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(maintenant);
-}
-
-/**
- * @param {{ statut: string, dateFin: string | null, supprimeLe?: string | null }} deal
- * @param {Date} maintenant
- * @returns {boolean}
- */
-export function estPublieExpirable(deal, maintenant = new Date()) {
-  if (deal.statut !== "publie") return false;
-  if (deal.supprimeLe) return false;
-  if (!deal.dateFin) return false;
-  return deal.dateFin < dateDuJour(maintenant);
-}

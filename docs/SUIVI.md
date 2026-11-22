@@ -154,7 +154,8 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
     Avant le 02/08, aucun seuil n'existait : un produit à −2 % entrait comme un produit à
     −70 %. Le chiffre est délibérément **uniforme**, jamais par enseigne — motif et effet
     mesuré par source dans `docs/IDEES.md`.
-  - **Expiration des deals publiés** (lot SEO-2b, 22/11/2026) : `expirer-publies.mjs`,
+  - **Expiration des deals publiés** (lot SEO-2b, 22/11/2026) : `expirer-publies.mjs`
+    (requête dans `_lib/expirerPublies.mjs`, jour calculé par Postgres, testée en intégration),
     étape du cron juste après `expirer-auto-draft`. Passe en `expire` tout deal `publie`
     dont la `date_fin` (type `date`) est strictement antérieure au jour de
     **Africa/Casablanca**. Le jour de fin reste publié. Avant ce lot, aucun code ne faisait
