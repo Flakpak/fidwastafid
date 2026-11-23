@@ -16,6 +16,7 @@ import { GET as getSitemapHubs } from "../src/app/sitemap-hubs.xml/route.js";
 import { GET as getSitemapDeals } from "../src/app/sitemap-deals.xml/route.js";
 import { fetchDealsEdition, categoriesFiltre } from "../src/app/api/v1/_lib/hubs.js";
 import { fetchCibleFusion } from "../src/app/api/v1/_lib/deals.js";
+import { annuler, diffuser } from "../src/app/api/v1/_lib/diffusion.js";
 import { PUBLIC_IDS_FIXTURES, PUBLIC_ID_INEXISTANT } from "./fixtures.js";
 import { POST as postDeal, GET as getDealsList } from "../src/app/api/v1/deals/route.js";
 import { GET as getCompte } from "../src/app/api/v1/deals/compte/route.js";
@@ -2715,6 +2716,172 @@ async function main() {
   // Fusion des fiches (lot SEO-2j) : redirection, sitemap, et VRAI
   // insert-deals.mjs : c'est toujours la fiche conservée qui est touchée.
   // ----------------------------------------------------------------
+  // ----------------------------------------------------------------
+  // Portée d'un rejet admin (lot SEO-2k), de bout en bout avec le VRAI
+  // insert-deals.mjs, puis la publication automatique.
+  // ----------------------------------------------------------------
+  console.log("\nrejet admin — ne bloque que les produits jamais publiés");
+  {
+    const MARQUEUR_LUS = 9999;
+    const dossier = mkdtempSync(nodePath.join(tmpdir(), "rejet-"));
+    const ancien = "2026-01-01T00:00:00Z";
+    const creer: string[] = [];
+    const lienDe = (nom: string) => `https://exemple.test/rejet/${nom}`;
+    const inserer = async (nom: string, statut: string) => {
+      const id = generatePublicId();
+      creer.push(id);
+      await query(
+        `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, prix_normal, lien, statut, score,
+                            vu_le, updated_at, image_key, motif_rejet)
+         values ($1, $2, (select id from enseignes where slug = 'kiabi'), 'Maison', 'en_ligne', 50, 100, $3, $4, 0,
+                 now(), $5, 'deals/test.webp', case when $4 = 'rejete' then 'purge' end)`,
+        [id, `Rejet produit ${nom}`, lienDe(nom), statut, ancien]
+      );
+      return id;
+    };
+    const auditer = (id: string, apres: string) =>
+      query(
+        `insert into journal_audit (admin_id, action, cible_type, cible_id, details)
+         values ($1, 'update_deal', 'deal', $2, $3)`,
+        [userId, id, JSON.stringify({ statut: { avant: "auto_draft", apres }, champs: {} })]
+      );
+    const rejeter = async (nom: string, publieAvant = false) => {
+      const id = await inserer(nom, "rejete");
+      if (publieAvant) await auditer(id, "publie");
+      await auditer(id, "rejete");
+      await query(
+        `insert into memoire_curation (empreinte, decision, deal_origine_public_id, motif, decide_par)
+         values (empreinte_curation($1, '', null), 'rejete', $2, 'purge', $3)`,
+        [lienDe(nom), id, userId]
+      );
+      return id;
+    };
+    const lire = async (id: string) =>
+      (await query<{ statut: string; prix: string }>("select statut, prix_promo as prix from deals where public_id = $1", [id]))[0];
+    const lignes = async (nom: string) =>
+      (await query<{ n: number }>("select count(*)::int as n from deals where titre = $1", [`Rejet produit ${nom}`]))[0]?.n;
+    const element = (nom: string, prix: number) => ({
+      titre: `Rejet produit ${nom}`,
+      prix_promo: prix,
+      prix_normal: 100,
+      categorie: "Maison",
+      description: null,
+      photo_url: null,
+      lien: lienDe(nom),
+      date_fin: null,
+      enseigne: "kiabi",
+      ville: "National",
+      statut: "auto_draft",
+    });
+    try {
+      await query("insert into enseignes (slug, nom) values ('kiabi', 'kiabi') on conflict (slug) do nothing");
+      const actif = await inserer("doublon-actif", "publie");
+      await auditer(actif, "publie");
+      const rejeteActif = await rejeter("doublon-actif");
+      const expire = await inserer("doublon-expire", "expire");
+      await auditer(expire, "publie");
+      const rejeteExpire = await rejeter("doublon-expire");
+      const jamais = await rejeter("jamais-publie");
+      const retire = await rejeter("publie-puis-rejete", true);
+      const brouillonRejete = await inserer("brouillon-rejete", "auto_draft");
+      await query(
+        `insert into memoire_curation (empreinte, decision, deal_origine_public_id, motif, decide_par)
+         values (empreinte_curation($1, '', null), 'rejete', $2, 'purge', $3)`,
+        [lienDe("brouillon-rejete"), brouillonRejete, userId]
+      );
+
+      const archive = [
+        element("doublon-actif", 40),
+        element("doublon-expire", 45),
+        element("jamais-publie", 45),
+        element("publie-puis-rejete", 45),
+      ];
+      const chemin = nodePath.join(dossier, "2026-11-23_05-00_kiabi.json");
+      ecrireArchiveEtTrace(chemin, archive, {
+        lus: MARQUEUR_LUS,
+        plafondAtteint: false,
+        interrompu: false,
+        enseigne: "kiabi",
+        releves: archive.map((e) => ({
+          titre: e.titre,
+          prix: e.prix_promo,
+          prixNormal: e.prix_normal,
+          lien: e.lien,
+          dateFin: null,
+          photoUrl: null,
+        })),
+      });
+      const sortie = execFileSync(process.execPath, ["--import", "tsx", "insert-deals.mjs", chemin], {
+        cwd: nodePath.resolve(process.cwd(), "../pipeline"),
+        env: process.env,
+        stdio: "pipe",
+      }).toString();
+      const resume = JSON.parse(sortie.match(/^RESUME_JSON=(.*)$/m)?.[1] ?? "{}") as Record<string, number>;
+
+      check("produit publié, doublon rejeté → fiche conservée mise à jour", Number((await lire(actif))?.prix) === 40);
+      check("la ligne rejetée reste rejetée", (await lire(rejeteActif))?.statut === "rejete" && Number((await lire(rejeteActif))?.prix) === 50);
+      const r = await lire(expire);
+      check("produit publié puis expiré, doublon rejeté → fiche conservée réactivée", r?.statut === "auto_draft" && Number(r.prix) === 45);
+      check("jamais une fiche rejetée réactivée", (await lire(rejeteExpire))?.statut === "rejete");
+      check("produit jamais publié et rejeté → bloqué", (await lire(jamais))?.statut === "rejete" && (await lignes("jamais-publie")) === 1);
+      check("seule fiche publiée rejetée → bloqué", (await lire(retire))?.statut === "rejete" && (await lignes("publie-puis-rejete")) === 1);
+      check("aucune nouvelle ligne", (await lignes("doublon-actif")) === 2 && (await lignes("doublon-expire")) === 2);
+      check(
+        "résumé : les deux types de rejet distingués",
+        resume.rejetsDoublon === 2 && resume.bloquesRejetAdmin === 2 && resume.reactives === 1 && resume.misAJour === 1 && resume.inseres === 0
+      );
+
+      const client = await getPool().connect();
+      try {
+        await client.query("begin");
+        const decisions = await appliquerPublicationAuto(client);
+        check("publication auto : doublon rejeté → fiche conservée publiée", decisions.find((d) => d.publicId === expire)?.publie === true);
+        const b = decisions.find((d) => d.publicId === brouillonRejete);
+        check("publication auto : jamais publié et rejeté → écarté", b?.publie === false && b.motifs.includes("deja_rejete"));
+      } finally {
+        await client.query("rollback");
+        client.release();
+      }
+
+      // Diffusions : une fiche fusionnée et sa fiche conservée sont le même produit.
+      const conservee = await inserer("diffusion-conservee", "publie");
+      const fusionnee = await inserer("diffusion-fusionnee", "expire");
+      await query("update deals set fusionne_dans = $1 where public_id = $2", [conservee, fusionnee]);
+      await query(
+        `insert into diffusions (deal_id, canal, external_message_id, mode)
+         values ((select id from deals where public_id = $1), 'telegram', 'message-fusionnee', 'production')`,
+        [fusionnee]
+      );
+      const envois: string[] = [];
+      const supprimes: string[] = [];
+      const canalTest = {
+        nom: "telegram",
+        libelle: "Telegram",
+        publier: async (m: { titre: string }) => {
+          envois.push(m.titre);
+          return { messageId: "nouveau", test: false };
+        },
+        supprimer: async (messageId: string) => {
+          supprimes.push(messageId);
+        },
+      } as unknown as Parameters<typeof diffuser>[2];
+      const admin = { id: userId } as unknown as Parameters<typeof diffuser>[0];
+      const refus = await diffuser(admin, conservee, canalTest, "production");
+      check("fiche conservée d'une fiche déjà diffusée → refus", refus.status === 409 && envois.length === 0);
+      const annulation = await annuler(admin, conservee, canalTest);
+      check("annulation depuis la fiche conservée → message de la fiche fusionnée", annulation.status === 200 && supprimes[0] === "message-fusionnee");
+      const accepte = await diffuser(admin, conservee, canalTest, "production");
+      check("après annulation → la fiche conservée se diffuse", accepte.status === 200 && envois.length === 1);
+    } finally {
+      rmSync(dossier, { recursive: true, force: true });
+      await query("delete from pipeline_runs where elements_lus = $1", [MARQUEUR_LUS]);
+      await query("delete from journal_audit where cible_type = 'deal' and cible_id = any($1::text[])", [creer]);
+      await query("delete from memoire_curation where deal_origine_public_id = any($1::text[])", [creer]);
+      await query("delete from deals where public_id = any($1::text[]) and fusionne_dans is not null", [creer]);
+      await query("delete from deals where public_id = any($1::text[])", [creer]);
+    }
+  }
+
   console.log("\nfusion des fiches — redirection, sitemap, fiche conservée");
   {
     const MARQUEUR_LUS = 8888;

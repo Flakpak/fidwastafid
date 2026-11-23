@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { DIFFUSION_MEME_PRODUIT } from "./deals.js";
 import { query, withTransaction } from "@fidwastafid/db";
 import type { AuthUser } from "@fidwastafid/auth";
 import { apiError } from "./errors.js";
@@ -79,7 +80,7 @@ export async function diffuser(
             e.nom as enseigne_nom,
             exists (
               select 1 from diffusions df
-               where df.deal_id = d.id and df.canal = $2 and df.mode = 'production'
+               where ${DIFFUSION_MEME_PRODUIT} and df.canal = $2 and df.mode = 'production'
             ) as deja_diffuse
        from deals d
        left join enseignes e on e.id = d.enseigne_id
@@ -225,7 +226,15 @@ export async function annuler(
   const rows = await query<{ diffusion_id: string | null; external_message_id: string | null; mode: ModeDiffusion | null }>(
     `select df.id as diffusion_id, df.external_message_id, df.mode
        from deals d
-       left join diffusions df on df.deal_id = d.id and df.canal = $2
+       -- La diffusion peut porter sur une fiche fusionnée dans celle-ci (lot
+       -- SEO-2k) : c'est elle qu'on annule, la fiche elle-même d'abord.
+       left join lateral (
+         select df.id, df.external_message_id, df.mode
+           from diffusions df
+          where ${DIFFUSION_MEME_PRODUIT} and df.canal = $2
+          order by (df.deal_id = d.id) desc, df.id
+          limit 1
+       ) df on true
       where d.public_id = $1`,
     [publicId, canal.nom]
   );

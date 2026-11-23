@@ -51,7 +51,9 @@ end`;
  * fortes remises de chaque source ; l'excédent reste en brouillon.
  *
  * Critère ajouté aux règles du lot : un brouillon dont l'empreinte a été
- * rejetée par l'admin (`memoire_curation`) n'est jamais publié.
+ * rejetée par l'admin (`memoire_curation`) n'est publié que si le produit a
+ * déjà une fiche publiée non rejetée (rejet d'un doublon, lot SEO-2k) et
+ * qu'aucune autre fiche de ce produit n'est publiée en ce moment.
  *
  * @param {import("pg").Client | import("pg").PoolClient} client
  * @returns {Promise<{ source: string, publicId: string, publie: boolean, motifs: string[] }[]>}
@@ -76,6 +78,21 @@ export async function appliquerPublicationAuto(client) {
                   select 1 from memoire_curation m
                    where m.empreinte = empreinte_curation(d.lien, d.titre, d.enseigne_id)
                      and m.decision = 'rejete' and m.levee_le is null
+                ) and (
+                  not exists (
+                    select 1 from deals c
+                      join journal_audit ja on ja.cible_type = 'deal' and ja.cible_id = c.public_id
+                     where c.enseigne_id is not distinct from d.enseigne_id
+                       and c.supprime_le is null and c.fusionne_dans is null and c.statut <> 'rejete'
+                       and empreinte_curation(c.lien, c.titre, c.enseigne_id) = empreinte_curation(d.lien, d.titre, d.enseigne_id)
+                       and coalesce((ja.details -> 'statut') ->> 'apres', ja.details ->> 'apres') = 'publie'
+                  )
+                  or exists (
+                    select 1 from deals c
+                     where c.id <> d.id and c.enseigne_id is not distinct from d.enseigne_id
+                       and c.supprime_le is null and c.statut = 'publie'
+                       and empreinte_curation(c.lien, c.titre, c.enseigne_id) = empreinte_curation(d.lien, d.titre, d.enseigne_id)
+                  )
                 ) then 'deja_rejete' end
               ], null)::text[] as motifs
          from deals d

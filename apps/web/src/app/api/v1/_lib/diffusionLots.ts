@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { DIFFUSION_MEME_PRODUIT } from "./deals.js";
 import { query, withTransaction } from "@fidwastafid/db";
 import type { AuthUser } from "@fidwastafid/auth";
 import { diffuser } from "./diffusion.js";
@@ -69,7 +70,7 @@ export async function creerLot(
     `select d.id, d.public_id,
             exists (
               select 1 from diffusions df
-               where df.deal_id = d.id and df.canal = $2 and df.mode = 'production'
+               where ${DIFFUSION_MEME_PRODUIT} and df.canal = $2 and df.mode = 'production'
             ) as deja_diffuse
        from deals d
       where d.public_id = any($1::text[])`,

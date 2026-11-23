@@ -121,12 +121,20 @@ export const PUBLIC_STATUTS = new Set(["publie", "expire"]);
  *  dans `diffusions` (dix-septième amendement, prolongé le 08/08/2026), la
  *  condition est donc redondante en pratique aujourd'hui — mais explicite,
  *  jamais un « ça marche par construction » tacite. */
+/**
+ * Anti-doublon des diffusions (lot SEO-2k) : une fiche et les fiches
+ * fusionnées en elle sont le même produit. Condition sur `df`, pour la fiche `d`.
+ */
+export const DIFFUSION_MEME_PRODUIT = `df.deal_id in (
+  select f.id from deals f where f.id = d.id or f.fusionne_dans = d.public_id
+)`;
+
 export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.motif_rejet, d.motifs_publication_auto, d.turnstile_verifie, d.supprime_le,
   exists (
-    select 1 from diffusions df where df.deal_id = d.id and df.canal = 'telegram' and df.mode = 'production'
+    select 1 from diffusions df where ${DIFFUSION_MEME_PRODUIT} and df.canal = 'telegram' and df.mode = 'production'
   ) as diffuse_telegram,
   exists (
-    select 1 from diffusions df where df.deal_id = d.id and df.canal = 'discord' and df.mode = 'production'
+    select 1 from diffusions df where ${DIFFUSION_MEME_PRODUIT} and df.canal = 'discord' and df.mode = 'production'
   ) as diffuse_discord`;
 
 export interface DealAdminRow extends DealRow {

@@ -308,7 +308,11 @@ n'a qu'une fiche, donc une seule URL à vie. Quand un produit revient chez sa so
   source, aucune expiration sur ce run ;
 - l'**image existante est conservée** si l'URL de l'image source n'a pas changé
   (`deals.image_source`, migration 0030) ;
-- un **rejet admin reste définitif** ;
+- un **rejet admin** ne bloque un produit (empreinte) que si **aucune fiche de ce produit n'a jamais
+  été publiée**. Si le produit a déjà été publié, le rejet est considéré comme le rejet d'un doublon :
+  le retour du produit met à jour ou réactive sa fiche conservée, selon les règles ci-dessus, jamais
+  une fiche rejetée ou fusionnée. Si la seule fiche publiée a elle-même été rejetée, il n'y a pas de
+  fiche à conserver : le produit reste bloqué (complément du lot SEO-2k, même date) ;
 - les **soumissions communautaires** ne sont ni modifiées ni réactivées.
 
 Plus aucune nouvelle ligne pour un produit qui a déjà une fiche non rejetée. Conséquences :
@@ -330,6 +334,8 @@ pour cette redirection de slug.
   fiche conservée.
 - Si la fiche conservée est supprimée, la fiche fusionnée redevient servie en 200 plutôt que de
   rediriger vers une page absente.
+- Diffusions : une fiche et les fiches fusionnées en elle sont le même produit. Une fiche conservée
+  dont une fiche fusionnée a déjà été diffusée sur un canal n'y est pas rediffusée.
 
 **Amendement du 18/07/2026 — consentement WhatsApp public** : la règle "`whatsapp_contact`
 n'apparaît jamais hors admin" (ci-dessous, §4) est remplacée par une règle conditionnée au
