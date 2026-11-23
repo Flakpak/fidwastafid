@@ -221,6 +221,9 @@ export const dealAdminSchema = dealSchema.extend({
   whatsappContact: z.string().nullable(),
   whatsappPublic: z.boolean(),
   motifRejet: z.string().nullable(),
+  /** Critères non remplis à la dernière publication automatique (lot SEO-2g).
+   *  Admin uniquement. */
+  motifsPublicationAuto: z.array(z.string()).nullable().optional(),
   /** `false` = soumission acceptée alors que Cloudflare Turnstile était
    *  injoignable (panne 429/5xx/réseau, migration 0010). Admin uniquement :
    *  c'est une information de modération, jamais un fait public. */

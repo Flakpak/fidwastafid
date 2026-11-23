@@ -270,6 +270,29 @@ sont actées mais ne s'activeront qu'au lot SEO-2f, après observation.**
   n'est possible que sur validation humaine d'une liste.
 - **URL.** Un deal expiré par ces règles garde son URL, en HTTP 200, avec le bandeau expiré (§1).
 
+**Amendement du 23/11/2026 — publication automatique des deals scrapés (vingt-quatrième
+amendement conscient de la liste fermée).** Fait générateur : lot SEO-2g. Un deal `auto_draft`
+issu d'un scraper passe automatiquement en `publie` s'il remplit **tous** les critères :
+
+- source active du cron (liste fermée dans `apps/pipeline/_lib/publicationAuto.mjs` : les sources
+  de `pipeline-quotidien.yml`, hors bestmark) ;
+- `vu_le` dans les 48 dernières heures ;
+- prix d'origine présent et strictement supérieur au prix promo ;
+- remise entre 20 % et 80 % inclus ;
+- catégorie différente de `Autre`, image présente, titre d'au moins 10 caractères ;
+- date de fin absente ou supérieure ou égale à aujourd'hui (Africa/Casablanca, calculée en SQL) ;
+- empreinte non rejetée par l'admin (`memoire_curation`) : un rejet humain n'est jamais annulé
+  par une règle automatique ;
+- au plus 30 publications automatiques par source et par run (les plus fortes remises) ;
+  l'excédent reste en brouillon.
+
+Les soumissions communautaires restent soumises à la modération manuelle. Les brouillons écartés
+restent en revue manuelle avec leur motif (`deals.motifs_publication_auto`, migration 0029).
+Chaque publication écrit dans `journal_audit` la même trace qu'une publication manuelle
+(`update_deal`), attribuée à l'utilisateur système, avec l'acteur `publication-auto` et la version
+des règles. Interrupteur : variable de dépôt GitHub `AUTO_PUBLICATION` (`on`/`off`) ; toute autre
+valeur que `on` n'écrit rien et le journalise.
+
 **Amendement du 18/07/2026 — consentement WhatsApp public** : la règle "`whatsapp_contact`
 n'apparaît jamais hors admin" (ci-dessous, §4) est remplacée par une règle conditionnée au
 consentement du soumetteur — voir §4. `deals` gagne **`whatsapp_public`** (booléen, `not null default

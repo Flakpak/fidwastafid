@@ -361,6 +361,15 @@
               "null"
             ]
           },
+          "motifsPublicationAuto": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
           "turnstileVerifie": {
             "type": "boolean"
           },

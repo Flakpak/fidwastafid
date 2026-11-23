@@ -10,8 +10,8 @@
 // concerné par cette purge automatique.
 // ============================================================
 
-/** Première étape de chaque run quotidien (purge le stock mort avant
- *  d'ajouter du frais) — CONTRAT-V1 §1 : un deal expiré garde son URL à
+/** Étape de chaque run quotidien, après la publication automatique (purge
+ *  le stock mort) — CONTRAT-V1 §1 : un deal expiré garde son URL à
  *  vie (HTTP 200, jamais de suppression), l'expiration n'est qu'un
  *  changement de statut. */
 export const SEUIL_JOURS_AUTO_DRAFT = 14;

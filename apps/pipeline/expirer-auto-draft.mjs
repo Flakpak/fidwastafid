@@ -2,8 +2,8 @@
 // FIDWASTAFID — Expiration des deals auto_draft trop anciens (Phase 7B)
 // Usage : node expirer-auto-draft.mjs
 //
-// Première étape du run quotidien (avant scraping/insertion) : purge le
-// stock mort avant d'ajouter du frais. Tout deal encore en auto_draft
+// Étape du run quotidien, après la publication automatique (lot SEO-2g) :
+// purge le stock mort. Tout deal encore en auto_draft
 // (jamais vu par un admin — ni validé, ni rejeté) depuis plus de
 // SEUIL_JOURS_AUTO_DRAFT jours (expiration.mjs) passe en `expire` —
 // CONTRAT-V1 §1 : "Deals expirés : URL vivante à vie, HTTP 200, affichage
