@@ -35,7 +35,8 @@
 // rejette proprement chaque deal (enseigne inconnue), sans erreur.
 // ============================================================
 
-import { writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
+import { ecrireArchiveEtTrace } from "./_lib/traceScraper.mjs";
 import { pathToFileURL } from "node:url";
 import { prixDepuisCentimes, dateFinDepuisISO } from "./_lib/wooStoreApi.mjs";
 import { mapCategorie } from "./_lib/categoriser.mjs";
@@ -132,6 +133,9 @@ async function main() {
   let totalProduits = 0;
   let totalRejets = 0;
   let totalDateFinManquante = 0;
+  // Trace de passage (lot SEO-2e) : fin réelle du catalogue vs plafond.
+  let finCatalogue = false;
+  let interrompu = false;
 
   for (let pageNum = 1; pageNum <= MAX_PAGES; pageNum++) {
     console.log(`📄 Page ${pageNum} : ${URL_BASE}?on_sale=true&per_page=${PAR_PAGE}&page=${pageNum}`);
@@ -145,6 +149,7 @@ async function main() {
         process.exit(1);
       }
       console.log(`   ::warning::page ${pageNum} en échec (${err.message}) — arrêt de la pagination.`);
+      interrompu = true;
       break;
     }
 
@@ -157,6 +162,7 @@ async function main() {
 
     if (pageNum >= totalPages) {
       console.log(`   (dernière page du catalogue : ${totalPages} page(s) au total)`);
+      finCatalogue = true;
       break;
     }
     if (pageNum < MAX_PAGES) await new Promise((r) => setTimeout(r, THROTTLE_MS));
@@ -181,7 +187,11 @@ async function main() {
   mkdirSync("extractions", { recursive: true });
   const horodatage = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
   const fichierSortie = `extractions/${horodatage}_aswakassalam.json`;
-  writeFileSync(fichierSortie, JSON.stringify(deals, null, 2), "utf8");
+  ecrireArchiveEtTrace(fichierSortie, deals, {
+    lus: totalProduits,
+    plafondAtteint: !finCatalogue && !interrompu,
+    interrompu,
+  });
 
   console.log(`\n✅ ${deals.length} deal(s) aswakassalam.com retenu(s) sur ${totalProduits} produit(s) | ${totalRejets} écarté(s)`);
   console.log(`→ Archive : ${fichierSortie}`);

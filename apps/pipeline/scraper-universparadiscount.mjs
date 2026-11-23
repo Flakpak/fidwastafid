@@ -30,7 +30,8 @@
 // (pas de .regular-price) est simplement ignoré, jamais complété.
 // ============================================================
 
-import { writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
+import { ecrireArchiveEtTrace } from "./_lib/traceScraper.mjs";
 import { pathToFileURL } from "node:url";
 import * as cheerio from "cheerio";
 
@@ -176,7 +177,11 @@ async function main() {
   mkdirSync("extractions", { recursive: true });
   const horodatage = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
   const fichierSortie = `extractions/${horodatage}_universparadiscount.json`;
-  writeFileSync(fichierSortie, JSON.stringify(deals, null, 2), "utf8");
+  // Trace de passage (lot SEO-2e) : la page d'accueil seule — lue en entier,
+  // jamais de plafond ni d'interruption. Elle ne couvre qu'une PARTIE des
+  // promotions de la source (carrousels) : ce n'est pas un plafond de
+  // pagination, mais une source partielle par construction (amendement).
+  ecrireArchiveEtTrace(fichierSortie, deals, { lus: extraits.length + rejets.length, plafondAtteint: false, interrompu: false });
 
   console.log(`\n✅ ${deals.length} deal(s) Univers Para Discount retenu(s)`);
   console.log(`→ Archive : ${fichierSortie}`);

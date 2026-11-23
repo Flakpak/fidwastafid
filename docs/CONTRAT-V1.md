@@ -248,6 +248,28 @@ construit.*
   qui les porte. `toDeal()` (`_lib/deals.ts`) valide `categorie` par `dealSchema.parse` : une
   valeur inconnue du code déployé ferait échouer la lecture du deal.
 
+**Amendement du 23/11/2026 — fraîcheur des deals (vingt-troisième amendement conscient de la
+liste fermée).** Fait générateur : audit de fraîcheur SEO-2d du 22/11/2026. Un deal retrouvé par
+un scraper n'était jamais mis à jour, aucune colonne ne datait son dernier passage, et sur 10
+liens marchands de deals publiés depuis plus de 90 jours, 4 répondaient 404. **Statut : `vu_le`
+et la trace des runs sont en vigueur dès ce lot (SEO-2e). Les règles d'expiration par absence
+sont actées mais ne s'activeront qu'au lot SEO-2f, après observation.**
+
+- **Colonne `deals.vu_le`** : dernière fois qu'un scraper a retrouvé le deal à la source.
+  Renseignée à l'insertion, mise à jour à chaque passage. Elle ne touche ni le prix ni
+  `updated_at`.
+- **Run « complet ».** Un run de source est complet s'il réussit, n'atteint pas son plafond de
+  pages et lit au moins 50 % de la médiane des éléments lus lors de ses 7 derniers runs réussis.
+- **Règles d'expiration (activation au lot SEO-2f).**
+  - Source complète, non revu depuis 3 jours et au moins 2 runs complets depuis → expiré.
+  - Source partielle, non revu depuis 21 jours → expiré.
+  - Source hors cron → expiré.
+  - Soumission manuelle sans date de fin → expirée 30 jours après sa publication.
+- **Garde-fou.** Un run ne fait jamais expirer plus de 25 % des deals actifs d'une source ;
+  au-delà, aucune expiration pour cette source et ouverture d'une issue. Une expiration massive
+  n'est possible que sur validation humaine d'une liste.
+- **URL.** Un deal expiré par ces règles garde son URL, en HTTP 200, avec le bandeau expiré (§1).
+
 **Amendement du 18/07/2026 — consentement WhatsApp public** : la règle "`whatsapp_contact`
 n'apparaît jamais hors admin" (ci-dessous, §4) est remplacée par une règle conditionnée au
 consentement du soumetteur — voir §4. `deals` gagne **`whatsapp_public`** (booléen, `not null default

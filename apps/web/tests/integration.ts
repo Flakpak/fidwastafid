@@ -3,6 +3,8 @@ import { generatePublicId } from "@fidwastafid/schemas";
 import { purgerImages, DELAI_JOURS_PURGE_IMAGES, UTILISATEUR_SYSTEME_ID } from "../../pipeline/purger-images.mjs";
 import { purgerLignes, DELAI_JOURS_PURGE_LIGNES } from "../../pipeline/purger-lignes.mjs";
 import { expirerPublies } from "../../pipeline/_lib/expirerPublies.mjs";
+import { marquerVu } from "../../pipeline/_lib/vuLe.mjs";
+import { enregistrerRun } from "../../pipeline/_lib/pipelineRuns.mjs";
 import { GET as getSitemapIndex } from "../src/app/sitemap.xml/route.js";
 import { GET as getSitemapHubs } from "../src/app/sitemap-hubs.xml/route.js";
 import { GET as getSitemapDeals } from "../src/app/sitemap-deals.xml/route.js";
@@ -2191,6 +2193,98 @@ async function main() {
       }
     } else {
       check("(base avec des deals Gaming : cas 0 deal non testable ici)", true);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Fraîcheur (lot SEO-2e) : même écriture que la prod (`marquerVu`,
+  // `enregistrerRun`), dans une transaction annulée à la fin.
+  // ----------------------------------------------------------------
+  console.log("\nfraîcheur — vu_le et trace de passage par source");
+  {
+    const client = await getPool().connect();
+    try {
+      await client.query("begin");
+      const { rows: enseignesVu } = await client.query<{ id: string }>(
+        "insert into enseignes (slug, nom) values ('test-vu-le', 'Test vu_le') returning id"
+      );
+      const enseigneVu = enseignesVu[0]!.id;
+      const ancien = "2026-01-01T00:00:00Z";
+      const inserer = async (titre: string, statut: string, supprimeLe: string | null, prix = 50) => {
+        const id = generatePublicId();
+        await client.query(
+          `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, prix_normal, statut, score, vu_le, updated_at, supprime_le)
+           values ($1, $2, $3, 'Maison', 'en_ligne', $4, 100, $5, 0, $6, $6, $7)`,
+          [id, titre, enseigneVu, prix, statut, ancien, supprimeLe]
+        );
+        return id;
+      };
+      const lire = async (id: string) =>
+        (
+          await client.query<{ vu: boolean; maj: boolean; prix: string }>(
+            `select vu_le > $2::timestamptz as vu, updated_at > $2::timestamptz as maj, prix_promo as prix
+               from deals where public_id = $1`,
+            [id, ancien]
+          )
+        ).rows[0]!;
+
+      const PUBLIE = await inserer("Vu le — deal retrouvé", "publie", null);
+      const EXPIRE = await inserer("Vu le — deal retrouvé", "expire", null);
+      const SUPPRIME = await inserer("Vu le — deal retrouvé", "publie", "2026-02-01T00:00:00Z");
+      const AUTRE_PRIX = await inserer("Vu le — deal retrouvé", "publie", null, 60);
+
+      const ids = await marquerVu(client, { titre: "VU LE — DEAL RETROUVÉ", enseigneId: enseigneVu, prixPromo: 50 });
+      const publie = await lire(PUBLIE);
+      check("deal retrouvé (casse différente) → vu_le mis à jour", publie.vu);
+      check("deal retrouvé → updated_at inchangé", !publie.maj);
+      check("deal retrouvé → prix inchangé", Number(publie.prix) === 50);
+      check("une seule ligne marquée", ids.length === 1);
+      check("deal expiré → vu_le inchangé", !(await lire(EXPIRE)).vu);
+      check("deal supprimé → vu_le inchangé", !(await lire(SUPPRIME)).vu);
+      check("même titre, autre prix → vu_le inchangé", !(await lire(AUTRE_PRIX)).vu);
+
+      const insereSansVu = generatePublicId();
+      await client.query(
+        `insert into deals (public_id, titre, categorie, type, prix_promo, statut, score)
+         values ($1, 'Vu le — défaut', 'Autre', 'en_ligne', 10, 'auto_draft', 0)`,
+        [insereSansVu]
+      );
+      const { rows: defaut } = await client.query<{ ok: boolean }>(
+        "select vu_le is not null as ok from deals where public_id = $1",
+        [insereSansVu]
+      );
+      check("insertion → vu_le renseigné", defaut[0]?.ok === true);
+
+      await enregistrerRun(client, {
+        source: "test-trace",
+        cause: "deja_en_base",
+        extraits: 12,
+        retenus: 3,
+        inseres: 0,
+        doublons: 3,
+        elementsLus: 250,
+        plafondAtteint: true,
+        interrompu: false,
+        vus: 3,
+      });
+      await enregistrerRun(client, { source: "test-trace-echec", cause: "injoignable", extraits: 0, retenus: 0, inseres: 0, doublons: 0 });
+      const { rows: traces } = await client.query<{
+        source: string;
+        elements_lus: number | null;
+        plafond_atteint: boolean | null;
+        interrompu: boolean | null;
+        vus: number | null;
+      }>("select source, elements_lus, plafond_atteint, interrompu, vus from pipeline_runs where source like 'test-trace%'");
+      const trace = traces.find((t) => t.source === "test-trace");
+      check(
+        "trace par source avec plafond atteint",
+        trace?.elements_lus === 250 && trace.plafond_atteint === true && trace.interrompu === false && trace.vus === 3
+      );
+      const echec = traces.find((t) => t.source === "test-trace-echec");
+      check("source injoignable → trace NULL (non mesuré, pas zéro)", echec?.elements_lus === null && echec.vus === null);
+    } finally {
+      await client.query("rollback");
+      client.release();
     }
   }
 

@@ -16,7 +16,8 @@
 // Gère la pagination Sylius (?page=2, 3…) automatiquement.
 // ============================================================
 
-import { writeFileSync, readFileSync, mkdirSync } from "node:fs";
+import { readFileSync, mkdirSync } from "node:fs";
+import { ecrireArchiveEtTrace } from "./_lib/traceScraper.mjs";
 import * as cheerio from "cheerio";
 import { mapCategorie, rayonDepuisUrl } from "./_lib/categoriser.mjs";
 
@@ -106,7 +107,16 @@ if (URL_LISTING.endsWith(".txt")) {
 
 let tous = [];
 const dejaVus = new Set();
+// Trace de passage (lot SEO-2e) : lus = produits lus (toutes pages, tous
+// rayons) ; plafond = au moins un rayon arrêté sur MAX_PAGES sans avoir vu sa
+// fin ; interrompu = au moins une page en échec.
+let lus = 0;
+let plafondAtteint = false;
+let interrompu = false;
 for (const listing of listings) {
+  // Arrêt du rayon sur sa fin réelle OU sur un échec : seul un rayon sorti de
+  // la boucle sans l'un ni l'autre a atteint MAX_PAGES.
+  let rayonTermine = false;
   for (let pageNum = 1; pageNum <= MAX_PAGES; pageNum++) {
     const sep = listing.includes("?") ? "&" : "?";
     const url = pageNum === 1 ? listing : `${listing}${sep}page=${pageNum}`;
@@ -117,14 +127,18 @@ for (const listing of listings) {
       produits = parseProducts(await fetchPage(url), rayonDepuisUrl(listing));
     } catch (err) {
       console.error(`❌ ${err.message}`);
+      interrompu = true;
+      rayonTermine = true;
       break;
     }
 
     // Bringo resert la page 1 au-delà de la dernière page :
     // on ne garde que les produits jamais vus, et on s'arrête s'il n'y en a aucun.
+    lus += produits.length;
     const nouveaux = produits.filter((p) => !dejaVus.has(p._key));
     if (nouveaux.length === 0) {
       console.log("   (aucun produit nouveau — fin de la pagination)");
+      rayonTermine = true;
       break;
     }
     nouveaux.forEach((p) => dejaVus.add(p._key));
@@ -132,6 +146,7 @@ for (const listing of listings) {
     tous = tous.concat(nouveaux);
     await new Promise((r) => setTimeout(r, 2000)); // politesse : 2 s entre pages
   }
+  if (!rayonTermine) plafondAtteint = true;
 }
 
 // Filtre deals : uniquement les produits remisés
@@ -155,7 +170,7 @@ const deals = retenus.map(({ _key, discount, discount_rate, ...d }) => ({
 mkdirSync("extractions", { recursive: true });
 const horodatage = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
 const fichierSortie = `extractions/${horodatage}_bringo-${VILLE.toLowerCase().replace(/\s+/g, "-")}.json`;
-writeFileSync(fichierSortie, JSON.stringify(deals, null, 2), "utf8");
+ecrireArchiveEtTrace(fichierSortie, deals, { lus, plafondAtteint, interrompu });
 
 console.log(`\n✅ ${tous.length} produits parcourus | ${remises.length} en promo | ${deals.length} retenus`);
 console.log(`→ Archive : ${fichierSortie}`);
