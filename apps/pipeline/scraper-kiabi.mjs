@@ -105,6 +105,8 @@ export function choisirVariante(variantes) {
 export function parseProduits(payload) {
   const deals = [];
   const rejets = [];
+  // Relevés (lot SEO-2e-bis) : tout ce qui est lu à la source, AVANT les rejets.
+  const releves = [];
 
   for (const produit of payload?.products || []) {
     const titre = (produit?.title || "").trim();
@@ -112,6 +114,12 @@ export function parseProduits(payload) {
       rejets.push({ nom: produit?.handle || "(sans titre)", raison: "titre absent ou trop court" });
       continue;
     }
+
+    // Toutes les variantes disponibles : un deal porte le prix de l'une d'elles.
+    const prixDisponibles = new Set(
+      (produit.variants || []).filter((v) => v?.available === true).map((v) => parsePrix(v.price))
+    );
+    for (const prix of prixDisponibles) if (prix !== null) releves.push({ titre, prix });
 
     const variante = choisirVariante(produit.variants);
     if (!variante) {
@@ -151,7 +159,7 @@ export function parseProduits(payload) {
     });
   }
 
-  return { deals, rejets };
+  return { deals, rejets, releves };
 }
 
 /** URL de la page N du catalogue (pagination Shopify ?page=). */
@@ -162,6 +170,7 @@ export function urlPage(n) {
 // ---------- Main ----------
 async function main() {
   const tousDeals = [];
+  const tousReleves = [];
   let totalProduits = 0;
   let totalRejets = 0;
   // Trace de passage (lot SEO-2e). Le cap MAX_DEALS compte comme un plafond :
@@ -190,7 +199,8 @@ async function main() {
     }
 
     const nbProduits = payload?.products?.length || 0;
-    const { deals, rejets } = parseProduits(payload);
+    const { deals, rejets, releves } = parseProduits(payload);
+    tousReleves.push(...releves);
     totalProduits += nbProduits;
     totalRejets += rejets.length;
     tousDeals.push(...deals);
@@ -234,6 +244,8 @@ async function main() {
     lus: totalProduits,
     plafondAtteint: capDealsAtteint || (!finCatalogue && !interrompu),
     interrompu,
+    enseigne: ENSEIGNE,
+    releves: tousReleves,
   });
 
   console.log(`\n✅ ${deals.length} deal(s) Kiabi retenu(s) sur ${totalProduits} produit(s) | ${totalRejets} écarté(s)`);

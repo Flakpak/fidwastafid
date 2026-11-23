@@ -91,6 +91,8 @@ export function dateFinDepuisISO(iso) {
 export function parseProduits(payload) {
   const deals = [];
   const rejets = [];
+  // Relevés (lot SEO-2e-bis) : tout ce qui est lu à la source, AVANT les rejets.
+  const releves = [];
   let dateFinManquante = 0;
 
   for (const p of payload?.products || []) {
@@ -102,6 +104,7 @@ export function parseProduits(payload) {
 
     const prixPromo = Number(p?.price);
     const prixNormal = Number(p?.crossedPrice);
+    if (Number.isFinite(prixPromo) && prixPromo > 0) releves.push({ titre, prix: prixPromo });
     if (!Number.isFinite(prixPromo) || prixPromo <= 0) {
       rejets.push({ nom: titre, raison: "prix promo absent ou non numérique" });
       continue;
@@ -148,12 +151,13 @@ export function parseProduits(payload) {
     });
   }
 
-  return { deals, rejets, dateFinManquante };
+  return { deals, rejets, dateFinManquante, releves };
 }
 
 // ---------- Main ----------
 async function main() {
   const tousDeals = [];
+  const tousReleves = [];
   let totalProduits = 0;
   let totalRejets = 0;
   let totalDateFinManquante = 0;
@@ -178,7 +182,8 @@ async function main() {
     }
 
     const nbProduits = payload?.products?.length || 0;
-    const { deals, rejets, dateFinManquante } = parseProduits(payload);
+    const { deals, rejets, dateFinManquante, releves } = parseProduits(payload);
+    tousReleves.push(...releves);
     totalProduits += nbProduits;
     totalRejets += rejets.length;
     totalDateFinManquante += dateFinManquante;
@@ -218,6 +223,8 @@ async function main() {
     lus: totalProduits,
     plafondAtteint: !finCatalogue && !interrompu,
     interrompu,
+    enseigne: ENSEIGNE,
+    releves: tousReleves,
   });
 
   console.log(`\n✅ ${deals.length} deal(s) Carrefour retenu(s) sur ${totalProduits} produit(s) | ${totalRejets} écarté(s)`);

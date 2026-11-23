@@ -33,7 +33,7 @@ import { decoderEntitesHtml } from "./entites-html.mjs";
 import { resoudreFichierArgument } from "./argv.mjs";
 import { sourceDepuisFichier, classifierCause, enregistrerRun } from "./_lib/pipelineRuns.mjs";
 import { lireTrace } from "./_lib/traceScraper.mjs";
-import { marquerVu } from "./_lib/vuLe.mjs";
+import { marquerReleves } from "./_lib/vuLe.mjs";
 
 // ---------- Description depuis la fiche produit (Bringo uniquement) ----------
 const BRINGO_LIEN_RE = /^https:\/\/(www\.)?bringo\.ma\//i;
@@ -185,7 +185,14 @@ try {
   // Repli « Autre » (lot SEO-2c) : toujours possible, jamais muet — compté
   // et listé à chaque run, parmi les deals réellement insérés.
   const inseresAutre = [];
-  const idsVus = new Set();
+
+  // « Revu » = présent à la source (lot SEO-2e-bis) : AVANT tout filtre, sur
+  // TOUT ce que le scraper a lu, en UNE requête. Les filtres ci-dessous ne
+  // décident que de l'insertion. Enseigne inconnue ou erreur d'écriture : le
+  // run échoue, jamais de passage silencieusement perdu.
+  const enseigneTrace = enseignes.get(normaliser(trace.enseigne));
+  if (!enseigneTrace) throw new Error(`enseigne de la trace inconnue en base : "${trace.enseigne}"`);
+  const idsVus = await marquerReleves(client, { releves: trace.releves, enseigneId: enseigneTrace });
   console.log(`📉 Seuil de remise minimum : ${SEUIL_REMISE_MIN_PCT} % (règle partagée, remise.mjs).`);
 
   for (const raw of deals) {
@@ -272,12 +279,6 @@ try {
     );
     if (dup.rowCount > 0) {
       doublons++;
-      // Fraîcheur (lot SEO-2e) : le deal est retrouvé à la source → vu_le,
-      // et rien d'autre. Un Set : un même deal lu deux fois dans le run
-      // (deux rayons) ne compte qu'une fois. Une erreur fait échouer le run.
-      for (const id of await marquerVu(client, { titre: d.titre, enseigneId, prixPromo: d.prix_promo })) {
-        idsVus.add(id);
-      }
       continue;
     }
 
@@ -356,9 +357,9 @@ try {
     elementsLus: trace.lus,
     plafondAtteint: trace.plafondAtteint,
     interrompu: trace.interrompu,
-    vus: idsVus.size,
+    vus: idsVus.length,
   });
-  console.log(`👁️  Passage : ${idsVus.size} deal(s) revu(s) (vu_le mis à jour).`);
+  console.log(`👁️  Passage : ${trace.releves.length} relevé(s), ${idsVus.length} deal(s) revu(s) (vu_le mis à jour).`);
   // Ligne structurée, capturée par le workflow après cette étape — pour que
   // l'annotation du run reflète la CAUSE réelle plutôt qu'un succès muet.
   console.log(`RESUME_JSON=${JSON.stringify({ source, cause, extraits, retenus, inseres, doublons, autre: inseresAutre.length })}`);

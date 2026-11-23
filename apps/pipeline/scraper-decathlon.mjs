@@ -116,6 +116,8 @@ export function parseListing(html) {
   const $ = cheerio.load(html);
   const deals = [];
   const rejets = [];
+  // Relevés (lot SEO-2e-bis) : tout ce qui est lu à la source, AVANT les rejets.
+  const releves = [];
 
   $("article.product-card").each((_, card) => {
     const $c = $(card);
@@ -133,6 +135,7 @@ export function parseListing(html) {
     // Rejet prime sur invention (CONTRAT-V1) : les deux prix doivent être
     // présents, parseables et cohérents (normal ≥ promo). Une carte non
     // remisée (pas de prix barré) est rejetée, jamais complétée.
+    if (nom && prixPromo != null) releves.push({ titre: nom, prix: prixPromo });
     if (!nom) {
       rejets.push({ nom: "(sans nom)", raison: "nom introuvable" });
       return;
@@ -158,7 +161,7 @@ export function parseListing(html) {
     });
   });
 
-  return { deals, rejets };
+  return { deals, rejets, releves };
 }
 
 /** URL de la page N du listing promos (pagination ?page=). */
@@ -169,6 +172,7 @@ function urlPage(n) {
 // ---------- Main ----------
 async function main() {
   let tous = [];
+  const tousReleves = [];
   let totalRejets = 0;
   let pagesPolluees = 0;
   const dejaVus = new Set(); // dédup intra-run par lien produit
@@ -203,7 +207,8 @@ async function main() {
       continue;
     }
 
-    const { deals, rejets } = parseListing(html);
+    const { deals, rejets, releves } = parseListing(html);
+    tousReleves.push(...releves);
     lus += deals.length + rejets.length;
     const nouveaux = deals.filter((d) => !d.lien || !dejaVus.has(d.lien));
     if (deals.length === 0 || nouveaux.length === 0) {
@@ -237,6 +242,8 @@ async function main() {
     lus,
     plafondAtteint: !finCatalogue && !interrompu && pagesPolluees === 0,
     interrompu: interrompu || pagesPolluees > 0,
+    enseigne: ENSEIGNE,
+    releves: tousReleves,
   });
 
   console.log(`\n✅ ${deals.length} deal(s) Decathlon retenu(s) | ${totalRejets} rejeté(s) | ${pagesPolluees} page(s) polluée(s) ignorée(s)`);

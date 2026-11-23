@@ -4,13 +4,17 @@
 //
 // Chaque scraper écrit, À CÔTÉ de son archive `extractions/<horodatage>_<source>.json`,
 // un fichier `<même nom>.trace.json` :
-//   { lus, plafondAtteint, interrompu }
+//   { lus, plafondAtteint, interrompu, enseigne, releves }
 // - lus            : éléments lus à la source (produits/cartes), AVANT tout
 //                    filtrage du scraper (non remisés, incohérents…) ;
 // - plafondAtteint : la boucle s'est arrêtée sur son plafond (pages, ou
 //                    plafond de deals), pas sur la fin réelle du catalogue ;
 // - interrompu     : une page a échoué en cours de pagination (lecture
-//                    partielle).
+//                    partielle) ;
+// - enseigne        : enseigne des éléments lus ;
+// - releves        : [{ titre, prix }] de TOUT ce qui a été lu avec un prix,
+//                    remisé ou non (lot SEO-2e-bis) : « revu » = présent à
+//                    la source, indépendamment des filtres.
 // insert-deals.mjs l'EXIGE et le recopie dans pipeline_runs : sans trace, le
 // run échoue (aucun repli silencieux). Ces trois valeurs servent à juger un
 // run « complet » (amendement) avant toute expiration par absence.
@@ -29,10 +33,11 @@ export function cheminTrace(fichierArchive) {
 }
 
 /** Écrit l'archive ET sa trace. Toute erreur d'écriture remonte. */
-export function ecrireArchiveEtTrace(fichierArchive, deals, { lus, plafondAtteint, interrompu }) {
-  validerTrace({ lus, plafondAtteint, interrompu });
+export function ecrireArchiveEtTrace(fichierArchive, deals, trace) {
+  validerTrace(trace);
+  const { lus, plafondAtteint, interrompu, enseigne, releves } = trace;
   writeFileSync(fichierArchive, JSON.stringify(deals, null, 2), "utf8");
-  writeFileSync(cheminTrace(fichierArchive), JSON.stringify({ lus, plafondAtteint, interrompu }, null, 2), "utf8");
+  writeFileSync(cheminTrace(fichierArchive), JSON.stringify({ lus, plafondAtteint, interrompu, enseigne, releves }), "utf8");
   console.log(
     `→ Trace : ${lus} élément(s) lu(s) | plafond atteint : ${plafondAtteint ? "oui" : "non"} | interrompu : ${interrompu ? "oui" : "non"}`
   );
@@ -42,6 +47,13 @@ function validerTrace(t) {
   if (!Number.isInteger(t?.lus) || t.lus < 0) throw new Error(`trace invalide : lus=${t?.lus}`);
   if (typeof t.plafondAtteint !== "boolean") throw new Error(`trace invalide : plafondAtteint=${t.plafondAtteint}`);
   if (typeof t.interrompu !== "boolean") throw new Error(`trace invalide : interrompu=${t.interrompu}`);
+  if (typeof t.enseigne !== "string" || !t.enseigne) throw new Error(`trace invalide : enseigne=${t.enseigne}`);
+  if (!Array.isArray(t.releves)) throw new Error("trace invalide : releves absent");
+  for (const r of t.releves) {
+    if (typeof r?.titre !== "string" || !Number.isFinite(r?.prix)) {
+      throw new Error(`trace invalide : relevé ${JSON.stringify(r)}`);
+    }
+  }
 }
 
 /** Lit la trace d'une archive. Absente ou invalide → erreur (le run échoue). */
@@ -55,5 +67,5 @@ export function lireTrace(fichierArchive) {
   }
   const t = JSON.parse(brut);
   validerTrace(t);
-  return { lus: t.lus, plafondAtteint: t.plafondAtteint, interrompu: t.interrompu };
+  return { lus: t.lus, plafondAtteint: t.plafondAtteint, interrompu: t.interrompu, enseigne: t.enseigne, releves: t.releves };
 }
