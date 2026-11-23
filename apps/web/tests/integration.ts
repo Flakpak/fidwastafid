@@ -2106,36 +2106,33 @@ async function main() {
   }
 
   // ----------------------------------------------------------------
-  // Black Friday : fenêtre de PREMIÈRE PUBLICATION (journal_audit), pas de
-  // création. Deux deals créés avant la fenêtre ; l'un publié avant (exclu),
-  // l'autre publié pendant (inclus, malgré un created_at antérieur).
+  // Black Friday (lot SEO-2i) : deals publiés actifs REVUS à la source dans
+  // les 48 dernières heures, remise ≥ 20 %.
   // ----------------------------------------------------------------
-  console.log("\nBlack Friday — deals publiés pour la première fois dans la fenêtre");
+  console.log("\nBlack Friday — deals publiés revus sous 48 h");
   {
-    const PUBLIE_AVANT = generatePublicId();
-    const PUBLIE_PENDANT = generatePublicId();
+    const REVU = generatePublicId();
+    const NON_REVU = generatePublicId();
+    const SOUS_REMISE = generatePublicId();
     try {
-      for (const [id, creation, publication] of [
-        [PUBLIE_AVANT, "2026-10-10T10:00:00Z", "2026-10-15T10:00:00Z"],
-        [PUBLIE_PENDANT, "2026-10-20T10:00:00Z", "2026-11-10T10:00:00Z"],
+      for (const [id, heures, prix] of [
+        [REVU, 47, 50],
+        [NON_REVU, 72, 50],
+        [SOUS_REMISE, 1, 85],
       ] as const) {
         await query(
-          `insert into deals (public_id, titre, categorie, type, prix_promo, prix_normal, statut, score, created_at)
-           values ($1, 'Black Friday — test fenêtre', 'Maison', 'en_ligne', 50, 100, 'publie', 0, $2)`,
-          [id, creation]
-        );
-        await query(
-          `insert into journal_audit (admin_id, action, cible_type, cible_id, details, created_at)
-           values ($1, 'update_statut', 'deal', $2, '{"apres":"publie"}', $3)`,
-          [userId, id, publication]
+          `insert into deals (public_id, titre, categorie, type, prix_promo, prix_normal, statut, score, vu_le)
+           values ($1, 'Black Friday — test revu', 'Maison', 'en_ligne', $2, 100, 'publie', 0,
+                   now() - make_interval(hours => $3::int))`,
+          [id, prix, heures]
         );
       }
-      const ids = (await fetchDealsEdition({ debut: "2026-11-01", fin: "2026-11-30" }, 0.2, 1000)).map((d) => d.publicId);
-      check("publié le 15/10 (avant la fenêtre) → exclu", !ids.includes(PUBLIE_AVANT));
-      check("créé le 20/10 mais publié le 10/11 → inclus (date de publication, pas de création)", ids.includes(PUBLIE_PENDANT));
+      const ids = (await fetchDealsEdition(0.2, 1000)).map((d) => d.publicId);
+      check("publié revu il y a 47 h → inclus", ids.includes(REVU));
+      check("publié non revu depuis 3 jours → exclu", !ids.includes(NON_REVU));
+      check("remise de 15 % → exclu", !ids.includes(SOUS_REMISE));
     } finally {
-      await query("delete from journal_audit where cible_type = 'deal' and cible_id = any($1::text[])", [[PUBLIE_AVANT, PUBLIE_PENDANT]]);
-      await query("delete from deals where public_id = any($1::text[])", [[PUBLIE_AVANT, PUBLIE_PENDANT]]);
+      await query("delete from deals where public_id = any($1::text[])", [[REVU, NON_REVU, SOUS_REMISE]]);
     }
   }
 
@@ -2500,8 +2497,8 @@ async function main() {
         stdio: "pipe",
       }).toString();
 
-      check("brouillon expiré → réinséré", (await compter(titres.expireBrouillon)) === 2);
-      check("publié puis expiré → réinséré", (await compter(titres.expirePublie)) === 2);
+      check("brouillon expiré → réactivé, aucune nouvelle ligne", (await compter(titres.expireBrouillon)) === 1);
+      check("publié puis expiré → réactivé, aucune nouvelle ligne", (await compter(titres.expirePublie)) === 1);
       check("rejeté par l'admin → bloqué", (await compter(titres.rejete)) === 1);
       check("rejeté, revenu sous un autre lien → bloqué", (await compter(titres.rejeteAutreLien)) === 1);
       check("publié actif → non inséré", (await compter(titres.publie)) === 1);
@@ -2511,24 +2508,17 @@ async function main() {
         ancien,
       ]);
       check("publié actif → vu_le mis à jour", vuPublie[0]?.vu === true);
-      const vuExpire = await query<{ vu: boolean; statut: string }>(
-        "select vu_le > $2::timestamptz as vu, statut from deals where public_id = $1",
-        [ids.expireBrouillon, ancien]
-      );
-      check("ligne expirée d'origine inchangée", vuExpire[0]?.vu === false && vuExpire[0]?.statut === "expire");
-      const nouveau = await query<{ statut: string }>(
-        "select statut from deals where titre = $1 and public_id <> $2",
-        [titres.expirePublie, ids.expirePublie]
-      );
-      check("le produit revient en brouillon", nouveau[0]?.statut === "auto_draft");
+      const reactive = await query<{ statut: string }>("select statut from deals where public_id = $1", [ids.expirePublie]);
+      check("le produit revient en brouillon sur sa ligne", reactive[0]?.statut === "auto_draft");
       const resume = JSON.parse(sortie.match(/^RESUME_JSON=(.*)$/m)?.[1] ?? "{}") as {
         inseres?: number;
         doublons?: number;
         bloquesRejetAdmin?: number;
+        reactives?: number;
       };
       check(
-        "résumé : 2 insérés, 2 doublons actifs, 2 bloqués par un rejet admin",
-        resume.inseres === 2 && resume.doublons === 2 && resume.bloquesRejetAdmin === 2
+        "résumé : 0 inséré, 2 réactivés, 2 doublons actifs, 2 bloqués par un rejet admin",
+        resume.inseres === 0 && resume.reactives === 2 && resume.doublons === 2 && resume.bloquesRejetAdmin === 2
       );
     } finally {
       rmSync(dossier, { recursive: true, force: true });
@@ -2537,6 +2527,186 @@ async function main() {
       await query("delete from memoire_curation where deal_origine_public_id = any($1::text[])", [Object.values(ids)]);
       await query("delete from deals where enseigne_id = (select id from enseignes where slug = $1)", [SLUG]);
       await query("delete from enseignes where slug = $1", [SLUG]);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Un produit, une fiche (lot SEO-2i), de bout en bout avec le VRAI
+  // insert-deals.mjs. Fichier nommé `_kiabi` : source réelle du cron, pour
+  // la publication automatique et le garde-fou de 25 %.
+  // ----------------------------------------------------------------
+  console.log("\nun produit, une fiche — réactivation, prix, image (insert-deals.mjs réel)");
+  {
+    const MARQUEUR_LUS = 7777;
+    const dossier = mkdtempSync(nodePath.join(tmpdir(), "fiche-produit-"));
+    const ancien = "2026-01-01T00:00:00Z";
+    const creer: string[] = [];
+    const lien = (nom: string) => `https://exemple.test/fiche/${nom}`;
+    const photo = (nom: string) => `https://exemple.test/img/${nom}.jpg`;
+    const inserer = async (
+      slug: string,
+      nom: string,
+      statut: string,
+      options: { submitter?: string; image?: string | null } = {}
+    ) => {
+      const id = generatePublicId();
+      creer.push(id);
+      await query("insert into enseignes (slug, nom) values ($1, $1) on conflict (slug) do nothing", [slug]);
+      await query(
+        `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, prix_normal, lien, statut, score,
+                            vu_le, updated_at, image_key, submitter_id, motif_rejet)
+         values ($1, $2, (select id from enseignes where slug = $3), 'Maison', 'en_ligne', 50, 100, $4, $5, 0,
+                 $6, $6, $7, $8, case when $5 = 'rejete' then 'Test' end)`,
+        [id, `Fiche produit ${nom}`, slug, lien(nom), statut, ancien,
+         options.image === undefined ? `deals/${id}.webp` : options.image, options.submitter ?? null]
+      );
+      return id;
+    };
+    const auditer = (id: string, apres: string) =>
+      query(
+        `insert into journal_audit (admin_id, action, cible_type, cible_id, details)
+         values ($1, 'update_deal', 'deal', $2, $3)`,
+        [userId, id, JSON.stringify({ statut: { avant: "auto_draft", apres }, champs: {} })]
+      );
+    const lire = async (id: string) =>
+      (
+        await query<{ statut: string; prix: string; normal: string; image: string | null; source: string | null; vu: boolean; protege: boolean }>(
+          `select d.statut, d.prix_promo as prix, d.prix_normal as normal, d.image_key as image, d.image_source as source,
+                  d.vu_le > $2::timestamptz as vu, p.protege
+             from deals d join deals_protection p using (public_id) where d.public_id = $1`,
+          [id, ancien]
+        )
+      )[0];
+    const lignesDe = async (nom: string) =>
+      (await query<{ n: number }>("select count(*)::int as n from deals where titre = $1", [`Fiche produit ${nom}`]))[0]?.n;
+    const element = (slug: string, nom: string, prix: number, prixNormal: number | null = 100) => ({
+      titre: `Fiche produit ${nom}`,
+      prix_promo: prix,
+      prix_normal: prixNormal,
+      categorie: "Maison",
+      description: null,
+      photo_url: photo(nom),
+      lien: lien(nom),
+      date_fin: null,
+      enseigne: slug,
+      ville: "National",
+      statut: "auto_draft",
+    });
+    const releve = (e: ReturnType<typeof element>) => ({
+      titre: e.titre,
+      prix: e.prix_promo,
+      prixNormal: e.prix_normal,
+      lien: e.lien,
+      dateFin: null,
+      photoUrl: e.photo_url,
+    });
+    const lancer = (slug: string, fichier: string, archive: ReturnType<typeof element>[], lus: ReturnType<typeof element>[]) => {
+      const chemin = nodePath.join(dossier, fichier);
+      ecrireArchiveEtTrace(chemin, archive, {
+        lus: MARQUEUR_LUS,
+        plafondAtteint: false,
+        interrompu: false,
+        enseigne: slug,
+        releves: lus.map(releve),
+      });
+      return execFileSync(process.execPath, ["--import", "tsx", "insert-deals.mjs", chemin], {
+        cwd: nodePath.resolve(process.cwd(), "../pipeline"),
+        env: process.env,
+        stdio: "pipe",
+      }).toString();
+    };
+    try {
+      const expireBrouillon = await inserer("kiabi", "expire-brouillon", "expire");
+      const imageBrouillon = (await lire(expireBrouillon))?.image;
+      const expirePublie = await inserer("kiabi", "expire-publie", "expire");
+      await auditer(expirePublie, "publie");
+      const baisse = await inserer("kiabi", "baisse", "publie");
+      const hausse = await inserer("kiabi", "hausse", "publie");
+      const stables: string[] = [];
+      for (const nom of ["stable-1", "stable-2", "stable-3", "stable-4"]) stables.push(await inserer("kiabi", nom, "publie"));
+      const rejete = await inserer("kiabi", "rejete", "rejete");
+      await auditer(rejete, "rejete");
+      await query(
+        `insert into memoire_curation (empreinte, decision, deal_origine_public_id, motif, decide_par)
+         values (empreinte_curation($1, '', null), 'rejete', $2, 'Test', $3)`,
+        [lien("rejete"), rejete, userId]
+      );
+      const soumis = await inserer("kiabi", "soumis", "expire", { submitter: userId });
+
+      const archive = [
+        element("kiabi", "expire-brouillon", 45),
+        element("kiabi", "expire-publie", 45),
+        element("kiabi", "rejete", 45),
+        element("kiabi", "soumis", 45),
+      ];
+      const lus = [
+        ...archive,
+        element("kiabi", "baisse", 40),
+        element("kiabi", "hausse", 95),
+        ...["stable-1", "stable-2", "stable-3", "stable-4"].map((n) => element("kiabi", n, 50)),
+      ];
+      const sortie = lancer("kiabi", "2026-11-23_05-00_kiabi.json", archive, lus);
+      const resume = JSON.parse(sortie.match(/^RESUME_JSON=(.*)$/m)?.[1] ?? "{}") as Record<string, number>;
+
+      const a = await lire(expireBrouillon);
+      check("brouillon expiré → même public_id, en brouillon, nouveau prix", a?.statut === "auto_draft" && Number(a.prix) === 45);
+      check("brouillon expiré → aucune nouvelle ligne", (await lignesDe("expire-brouillon")) === 1);
+      check("image conservée, URL source mémorisée", a?.image === imageBrouillon && a?.source === photo("expire-brouillon"));
+      check("réactivation d'un jamais publié → reste non protégé", a?.protege === false);
+      const trace = await query<{ details: Record<string, unknown>; action: string }>(
+        "select action, details from journal_audit where cible_id = $1",
+        [expireBrouillon]
+      );
+      check(
+        "trace de réactivation",
+        trace.length === 1 && trace[0]?.action === "update_deal" && trace[0]?.details.operation === "reactivation"
+      );
+
+      const client = await getPool().connect();
+      try {
+        await client.query("begin");
+        await client.query(
+          "update deals set supprime_le = now() where statut = 'auto_draft' and supprime_le is null and public_id <> $1",
+          [expirePublie]
+        );
+        const decisions = await appliquerPublicationAuto(client);
+        check("publié puis expiré → de nouveau publié, même URL", decisions.find((d) => d.publicId === expirePublie)?.publie === true);
+      } finally {
+        await client.query("rollback");
+        client.release();
+      }
+      check("publié puis expiré → aucune nouvelle ligne", (await lignesDe("expire-publie")) === 1);
+
+      const b = await lire(baisse);
+      check("publié, prix en baisse → prix mis à jour sur la même ligne", b?.statut === "publie" && Number(b.prix) === 40);
+      check("prix en baisse → aucune nouvelle ligne", (await lignesDe("baisse")) === 1);
+      const h = await lire(hausse);
+      check("prix en hausse sous les critères → expire", h?.statut === "expire" && Number(h.prix) === 50);
+      check("prix stable → inchangé et revu", (await lire(stables[0]!))?.vu === true);
+      const r = await lire(rejete);
+      check("rejet admin → bloqué, ligne intacte", r?.statut === "rejete" && Number(r.prix) === 50 && (await lignesDe("rejete")) === 1);
+      const s = await lire(soumis);
+      check("soumission expirée → ni réactivée, ni dupliquée", s?.statut === "expire" && (await lignesDe("soumis")) === 1);
+      check(
+        "résumé : réactivés, mis à jour, expirés",
+        resume.reactives === 2 && resume.misAJour === 1 && resume.expiresPrix === 1 && resume.inseres === 0
+      );
+
+      const garde1 = await inserer("universparadiscount", "garde-1", "publie");
+      const garde2 = await inserer("universparadiscount", "garde-2", "publie");
+      const hausses = [element("universparadiscount", "garde-1", 95), element("universparadiscount", "garde-2", 95)];
+      const sortieGarde = lancer("universparadiscount", "2026-11-23_05-00_universparadiscount.json", [], hausses);
+      const resumeGarde = JSON.parse(sortieGarde.match(/^RESUME_JSON=(.*)$/m)?.[1] ?? "{}") as Record<string, number>;
+      check(
+        "plus de 25 % à expirer → aucune expiration sur ce run",
+        (await lire(garde1))?.statut === "publie" && (await lire(garde2))?.statut === "publie" && resumeGarde.expirationsBloquees === 2
+      );
+    } finally {
+      rmSync(dossier, { recursive: true, force: true });
+      await query("delete from pipeline_runs where elements_lus = $1", [MARQUEUR_LUS]);
+      await query("delete from journal_audit where cible_type = 'deal' and cible_id = any($1::text[])", [creer]);
+      await query("delete from memoire_curation where deal_origine_public_id = any($1::text[])", [creer]);
+      await query("delete from deals where public_id = any($1::text[])", [creer]);
     }
   }
 

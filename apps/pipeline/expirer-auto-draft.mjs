@@ -3,7 +3,9 @@
 // Usage : node expirer-auto-draft.mjs
 //
 // Étape du run quotidien, après la publication automatique (lot SEO-2g) :
-// purge le stock mort. Tout deal encore en auto_draft
+// purge le stock mort. Depuis le lot SEO-2i, le délai court depuis le dernier
+// passage d'un scraper (`vu_le`) : une fiche réactivée a un created_at ancien
+// et serait sinon ré-expirée dans le run même. Tout deal encore en auto_draft
 // (jamais vu par un admin — ni validé, ni rejeté) depuis plus de
 // SEUIL_JOURS_AUTO_DRAFT jours (expiration.mjs) passe en `expire` —
 // CONTRAT-V1 §1 : "Deals expirés : URL vivante à vie, HTTP 200, affichage
@@ -44,7 +46,7 @@ try {
        set statut = 'expire', updated_at = now()
      where statut = 'auto_draft'
        and supprime_le is null
-       and created_at < now() - make_interval(days => $1)
+       and vu_le < now() - make_interval(days => $1)
      returning public_id`,
     [SEUIL_JOURS_AUTO_DRAFT]
   );

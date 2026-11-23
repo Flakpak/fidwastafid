@@ -81,7 +81,16 @@ export function parseProduits(produits) {
 
     const prixPromo = prixDepuisCentimes(p?.prices?.sale_price, p?.prices?.currency_minor_unit);
     const prixNormal = prixDepuisCentimes(p?.prices?.regular_price, p?.prices?.currency_minor_unit);
-    if (prixPromo !== null && prixPromo > 0) releves.push({ titre, prix: prixPromo });
+    if (prixPromo !== null && prixPromo > 0) {
+      releves.push({
+        titre,
+        prix: prixPromo,
+        prixNormal,
+        lien: p?.permalink || null,
+        dateFin: dateFinDepuisISO(p?.date_on_sale_to),
+        photoUrl: p?.images?.[0]?.src || null,
+      });
+    }
     if (prixPromo === null || prixPromo <= 0) {
       rejets.push({ nom: titre, raison: "prix promo (sale_price) absent ou non numérique" });
       continue;

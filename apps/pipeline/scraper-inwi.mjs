@@ -107,7 +107,7 @@ export function parseOffres(html) {
     // Rejet prime sur invention (CONTRAT-V1) : les deux prix doivent être
     // présents, entiers positifs, et cohérents (normal ≥ promo). Toute carte
     // qui n'a pas un prix barré exploitable est rejetée, jamais complétée.
-    if (nom && prixPromo) releves.push({ titre: nom, prix: prixPromo });
+    if (nom && prixPromo) releves.push({ titre: nom, prix: prixPromo, prixNormal, lien: null, dateFin: null, photoUrl });
     if (!nom) {
       rejets.push({ nom: "(sans nom)", raison: "nom introuvable" });
       return;

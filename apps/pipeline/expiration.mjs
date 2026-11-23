@@ -17,7 +17,7 @@
 export const SEUIL_JOURS_AUTO_DRAFT = 14;
 
 /**
- * @param {{ statut: string, createdAt: string | Date }} deal
+ * @param {{ statut: string, createdAt: string | Date, vuLe?: string | Date }} deal
  * @param {Date} maintenant
  * @param {number} seuilJours
  * @returns {boolean}
@@ -25,5 +25,6 @@ export const SEUIL_JOURS_AUTO_DRAFT = 14;
 export function estExpirable(deal, maintenant = new Date(), seuilJours = SEUIL_JOURS_AUTO_DRAFT) {
   if (deal.statut !== "auto_draft") return false;
   const seuilMs = seuilJours * 24 * 60 * 60 * 1000;
-  return maintenant.getTime() - new Date(deal.createdAt).getTime() > seuilMs;
+  // Dernier passage d'un scraper (lot SEO-2i), à défaut la création.
+  return maintenant.getTime() - new Date(deal.vuLe ?? deal.createdAt).getTime() > seuilMs;
 }

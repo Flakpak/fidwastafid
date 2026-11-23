@@ -116,10 +116,28 @@ export function parseProduits(payload) {
     }
 
     // Toutes les variantes disponibles : un deal porte le prix de l'une d'elles.
-    const prixDisponibles = new Set(
-      (produit.variants || []).filter((v) => v?.available === true).map((v) => parsePrix(v.price))
-    );
-    for (const prix of prixDisponibles) if (prix !== null) releves.push({ titre, prix });
+    // `principal` : la variante qui représente le produit (celle de l'offre,
+    // sinon la moins chère), seule comparée au prix de la fiche (lot SEO-2i).
+    const disponibles = (produit.variants || []).filter((v) => v?.available === true && parsePrix(v.price) !== null);
+    const representante =
+      choisirVariante(produit.variants) ??
+      disponibles.reduce((a, b) => (a && parsePrix(a.price) <= parsePrix(b.price) ? a : b), null);
+    const prixVus = new Set();
+    for (const v of disponibles) {
+      const prix = parsePrix(v.price);
+      const principal = representante !== null && prix === parsePrix(representante.price);
+      if (prixVus.has(prix)) continue;
+      prixVus.add(prix);
+      releves.push({
+        titre,
+        prix,
+        prixNormal: parsePrix(v.compare_at_price),
+        lien: produit.handle ? `https://kiabi.ma/products/${produit.handle}` : null,
+        dateFin: null,
+        photoUrl: produit.images?.[0]?.src || null,
+        principal,
+      });
+    }
 
     const variante = choisirVariante(produit.variants);
     if (!variante) {

@@ -176,7 +176,14 @@ ecrireArchiveEtTrace(fichierSortie, deals, {
   plafondAtteint,
   interrompu,
   enseigne: "Carrefour",
-  releves: tous.map((p) => ({ titre: p.titre, prix: p.prix_promo })),
+  releves: tous.map((p) => ({
+    titre: p.titre,
+    prix: p.prix_promo,
+    prixNormal: p.prix_normal,
+    lien: p.lien,
+    dateFin: null,
+    photoUrl: p.photo_url,
+  })),
 });
 
 console.log(`\n✅ ${tous.length} produits parcourus | ${remises.length} en promo | ${deals.length} retenus`);

@@ -21,10 +21,9 @@ import {
  * /bons-plans/[evenement] — CONTRAT-V1 §3, vingt-deuxième amendement (lot
  * SEO-3). Liste fermée (content/hubs.ts) ; hors liste → 404. URL sans année,
  * réutilisée à chaque édition. Jamais de 404 hors saison :
- * - dans la fenêtre d'une édition : deals actifs PUBLIÉS POUR LA PREMIÈRE
- *   FOIS dans la fenêtre, remise ≥ 20 %, 60 max — jamais complétés par des
- *   deals plus anciens ; sous 8 deals, une phrase l'annonce (page toujours
- *   indexable) ;
+ * - dans la fenêtre d'une édition : deals publiés actifs REVUS À LA SOURCE
+ *   dans les 48 dernières heures (lot SEO-2i), remise ≥ 20 %, 60 max ; sous
+ *   8 deals, une phrase l'annonce (page toujours indexable) ;
  * - hors fenêtre : intro générique, meilleures remises du moment ;
  * - aucune édition configurée : idem, mais `noindex, follow` (et hors sitemap).
  * Le jour courant vient de Postgres (Africa/Casablanca), jamais de Node.
@@ -60,7 +59,7 @@ export default async function EvenementPage({ params }: PageParams) {
   const { edition } = etatEvenement(evenement, await aujourdhuiCasablanca());
   const [deals, indexables] = await Promise.all([
     edition
-      ? fetchDealsEdition(edition, REMISE_MIN_EVENEMENT, LIMITE_DEALS_EVENEMENT_EN_COURS)
+      ? fetchDealsEdition(REMISE_MIN_EVENEMENT, LIMITE_DEALS_EVENEMENT_EN_COURS)
       : fetchMeilleuresRemises(LIMITE_DEALS_HORS_SAISON),
     categoriesIndexables(),
   ]);

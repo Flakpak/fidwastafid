@@ -149,10 +149,10 @@ export async function entreesHubs(): Promise<UrlEntry[]> {
   for (const evenement of HUBS_EVENEMENTS) {
     const { edition, indexable } = etatEvenement(evenement, aujourdhui);
     if (!indexable) continue;
-    // Même jeu de deals que la page : édition en cours → deals publiés dans
-    // la fenêtre ; hors saison → meilleures remises du moment.
+    // Même jeu de deals que la page : édition en cours → deals revus à la
+    // source sous 48 h ; hors saison → meilleures remises du moment.
     const derniere = edition
-      ? await derniereMajEdition(edition, REMISE_MIN_EVENEMENT)
+      ? await derniereMajEdition(REMISE_MIN_EVENEMENT)
       : await derniereMajRemise();
     evenements.push({
       loc: abs(`/bons-plans/${evenement.slug}`),

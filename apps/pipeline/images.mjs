@@ -114,6 +114,8 @@ async function uploaderVersStorage(publicId, webpBuffer) {
     headers: {
       ...storageAuthHeaders(),
       "Content-Type": "image/webp",
+      // Une fiche réactivée peut remplacer son image (lot SEO-2i).
+      "x-upsert": "true",
     },
     body: webpBuffer,
   });
@@ -177,8 +179,9 @@ export async function traiterImage(deal, publicId, pool) {
     await uploaderVersStorage(publicId, webp);
 
     etape = "mise à jour image_key";
-    await pool.query("update deals set image_key = $1 where public_id = $2", [
+    await pool.query("update deals set image_key = $1, image_source = $2 where public_id = $3", [
       `deals/${publicId}.webp`,
+      deal.photo_url,
       publicId,
     ]);
 
