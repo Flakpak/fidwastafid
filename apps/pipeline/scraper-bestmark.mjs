@@ -31,7 +31,8 @@
 // promotion — il est écarté, jamais complété.
 // ============================================================
 
-import { writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
+import { ecrireArchiveEtTrace } from "./_lib/traceScraper.mjs";
 import { pathToFileURL } from "node:url";
 
 const URL_GRAPHQL = "https://www.bestmark.ma/graphql";
@@ -173,6 +174,9 @@ async function main() {
   const tousDeals = [];
   let totalProduits = 0;
   let totalRejets = 0;
+  // Trace de passage (lot SEO-2e) : fin réelle du catalogue vs plafond.
+  let finCatalogue = false;
+  let interrompu = false;
 
   for (let pageNum = 1; pageNum <= MAX_PAGES; pageNum++) {
     let json;
@@ -184,6 +188,7 @@ async function main() {
         process.exit(1);
       }
       console.log(`   ::warning::page ${pageNum} en échec (${err.message}) — arrêt de la pagination.`);
+      interrompu = true;
       break;
     }
 
@@ -195,6 +200,7 @@ async function main() {
 
     if (nbProduits === 0) {
       console.log(`   (page vide — fin du catalogue)`);
+      finCatalogue = true;
       break;
     }
     // Dernière page atteinte : on s'arrête AVANT de la dépasser. Demander la
@@ -203,6 +209,7 @@ async function main() {
     // survient toujours finit par ne plus être lu.
     if (totalCount !== null && pageNum >= Math.ceil(totalCount / TAILLE_PAGE)) {
       console.log(`   (dernière page du catalogue : ${totalCount} produit(s) annoncé(s))`);
+      finCatalogue = true;
       break;
     }
     if (pageNum < MAX_PAGES) await new Promise((r) => setTimeout(r, THROTTLE_MS));
@@ -221,7 +228,11 @@ async function main() {
   mkdirSync("extractions", { recursive: true });
   const horodatage = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
   const fichierSortie = `extractions/${horodatage}_bestmark.json`;
-  writeFileSync(fichierSortie, JSON.stringify(deals, null, 2), "utf8");
+  ecrireArchiveEtTrace(fichierSortie, deals, {
+    lus: totalProduits,
+    plafondAtteint: !finCatalogue && !interrompu,
+    interrompu,
+  });
 
   console.log(
     `\n✅ ${deals.length} deal(s) Bestmark retenu(s) sur ${totalProduits} produit(s) | ${totalRejets} écarté(s)`

@@ -32,6 +32,8 @@ import { estRemiseSuffisante, SEUIL_REMISE_MIN_PCT } from "./remise.mjs";
 import { decoderEntitesHtml } from "./entites-html.mjs";
 import { resoudreFichierArgument } from "./argv.mjs";
 import { sourceDepuisFichier, classifierCause, enregistrerRun } from "./_lib/pipelineRuns.mjs";
+import { lireTrace } from "./_lib/traceScraper.mjs";
+import { marquerVu } from "./_lib/vuLe.mjs";
 
 // ---------- Description depuis la fiche produit (Bringo uniquement) ----------
 const BRINGO_LIEN_RE = /^https:\/\/(www\.)?bringo\.ma\//i;
@@ -81,6 +83,10 @@ if (!process.env.DATABASE_URL) {
 }
 
 const deals = JSON.parse(readFileSync(fichier, "utf8"));
+// Trace de passage du scraper (lot SEO-2e) — exigée : sans elle, impossible
+// de juger si ce run est « complet » (CONTRAT-V1 §3, vingt-troisième
+// amendement). Absente ou invalide → erreur, le run échoue.
+const trace = lireTrace(fichier);
 
 const client = new pg.Client({
   connectionString: process.env.DATABASE_URL,
@@ -179,6 +185,7 @@ try {
   // Repli « Autre » (lot SEO-2c) : toujours possible, jamais muet — compté
   // et listé à chaque run, parmi les deals réellement insérés.
   const inseresAutre = [];
+  const idsVus = new Set();
   console.log(`📉 Seuil de remise minimum : ${SEUIL_REMISE_MIN_PCT} % (règle partagée, remise.mjs).`);
 
   for (const raw of deals) {
@@ -265,6 +272,12 @@ try {
     );
     if (dup.rowCount > 0) {
       doublons++;
+      // Fraîcheur (lot SEO-2e) : le deal est retrouvé à la source → vu_le,
+      // et rien d'autre. Un Set : un même deal lu deux fois dans le run
+      // (deux rayons) ne compte qu'une fois. Une erreur fait échouer le run.
+      for (const id of await marquerVu(client, { titre: d.titre, enseigneId, prixPromo: d.prix_promo })) {
+        idsVus.add(id);
+      }
       continue;
     }
 
@@ -333,7 +346,19 @@ try {
   const retenus = extraits - rejetes - rejetesRemise - rejetesEnseigne - rejetesMemoire;
   const cause = classifierCause({ retenus, inseres });
   const source = sourceDepuisFichier(fichier);
-  await enregistrerRun(client, { source, cause, extraits, retenus, inseres, doublons });
+  await enregistrerRun(client, {
+    source,
+    cause,
+    extraits,
+    retenus,
+    inseres,
+    doublons,
+    elementsLus: trace.lus,
+    plafondAtteint: trace.plafondAtteint,
+    interrompu: trace.interrompu,
+    vus: idsVus.size,
+  });
+  console.log(`👁️  Passage : ${idsVus.size} deal(s) revu(s) (vu_le mis à jour).`);
   // Ligne structurée, capturée par le workflow après cette étape — pour que
   // l'annotation du run reflète la CAUSE réelle plutôt qu'un succès muet.
   console.log(`RESUME_JSON=${JSON.stringify({ source, cause, extraits, retenus, inseres, doublons, autre: inseresAutre.length })}`);

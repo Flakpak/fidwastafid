@@ -35,12 +35,36 @@ export function classifierCause({ retenus, inseres }) {
  * Écrit une ligne pipeline_runs. `runId` : GITHUB_RUN_ID côté CI (fourni
  * automatiquement par GitHub Actions) — 0 en local/manuel, jamais bloquant
  * (pas une clé d'unicité, seulement une référence pour retrouver le run).
+ *
+ * Trace de passage (lot SEO-2e, migration 0027) : `elementsLus`,
+ * `plafondAtteint`, `interrompu`, `vus`. NULL quand le scraper n'a rien
+ * produit (`injoignable`, enregistrer-echec-scraping.mjs) : « non mesuré »
+ * n'est pas « zéro élément lu ».
+ *
+ * @param {import("pg").Client | import("pg").PoolClient} client
+ * @param {{ source: string, cause: string, extraits: number, retenus: number, inseres: number, doublons: number,
+ *   elementsLus?: number | null, plafondAtteint?: boolean | null, interrompu?: boolean | null, vus?: number | null }} run
  */
-export async function enregistrerRun(client, { source, cause, extraits, retenus, inseres, doublons }) {
+export async function enregistrerRun(
+  client,
+  {
+    source,
+    cause,
+    extraits,
+    retenus,
+    inseres,
+    doublons,
+    elementsLus = null,
+    plafondAtteint = null,
+    interrompu = null,
+    vus = null,
+  }
+) {
   const runId = Number(process.env.GITHUB_RUN_ID) || 0;
   await client.query(
-    `insert into pipeline_runs (source, run_id, cause, extraits, retenus, inseres, doublons)
-     values ($1, $2, $3, $4, $5, $6, $7)`,
-    [source, runId, cause, extraits, retenus, inseres, doublons]
+    `insert into pipeline_runs
+       (source, run_id, cause, extraits, retenus, inseres, doublons, elements_lus, plafond_atteint, interrompu, vus)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [source, runId, cause, extraits, retenus, inseres, doublons, elementsLus, plafondAtteint, interrompu, vus]
   );
 }

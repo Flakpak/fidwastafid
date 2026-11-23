@@ -31,7 +31,8 @@
 // courant n'est PAS une promotion — il est rejeté, jamais complété.
 // ============================================================
 
-import { writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
+import { ecrireArchiveEtTrace } from "./_lib/traceScraper.mjs";
 import { pathToFileURL } from "node:url";
 
 const URL_BASE = "https://kiabi.ma/products.json";
@@ -163,6 +164,11 @@ async function main() {
   const tousDeals = [];
   let totalProduits = 0;
   let totalRejets = 0;
+  // Trace de passage (lot SEO-2e). Le cap MAX_DEALS compte comme un plafond :
+  // le reste du catalogue remisé n'a pas été lu.
+  let finCatalogue = false;
+  let interrompu = false;
+  let capDealsAtteint = false;
 
   for (let pageNum = 1; pageNum <= MAX_PAGES; pageNum++) {
     const url = urlPage(pageNum);
@@ -179,6 +185,7 @@ async function main() {
         process.exit(1);
       }
       console.log(`   ::warning::page ${pageNum} en échec (${err.message}) — arrêt de la pagination.`);
+      interrompu = true;
       break;
     }
 
@@ -196,6 +203,7 @@ async function main() {
       const surplus = tousDeals.length - MAX_DEALS;
       tousDeals.length = MAX_DEALS;
       console.log(`   ⏹  Cap de ${MAX_DEALS} deals/run atteint — ${surplus} deal(s) de cette page laissé(s) pour un prochain run.`);
+      capDealsAtteint = true;
       break;
     }
 
@@ -203,6 +211,7 @@ async function main() {
     // d'autre — inutile de demander la suivante pour se le faire confirmer.
     if (nbProduits < LIMITE_PAR_PAGE) {
       console.log(`   (page incomplète — fin du catalogue)`);
+      finCatalogue = true;
       break;
     }
     if (pageNum < MAX_PAGES) await new Promise((r) => setTimeout(r, THROTTLE_MS));
@@ -221,7 +230,11 @@ async function main() {
   mkdirSync("extractions", { recursive: true });
   const horodatage = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
   const fichierSortie = `extractions/${horodatage}_kiabi.json`;
-  writeFileSync(fichierSortie, JSON.stringify(deals, null, 2), "utf8");
+  ecrireArchiveEtTrace(fichierSortie, deals, {
+    lus: totalProduits,
+    plafondAtteint: capDealsAtteint || (!finCatalogue && !interrompu),
+    interrompu,
+  });
 
   console.log(`\n✅ ${deals.length} deal(s) Kiabi retenu(s) sur ${totalProduits} produit(s) | ${totalRejets} écarté(s)`);
   console.log(`→ Archive : ${fichierSortie}`);

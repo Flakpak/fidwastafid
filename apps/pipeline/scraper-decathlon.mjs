@@ -35,7 +35,8 @@
 // (normal ≥ promo) est REJETÉE — jamais complétée.
 // ============================================================
 
-import { writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
+import { ecrireArchiveEtTrace } from "./_lib/traceScraper.mjs";
 import { pathToFileURL } from "node:url";
 import * as cheerio from "cheerio";
 
@@ -171,6 +172,11 @@ async function main() {
   let totalRejets = 0;
   let pagesPolluees = 0;
   const dejaVus = new Set(); // dédup intra-run par lien produit
+  // Trace de passage (lot SEO-2e). Une page en échec ou ignorée (pollution)
+  // = lecture partielle : prudence, comptée comme interruption.
+  let lus = 0;
+  let finCatalogue = false;
+  let interrompu = false;
 
   for (let pageNum = 1; pageNum <= MAX_PAGES; pageNum++) {
     const url = urlPage(pageNum);
@@ -185,6 +191,7 @@ async function main() {
         process.exit(1);
       }
       console.log(`   (fin de pagination : ${err.message})`);
+      interrompu = true;
       break;
     }
 
@@ -197,9 +204,11 @@ async function main() {
     }
 
     const { deals, rejets } = parseListing(html);
+    lus += deals.length + rejets.length;
     const nouveaux = deals.filter((d) => !d.lien || !dejaVus.has(d.lien));
     if (deals.length === 0 || nouveaux.length === 0) {
       console.log("   (aucune carte nouvelle — fin de la pagination)");
+      finCatalogue = true;
       break;
     }
     nouveaux.forEach((d) => d.lien && dejaVus.add(d.lien));
@@ -224,7 +233,11 @@ async function main() {
   mkdirSync("extractions", { recursive: true });
   const horodatage = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
   const fichierSortie = `extractions/${horodatage}_decathlon.json`;
-  writeFileSync(fichierSortie, JSON.stringify(deals, null, 2), "utf8");
+  ecrireArchiveEtTrace(fichierSortie, deals, {
+    lus,
+    plafondAtteint: !finCatalogue && !interrompu && pagesPolluees === 0,
+    interrompu: interrompu || pagesPolluees > 0,
+  });
 
   console.log(`\n✅ ${deals.length} deal(s) Decathlon retenu(s) | ${totalRejets} rejeté(s) | ${pagesPolluees} page(s) polluée(s) ignorée(s)`);
   console.log(`→ Archive : ${fichierSortie}`);
