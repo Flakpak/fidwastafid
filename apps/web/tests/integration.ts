@@ -1,9 +1,10 @@
-import { withTransaction, closePool, query, getPool } from "@fidwastafid/db";
+import { withTransaction, closePool, query, getPool, type PoolClient } from "@fidwastafid/db";
 import { generatePublicId } from "@fidwastafid/schemas";
 import { purgerImages, DELAI_JOURS_PURGE_IMAGES, UTILISATEUR_SYSTEME_ID } from "../../pipeline/purger-images.mjs";
 import { purgerLignes, DELAI_JOURS_PURGE_LIGNES } from "../../pipeline/purger-lignes.mjs";
 import { expirerPublies } from "../../pipeline/_lib/expirerPublies.mjs";
 import { marquerReleves } from "../../pipeline/_lib/vuLe.mjs";
+import { appliquerPublicationAuto, resumerParSource, VERSION_REGLES } from "../../pipeline/_lib/publicationAuto.mjs";
 import { ecrireArchiveEtTrace } from "../../pipeline/_lib/traceScraper.mjs";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -2387,6 +2388,190 @@ async function main() {
       await query("delete from pipeline_runs where source = 'test-revu-source'");
       await query("delete from deals where public_id = any($1::text[])", [Object.values(ids)]);
       await query("delete from enseignes where slug = $1", [SLUG_REVU]);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Publication automatique (lot SEO-2g) — même requête que la prod. Chaque
+  // cas tourne dans sa transaction, annulée à la fin, après avoir écarté les
+  // brouillons des autres blocs.
+  // ----------------------------------------------------------------
+  console.log("\npublication automatique — critères, plafond, soumissions, interrupteur");
+  {
+    type CasBrouillon = {
+      titre?: string;
+      enseigne?: string;
+      lien?: string | null;
+      categorie?: string;
+      prixPromo?: number;
+      prixNormal?: number | null;
+      image?: string | null;
+      vuIlYaHeures?: number;
+      dateFinDecalage?: number | null;
+      submitter?: string | null;
+    };
+    const insererBrouillon = async (client: PoolClient, c: CasBrouillon = {}) => {
+      const id = generatePublicId();
+      const slug = c.enseigne ?? "kiabi";
+      await client.query("insert into enseignes (slug, nom) values ($1, $1) on conflict (slug) do nothing", [slug]);
+      await client.query(
+        `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, prix_normal, image_key, lien,
+                            statut, score, vu_le, date_fin, submitter_id)
+         values ($1, $2, (select id from enseignes where slug = $3), $4, 'en_ligne', $5, $6, $7, $8, 'auto_draft', 0,
+                 now() - make_interval(hours => $9::int),
+                 case when $10::int is null then null
+                      else (now() at time zone 'Africa/Casablanca')::date + $10::int end,
+                 $11)`,
+        [
+          id,
+          c.titre ?? `Publication auto ${id}`,
+          slug,
+          c.categorie ?? "Mode",
+          c.prixPromo ?? 60,
+          c.prixNormal === undefined ? 100 : c.prixNormal,
+          c.image === undefined ? "deals/test.webp" : c.image,
+          c.lien === undefined ? `https://exemple.test/${id}` : c.lien,
+          c.vuIlYaHeures ?? 1,
+          c.dateFinDecalage ?? null,
+          c.submitter ?? null,
+        ]
+      );
+      return id;
+    };
+    const dansTransaction = async <T,>(fn: (client: PoolClient) => Promise<T>): Promise<T> => {
+      const client = await getPool().connect();
+      try {
+        await client.query("begin");
+        await client.query("update deals set supprime_le = now() where statut = 'auto_draft' and supprime_le is null");
+        return await fn(client);
+      } finally {
+        await client.query("rollback");
+        client.release();
+      }
+    };
+    const casSimple = (c: CasBrouillon) =>
+      dansTransaction(async (client) => {
+        const id = await insererBrouillon(client, c);
+        const decisions = await appliquerPublicationAuto(client);
+        const { rows } = await client.query<{ statut: string; motifs: string[] | null }>(
+          "select statut, motifs_publication_auto as motifs from deals where public_id = $1",
+          [id]
+        );
+        return { decision: decisions.find((d) => d.publicId === id), statut: rows[0]?.statut, motifs: rows[0]?.motifs ?? [] };
+      });
+
+    await dansTransaction(async (client) => {
+      const id = await insererBrouillon(client);
+      const [decision] = await appliquerPublicationAuto(client);
+      const { rows: deal } = await client.query<{ statut: string; protege: boolean }>(
+        "select d.statut, p.protege from deals d join deals_protection p using (public_id) where d.public_id = $1",
+        [id]
+      );
+      const { rows: audit } = await client.query<{ admin_id: string; action: string; details: Record<string, unknown> }>(
+        "select admin_id, action, details from journal_audit where cible_type = 'deal' and cible_id = $1",
+        [id]
+      );
+      check("deal valide → publié", decision?.publie === true && deal[0]?.statut === "publie");
+      check("publication → indexable (deals_protection)", deal[0]?.protege === true);
+      check("une seule trace, même action qu'une publication manuelle", audit.length === 1 && audit[0]?.action === "update_deal");
+      check("trace : utilisateur système", audit[0]?.admin_id === UTILISATEUR_SYSTEME_ID);
+      check(
+        "trace : statut, acteur et version des règles",
+        JSON.stringify(audit[0]?.details.statut) === JSON.stringify({ apres: "publie", avant: "auto_draft" }) &&
+          audit[0]?.details.acteur === "publication-auto" &&
+          audit[0]?.details.versionRegles === VERSION_REGLES
+      );
+    });
+
+    const echecs: [string, CasBrouillon, string][] = [
+      ["source hors cron (decathlon)", { enseigne: "decathlon" }, "source_hors_cron"],
+      ["Carrefour sur un domaine inconnu", { enseigne: "carrefour" }, "source_hors_cron"],
+      ["vu il y a 49 h", { vuIlYaHeures: 49 }, "non_revu_48h"],
+      ["prix d'origine absent", { prixNormal: null }, "prix_origine_invalide"],
+      ["prix d'origine égal au prix promo", { prixPromo: 100, prixNormal: 100 }, "prix_origine_invalide"],
+      ["remise de 19 %", { prixPromo: 81 }, "remise_hors_bornes"],
+      ["remise de 81 %", { prixPromo: 19 }, "remise_hors_bornes"],
+      ["catégorie Autre", { categorie: "Autre" }, "categorie_autre"],
+      ["image absente", { image: null }, "image_absente"],
+      ["titre de 9 caractères", { titre: "Neuf lett" }, "titre_trop_court"],
+      ["date de fin hier", { dateFinDecalage: -1 }, "date_fin_passee"],
+    ];
+    for (const [label, cas, motif] of echecs) {
+      const r = await casSimple(cas);
+      check(`${label} → reste brouillon, motif ${motif}`, r.statut === "auto_draft" && r.motifs.includes(motif));
+    }
+    for (const [label, cas] of [
+      ["remise de 20 % pile", { prixPromo: 80 }],
+      ["remise de 80 % pile", { prixPromo: 20 }],
+      ["titre de 10 caractères", { titre: "Dix lettre" }],
+      ["date de fin aujourd'hui", { dateFinDecalage: 0 }],
+      ["vu il y a 47 h", { vuIlYaHeures: 47 }],
+      ["Bringo (domaine, enseigne Carrefour)", { enseigne: "carrefour", lien: "https://www.bringo.ma/p/1" }],
+      ["inwi sans lien", { enseigne: "inwi", lien: null }],
+    ] as [string, CasBrouillon][]) {
+      check(`${label} → publié`, (await casSimple(cas)).statut === "publie");
+    }
+
+    await dansTransaction(async (client) => {
+      const id = await insererBrouillon(client, { lien: "https://exemple.test/deja-rejete" });
+      await client.query(
+        `insert into memoire_curation (empreinte, decision, deal_origine_public_id, motif, decide_par)
+         values (empreinte_curation('https://exemple.test/deja-rejete', '', null), 'rejete', $1, 'test', $2)`,
+        [id, userId]
+      );
+      const [decision] = await appliquerPublicationAuto(client);
+      check("empreinte rejetée par l'admin → jamais publié", decision?.publie === false && decision.motifs.includes("deja_rejete"));
+    });
+
+    await dansTransaction(async (client) => {
+      const faible = await insererBrouillon(client, { enseigne: "ab-maroc", prixPromo: 79 });
+      for (let i = 0; i < 30; i++) await insererBrouillon(client, { enseigne: "ab-maroc", prixPromo: 50 });
+      const autreSource = await insererBrouillon(client, { enseigne: "kiabi" });
+      const decisions = await appliquerPublicationAuto(client);
+      const abMaroc = decisions.filter((d) => d.source === "ab-maroc");
+      check("plafond : 30 publiés par source", abMaroc.filter((d) => d.publie).length === 30);
+      const ecarte = decisions.find((d) => d.publicId === faible);
+      check("plafond : la plus faible remise reste en brouillon", ecarte?.publie === false && ecarte.motifs[0] === "plafond_source");
+      check("plafond : par source, l'autre source n'est pas touchée", decisions.find((d) => d.publicId === autreSource)?.publie === true);
+      const resume = resumerParSource(decisions).find((l) => l.source === "ab-maroc");
+      check("résumé par source et par motif", resume?.publies === 30 && resume.ecartes === 1 && resume.motifs.plafond_source === 1);
+    });
+
+    await dansTransaction(async (client) => {
+      const id = await insererBrouillon(client, { submitter: userId });
+      const decisions = await appliquerPublicationAuto(client);
+      const { rows } = await client.query<{ statut: string }>("select statut from deals where public_id = $1", [id]);
+      check("soumission communautaire → jamais publiée ni évaluée", rows[0]?.statut === "auto_draft" && decisions.length === 0);
+    });
+
+    const ID_INTERRUPTEUR = generatePublicId();
+    try {
+      await query(
+        `insert into deals (public_id, titre, categorie, type, prix_promo, prix_normal, image_key, statut, score, enseigne_id)
+         values ($1, 'Publication auto — interrupteur', 'Mode', 'en_ligne', 60, 100, 'deals/test.webp', 'auto_draft', 0,
+                 (select id from enseignes order by id limit 1))`,
+        [ID_INTERRUPTEUR]
+      );
+      for (const valeur of ["off", undefined]) {
+        const env = { ...process.env };
+        if (valeur === undefined) delete env.AUTO_PUBLICATION;
+        else env.AUTO_PUBLICATION = valeur;
+        const sortie = execFileSync(process.execPath, ["--import", "tsx", "publier-auto.mjs"], {
+          cwd: nodePath.resolve(process.cwd(), "../pipeline"),
+          env,
+          stdio: "pipe",
+        }).toString();
+        const { 0: ligne } = await query<{ statut: string; motifs: string[] | null }>(
+          "select statut, motifs_publication_auto as motifs from deals where public_id = $1",
+          [ID_INTERRUPTEUR]
+        );
+        check(
+          `interrupteur ${valeur ?? "absent"} → aucune écriture, et journalisé`,
+          ligne?.statut === "auto_draft" && ligne.motifs === null && sortie.includes("désactivée")
+        );
+      }
+    } finally {
+      await query("delete from deals where public_id = $1", [ID_INTERRUPTEUR]);
     }
   }
 

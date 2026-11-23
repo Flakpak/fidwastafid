@@ -140,9 +140,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Expiration des deals auto_draft (> 14 jours)
-        run: pnpm --filter pipeline run expirer-auto-draft
-
       # Lot SEO-2b (22/11/2026) : publie → expire quand date_fin est
       # strictement antérieure au jour de Casablanca. Même discipline que
       # l'étape précédente : un échec fait échouer le job. Pas de
@@ -611,6 +608,20 @@ jobs:
           elif [ "$cause" = "deja_en_base" ]; then
             echo "::warning::aswakassalam — tout ce qui a été retenu était déjà en base sur ce run : $resume"
           fi
+
+      # Lot SEO-2g (vingt-quatrième amendement) : après TOUTES les insertions,
+      # donc avec un vu_le à jour. Interrupteur : variable de dépôt
+      # AUTO_PUBLICATION (toute valeur autre que « on » : aucune écriture).
+      # Un échec fait échouer le job.
+      - name: Publication automatique des deals scrapés
+        env:
+          AUTO_PUBLICATION: ${{ vars.AUTO_PUBLICATION }}
+        run: pnpm --filter pipeline run publier-auto
+
+      # Déplacée ici par le lot SEO-2g (elle ouvrait le run) : un brouillon
+      # éligible doit être publié avant d'être expiré.
+      - name: Expiration des deals auto_draft (> 14 jours)
+        run: pnpm --filter pipeline run expirer-auto-draft
 
       - name: Revalidation Next.js (feed, enseignes, sitemap)
         run: |

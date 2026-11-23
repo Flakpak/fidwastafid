@@ -121,7 +121,7 @@ export const PUBLIC_STATUTS = new Set(["publie", "expire"]);
  *  dans `diffusions` (dix-septième amendement, prolongé le 08/08/2026), la
  *  condition est donc redondante en pratique aujourd'hui — mais explicite,
  *  jamais un « ça marche par construction » tacite. */
-export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.motif_rejet, d.turnstile_verifie, d.supprime_le,
+export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.motif_rejet, d.motifs_publication_auto, d.turnstile_verifie, d.supprime_le,
   exists (
     select 1 from diffusions df where df.deal_id = d.id and df.canal = 'telegram' and df.mode = 'production'
   ) as diffuse_telegram,
@@ -131,6 +131,7 @@ export const DEAL_ADMIN_SELECT = `${DEAL_SELECT}, d.motif_rejet, d.turnstile_ver
 
 export interface DealAdminRow extends DealRow {
   motif_rejet: string | null;
+  motifs_publication_auto: string[] | null;
   turnstile_verifie: boolean;
   /** Suppression douce (lot 1, plan « suppression administrative ») — `null`
    *  = visible. Jamais un DELETE réel : sans PITR, c'est ce qui transforme
@@ -147,6 +148,7 @@ export function toDealAdmin(row: DealAdminRow): DealAdmin {
     whatsappContact: row.whatsapp_contact,
     whatsappPublic: row.whatsapp_public,
     motifRejet: row.motif_rejet,
+    motifsPublicationAuto: row.motifs_publication_auto,
     turnstileVerifie: row.turnstile_verifie,
     supprimeLe: row.supprime_le ? new Date(row.supprime_le).toISOString() : null,
     imagePurgeeLe: row.image_purgee_le ? new Date(row.image_purgee_le).toISOString() : null,

@@ -422,6 +422,20 @@ function isGoogleMapsUrl(value: string): boolean {
  * champs terrain (nomVendeur/adresse/lienMaps/whatsapp) déjà éditables, et
  * récupérer l'image produit depuis le lien existant.
  */
+/** Libellés des critères de publication automatique (lot SEO-2g). */
+const MOTIFS_PUBLICATION_AUTO: Record<string, string> = {
+  source_hors_cron: "source hors cron",
+  non_revu_48h: "non revu depuis 48 h",
+  prix_origine_invalide: "prix d'origine absent ou incohérent",
+  remise_hors_bornes: "remise hors de 20-80 %",
+  categorie_autre: "catégorie « Autre »",
+  image_absente: "image absente",
+  titre_trop_court: "titre trop court",
+  date_fin_passee: "date de fin passée",
+  deja_rejete: "déjà rejeté par l'admin",
+  plafond_source: "plafond de 30 par source atteint",
+};
+
 export function AdminDealItem({
   deal,
   doublon,
@@ -944,6 +958,14 @@ export function AdminDealItem({
           {deal.motifRejet && (
             <p className="text-xs text-ink-muted mt-1">
               Motif enregistré : <span className="font-bold text-ink">{deal.motifRejet}</span>
+            </p>
+          )}
+          {deal.statut === "auto_draft" && deal.motifsPublicationAuto && deal.motifsPublicationAuto.length > 0 && (
+            <p className="text-xs text-ink-muted mt-1">
+              Non publié automatiquement :{" "}
+              <span className="font-bold text-ink">
+                {deal.motifsPublicationAuto.map((m) => MOTIFS_PUBLICATION_AUTO[m] ?? m).join(", ")}
+              </span>
             </p>
           )}
         </div>
