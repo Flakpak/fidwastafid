@@ -1,9 +1,10 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-11-22, sur `main` à `c64c52c`. Rattrape les lots SEO du 22/11 :
-entités HTML des titres décodées (0023/0024), expiration automatique des deals publiés,
+*Dernière mise à jour : 2026-11-23, sur `main` à `41c8a58`. Rattrape les lots SEO des 22 et
+23/11 : entités HTML des titres décodées (0023/0024), expiration automatique des deals publiés,
 taxonomie v3 et reclassement de « Autre » (0026), **pages hub SEO livrées** (`/categorie`,
-`/bons-plans`, maillage, sitemap découpé), puis une seule navigation par catégorie (SEO-3b)
+`/bons-plans`, maillage, sitemap découpé), une seule navigation par catégorie (SEO-3b), puis
+**fraîcheur des deals** (`vu_le`, trace par source, 0027/0028 — SEO-2e)
 — voir §1 et « Derniers lots livrés ». La section
 « Chiffres réels » date toujours du 05/08 et n'a pas été remesurée.*
 
@@ -164,6 +165,15 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
     avril. Un deal expiré ainsi reste dans le sitemap, sans `noindex` (`deals_protection`
     le garde protégé par son historique de publication, CONTRAT-V1 §1). Toute erreur fait
     échouer le job.
+  - **Fraîcheur** (lot SEO-2e, #197, 23/11/2026 — vingt-troisième amendement) : `deals.vu_le`
+    date le dernier passage d'un scraper (`_lib/vuLe.mjs`) ; chaque run enregistre par source
+    `elements_lus`, `plafond_atteint`, `interrompu` et `vus` dans `pipeline_runs`. Les règles
+    d'expiration par absence **ne sont pas actives** (lot SEO-2f, après observation). 0028 a
+    expiré Decathlon (23), Lemobilier (2) et 8 soumissions : 259 deals publiés actifs.
+    **Premier run mesuré (45241314553) : 54 des 259 revus.** `insert-deals` filtre (validation,
+    remise, mémoire) avant la dédup : un deal encore en ligne mais sous 30 % n'est pas « revu ».
+    Bringo et Kiabi ont atteint leur plafond de pages. `vus` compte tous les statuts, pas
+    seulement les publiés.
 - **Pages hub SEO** (lots SEO-3 #193 et SEO-3b #195, 22/11/2026 — CONTRAT-V1 §3,
   vingt-deuxième amendement) :
   - `/categorie/[slug]` : 13 slugs fixes (`apps/web/content/hubs.ts`), « autre » → 404. Même
@@ -193,6 +203,7 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| SEO-2e — fraîcheur des deals | #197 | 23/11 | Vingt-troisième amendement ; `vu_le` et trace par source (0027) ; expiration de Decathlon, Lemobilier et des soumissions anciennes (0028). Règles d'expiration par absence actées, activation au lot SEO-2f. |
 | SEO-3b — navigation par catégorie | #195 | 22/11 | Filtre en liens `/categorie/[slug]` rendus serveur, sans paramètre (choix reportés au clic) ; même filtre sur les pages catégorie ; bloc « Catégories » retiré ; Black Friday dans le filtre en saison. |
 | SEO-3 — pages hub | #193 | 22/11 | `/categorie/[slug]`, `/bons-plans/[evenement]`, seuil d'indexation de 8 deals (catégories et enseignes), maillage, fil d'Ariane, sitemap découpé (index + hubs + deals). |
 | SEO-2c — taxonomie v3 | #191, #192 | 22/11 | Vingt-deuxième amendement ; catégories `Fournitures scolaires` et `Enfants & Jouets` ; repli « Autre » compté à chaque run ; 0026 reclasse les 49 deals « Autre ». |
