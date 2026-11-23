@@ -1,11 +1,12 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-11-23, sur `main` à `da8382e`. Rattrape les lots SEO des 22 et
+*Dernière mise à jour : 2026-11-23, sur `main` à `0826770`. Rattrape les lots SEO des 22 et
 23/11 : entités HTML des titres décodées (0023/0024), expiration automatique des deals publiés,
 taxonomie v3 et reclassement de « Autre » (0026), **pages hub SEO livrées** (`/categorie`,
 `/bons-plans`, maillage, sitemap découpé), une seule navigation par catégorie (SEO-3b), puis
 **fraîcheur des deals** (`vu_le`, trace par source, 0027/0028 — SEO-2e et SEO-2e-bis) et
-**publication automatique** des deals scrapés (0029 — SEO-2g, réinsertion — SEO-2h)
+**publication automatique** des deals scrapés (0029 — SEO-2g, réinsertion — SEO-2h), et
+**un produit, une fiche** (0030 — SEO-2i)
 — voir §1 et « Derniers lots livrés ». La section
 « Chiffres réels » date toujours du 05/08 et n'a pas été remesurée.*
 
@@ -198,19 +199,29 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
     - **Premier run (45251162089) : 11 publiés sur 12 brouillons**, tous Univers Para Discount ;
       1 écarté (Aswak Assalam, `Autre`). 270 deals publiés ; Black Friday passe de 9 à 20 deals.
     - **Réinsertion** (lot SEO-2h, #203) : seul un rejet admin bloque le retour d'un produit
-      (`memoire_curation`, ou ligne `rejete` de même titre + enseigne + prix). Un deal expiré,
-      publié ou non, ne bloque plus : le produit revient comme nouveau deal s'il passe les
-      filtres. La déduplication contre les deals publiés et les brouillons actifs est inchangée.
-    - **Run 45254521446** : 147 insérés, 96 publiés automatiquement, 358 bloqués par un rejet
-      admin, 52 brouillons restants (51 au plafond de 30 par source, 1 en `Autre`). 366 deals
-      publiés ; Black Friday atteint son maximum de 60 deals.
+      (`memoire_curation`, ou ligne `rejete` de même titre + enseigne + prix). Run 45254521446 :
+      147 lignes insérées, 96 publiées. Comportement remplacé par « un produit, une fiche ».
+  - **Un produit, une fiche** (lot SEO-2i, #205, 23/11/2026 — vingt-cinquième amendement,
+    `_lib/ficheProduit.mjs`) : plus aucune nouvelle ligne pour un produit (empreinte) qui a déjà
+    une fiche non rejetée.
+    - Ligne expirée non rejetée : réactivée (même `public_id`), en `auto_draft`, puis publication
+      automatique. Plusieurs lignes : celle déjà publiée, sinon la plus récente.
+    - Ligne publiée à un autre prix : mise à jour si la remise reste entre 20 et 80 %, sinon
+      expirée. Au-delà de 25 % des deals actifs d'une source : aucune expiration sur ce run.
+    - Image conservée si l'URL source n'a pas changé (`deals.image_source`, 0030).
+    - Rejet admin définitif ; soumissions communautaires jamais modifiées.
+    - `expirer-auto-draft` et `purger-lignes` jugent un brouillon sur `vu_le`.
+    - `/bons-plans/black-friday` : deals publiés actifs revus sous 48 h, remise ≥ 20 %, 60 max.
+      **Jusqu'au 25/11 vers 18:40 UTC**, la période de grâce de 0027 compte encore comme « revus »
+      des deals que les scrapers n'ont pas retrouvés.
+    - **Run 45260098523** : 0 inséré, 0 réactivé, 4 prix mis à jour, 13 expirés (prix hors
+      critères), 43 publiés automatiquement, 358 bloqués par un rejet admin. 396 deals publiés.
     - **Points ouverts** :
-      - un produit réinséré compte comme « publié dans la fenêtre » du Black Friday, même si
-        sa promotion est plus ancienne (la date est celle de la nouvelle ligne) ;
-      - un produit revenu après un passage en `publie` obtient une nouvelle URL, à côté de
-        l'ancienne fiche expirée ;
-      - un brouillon non publiable expire à 14 jours puis revient au run suivant : une nouvelle
-        ligne et une nouvelle image à chaque cycle.
+      - **11 produits ont encore plusieurs fiches publiées actives** (23 lignes, à des prix
+        différents), créées avant ce lot : si l'une porte le prix courant, les autres ne sont
+        ni mises à jour ni expirées ;
+      - les 147 produits réinsérés par SEO-2h gardent leur ancienne ligne expirée, donc deux URL ;
+      - 54 deals publiés portent une empreinte rejetée par l'admin (antérieurs à ce lot).
 - **Pages hub SEO** (lots SEO-3 #193 et SEO-3b #195, 22/11/2026 — CONTRAT-V1 §3,
   vingt-deuxième amendement) :
   - `/categorie/[slug]` : 13 slugs fixes (`apps/web/content/hubs.ts`), « autre » → 404. Même
@@ -240,6 +251,7 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| SEO-2i — un produit, une fiche | #205 | 23/11 | Vingt-cinquième amendement ; réactivation sur la même URL, prix mis à jour ou expiré, image conservée (0030), Black Friday sur les deals revus sous 48 h. |
 | SEO-2h — réinsertion des expirés | #203 | 23/11 | Seul un rejet admin bloque le retour d'un produit ; un deal expiré ne bloque plus. Premier run : 147 insérés, 96 publiés automatiquement. |
 | SEO-2g — publication automatique | #201 | 23/11 | Vingt-quatrième amendement ; `publier-auto.mjs`, interrupteur `AUTO_PUBLICATION`, plafond de 30 par source, motifs des brouillons écartés (0029) affichés dans l'admin. |
 | SEO-2e-bis — revu = présent à la source | #199 | 23/11 | Scrapers qui transmettent tout ce qu'ils lisent ; `vu_le` mis à jour avant tout filtre, en une requête groupée par source et par run. |
