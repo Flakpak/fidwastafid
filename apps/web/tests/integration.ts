@@ -2833,6 +2833,147 @@ async function main() {
     }
   }
 
+  // ----------------------------------------------------------------
+  // Une purge ne bloque pas (lot SEO-2m), de bout en bout avec le VRAI
+  // insert-deals.mjs et la vraie publication automatique.
+  // ----------------------------------------------------------------
+  console.log("\nrejet Purge — ne bloque jamais un produit");
+  {
+    const MARQUEUR_LUS = 5555;
+    const dossier = mkdtempSync(nodePath.join(tmpdir(), "purge-"));
+    const ancien = "2026-01-01T00:00:00Z";
+    const titreDe = (nom: string) => `Purge produit ${nom}`;
+    const lienDe = (nom: string) => `https://exemple.test/purge/${nom}`;
+    const inserer = async (nom: string, statut: string, motif: string | null = null) => {
+      const id = generatePublicId();
+      await query(
+        `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, prix_normal, lien, statut, score,
+                            vu_le, updated_at, image_key, motif_rejet)
+         values ($1, $2, (select id from enseignes where slug = 'kiabi'), 'Maison', 'en_ligne', 50, 100, $3, $4, 0,
+                 now(), $5, 'deals/test.webp', $6)`,
+        [id, titreDe(nom), lienDe(nom), statut, ancien, motif]
+      );
+      return id;
+    };
+    const auditer = (id: string, apres: string) =>
+      query(
+        `insert into journal_audit (admin_id, action, cible_type, cible_id, details)
+         values ($1, 'update_deal', 'deal', $2, $3)`,
+        [userId, id, JSON.stringify({ statut: { avant: "auto_draft", apres }, champs: {} })]
+      );
+    const memoriser = (nom: string, id: string, motif: string | null) =>
+      query(
+        `insert into memoire_curation (empreinte, decision, deal_origine_public_id, motif, decide_par)
+         values (empreinte_curation($1, '', null), 'rejete', $2, $3, $4)`,
+        [lienDe(nom), id, motif, userId]
+      );
+    const rejeter = async (nom: string, motif: string | null) => {
+      const id = await inserer(nom, "rejete", motif);
+      await auditer(id, "rejete");
+      await memoriser(nom, id, motif);
+      return id;
+    };
+    const fiches = (nom: string) =>
+      query<{ public_id: string; statut: string; prix: string }>(
+        "select public_id, statut, prix_promo as prix from deals where titre = $1 and statut <> 'rejete'",
+        [titreDe(nom)]
+      );
+    const element = (nom: string, prix: number) => ({
+      titre: titreDe(nom),
+      prix_promo: prix,
+      prix_normal: 100,
+      categorie: "Maison",
+      description: null,
+      photo_url: null,
+      lien: lienDe(nom),
+      date_fin: null,
+      enseigne: "kiabi",
+      ville: "National",
+      statut: "auto_draft",
+    });
+    try {
+      await query("insert into enseignes (slug, nom) values ('kiabi', 'kiabi') on conflict (slug) do nothing");
+      await rejeter("nouveau", "Purge");
+      await rejeter("casse", "purge");
+      await rejeter("deux-fois", "Purge");
+      const expiree = await inserer("reactivable", "expire");
+      await auditer(expiree, "publie");
+      await rejeter("reactivable", "Purge");
+      await rejeter("hors-sujet", "Hors sujet");
+      await rejeter("sans-motif", null);
+      await rejeter("mixte", "Purge");
+      await rejeter("mixte", "Hors sujet");
+      const publiee = await inserer("deja-publiee", "publie");
+      await auditer(publiee, "publie");
+      const brouillon = await inserer("deja-publiee", "auto_draft");
+      await memoriser("deja-publiee", brouillon, "Purge");
+
+      const archive = [
+        element("nouveau", 45),
+        element("casse", 45),
+        element("deux-fois", 45),
+        element("deux-fois", 42),
+        element("reactivable", 45),
+        element("hors-sujet", 45),
+        element("sans-motif", 45),
+        element("mixte", 45),
+      ];
+      const chemin = nodePath.join(dossier, "2026-11-23_05-00_kiabi.json");
+      ecrireArchiveEtTrace(chemin, archive, {
+        lus: MARQUEUR_LUS,
+        plafondAtteint: false,
+        interrompu: false,
+        enseigne: "kiabi",
+        releves: archive.map((e) => ({
+          titre: e.titre,
+          prix: e.prix_promo,
+          prixNormal: e.prix_normal,
+          lien: e.lien,
+          dateFin: null,
+          photoUrl: null,
+        })),
+      });
+      const sortie = execFileSync(process.execPath, ["--import", "tsx", "insert-deals.mjs", chemin], {
+        cwd: nodePath.resolve(process.cwd(), "../pipeline"),
+        env: process.env,
+        stdio: "pipe",
+      }).toString();
+      const resume = JSON.parse(sortie.match(/^RESUME_JSON=(.*)$/m)?.[1] ?? "{}") as Record<string, number>;
+
+      const nouveau = (await fiches("nouveau"))[0];
+      check("rejet Purge, jamais publié → réinséré en brouillon", nouveau?.statut === "auto_draft");
+      check("motif « purge » en minuscules → même règle", (await fiches("casse"))[0]?.statut === "auto_draft");
+      check("même produit lu deux fois → une seule fiche", (await fiches("deux-fois")).length === 1);
+      const r = (await fiches("reactivable"))[0];
+      check("rejet Purge, fiche expirée → réactivée, même public_id", r?.public_id === expiree && r.statut === "auto_draft" && Number(r.prix) === 45);
+      check("autre motif, jamais publié → bloqué", (await fiches("hors-sujet")).length === 0);
+      check("rejet sans motif, jamais publié → bloqué", (await fiches("sans-motif")).length === 0);
+      check("Purge et autre motif, jamais publié → bloqué", (await fiches("mixte")).length === 0);
+      check("résumé : 3 refus réels, 3 insérés, 1 réactivé", resume.bloquesRejetAdmin === 3 && resume.inseres === 3 && resume.reactives === 1);
+
+      await query("update deals set image_key = 'deals/test.webp' where titre like 'Purge produit %' and image_key is null");
+      const client = await getPool().connect();
+      try {
+        await client.query("begin");
+        const decisions = await appliquerPublicationAuto(client);
+        check("publication auto : produit purgé réinséré → publié", decisions.find((d) => d.publicId === nouveau?.public_id)?.publie === true);
+        check("publication auto : produit purgé réactivé → publié", decisions.find((d) => d.publicId === expiree)?.publie === true);
+        const b = decisions.find((d) => d.publicId === brouillon);
+        check("publication auto : Purge avec une autre fiche publiée → écarté", b?.publie === false && b.motifs.includes("deja_rejete"));
+      } finally {
+        await client.query("rollback");
+        client.release();
+      }
+    } finally {
+      rmSync(dossier, { recursive: true, force: true });
+      const ids = (await query<{ public_id: string }>("select public_id from deals where titre like 'Purge produit %'")).map((l) => l.public_id);
+      await query("delete from pipeline_runs where elements_lus = $1", [MARQUEUR_LUS]);
+      await query("delete from journal_audit where cible_type = 'deal' and cible_id = any($1::text[])", [ids]);
+      await query("delete from memoire_curation where deal_origine_public_id = any($1::text[])", [ids]);
+      await query("delete from deals where public_id = any($1::text[])", [ids]);
+    }
+  }
+
   console.log("\nrejet admin — ne bloque que les produits jamais publiés");
   {
     const MARQUEUR_LUS = 9999;
@@ -2847,7 +2988,7 @@ async function main() {
         `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, prix_normal, lien, statut, score,
                             vu_le, updated_at, image_key, motif_rejet)
          values ($1, $2, (select id from enseignes where slug = 'kiabi'), 'Maison', 'en_ligne', 50, 100, $3, $4, 0,
-                 now(), $5, 'deals/test.webp', case when $4 = 'rejete' then 'purge' end)`,
+                 now(), $5, 'deals/test.webp', case when $4 = 'rejete' then 'Hors sujet' end)`,
         [id, `Rejet produit ${nom}`, lienDe(nom), statut, ancien]
       );
       return id;
@@ -2864,7 +3005,7 @@ async function main() {
       await auditer(id, "rejete");
       await query(
         `insert into memoire_curation (empreinte, decision, deal_origine_public_id, motif, decide_par)
-         values (empreinte_curation($1, '', null), 'rejete', $2, 'purge', $3)`,
+         values (empreinte_curation($1, '', null), 'rejete', $2, 'Hors sujet', $3)`,
         [lienDe(nom), id, userId]
       );
       return id;
@@ -2899,7 +3040,7 @@ async function main() {
       const brouillonRejete = await inserer("brouillon-rejete", "auto_draft");
       await query(
         `insert into memoire_curation (empreinte, decision, deal_origine_public_id, motif, decide_par)
-         values (empreinte_curation($1, '', null), 'rejete', $2, 'purge', $3)`,
+         values (empreinte_curation($1, '', null), 'rejete', $2, 'Hors sujet', $3)`,
         [lienDe("brouillon-rejete"), brouillonRejete, userId]
       );
 

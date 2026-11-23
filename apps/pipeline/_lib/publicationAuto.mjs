@@ -11,10 +11,11 @@
 // soumission communautaire reste soumise à la modération manuelle.
 // ============================================================
 
+import { estPurgeSql } from "./rejetPurge.mjs";
 import { UTILISATEUR_SYSTEME_ID } from "./utilisateurSysteme.mjs";
 
 /** Consignée dans chaque ligne de journal_audit : à changer avec les règles. */
-export const VERSION_REGLES = "2026-11-23.1";
+export const VERSION_REGLES = "2026-11-23.2";
 export const ACTEUR = "publication-auto";
 export const PLAFOND_PAR_SOURCE = 30;
 
@@ -53,7 +54,9 @@ end`;
  * Critère ajouté aux règles du lot : un brouillon dont l'empreinte a été
  * rejetée par l'admin (`memoire_curation`) n'est publié que si le produit a
  * déjà une fiche publiée non rejetée (rejet d'un doublon, lot SEO-2k) et
- * qu'aucune autre fiche de ce produit n'est publiée en ce moment.
+ * qu'aucune autre fiche de ce produit n'est publiée en ce moment. Une Purge
+ * ne bloque jamais (lot SEO-2m), mais ne permet pas non plus une seconde fiche
+ * publiée du même produit.
  *
  * @param {import("pg").Client | import("pg").PoolClient} client
  * @returns {Promise<{ source: string, publicId: string, publie: boolean, motifs: string[] }[]>}
@@ -74,12 +77,13 @@ export async function appliquerPublicationAuto(client) {
                 case when d.image_key is null or d.image_purgee_le is not null then 'image_absente' end,
                 case when char_length(trim(d.titre)) < 10 then 'titre_trop_court' end,
                 case when d.date_fin < (now() at time zone 'Africa/Casablanca')::date then 'date_fin_passee' end,
-                case when exists (
-                  select 1 from memoire_curation m
-                   where m.empreinte = empreinte_curation(d.lien, d.titre, d.enseigne_id)
-                     and m.decision = 'rejete' and m.levee_le is null
-                ) and (
-                  not exists (
+                case when (
+                  exists (
+                    select 1 from memoire_curation m
+                     where m.empreinte = empreinte_curation(d.lien, d.titre, d.enseigne_id)
+                       and m.decision = 'rejete' and m.levee_le is null
+                       and not ${estPurgeSql("m.motif")}
+                  ) and not exists (
                     select 1 from deals c
                       join journal_audit ja on ja.cible_type = 'deal' and ja.cible_id = c.public_id
                      where c.enseigne_id is not distinct from d.enseigne_id
@@ -87,7 +91,12 @@ export async function appliquerPublicationAuto(client) {
                        and empreinte_curation(c.lien, c.titre, c.enseigne_id) = empreinte_curation(d.lien, d.titre, d.enseigne_id)
                        and coalesce((ja.details -> 'statut') ->> 'apres', ja.details ->> 'apres') = 'publie'
                   )
-                  or exists (
+                ) or (
+                  exists (
+                    select 1 from memoire_curation m
+                     where m.empreinte = empreinte_curation(d.lien, d.titre, d.enseigne_id)
+                       and m.decision = 'rejete' and m.levee_le is null
+                  ) and exists (
                     select 1 from deals c
                      where c.id <> d.id and c.enseigne_id is not distinct from d.enseigne_id
                        and c.supprime_le is null and c.statut = 'publie'

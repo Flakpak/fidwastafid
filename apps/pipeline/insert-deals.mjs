@@ -35,6 +35,7 @@ import { sourceDepuisFichier, classifierCause, enregistrerRun } from "./_lib/pip
 import { lireTrace } from "./_lib/traceScraper.mjs";
 import { marquerReleves } from "./_lib/vuLe.mjs";
 import { jourCasablanca, retirerPromosTerminees } from "./_lib/promoTerminee.mjs";
+import { estPurgeSql } from "./_lib/rejetPurge.mjs";
 import { chargerFiches, choisirLigneReactivable, porteeRejet, reactiverLigne, reconcilierActives } from "./_lib/ficheProduit.mjs";
 
 // ---------- Description depuis la fiche produit (Bringo uniquement) ----------
@@ -225,6 +226,8 @@ try {
   });
   let reactives = 0;
   let rejetsDoublon = 0;
+  // Un produit inséré sur ce run n'est pas dans `fiches`, chargé avant la boucle.
+  const empreintesInserees = new Set();
   const idsVus = await marquerReleves(client, { releves: relevesEnCours, enseigneId: enseigneTrace });
   console.log(`📉 Seuil de remise minimum : ${SEUIL_REMISE_MIN_PCT} % (règle partagée, remise.mjs).`);
 
@@ -313,6 +316,11 @@ try {
       continue;
     }
 
+    if (empreintesInserees.has(empreinte.rows[0].empreinte)) {
+      doublons++;
+      continue;
+    }
+
     const publicId = generatePublicId();
 
     // Déduplication : même titre + enseigne + prix (même logique qu'avant
@@ -325,7 +333,8 @@ try {
     // d'un produit. Un deal expiré, publié ou non, ne bloque plus : le produit
     // revient comme nouveau deal s'il passe les filtres. Une ligne `rejete`
     // reste bloquante ici : la mémoire de curation suit le lien, et un même
-    // produit rejeté peut revenir sous un autre lien.
+    // produit rejeté peut revenir sous un autre lien. Sauf une Purge, qui ne
+    // bloque jamais (lot SEO-2m).
     const dup = await client.query(
       `SELECT statut FROM deals
        WHERE lower(titre) = lower($1) AND enseigne_id = $2
@@ -333,6 +342,7 @@ try {
          AND (date_fin IS NULL OR date_fin >= CURRENT_DATE)
          AND supprime_le IS NULL
          AND statut <> 'expire'
+         AND NOT (statut = 'rejete' AND ${estPurgeSql("motif_rejet")})
        ORDER BY (statut = 'rejete')
        LIMIT 1`,
       [d.titre, enseigneId, d.prix_promo]
@@ -384,6 +394,7 @@ try {
       ]
     );
     inseres++;
+    empreintesInserees.add(empreinte.rows[0].empreinte);
     if (d.categorie === "Autre") inseresAutre.push(d.titre);
 
     // Après insertion réussie uniquement — jamais sur un doublon (cf. le

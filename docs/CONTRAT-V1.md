@@ -313,6 +313,11 @@ n'a qu'une fiche, donc une seule URL à vie. Quand un produit revient chez sa so
   le retour du produit met à jour ou réactive sa fiche conservée, selon les règles ci-dessus, jamais
   une fiche rejetée ou fusionnée. Si la seule fiche publiée a elle-même été rejetée, il n'y a pas de
   fiche à conserver : le produit reste bloqué (complément du lot SEO-2k, même date) ;
+- un rejet au motif **« Purge »** (sans distinction de casse) est un nettoyage et **ne bloque jamais
+  un produit** : un produit dont le seul rejet est une Purge est traité comme un produit nouveau ou
+  réactivable, selon les règles ci-dessus. **Seul un rejet avec un autre motif, sur un produit jamais
+  publié, bloque le produit à vie** ; un rejet sans motif n'est pas une Purge (complément du lot
+  SEO-2m, même date) ;
 - les **soumissions communautaires** ne sont ni modifiées ni réactivées.
 
 Plus aucune nouvelle ligne pour un produit qui a déjà une fiche non rejetée. Conséquences :
