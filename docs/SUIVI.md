@@ -1,10 +1,11 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-11-23, sur `main` à `d1a16f2`. Rattrape les lots SEO des 22 et
+*Dernière mise à jour : 2026-11-23, sur `main` à `6f0b3fa`. Rattrape les lots SEO des 22 et
 23/11 : entités HTML des titres décodées (0023/0024), expiration automatique des deals publiés,
 taxonomie v3 et reclassement de « Autre » (0026), **pages hub SEO livrées** (`/categorie`,
 `/bons-plans`, maillage, sitemap découpé), une seule navigation par catégorie (SEO-3b), puis
-**fraîcheur des deals** (`vu_le`, trace par source, 0027/0028 — SEO-2e et SEO-2e-bis)
+**fraîcheur des deals** (`vu_le`, trace par source, 0027/0028 — SEO-2e et SEO-2e-bis) et
+**publication automatique** des deals scrapés (0029 — SEO-2g)
 — voir §1 et « Derniers lots livrés ». La section
 « Chiffres réels » date toujours du 05/08 et n'a pas été remesurée.*
 
@@ -183,6 +184,21 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
     - **Dernier run mesuré (45244628205) : 76 des 259 revus** (54 avant SEO-2e-bis). Les autres
       sont absents de la source, ou leur prix ou titre a changé : la clé ne distingue pas ces
       cas. Bringo et Kiabi atteignent leur plafond de pages. Univers Para Discount : 0 sur 24.
+  - **Publication automatique** (lot SEO-2g, #201, 23/11/2026 — vingt-quatrième amendement) :
+    `publier-auto.mjs` (règles dans `_lib/publicationAuto.mjs`, version `2026-11-23.1`), étape
+    du cron après toutes les insertions et avant `expirer-auto-draft`, qui n'ouvre donc plus le
+    run. **Active** : variable de dépôt `AUTO_PUBLICATION=on` ; toute autre valeur n'écrit rien.
+    - Un `auto_draft` scrapé est publié si : source du cron (hors bestmark), `vu_le` de moins de
+      48 h, prix d'origine supérieur au prix promo, remise de 20 à 80 %, catégorie autre que
+      `Autre`, image, titre d'au moins 10 caractères, date de fin absente ou non passée, et
+      empreinte non rejetée par l'admin. Plafond : 30 par source et par run (plus fortes remises).
+    - Les soumissions communautaires restent en modération manuelle. Les brouillons écartés
+      gardent leurs motifs (`deals.motifs_publication_auto`, 0029), affichés dans l'admin.
+    - Trace : `update_deal` dans `journal_audit`, utilisateur système, acteur `publication-auto`.
+    - **Premier run (45251162089) : 11 publiés sur 12 brouillons**, tous Univers Para Discount ;
+      1 écarté (Aswak Assalam, `Autre`). 270 deals publiés ; Black Friday passe de 9 à 20 deals.
+    - **Limite de volume** : un produit expiré ou rejeté bloque sa réinsertion (déduplication et
+      mémoire de curation), donc le flux dépend des seuls nouveaux produits.
 - **Pages hub SEO** (lots SEO-3 #193 et SEO-3b #195, 22/11/2026 — CONTRAT-V1 §3,
   vingt-deuxième amendement) :
   - `/categorie/[slug]` : 13 slugs fixes (`apps/web/content/hubs.ts`), « autre » → 404. Même
@@ -212,6 +228,7 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| SEO-2g — publication automatique | #201 | 23/11 | Vingt-quatrième amendement ; `publier-auto.mjs`, interrupteur `AUTO_PUBLICATION`, plafond de 30 par source, motifs des brouillons écartés (0029) affichés dans l'admin. |
 | SEO-2e-bis — revu = présent à la source | #199 | 23/11 | Scrapers qui transmettent tout ce qu'ils lisent ; `vu_le` mis à jour avant tout filtre, en une requête groupée par source et par run. |
 | SEO-2e — fraîcheur des deals | #197 | 23/11 | Vingt-troisième amendement ; `vu_le` et trace par source (0027) ; expiration de Decathlon, Lemobilier et des soumissions anciennes (0028). Règles d'expiration par absence actées, activation au lot SEO-2f. |
 | SEO-3b — navigation par catégorie | #195 | 22/11 | Filtre en liens `/categorie/[slug]` rendus serveur, sans paramètre (choix reportés au clic) ; même filtre sur les pages catégorie ; bloc « Catégories » retiré ; Black Friday dans le filtre en saison. |
