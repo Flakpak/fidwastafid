@@ -1,12 +1,12 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-11-23, sur `main` à `0826770`. Rattrape les lots SEO des 22 et
+*Dernière mise à jour : 2026-11-23, sur `main` à `45b3ff0`. Rattrape les lots SEO des 22 et
 23/11 : entités HTML des titres décodées (0023/0024), expiration automatique des deals publiés,
 taxonomie v3 et reclassement de « Autre » (0026), **pages hub SEO livrées** (`/categorie`,
 `/bons-plans`, maillage, sitemap découpé), une seule navigation par catégorie (SEO-3b), puis
 **fraîcheur des deals** (`vu_le`, trace par source, 0027/0028 — SEO-2e et SEO-2e-bis) et
 **publication automatique** des deals scrapés (0029 — SEO-2g, réinsertion — SEO-2h), et
-**un produit, une fiche** (0030 — SEO-2i)
+**un produit, une fiche** (0030 — SEO-2i, fusion des doublons 0031/0032 — SEO-2j)
 — voir §1 et « Derniers lots livrés ». La section
 « Chiffres réels » date toujours du 05/08 et n'a pas été remesurée.*
 
@@ -216,12 +216,24 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
       des deals que les scrapers n'ont pas retrouvés.
     - **Run 45260098523** : 0 inséré, 0 réactivé, 4 prix mis à jour, 13 expirés (prix hors
       critères), 43 publiés automatiquement, 358 bloqués par un rejet admin. 396 deals publiés.
+  - **Fusion des doublons** (lot SEO-2j, #207, 23/11/2026 — vingt-sixième amendement) : 0032 a
+    fusionné **173 fiches** (12 publiées, 161 expirées) dans **164 fiches conservées** : la publiée
+    active au `vu_le` le plus récent, à égalité la plus anciennement publiée. 384 deals publiés.
+    - Une fiche fusionnée (`deals.fusionne_dans`, 0031) redirige en permanence vers la fiche
+      conservée (**308** émis par Next.js, équivalent du 301), sort du sitemap et n'est jamais
+      réactivée ni republiée (contrainte en base, refus dans l'admin).
     - **Points ouverts** :
-      - **11 produits ont encore plusieurs fiches publiées actives** (23 lignes, à des prix
-        différents), créées avant ce lot : si l'une porte le prix courant, les autres ne sont
-        ni mises à jour ni expirées ;
-      - les 147 produits réinsérés par SEO-2h gardent leur ancienne ligne expirée, donc deux URL ;
-      - 54 deals publiés portent une empreinte rejetée par l'admin (antérieurs à ce lot).
+      - **Revue de jeudi : 54 deals publiés portent une empreinte rejetée par l'admin** (53 publiés
+        avant le rejet, 1 après). Non modifiés. Les **7 produits** concernés qui ont aussi une
+        autre fiche sont restés hors fusion, dont *Machine à Pâte Monobloc 18 cm* avec **2 fiches
+        publiées** (`fwum8r9yjb`, `24q2ju939e`) ;
+      - 9 produits n'ont qu'un brouillon actif et une ancienne fiche expirée : hors règle (pas de
+        fiche publiée à conserver) ;
+      - 4 des 11 produits à fiches multiples ne sont plus lus à la source (vélo d'appartement,
+        glacière, set d'outils, jogging) : leur fiche conservée, choisie à égalité de `vu_le`,
+        garde un prix non vérifiable. Le vélo répond 404 chez Aswak Assalam ;
+      - 4 fiches fusionnées portaient une diffusion : la fiche conservée n'en a pas la trace et
+        peut être rediffusée.
 - **Pages hub SEO** (lots SEO-3 #193 et SEO-3b #195, 22/11/2026 — CONTRAT-V1 §3,
   vingt-deuxième amendement) :
   - `/categorie/[slug]` : 13 slugs fixes (`apps/web/content/hubs.ts`), « autre » → 404. Même
@@ -251,6 +263,7 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| SEO-2j — fusion des doublons | #207 | 23/11 | Vingt-sixième amendement ; 173 fiches fusionnées dans 164 fiches conservées (0031, 0032), redirection permanente, sortie du sitemap. |
 | SEO-2i — un produit, une fiche | #205 | 23/11 | Vingt-cinquième amendement ; réactivation sur la même URL, prix mis à jour ou expiré, image conservée (0030), Black Friday sur les deals revus sous 48 h. |
 | SEO-2h — réinsertion des expirés | #203 | 23/11 | Seul un rejet admin bloque le retour d'un produit ; un deal expiré ne bloque plus. Premier run : 147 insérés, 96 publiés automatiquement. |
 | SEO-2g — publication automatique | #201 | 23/11 | Vingt-quatrième amendement ; `publier-auto.mjs`, interrupteur `AUTO_PUBLICATION`, plafond de 30 par source, motifs des brouillons écartés (0029) affichés dans l'admin. |
