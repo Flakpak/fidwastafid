@@ -1,10 +1,10 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-11-23, sur `main` à `41c8a58`. Rattrape les lots SEO des 22 et
+*Dernière mise à jour : 2026-11-23, sur `main` à `d1a16f2`. Rattrape les lots SEO des 22 et
 23/11 : entités HTML des titres décodées (0023/0024), expiration automatique des deals publiés,
 taxonomie v3 et reclassement de « Autre » (0026), **pages hub SEO livrées** (`/categorie`,
 `/bons-plans`, maillage, sitemap découpé), une seule navigation par catégorie (SEO-3b), puis
-**fraîcheur des deals** (`vu_le`, trace par source, 0027/0028 — SEO-2e)
+**fraîcheur des deals** (`vu_le`, trace par source, 0027/0028 — SEO-2e et SEO-2e-bis)
 — voir §1 et « Derniers lots livrés ». La section
 « Chiffres réels » date toujours du 05/08 et n'a pas été remesurée.*
 
@@ -165,15 +165,24 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
     avril. Un deal expiré ainsi reste dans le sitemap, sans `noindex` (`deals_protection`
     le garde protégé par son historique de publication, CONTRAT-V1 §1). Toute erreur fait
     échouer le job.
-  - **Fraîcheur** (lot SEO-2e, #197, 23/11/2026 — vingt-troisième amendement) : `deals.vu_le`
-    date le dernier passage d'un scraper (`_lib/vuLe.mjs`) ; chaque run enregistre par source
-    `elements_lus`, `plafond_atteint`, `interrompu` et `vus` dans `pipeline_runs`. Les règles
-    d'expiration par absence **ne sont pas actives** (lot SEO-2f, après observation). 0028 a
-    expiré Decathlon (23), Lemobilier (2) et 8 soumissions : 259 deals publiés actifs.
-    **Premier run mesuré (45241314553) : 54 des 259 revus.** `insert-deals` filtre (validation,
-    remise, mémoire) avant la dédup : un deal encore en ligne mais sous 30 % n'est pas « revu ».
-    Bringo et Kiabi ont atteint leur plafond de pages. `vus` compte tous les statuts, pas
-    seulement les publiés.
+  - **Fraîcheur** (lots SEO-2e #197 et SEO-2e-bis #199, 23/11/2026 — vingt-troisième
+    amendement) : `deals.vu_le` date la dernière fois qu'un scraper a retrouvé le deal **à la
+    source**.
+    - Chaque scraper transmet dans sa trace (`<archive>.trace.json`, `_lib/traceScraper.mjs`)
+      **tout ce qu'il lit avec un prix**, remisé ou non (`releves`).
+    - `insert-deals` met à jour `vu_le` **avant tout filtre**, en **une seule requête groupée
+      par source et par run** (`marquerReleves`, `_lib/vuLe.mjs`). Clé : titre sans casse +
+      enseigne + prix promo, sur les deals non expirés et non supprimés. Seule `vu_le` change.
+      Un deal sous le seuil de remise reste donc « revu » ; un prix différent ne l'est pas. Les
+      filtres ne décident que de l'insertion.
+    - Chaque run enregistre par source `elements_lus`, `plafond_atteint`, `interrompu` et `vus`
+      dans `pipeline_runs`. `vus` compte tous les statuts non expirés, pas seulement les publiés.
+    - Les règles d'expiration par absence **ne sont pas actives** (lot SEO-2f, après
+      observation). 0028 a expiré Decathlon (23), Lemobilier (2) et 8 soumissions : 259 deals
+      publiés actifs.
+    - **Dernier run mesuré (45244628205) : 76 des 259 revus** (54 avant SEO-2e-bis). Les autres
+      sont absents de la source, ou leur prix ou titre a changé : la clé ne distingue pas ces
+      cas. Bringo et Kiabi atteignent leur plafond de pages. Univers Para Discount : 0 sur 24.
 - **Pages hub SEO** (lots SEO-3 #193 et SEO-3b #195, 22/11/2026 — CONTRAT-V1 §3,
   vingt-deuxième amendement) :
   - `/categorie/[slug]` : 13 slugs fixes (`apps/web/content/hubs.ts`), « autre » → 404. Même
@@ -203,6 +212,7 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| SEO-2e-bis — revu = présent à la source | #199 | 23/11 | Scrapers qui transmettent tout ce qu'ils lisent ; `vu_le` mis à jour avant tout filtre, en une requête groupée par source et par run. |
 | SEO-2e — fraîcheur des deals | #197 | 23/11 | Vingt-troisième amendement ; `vu_le` et trace par source (0027) ; expiration de Decathlon, Lemobilier et des soumissions anciennes (0028). Règles d'expiration par absence actées, activation au lot SEO-2f. |
 | SEO-3b — navigation par catégorie | #195 | 22/11 | Filtre en liens `/categorie/[slug]` rendus serveur, sans paramètre (choix reportés au clic) ; même filtre sur les pages catégorie ; bloc « Catégories » retiré ; Black Friday dans le filtre en saison. |
 | SEO-3 — pages hub | #193 | 22/11 | `/categorie/[slug]`, `/bons-plans/[evenement]`, seuil d'indexation de 8 deals (catégories et enseignes), maillage, fil d'Ariane, sitemap découpé (index + hubs + deals). |
