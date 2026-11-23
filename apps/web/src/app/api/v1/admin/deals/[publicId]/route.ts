@@ -19,6 +19,7 @@ type Context = { params: Promise<{ publicId: string }> };
 interface DealEditableRow {
   id: string;
   statut: string;
+  fusionne_dans: string | null;
   titre: string;
   description: string | null;
   /** `numeric` — `pg` le renvoie en CHAÎNE pour ne pas tronquer sa précision. */
@@ -88,12 +89,18 @@ export const PATCH = withAuthErrors<Context>(async (request, { params }) => {
     const before = await client.query<DealEditableRow>(
       `select id, statut, titre, description, prix_promo, prix_normal, categorie, type, ville,
               date_fin, lien, enseigne_id, motif_rejet, nom_vendeur, adresse, lien_maps,
-              whatsapp_contact, whatsapp_public
+              whatsapp_contact, whatsapp_public, fusionne_dans
        from deals where public_id = $1 for update`,
       [publicId]
     );
     const deal = before.rows[0];
     if (!deal) return { kind: "not_found" as const };
+
+    // Une fiche fusionnée n'est jamais republiée (vingt-sixième amendement).
+    if (deal.fusionne_dans && patch.statut !== "expire") {
+      const message = "Cette fiche est fusionnée dans une autre fiche du même produit : modifie la fiche conservée.";
+      return { kind: "invalid" as const, message, fields: { statut: message } };
+    }
 
     const enseigne = await resolveEnseigneId(client, patch.enseigneSlug);
     if (!enseigne.ok) {

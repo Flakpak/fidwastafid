@@ -316,6 +316,21 @@ Plus aucune nouvelle ligne pour un produit qui a déjà une fiche non rejetée. 
 fiche réactivée a un `created_at` ancien). La page `/bons-plans/black-friday` liste, pendant la
 fenêtre, les deals publiés actifs revus à la source dans les 48 dernières heures.
 
+**Amendement du 23/11/2026 — fusion des fiches en double (vingt-sixième amendement conscient de la
+liste fermée).** Fait générateur : lot SEO-2j. **Exception au §1** : une fiche fusionnée dans une
+autre fiche du même produit répond par une redirection permanente vers la fiche conservée (même
+produit, même source). C'est le seul cas où une URL de deal ne répond pas 200 ; la redirection de
+slug du §1 reste à part. Techniquement, Next.js émet un **308**, équivalent permanent du 301, comme
+pour cette redirection de slug.
+
+- Fiche conservée : la fiche publiée active au `vu_le` le plus récent ; à égalité, la plus
+  anciennement publiée.
+- Une fiche fusionnée (`deals.fusionne_dans`, migration 0031) reste en `expire`, **sort du sitemap**
+  et **n'est jamais réactivée** ni republiée : la réactivation du vingt-cinquième amendement vise la
+  fiche conservée.
+- Si la fiche conservée est supprimée, la fiche fusionnée redevient servie en 200 plutôt que de
+  rediriger vers une page absente.
+
 **Amendement du 18/07/2026 — consentement WhatsApp public** : la règle "`whatsapp_contact`
 n'apparaît jamais hors admin" (ci-dessous, §4) est remplacée par une règle conditionnée au
 consentement du soumetteur — voir §4. `deals` gagne **`whatsapp_public`** (booléen, `not null default

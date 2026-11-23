@@ -14,7 +14,7 @@ import { Badge } from "../../../components/Badge.js";
 import { resolveCurrentUser } from "../../../lib/currentUser.js";
 import { fetchMesVotes } from "../../api/v1/_lib/votes.js";
 import { fetchDealsLies } from "../../api/v1/_lib/dealsLies.js";
-import { estActifSeo, fetchProtege } from "../../api/v1/_lib/deals.js";
+import { estActifSeo, fetchCibleFusion, fetchProtege } from "../../api/v1/_lib/deals.js";
 import { DealCardMini } from "../../../components/DealCardMini.js";
 import { FilAriane } from "../../../components/FilAriane.js";
 import { hubParCategorie } from "../../../lib/hubs.js";
@@ -147,6 +147,11 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
 export default async function DealPage({ params }: PageParams) {
   const { slugAndId } = await params;
   const publicId = extractPublicId(slugAndId);
+
+  // Fiche fusionnée (CONTRAT-V1 §3, vingt-sixième amendement) : redirection
+  // permanente vers la fiche conservée du même produit.
+  const cibleFusion = await fetchCibleFusion(publicId);
+  if (cibleFusion) permanentRedirect(`/deal/${dealUrlSlug(cibleFusion.titre, cibleFusion.publicId)}`);
 
   const deal = await fetchDeal(publicId);
   if (!deal) notFound();
