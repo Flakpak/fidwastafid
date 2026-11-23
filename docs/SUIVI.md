@@ -1,13 +1,13 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-11-23, sur `main` à `c4c22df`. Rattrape les lots SEO des 22 et
+*Dernière mise à jour : 2026-11-23, sur `main` à `ba8571c`. Rattrape les lots SEO des 22 et
 23/11 : entités HTML des titres décodées (0023/0024), expiration automatique des deals publiés,
 taxonomie v3 et reclassement de « Autre » (0026), **pages hub SEO livrées** (`/categorie`,
 `/bons-plans`, maillage, sitemap découpé), une seule navigation par catégorie (SEO-3b), puis
 **fraîcheur des deals** (`vu_le`, trace par source, 0027/0028 — SEO-2e et SEO-2e-bis) et
 **publication automatique** des deals scrapés (0029 — SEO-2g, réinsertion — SEO-2h), et
 **un produit, une fiche** (0030 — SEO-2i, fusion des doublons 0031/0032/0033 — SEO-2j et
-SEO-2k, portée des rejets admin — SEO-2k, promos terminées à la source ignorées, 0034 — SEO-2l)
+SEO-2k, portée des rejets admin — SEO-2k, promos terminées à la source ignorées, 0034 — SEO-2l, une Purge ne bloque pas — SEO-2m)
 — voir §1 et « Derniers lots livrés ». La section
 « Chiffres réels » date toujours du 05/08 et n'a pas été remesurée.*
 
@@ -253,6 +253,20 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
       `qmsayqve6t` (date passée) a été expirée par le job automatique.
     - **Run 45269130209** : **282 éléments ignorés sur 290 lus chez Carrefour**, 0 ailleurs ;
       0 deal publié avec une date de fin passée, 386 deals publiés.
+  - **Une Purge ne bloque pas** (lot SEO-2m, #213, 23/11/2026 — vingt-cinquième amendement complété) :
+    « Purge » est un motif saisi à la main lors des rejets en masse de l'admin (1 918 rejets, écrits
+    « Purge » ou « purge »). C'est un nettoyage : il ne bloque plus ni la réinsertion ni la publication
+    automatique. Seul un autre motif, sur un produit jamais publié, bloque à vie. Un rejet **sans
+    motif** n'est pas une Purge et continue de bloquer. Une Purge ne permet jamais une seconde fiche
+    publiée du même produit.
+    - Sur les 316 blocages du run 45265729769 : 269 Purge seule, 47 autre motif ou sans motif
+      (42 sans motif, 4 « Hors sujet », 1 « Test »).
+    - **Run 45272141806** : 118 réactivés, 126 insérés, 64 publiés automatiquement, 47 refus réels.
+      **450 deals publiés**, 0 produit avec plusieurs fiches publiées actives.
+    - **182 brouillons** : 154 au plafond de 30 par source (Bringo, publiés au fil des prochains
+      runs), 27 en catégorie « Autre », 1 remise hors bornes.
+    - **Point ouvert** : les 42 blocages sans motif datent de juillet, avant que le motif soit
+      obligatoire. Ils restent bloqués tant que l'admin ne lève pas ces rejets.
 - **Pages hub SEO** (lots SEO-3 #193 et SEO-3b #195, 22/11/2026 — CONTRAT-V1 §3,
   vingt-deuxième amendement) :
   - `/categorie/[slug]` : 13 slugs fixes (`apps/web/content/hubs.ts`), « autre » → 404. Même
@@ -282,6 +296,7 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| SEO-2m — une Purge ne bloque pas | #213 | 23/11 | Seul un autre motif sur un produit jamais publié bloque ; 118 réactivés, 126 insérés, 64 publiés, 47 refus réels ; 450 deals publiés. |
 | SEO-2l — promo terminée à la source | #211 | 23/11 | Élément à date de fin passée ignoré avant toute étape ; 0034 expire les 13 fiches Carrefour réactivées à tort ; 282 ignorés chez Carrefour au run de contrôle. |
 | SEO-2k — portée des rejets admin | #209 | 23/11 | Un rejet ne bloque que les produits jamais publiés ; 0033 fusionne les 7 derniers groupes ; anti-doublon des diffusions par produit. |
 | SEO-2j — fusion des doublons | #207 | 23/11 | Vingt-sixième amendement ; 173 fiches fusionnées dans 164 fiches conservées (0031, 0032), redirection permanente, sortie du sitemap. |
