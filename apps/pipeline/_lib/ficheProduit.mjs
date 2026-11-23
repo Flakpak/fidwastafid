@@ -9,7 +9,9 @@
 //   puis publication automatique normale ;
 // - ligne publiée active à un autre prix → mise à jour si la nouvelle remise
 //   respecte les critères de publication automatique, sinon expirée ;
-// - rejet admin → définitif, rien n'est touché.
+// - rejet admin → bloque le produit seulement si aucune de ses fiches n'a
+//   jamais été publiée (lot SEO-2k). Sinon c'est le rejet d'un doublon : le
+//   produit met à jour ou réactive sa fiche conservée.
 //
 // Les soumissions communautaires (`submitter_id`) ne sont jamais modifiées
 // ni réactivées : elles relèvent de la modération manuelle.
@@ -48,7 +50,22 @@ function plusRecente(a, b) {
  */
 export function choisirLigneReactivable(lignes) {
   const expirees = lignes.filter((l) => l.statut === "expire" && !l.soumis).sort(plusRecente);
-  return expirees.find((l) => l.protege) ?? expirees[0] ?? null;
+  return expirees.find((l) => l.a_ete_publiee) ?? expirees[0] ?? null;
+}
+
+/**
+ * Portée du rejet admin d'une empreinte (lot SEO-2k) :
+ * - `null` : aucun rejet actif ;
+ * - `doublon` : une fiche non rejetée a déjà été publiée, elle porte le produit ;
+ * - `retire` : la seule fiche publiée a elle-même été rejetée. Il n'y a pas de
+ *   fiche à conserver, et une fiche rejetée n'est jamais réactivée : bloqué ;
+ * - `jamais_publie` : aucune fiche publiée : bloqué.
+ */
+export function porteeRejet(fiches, empreinte) {
+  if (!fiches.rejetees.has(empreinte)) return null;
+  const lignes = fiches.parEmpreinte.get(empreinte) ?? [];
+  if (lignes.some((l) => l.statut !== "rejete" && l.a_ete_publiee)) return "doublon";
+  return lignes.some((l) => l.statut === "rejete" && l.a_ete_publiee) ? "retire" : "jamais_publie";
 }
 
 /**
@@ -87,6 +104,11 @@ export async function chargerFiches(client, { paires, enseigneId }) {
     `select d.id, d.public_id, d.statut, d.prix_promo, d.prix_normal, d.date_fin, d.created_at,
             d.image_key, d.image_source, d.image_purgee_le,
             d.submitter_id is not null as soumis, dp.protege,
+            exists (
+              select 1 from journal_audit ja
+               where ja.cible_type = 'deal' and ja.cible_id = d.public_id
+                 and coalesce((ja.details -> 'statut') ->> 'apres', ja.details ->> 'apres') = 'publie'
+            ) as a_ete_publiee,
             empreinte_curation(d.lien, d.titre, d.enseigne_id) as empreinte
        from deals d
        join deals_protection dp on dp.public_id = d.public_id
@@ -209,8 +231,10 @@ export async function reconcilierActives(client, { produits, empreintes, fiches,
   const vues = new Set();
   produits.forEach((produit, i) => {
     const empreinte = empreintes[i];
-    if (fiches.rejetees.has(empreinte) || vues.has(empreinte)) return;
+    if (vues.has(empreinte)) return;
     vues.add(empreinte);
+    const rejet = porteeRejet(fiches, empreinte);
+    if (rejet !== null && rejet !== "doublon") return;
     const lignes = (fiches.parEmpreinte.get(empreinte) ?? []).filter((l) => l.statut !== "rejete");
     const decision = deciderLigneActive(lignes, produit);
     if (decision.action !== "aucune") decisions.push({ ...decision, produit });

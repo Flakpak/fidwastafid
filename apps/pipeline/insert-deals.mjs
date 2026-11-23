@@ -34,7 +34,7 @@ import { resoudreFichierArgument } from "./argv.mjs";
 import { sourceDepuisFichier, classifierCause, enregistrerRun } from "./_lib/pipelineRuns.mjs";
 import { lireTrace } from "./_lib/traceScraper.mjs";
 import { marquerReleves } from "./_lib/vuLe.mjs";
-import { chargerFiches, choisirLigneReactivable, reactiverLigne, reconcilierActives } from "./_lib/ficheProduit.mjs";
+import { chargerFiches, choisirLigneReactivable, porteeRejet, reactiverLigne, reconcilierActives } from "./_lib/ficheProduit.mjs";
 
 // ---------- Description depuis la fiche produit (Bringo uniquement) ----------
 const BRINGO_LIEN_RE = /^https:\/\/(www\.)?bringo\.ma\//i;
@@ -215,6 +215,7 @@ try {
     imagesActivees,
   });
   let reactives = 0;
+  let rejetsDoublon = 0;
   const idsVus = await marquerReleves(client, { releves: trace.releves, enseigneId: enseigneTrace });
   console.log(`📉 Seuil de remise minimum : ${SEUIL_REMISE_MIN_PCT} % (règle partagée, remise.mjs).`);
 
@@ -269,17 +270,15 @@ try {
       `select empreinte_curation($1, $2, $3) as empreinte`,
       [d.lien || null, d.titre, enseigneId]
     );
-    const bloque = await client.query(
-      `select 1 from memoire_curation
-       where empreinte = $1 and decision = 'rejete' and levee_le is null
-       limit 1`,
-      [empreinte.rows[0].empreinte]
-    );
-    if (bloque.rowCount > 0) {
+    // Lot SEO-2k : le rejet ne bloque que si le produit n'a jamais été publié.
+    // Sinon c'est le rejet d'un doublon, et la fiche conservée prend le relais.
+    const rejet = porteeRejet(fiches, empreinte.rows[0].empreinte);
+    if (rejet === "jamais_publie" || rejet === "retire") {
       rejetesMemoire++;
       console.log(`  ⤫ Rejeté (déjà rejeté par l'admin — mémoire de curation) : ${d.titre}`);
       continue;
     }
+    if (rejet === "doublon") rejetsDoublon++;
 
     // Un produit, une fiche (lot SEO-2i) : plus aucune nouvelle ligne pour un
     // produit qui a déjà une fiche non rejetée.
@@ -424,7 +423,7 @@ try {
   console.log(`👁️  Passage : ${trace.releves.length} relevé(s), ${idsVus.length} deal(s) revu(s) (vu_le mis à jour).`);
   // Ligne structurée, capturée par le workflow après cette étape — pour que
   // l'annotation du run reflète la CAUSE réelle plutôt qu'un succès muet.
-  console.log(`RESUME_JSON=${JSON.stringify({ source, cause, extraits, retenus, inseres, doublons, autre: inseresAutre.length, bloquesRejetAdmin: rejetesMemoire, reactives, misAJour: reconciliation.misAJour, expiresPrix: reconciliation.expires, expirationsBloquees: reconciliation.expirationsBloquees })}`);
+  console.log(`RESUME_JSON=${JSON.stringify({ source, cause, extraits, retenus, inseres, doublons, autre: inseresAutre.length, bloquesRejetAdmin: rejetesMemoire, rejetsDoublon, reactives, misAJour: reconciliation.misAJour, expiresPrix: reconciliation.expires, expirationsBloquees: reconciliation.expirationsBloquees })}`);
   if (remisesNonMesurables > 0) {
     console.log(
       `📉 ${remisesNonMesurables} deal(s) insérable(s) sans remise mesurable (prix barré absent) — ` +
