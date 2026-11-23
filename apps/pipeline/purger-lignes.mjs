@@ -68,6 +68,9 @@ async function candidats(client, delaiJours) {
       where d.supprime_le is null
         and d.statut = any($2::text[])
         and d.created_at < now() - make_interval(days => $1)
+        -- Lot SEO-2i : un brouillon revu récemment (fiche réactivée, created_at
+        -- ancien) n'est pas dormant.
+        and (d.statut <> 'auto_draft' or d.vu_le < now() - make_interval(days => $1))
         and dp.protege = false
       order by d.created_at asc`,
     [delaiJours, STATUTS_ELIGIBLES]

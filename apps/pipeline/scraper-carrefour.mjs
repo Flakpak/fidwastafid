@@ -104,7 +104,16 @@ export function parseProduits(payload) {
 
     const prixPromo = Number(p?.price);
     const prixNormal = Number(p?.crossedPrice);
-    if (Number.isFinite(prixPromo) && prixPromo > 0) releves.push({ titre, prix: prixPromo });
+    if (Number.isFinite(prixPromo) && prixPromo > 0) {
+      releves.push({
+        titre,
+        prix: prixPromo,
+        prixNormal: Number.isFinite(prixNormal) && prixNormal > 0 ? prixNormal : null,
+        lien: p?.slug ? `https://carrefour.ma/produits/${p.slug}` : null,
+        dateFin: dateFinDepuisISO(p?.promotionEndDate),
+        photoUrl: p?.mainImageUrl || null,
+      });
+    }
     if (!Number.isFinite(prixPromo) || prixPromo <= 0) {
       rejets.push({ nom: titre, raison: "prix promo absent ou non numérique" });
       continue;

@@ -34,7 +34,8 @@ export const SOURCES_CRON = [
 ];
 
 const HOTE = `lower(substring(d.lien from '^https?://([^/]+)'))`;
-const SOURCE_SQL = `case
+/** Source d'une ligne `d` (alias `e` = enseignes), noms de pipeline_runs. */
+export const SOURCE_SQL = `case
   when e.slug = 'carrefour' and ${HOTE} in ('bringo.ma', 'www.bringo.ma') then 'bringo-casablanca'
   when e.slug = 'carrefour' and ${HOTE} in ('carrefour.ma', 'www.carrefour.ma') then 'carrefour'
   when e.slug = 'carrefour' then 'carrefour-lien-inconnu'

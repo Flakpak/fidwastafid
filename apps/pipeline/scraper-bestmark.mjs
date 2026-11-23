@@ -128,7 +128,14 @@ export function parseProduits(json) {
 
     // Hors stock : le produit n'est plus achetable, donc pas « présent ».
     if (prixPromo !== null && (!item.stock_status || item.stock_status === "IN_STOCK")) {
-      releves.push({ titre, prix: prixPromo });
+      releves.push({
+        titre,
+        prix: prixPromo,
+        prixNormal,
+        lien: item.url_key ? `${BASE_SITE}/${item.url_key}${item.url_suffix || ".html"}` : null,
+        dateFin: null,
+        photoUrl: item.small_image?.url || null,
+      });
     }
     if (prixNormal === null || prixPromo === null) {
       rejets.push({ nom: titre, raison: `prix manquant (promo=${prixPromo ?? "?"}, normal=${prixNormal ?? "?"})` });

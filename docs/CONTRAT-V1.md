@@ -293,6 +293,29 @@ Chaque publication écrit dans `journal_audit` la même trace qu'une publication
 des règles. Interrupteur : variable de dépôt GitHub `AUTO_PUBLICATION` (`on`/`off`) ; toute autre
 valeur que `on` n'écrit rien et le journalise.
 
+**Amendement du 23/11/2026 — un produit, une fiche (vingt-cinquième amendement conscient de la
+liste fermée).** Fait générateur : lot SEO-2i. Un produit (empreinte : lien, sinon titre + enseigne)
+n'a qu'une fiche, donc une seule URL à vie. Quand un produit revient chez sa source :
+
+- s'il correspond à une **ligne expirée non rejetée par l'admin**, cette ligne est réactivée (même
+  `public_id`, même URL) : prix promo, prix d'origine, date de fin et `vu_le` mis à jour, statut
+  `auto_draft`, puis passage normal par la publication automatique. Une trace de réactivation est
+  écrite dans `journal_audit`. Si plusieurs lignes correspondent, c'est celle qui a déjà été publiée ;
+  à défaut, la plus récente ;
+- s'il correspond à une **ligne publiée active avec un prix différent**, la ligne est mise à jour si
+  la nouvelle remise respecte les critères de publication automatique (20 à 80 %), sinon elle passe
+  en `expire`. Garde-fou du vingt-troisième amendement : au-delà de 25 % des deals actifs d'une
+  source, aucune expiration sur ce run ;
+- l'**image existante est conservée** si l'URL de l'image source n'a pas changé
+  (`deals.image_source`, migration 0030) ;
+- un **rejet admin reste définitif** ;
+- les **soumissions communautaires** ne sont ni modifiées ni réactivées.
+
+Plus aucune nouvelle ligne pour un produit qui a déjà une fiche non rejetée. Conséquences :
+`expirer-auto-draft` et `purger-lignes` jugent un brouillon sur `vu_le`, pas sur sa création (une
+fiche réactivée a un `created_at` ancien). La page `/bons-plans/black-friday` liste, pendant la
+fenêtre, les deals publiés actifs revus à la source dans les 48 dernières heures.
+
 **Amendement du 18/07/2026 — consentement WhatsApp public** : la règle "`whatsapp_contact`
 n'apparaît jamais hors admin" (ci-dessous, §4) est remplacée par une règle conditionnée au
 consentement du soumetteur — voir §4. `deals` gagne **`whatsapp_public`** (booléen, `not null default

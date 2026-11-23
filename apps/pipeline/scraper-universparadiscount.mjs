@@ -114,7 +114,7 @@ export function parseHome(html) {
     // ET prix promo (.price) parseables et cohérents, la carte est ignorée —
     // c'est le cas des produits non remisés (pas de .regular-price), jamais
     // complétés avec une valeur devinée.
-    if (nom && prixPromo != null) releves.push({ titre: nom, prix: prixPromo });
+    if (nom && prixPromo != null) releves.push({ titre: nom, prix: prixPromo, prixNormal, lien, dateFin: null, photoUrl });
     if (!nom) {
       rejets.push({ nom: "(sans nom)", raison: "nom introuvable" });
       return;

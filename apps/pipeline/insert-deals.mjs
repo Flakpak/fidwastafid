@@ -34,6 +34,7 @@ import { resoudreFichierArgument } from "./argv.mjs";
 import { sourceDepuisFichier, classifierCause, enregistrerRun } from "./_lib/pipelineRuns.mjs";
 import { lireTrace } from "./_lib/traceScraper.mjs";
 import { marquerReleves } from "./_lib/vuLe.mjs";
+import { chargerFiches, choisirLigneReactivable, reactiverLigne, reconcilierActives } from "./_lib/ficheProduit.mjs";
 
 // ---------- Description depuis la fiche produit (Bringo uniquement) ----------
 const BRINGO_LIEN_RE = /^https:\/\/(www\.)?bringo\.ma\//i;
@@ -192,6 +193,28 @@ try {
   // run échoue, jamais de passage silencieusement perdu.
   const enseigneTrace = enseignes.get(normaliser(trace.enseigne));
   if (!enseigneTrace) throw new Error(`enseigne de la trace inconnue en base : "${trace.enseigne}"`);
+
+  // Un produit, une fiche (lot SEO-2i) : AVANT l'insertion. Sur tout ce qui a
+  // été lu, car un produit sorti de promotion n'est plus dans l'archive. Les
+  // prix sont réconciliés AVANT vu_le, qui compare au prix de la fiche.
+  const source = sourceDepuisFichier(fichier);
+  const produitsLus = trace.releves
+    .filter((r) => r.principal !== false)
+    .map((r) => ({ ...r, titre: decoderEntitesHtml(r.titre).trim().slice(0, 200) }));
+  const elementsArchive = deals.map((raw) => mapDeal(raw)).filter((d) => d.titre);
+  const fiches = await chargerFiches(client, {
+    paires: [...produitsLus, ...elementsArchive].map((p) => ({ lien: p.lien, titre: p.titre })),
+    enseigneId: enseigneTrace,
+  });
+  const reconciliation = await reconcilierActives(client, {
+    produits: produitsLus,
+    empreintes: fiches.empreintes.slice(0, produitsLus.length),
+    fiches,
+    source,
+    enseigneId: enseigneTrace,
+    imagesActivees,
+  });
+  let reactives = 0;
   const idsVus = await marquerReleves(client, { releves: trace.releves, enseigneId: enseigneTrace });
   console.log(`📉 Seuil de remise minimum : ${SEUIL_REMISE_MIN_PCT} % (règle partagée, remise.mjs).`);
 
@@ -255,6 +278,30 @@ try {
     if (bloque.rowCount > 0) {
       rejetesMemoire++;
       console.log(`  ⤫ Rejeté (déjà rejeté par l'admin — mémoire de curation) : ${d.titre}`);
+      continue;
+    }
+
+    // Un produit, une fiche (lot SEO-2i) : plus aucune nouvelle ligne pour un
+    // produit qui a déjà une fiche non rejetée.
+    const lignesFiche = (fiches.parEmpreinte.get(empreinte.rows[0].empreinte) ?? []).filter((l) => l.statut !== "rejete");
+    if (lignesFiche.some((l) => l.statut !== "expire")) {
+      doublons++;
+      continue;
+    }
+    const aReactiver = choisirLigneReactivable(lignesFiche);
+    if (aReactiver) {
+      await reactiverLigne(
+        client,
+        aReactiver,
+        { prix: d.prix_promo, prixNormal: d.prix_normal ?? null, dateFin: d.date_fin ?? null, photoUrl: d.photo_url },
+        imagesActivees
+      );
+      reactives++;
+      continue;
+    }
+    if (lignesFiche.length > 0) {
+      // Seule une soumission communautaire expirée porte ce produit.
+      doublons++;
       continue;
     }
 
@@ -344,6 +391,10 @@ try {
       `${rejetes} rejetés (validation) | ${rejetesRemise} rejetés (remise < ${SEUIL_REMISE_MIN_PCT} %) | ` +
       `${rejetesEnseigne} rejetés (enseigne inconnue) | ${rejetesMemoire} rejetés (mémoire de curation)`
   );
+  console.log(
+    `♻️  Fiches : ${reactives} réactivée(s) | ${reconciliation.misAJour} prix mis à jour | ` +
+      `${reconciliation.expires} expirée(s) (prix hors critères) | ${reconciliation.expirationsBloquees} expiration(s) bloquée(s)`
+  );
   console.log(`🗂️  Catégorie « Autre » (repli) : ${inseresAutre.length} inséré(s) sur ${inseres}.`);
   for (const titre of inseresAutre) console.log(`   - ${titre}`);
 
@@ -356,8 +407,8 @@ try {
   // toujours (le dédoublonnage est le seul chemin restant après retenus).
   const extraits = deals.length;
   const retenus = extraits - rejetes - rejetesRemise - rejetesEnseigne - rejetesMemoire;
-  const cause = classifierCause({ retenus, inseres });
-  const source = sourceDepuisFichier(fichier);
+  // Une réactivation est un produit qui revient : pas un « déjà en base ».
+  const cause = classifierCause({ retenus, inseres: inseres + reactives });
   await enregistrerRun(client, {
     source,
     cause,
@@ -373,7 +424,7 @@ try {
   console.log(`👁️  Passage : ${trace.releves.length} relevé(s), ${idsVus.length} deal(s) revu(s) (vu_le mis à jour).`);
   // Ligne structurée, capturée par le workflow après cette étape — pour que
   // l'annotation du run reflète la CAUSE réelle plutôt qu'un succès muet.
-  console.log(`RESUME_JSON=${JSON.stringify({ source, cause, extraits, retenus, inseres, doublons, autre: inseresAutre.length, bloquesRejetAdmin: rejetesMemoire })}`);
+  console.log(`RESUME_JSON=${JSON.stringify({ source, cause, extraits, retenus, inseres, doublons, autre: inseresAutre.length, bloquesRejetAdmin: rejetesMemoire, reactives, misAJour: reconciliation.misAJour, expiresPrix: reconciliation.expires, expirationsBloquees: reconciliation.expirationsBloquees })}`);
   if (remisesNonMesurables > 0) {
     console.log(
       `📉 ${remisesNonMesurables} deal(s) insérable(s) sans remise mesurable (prix barré absent) — ` +
