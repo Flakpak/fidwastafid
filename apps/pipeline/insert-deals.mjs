@@ -260,25 +260,36 @@ try {
 
     const publicId = generatePublicId();
 
-    // Déduplication : même titre + enseigne + prix, deal non expiré (même
-    // logique qu'avant l'adaptation v2, magasin texte remplacé par
-    // enseigne_id). Sans rapport avec la dédup par URL de scraper-bringo.mjs
-    // (quirk pagination Sylius), qui reste inchangée dans ce fichier-là.
-    // supprime_le IS NULL (lot 1, suppression douce) : une ligne supprimée
-    // ne doit pas bloquer une réinsertion — la mémoire de ce qui a déjà été
-    // vu/rejeté est un chantier séparé (lot 2, empreinte de dédoublonnage
-    // indépendante de la ligne), pas le rôle de cette table.
+    // Déduplication : même titre + enseigne + prix (même logique qu'avant
+    // l'adaptation v2, magasin texte remplacé par enseigne_id). Sans rapport
+    // avec la dédup par URL de scraper-bringo.mjs (quirk pagination Sylius),
+    // qui reste inchangée dans ce fichier-là. supprime_le IS NULL (lot 1,
+    // suppression douce) : une ligne supprimée ne bloque pas une réinsertion.
+    //
+    // statut <> 'expire' (lot SEO-2h) : seul un rejet admin bloque le retour
+    // d'un produit. Un deal expiré, publié ou non, ne bloque plus : le produit
+    // revient comme nouveau deal s'il passe les filtres. Une ligne `rejete`
+    // reste bloquante ici : la mémoire de curation suit le lien, et un même
+    // produit rejeté peut revenir sous un autre lien.
     const dup = await client.query(
-      `SELECT id FROM deals
+      `SELECT statut FROM deals
        WHERE lower(titre) = lower($1) AND enseigne_id = $2
          AND prix_promo = $3
          AND (date_fin IS NULL OR date_fin >= CURRENT_DATE)
          AND supprime_le IS NULL
+         AND statut <> 'expire'
+       ORDER BY (statut = 'rejete')
        LIMIT 1`,
       [d.titre, enseigneId, d.prix_promo]
     );
     if (dup.rowCount > 0) {
-      doublons++;
+      // Tri ci-dessus : `rejete` ne ressort que si aucun deal actif n'existe.
+      if (dup.rows[0].statut === "rejete") {
+        rejetesMemoire++;
+        console.log(`  ⤫ Rejeté (même produit déjà rejeté par l'admin, autre lien) : ${d.titre}`);
+      } else {
+        doublons++;
+      }
       continue;
     }
 
@@ -362,7 +373,7 @@ try {
   console.log(`👁️  Passage : ${trace.releves.length} relevé(s), ${idsVus.length} deal(s) revu(s) (vu_le mis à jour).`);
   // Ligne structurée, capturée par le workflow après cette étape — pour que
   // l'annotation du run reflète la CAUSE réelle plutôt qu'un succès muet.
-  console.log(`RESUME_JSON=${JSON.stringify({ source, cause, extraits, retenus, inseres, doublons, autre: inseresAutre.length })}`);
+  console.log(`RESUME_JSON=${JSON.stringify({ source, cause, extraits, retenus, inseres, doublons, autre: inseresAutre.length, bloquesRejetAdmin: rejetesMemoire })}`);
   if (remisesNonMesurables > 0) {
     console.log(
       `📉 ${remisesNonMesurables} deal(s) insérable(s) sans remise mesurable (prix barré absent) — ` +

@@ -2396,6 +2396,150 @@ async function main() {
   // cas tourne dans sa transaction, annulée à la fin, après avoir écarté les
   // brouillons des autres blocs.
   // ----------------------------------------------------------------
+  // ----------------------------------------------------------------
+  // Réinsertion (lot SEO-2h), de bout en bout avec le VRAI insert-deals.mjs :
+  // seul un rejet admin bloque le retour d'un produit.
+  // ----------------------------------------------------------------
+  console.log("\nréinsertion — seul un rejet admin bloque (insert-deals.mjs réel)");
+  {
+    const SLUG = "test-reinsertion";
+    const dossier = mkdtempSync(nodePath.join(tmpdir(), "reinsertion-"));
+    const ancien = "2026-01-01T00:00:00Z";
+    const lien = (nom: string) => `https://exemple.test/reinsertion/${nom}`;
+    const ids = {
+      expireBrouillon: generatePublicId(),
+      expirePublie: generatePublicId(),
+      rejete: generatePublicId(),
+      rejeteAutreLien: generatePublicId(),
+      publie: generatePublicId(),
+      brouillon: generatePublicId(),
+    };
+    const titres = {
+      expireBrouillon: "Réinsertion — brouillon expiré",
+      expirePublie: "Réinsertion — publié puis expiré",
+      rejete: "Réinsertion — rejeté par l'admin",
+      rejeteAutreLien: "Réinsertion — rejeté, lien changé",
+      publie: "Réinsertion — publié actif",
+      brouillon: "Réinsertion — brouillon actif",
+    };
+    const compter = async (titre: string) =>
+      (
+        await query<{ n: number }>(
+          `select count(*)::int as n from deals
+            where enseigne_id = (select id from enseignes where slug = $1) and titre = $2`,
+          [SLUG, titre]
+        )
+      )[0]?.n;
+    try {
+      await query("insert into enseignes (slug, nom) values ($1, 'Test réinsertion')", [SLUG]);
+      for (const [cle, statut] of [
+        ["expireBrouillon", "expire"],
+        ["expirePublie", "expire"],
+        ["rejete", "rejete"],
+        ["rejeteAutreLien", "rejete"],
+        ["publie", "publie"],
+        ["brouillon", "auto_draft"],
+      ] as const) {
+        await query(
+          `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, prix_normal, lien, statut, score, vu_le, updated_at, motif_rejet)
+           values ($1, $2, (select id from enseignes where slug = $3), 'Maison', 'en_ligne', 50, 100, $4, $5, 0, $6, $6,
+                   case when $5 = 'rejete' then 'Test' end)`,
+          [ids[cle], titres[cle], SLUG, lien(cle), statut, ancien]
+        );
+      }
+      await query(
+        `insert into journal_audit (admin_id, action, cible_type, cible_id, details)
+         values ($1, 'update_deal', 'deal', $2, '{"statut":{"avant":"auto_draft","apres":"publie"},"champs":{}}')`,
+        [userId, ids.expirePublie]
+      );
+      for (const cle of ["rejete", "rejeteAutreLien"] as const) {
+        await query(
+          `insert into journal_audit (admin_id, action, cible_type, cible_id, details)
+           values ($1, 'update_deal', 'deal', $2, '{"statut":{"avant":"auto_draft","apres":"rejete"},"champs":{}}')`,
+          [userId, ids[cle]]
+        );
+        await query(
+          `insert into memoire_curation (empreinte, decision, deal_origine_public_id, motif, decide_par)
+           values (empreinte_curation($1, $2, null), 'rejete', $3, 'Test', $4)`,
+          [lien(cle), titres[cle], ids[cle], userId]
+        );
+      }
+
+      const element = (cle: keyof typeof ids, lienElement = lien(cle)) => ({
+        titre: titres[cle],
+        prix_promo: 50,
+        prix_normal: 100,
+        categorie: "Maison",
+        description: null,
+        photo_url: null,
+        lien: lienElement,
+        date_fin: null,
+        enseigne: SLUG,
+        ville: "National",
+        statut: "auto_draft",
+      });
+      const elements = [
+        element("expireBrouillon"),
+        element("expirePublie"),
+        element("rejete"),
+        element("rejeteAutreLien", lien("rejeteAutreLien-nouveau")),
+        element("publie"),
+        element("brouillon"),
+      ];
+      const archive = nodePath.join(dossier, "2026-11-23_05-00_test-reinsertion.json");
+      ecrireArchiveEtTrace(archive, elements, {
+        lus: elements.length,
+        plafondAtteint: false,
+        interrompu: false,
+        enseigne: SLUG,
+        releves: elements.map((e) => ({ titre: e.titre, prix: e.prix_promo })),
+      });
+      const sortie = execFileSync(process.execPath, ["--import", "tsx", "insert-deals.mjs", archive], {
+        cwd: nodePath.resolve(process.cwd(), "../pipeline"),
+        env: process.env,
+        stdio: "pipe",
+      }).toString();
+
+      check("brouillon expiré → réinséré", (await compter(titres.expireBrouillon)) === 2);
+      check("publié puis expiré → réinséré", (await compter(titres.expirePublie)) === 2);
+      check("rejeté par l'admin → bloqué", (await compter(titres.rejete)) === 1);
+      check("rejeté, revenu sous un autre lien → bloqué", (await compter(titres.rejeteAutreLien)) === 1);
+      check("publié actif → non inséré", (await compter(titres.publie)) === 1);
+      check("brouillon actif → non inséré", (await compter(titres.brouillon)) === 1);
+      const vuPublie = await query<{ vu: boolean }>("select vu_le > $2::timestamptz as vu from deals where public_id = $1", [
+        ids.publie,
+        ancien,
+      ]);
+      check("publié actif → vu_le mis à jour", vuPublie[0]?.vu === true);
+      const vuExpire = await query<{ vu: boolean; statut: string }>(
+        "select vu_le > $2::timestamptz as vu, statut from deals where public_id = $1",
+        [ids.expireBrouillon, ancien]
+      );
+      check("ligne expirée d'origine inchangée", vuExpire[0]?.vu === false && vuExpire[0]?.statut === "expire");
+      const nouveau = await query<{ statut: string }>(
+        "select statut from deals where titre = $1 and public_id <> $2",
+        [titres.expirePublie, ids.expirePublie]
+      );
+      check("le produit revient en brouillon", nouveau[0]?.statut === "auto_draft");
+      const resume = JSON.parse(sortie.match(/^RESUME_JSON=(.*)$/m)?.[1] ?? "{}") as {
+        inseres?: number;
+        doublons?: number;
+        bloquesRejetAdmin?: number;
+      };
+      check(
+        "résumé : 2 insérés, 2 doublons actifs, 2 bloqués par un rejet admin",
+        resume.inseres === 2 && resume.doublons === 2 && resume.bloquesRejetAdmin === 2
+      );
+    } finally {
+      rmSync(dossier, { recursive: true, force: true });
+      await query("delete from pipeline_runs where source = 'test-reinsertion'");
+      await query("delete from journal_audit where cible_type = 'deal' and cible_id = any($1::text[])", [Object.values(ids)]);
+      await query("delete from memoire_curation where deal_origine_public_id = any($1::text[])", [Object.values(ids)]);
+      await query("delete from deals where enseigne_id = (select id from enseignes where slug = $1)", [SLUG]);
+      await query("delete from enseignes where slug = $1", [SLUG]);
+    }
+  }
+
   console.log("\npublication automatique — critères, plafond, soumissions, interrupteur");
   {
     type CasBrouillon = {
