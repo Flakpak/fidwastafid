@@ -71,6 +71,8 @@ async function fetchPage(page) {
 export function parseProduits(produits) {
   const deals = [];
   const rejets = [];
+  // Relevés (lot SEO-2e-bis) : tout ce qui est lu à la source, AVANT les rejets.
+  const releves = [];
   let dateFinManquante = 0;
 
   for (const p of produits || []) {
@@ -84,6 +86,7 @@ export function parseProduits(produits) {
 
     const prixPromo = prixDepuisCentimes(p?.prices?.sale_price, p?.prices?.currency_minor_unit);
     const prixNormal = prixDepuisCentimes(p?.prices?.regular_price, p?.prices?.currency_minor_unit);
+    if (prixPromo !== null && prixPromo > 0) releves.push({ titre, prix: prixPromo });
     if (prixPromo === null || prixPromo <= 0) {
       rejets.push({ nom: titre, raison: "prix promo (sale_price) absent ou non numérique" });
       continue;
@@ -124,12 +127,13 @@ export function parseProduits(produits) {
     });
   }
 
-  return { deals, rejets, dateFinManquante };
+  return { deals, rejets, dateFinManquante, releves };
 }
 
 // ---------- Main ----------
 async function main() {
   const tousDeals = [];
+  const tousReleves = [];
   let totalProduits = 0;
   let totalRejets = 0;
   let totalDateFinManquante = 0;
@@ -153,7 +157,8 @@ async function main() {
       break;
     }
 
-    const { deals, rejets, dateFinManquante } = parseProduits(produits);
+    const { deals, rejets, dateFinManquante, releves } = parseProduits(produits);
+    tousReleves.push(...releves);
     totalProduits += produits.length;
     totalRejets += rejets.length;
     totalDateFinManquante += dateFinManquante;
@@ -191,6 +196,8 @@ async function main() {
     lus: totalProduits,
     plafondAtteint: !finCatalogue && !interrompu,
     interrompu,
+    enseigne: ENSEIGNE,
+    releves: tousReleves,
   });
 
   console.log(`\n✅ ${deals.length} deal(s) aswakassalam.com retenu(s) sur ${totalProduits} produit(s) | ${totalRejets} écarté(s)`);

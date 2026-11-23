@@ -170,7 +170,14 @@ const deals = retenus.map(({ _key, discount, discount_rate, ...d }) => ({
 mkdirSync("extractions", { recursive: true });
 const horodatage = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
 const fichierSortie = `extractions/${horodatage}_bringo-${VILLE.toLowerCase().replace(/\s+/g, "-")}.json`;
-ecrireArchiveEtTrace(fichierSortie, deals, { lus, plafondAtteint, interrompu });
+// Relevés (lot SEO-2e-bis) : tous les produits lus, remisés ou non.
+ecrireArchiveEtTrace(fichierSortie, deals, {
+  lus,
+  plafondAtteint,
+  interrompu,
+  enseigne: "Carrefour",
+  releves: tous.map((p) => ({ titre: p.titre, prix: p.prix_promo })),
+});
 
 console.log(`\n✅ ${tous.length} produits parcourus | ${remises.length} en promo | ${deals.length} retenus`);
 console.log(`→ Archive : ${fichierSortie}`);

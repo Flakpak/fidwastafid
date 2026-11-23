@@ -3,7 +3,12 @@ import { generatePublicId } from "@fidwastafid/schemas";
 import { purgerImages, DELAI_JOURS_PURGE_IMAGES, UTILISATEUR_SYSTEME_ID } from "../../pipeline/purger-images.mjs";
 import { purgerLignes, DELAI_JOURS_PURGE_LIGNES } from "../../pipeline/purger-lignes.mjs";
 import { expirerPublies } from "../../pipeline/_lib/expirerPublies.mjs";
-import { marquerVu } from "../../pipeline/_lib/vuLe.mjs";
+import { marquerReleves } from "../../pipeline/_lib/vuLe.mjs";
+import { ecrireArchiveEtTrace } from "../../pipeline/_lib/traceScraper.mjs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import nodePath from "node:path";
 import { enregistrerRun } from "../../pipeline/_lib/pipelineRuns.mjs";
 import { GET as getSitemapIndex } from "../src/app/sitemap.xml/route.js";
 import { GET as getSitemapHubs } from "../src/app/sitemap-hubs.xml/route.js";
@@ -2197,7 +2202,7 @@ async function main() {
   }
 
   // ----------------------------------------------------------------
-  // Fraîcheur (lot SEO-2e) : même écriture que la prod (`marquerVu`,
+  // Fraîcheur (lot SEO-2e) : même écriture que la prod (`marquerReleves`,
   // `enregistrerRun`), dans une transaction annulée à la fin.
   // ----------------------------------------------------------------
   console.log("\nfraîcheur — vu_le et trace de passage par source");
@@ -2233,7 +2238,14 @@ async function main() {
       const SUPPRIME = await inserer("Vu le — deal retrouvé", "publie", "2026-02-01T00:00:00Z");
       const AUTRE_PRIX = await inserer("Vu le — deal retrouvé", "publie", null, 60);
 
-      const ids = await marquerVu(client, { titre: "VU LE — DEAL RETROUVÉ", enseigneId: enseigneVu, prixPromo: 50 });
+      const ids = await marquerReleves(client, {
+        // Lu deux fois dans le run (deux rayons) : une seule mise à jour.
+        releves: [
+          { titre: "VU LE — DEAL RETROUVÉ", prix: 50 },
+          { titre: "vu le — deal retrouvé", prix: 50 },
+        ],
+        enseigneId: enseigneVu,
+      });
       const publie = await lire(PUBLIE);
       check("deal retrouvé (casse différente) → vu_le mis à jour", publie.vu);
       check("deal retrouvé → updated_at inchangé", !publie.maj);
@@ -2285,6 +2297,96 @@ async function main() {
     } finally {
       await client.query("rollback");
       client.release();
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // « Revu » = présent à la source (lot SEO-2e-bis), de bout en bout : le
+  // VRAI insert-deals.mjs sur une archive et sa trace.
+  // ----------------------------------------------------------------
+  console.log("\nfraîcheur — revu avant les filtres (insert-deals.mjs réel)");
+  {
+    const SLUG_REVU = "test-revu-source";
+    const dossier = mkdtempSync(nodePath.join(tmpdir(), "revu-source-"));
+    const ancien = "2026-01-01T00:00:00Z";
+    const ids = { sousSeuil: generatePublicId(), nonRemise: generatePublicId(), autrePrix: generatePublicId() };
+    try {
+      await query("insert into enseignes (slug, nom) values ($1, 'Test revu source')", [SLUG_REVU]);
+      for (const [id, titre, prix] of [
+        [ids.sousSeuil, "Revu source — sous le seuil", 95],
+        [ids.nonRemise, "Revu source — plus remisé", 70],
+        [ids.autrePrix, "Revu source — autre prix", 50],
+      ] as const) {
+        await query(
+          `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, prix_normal, statut, score, vu_le, updated_at)
+           values ($1, $2, (select id from enseignes where slug = $3), 'Maison', 'en_ligne', $4, 100, 'publie', 0, $5, $5)`,
+          [id, titre, SLUG_REVU, prix, ancien]
+        );
+      }
+      const archive = nodePath.join(dossier, "2026-11-23_05-00_test-revu-source.json");
+      // L'archive ne porte que l'élément sous le seuil (5 % < 30 %) ; les deux
+      // autres n'ont été que LUS (écartés par le scraper).
+      ecrireArchiveEtTrace(
+        archive,
+        [
+          {
+            titre: "Revu source — sous le seuil",
+            enseigne: SLUG_REVU,
+            ville: "National",
+            categorie: "Maison",
+            type: "en_ligne",
+            prix_promo: 95,
+            prix_normal: 100,
+            lien: "https://exemple.test/produit",
+            statut: "auto_draft",
+          },
+        ],
+        {
+          lus: 3,
+          plafondAtteint: false,
+          interrompu: false,
+          enseigne: SLUG_REVU,
+          releves: [
+            { titre: "REVU SOURCE — SOUS LE SEUIL", prix: 95 },
+            { titre: "Revu source — plus remisé", prix: 70 },
+            { titre: "Revu source — autre prix", prix: 60 },
+          ],
+        }
+      );
+      execFileSync(process.execPath, ["--import", "tsx", "insert-deals.mjs", archive], {
+        cwd: nodePath.resolve(process.cwd(), "../pipeline"),
+        env: process.env,
+        stdio: "pipe",
+      });
+
+      const lire = async (id: string) =>
+        (
+          await query<{ vu: boolean; maj: boolean }>(
+            `select vu_le > $2::timestamptz as vu, updated_at > $2::timestamptz as maj from deals where public_id = $1`,
+            [id, ancien]
+          )
+        )[0];
+      check("élément sous le seuil, deal publié → vu_le mis à jour", (await lire(ids.sousSeuil))?.vu === true);
+      check("élément sous le seuil → updated_at inchangé", (await lire(ids.sousSeuil))?.maj === false);
+      check("élément lu mais écarté par le scraper → vu_le mis à jour", (await lire(ids.nonRemise))?.vu === true);
+      check("élément au prix différent → vu_le inchangé", (await lire(ids.autrePrix))?.vu === false);
+      const lignes = await query<{ n: number }>(
+        "select count(*)::int as n from deals where enseigne_id = (select id from enseignes where slug = $1)",
+        [SLUG_REVU]
+      );
+      check("rien d'inséré", lignes[0]?.n === 3);
+      const run = await query<{ elements_lus: number; vus: number; inseres: number }>(
+        "select elements_lus, vus, inseres from pipeline_runs where source = 'test-revu-source' order by cree_le desc limit 1"
+      );
+      check(
+        "trace : « revus » compte les correspondances",
+        run[0]?.elements_lus === 3 && run[0]?.vus === 2 && run[0]?.inseres === 0
+      );
+    } finally {
+      rmSync(dossier, { recursive: true, force: true });
+      await query("delete from pipeline_runs where source = 'test-revu-source'");
+      await query("delete from deals where public_id = any($1::text[])", [Object.values(ids)]);
+      await query("delete from enseignes where slug = $1", [SLUG_REVU]);
     }
   }
 

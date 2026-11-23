@@ -112,6 +112,8 @@ export function parseProduits(json) {
   const items = json?.data?.products?.items || [];
   const deals = [];
   const rejets = [];
+  // Relevés (lot SEO-2e-bis) : tout ce qui est lu à la source, AVANT les rejets.
+  const releves = [];
 
   for (const item of items) {
     const titre = (item?.name || "").trim();
@@ -124,6 +126,10 @@ export function parseProduits(json) {
     const prixNormal = parsePrix(min?.regular_price?.value);
     const prixPromo = parsePrix(min?.final_price?.value);
 
+    // Hors stock : le produit n'est plus achetable, donc pas « présent ».
+    if (prixPromo !== null && (!item.stock_status || item.stock_status === "IN_STOCK")) {
+      releves.push({ titre, prix: prixPromo });
+    }
     if (prixNormal === null || prixPromo === null) {
       rejets.push({ nom: titre, raison: `prix manquant (promo=${prixPromo ?? "?"}, normal=${prixNormal ?? "?"})` });
       continue;
@@ -161,6 +167,7 @@ export function parseProduits(json) {
   return {
     deals,
     rejets,
+    releves,
     nbProduits: items.length,
     // Magento renvoie une ERREUR (pas une page vide) au-delà de la dernière
     // page : la borne se lit donc dans total_count, elle ne se découvre pas
@@ -172,6 +179,7 @@ export function parseProduits(json) {
 // ---------- Main ----------
 async function main() {
   const tousDeals = [];
+  const tousReleves = [];
   let totalProduits = 0;
   let totalRejets = 0;
   // Trace de passage (lot SEO-2e) : fin réelle du catalogue vs plafond.
@@ -192,7 +200,8 @@ async function main() {
       break;
     }
 
-    const { deals, rejets, nbProduits, totalCount } = parseProduits(json);
+    const { deals, rejets, releves, nbProduits, totalCount } = parseProduits(json);
+    tousReleves.push(...releves);
     totalProduits += nbProduits;
     totalRejets += rejets.length;
     tousDeals.push(...deals);
@@ -232,6 +241,8 @@ async function main() {
     lus: totalProduits,
     plafondAtteint: !finCatalogue && !interrompu,
     interrompu,
+    enseigne: ENSEIGNE,
+    releves: tousReleves,
   });
 
   console.log(

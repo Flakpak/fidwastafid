@@ -93,6 +93,8 @@ export function parseHome(html) {
   const $ = cheerio.load(html);
   const deals = [];
   const rejets = [];
+  // Relevés (lot SEO-2e-bis) : tout ce qui est lu à la source, AVANT les rejets.
+  const releves = [];
   const vus = new Set();
 
   $(".js-product-miniature").each((_, card) => {
@@ -112,6 +114,7 @@ export function parseHome(html) {
     // ET prix promo (.price) parseables et cohérents, la carte est ignorée —
     // c'est le cas des produits non remisés (pas de .regular-price), jamais
     // complétés avec une valeur devinée.
+    if (nom && prixPromo != null) releves.push({ titre: nom, prix: prixPromo });
     if (!nom) {
       rejets.push({ nom: "(sans nom)", raison: "nom introuvable" });
       return;
@@ -142,7 +145,7 @@ export function parseHome(html) {
     });
   });
 
-  return { deals, rejets };
+  return { deals, rejets, releves };
 }
 
 // ---------- Main ----------
@@ -155,7 +158,7 @@ async function main() {
     process.exit(1);
   }
 
-  const { deals: extraits, rejets } = parseHome(html);
+  const { deals: extraits, rejets, releves } = parseHome(html);
   const rejetsBruyants = rejets.filter((r) => !r.silencieux);
   const nonRemises = rejets.length - rejetsBruyants.length;
 
@@ -181,7 +184,7 @@ async function main() {
   // jamais de plafond ni d'interruption. Elle ne couvre qu'une PARTIE des
   // promotions de la source (carrousels) : ce n'est pas un plafond de
   // pagination, mais une source partielle par construction (amendement).
-  ecrireArchiveEtTrace(fichierSortie, deals, { lus: extraits.length + rejets.length, plafondAtteint: false, interrompu: false });
+  ecrireArchiveEtTrace(fichierSortie, deals, { lus: extraits.length + rejets.length, plafondAtteint: false, interrompu: false, enseigne: ENSEIGNE, releves });
 
   console.log(`\n✅ ${deals.length} deal(s) Univers Para Discount retenu(s)`);
   console.log(`→ Archive : ${fichierSortie}`);

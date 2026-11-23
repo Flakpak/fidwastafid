@@ -94,6 +94,8 @@ export function parseOffres(html) {
   const $ = cheerio.load(html);
   const deals = [];
   const rejets = [];
+  // Relevés (lot SEO-2e-bis) : tout ce qui est lu à la source, AVANT les rejets.
+  const releves = [];
 
   $('div[class*="h-[354px]"]').each((_, card) => {
     const $c = $(card);
@@ -105,6 +107,7 @@ export function parseOffres(html) {
     // Rejet prime sur invention (CONTRAT-V1) : les deux prix doivent être
     // présents, entiers positifs, et cohérents (normal ≥ promo). Toute carte
     // qui n'a pas un prix barré exploitable est rejetée, jamais complétée.
+    if (nom && prixPromo) releves.push({ titre: nom, prix: prixPromo });
     if (!nom) {
       rejets.push({ nom: "(sans nom)", raison: "nom introuvable" });
       return;
@@ -133,7 +136,7 @@ export function parseOffres(html) {
     });
   });
 
-  return { deals, rejets };
+  return { deals, rejets, releves };
 }
 
 // ---------- Main ----------
@@ -146,7 +149,7 @@ async function main() {
     process.exit(1);
   }
 
-  const { deals: extraits, rejets } = parseOffres(html);
+  const { deals: extraits, rejets, releves } = parseOffres(html);
 
   console.log(`📶 inwi — page "Offres du moment"`);
   console.log(`   ${extraits.length} offre(s) retenue(s) | ${rejets.length} rejetée(s)`);
@@ -168,7 +171,7 @@ async function main() {
   const fichierSortie = `extractions/${horodatage}_inwi.json`;
   // Trace de passage (lot SEO-2e) : page unique, lue en entier — jamais de
   // plafond ni d'interruption (un échec de la page fait déjà sortir en erreur).
-  ecrireArchiveEtTrace(fichierSortie, deals, { lus: extraits.length + rejets.length, plafondAtteint: false, interrompu: false });
+  ecrireArchiveEtTrace(fichierSortie, deals, { lus: extraits.length + rejets.length, plafondAtteint: false, interrompu: false, enseigne: ENSEIGNE, releves });
 
   console.log(`\n✅ ${deals.length} deal(s) inwi retenu(s)`);
   console.log(`→ Archive : ${fichierSortie}`);
