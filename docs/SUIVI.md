@@ -1,12 +1,13 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-11-23, sur `main` à `45b3ff0`. Rattrape les lots SEO des 22 et
+*Dernière mise à jour : 2026-11-23, sur `main` à `dd57b4d`. Rattrape les lots SEO des 22 et
 23/11 : entités HTML des titres décodées (0023/0024), expiration automatique des deals publiés,
 taxonomie v3 et reclassement de « Autre » (0026), **pages hub SEO livrées** (`/categorie`,
 `/bons-plans`, maillage, sitemap découpé), une seule navigation par catégorie (SEO-3b), puis
 **fraîcheur des deals** (`vu_le`, trace par source, 0027/0028 — SEO-2e et SEO-2e-bis) et
 **publication automatique** des deals scrapés (0029 — SEO-2g, réinsertion — SEO-2h), et
-**un produit, une fiche** (0030 — SEO-2i, fusion des doublons 0031/0032 — SEO-2j)
+**un produit, une fiche** (0030 — SEO-2i, fusion des doublons 0031/0032/0033 — SEO-2j et
+SEO-2k, portée des rejets admin — SEO-2k)
 — voir §1 et « Derniers lots livrés ». La section
 « Chiffres réels » date toujours du 05/08 et n'a pas été remesurée.*
 
@@ -222,18 +223,30 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
     - Une fiche fusionnée (`deals.fusionne_dans`, 0031) redirige en permanence vers la fiche
       conservée (**308** émis par Next.js, équivalent du 301), sort du sitemap et n'est jamais
       réactivée ni republiée (contrainte en base, refus dans l'admin).
+  - **Portée des rejets admin** (lot SEO-2k, #209, 23/11/2026 — vingt-cinquième amendement
+    complété) : un rejet ne bloque un produit que si **aucune de ses fiches n'a jamais été publiée**.
+    Sinon c'est le rejet d'un doublon : le produit met à jour ou réactive sa fiche conservée, jamais
+    une fiche rejetée ou fusionnée. Si la seule fiche publiée a elle-même été rejetée, le produit
+    reste bloqué (2 cas, des fiches de test).
+    - 0033 a fusionné les 7 groupes écartés de 0032 : **180 fiches fusionnées** au total, **0 produit
+      avec plusieurs fiches publiées actives**.
+    - Diffusions : une fiche conservée et ses fiches fusionnées comptent comme un même produit
+      (refus, état affiché, annulation).
+    - **Run 45265729769** : 14 réactivés, 14 prix mis à jour, 4 expirés (prix hors critères),
+      0 inséré, 8 publiés automatiquement ; 316 bloqués (produit jamais publié), 42 rejets de
+      doublon levés. 387 deals publiés.
     - **Points ouverts** :
-      - **Revue de jeudi : 54 deals publiés portent une empreinte rejetée par l'admin** (53 publiés
-        avant le rejet, 1 après). Non modifiés. Les **7 produits** concernés qui ont aussi une
-        autre fiche sont restés hors fusion, dont *Machine à Pâte Monobloc 18 cm* avec **2 fiches
-        publiées** (`fwum8r9yjb`, `24q2ju939e`) ;
-      - 9 produits n'ont qu'un brouillon actif et une ancienne fiche expirée : hors règle (pas de
-        fiche publiée à conserver) ;
-      - 4 des 11 produits à fiches multiples ne sont plus lus à la source (vélo d'appartement,
-        glacière, set d'outils, jogging) : leur fiche conservée, choisie à égalité de `vu_le`,
-        garde un prix non vérifiable. Le vélo répond 404 chez Aswak Assalam ;
-      - 4 fiches fusionnées portaient une diffusion : la fiche conservée n'en a pas la trace et
-        peut être rediffusée.
+      - **13 fiches Carrefour réactivées restent en brouillon** (`date_fin_passee`) : l'API
+        carrefour.ma liste encore ces promotions avec une date de fin passée (avril à novembre).
+        1 fiche publiée a reçu de la même façon une date passée (13/10) : elle expirera au
+        prochain run ;
+      - revue de jeudi : **49 deals publiés** portent encore une empreinte rejetée par l'admin
+        (54 avant ce lot, les autres ont été fusionnés ou expirés) ;
+      - 9 produits n'avaient qu'un brouillon actif et une ancienne fiche expirée au moment de la
+        fusion : hors règle (pas de fiche publiée à conserver) ;
+      - 4 produits ne sont plus lus à la source (vélo d'appartement, glacière, set d'outils,
+        jogging) : leur fiche conservée garde un prix non vérifiable. Le vélo répond 404 chez
+        Aswak Assalam.
 - **Pages hub SEO** (lots SEO-3 #193 et SEO-3b #195, 22/11/2026 — CONTRAT-V1 §3,
   vingt-deuxième amendement) :
   - `/categorie/[slug]` : 13 slugs fixes (`apps/web/content/hubs.ts`), « autre » → 404. Même
@@ -263,6 +276,7 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| SEO-2k — portée des rejets admin | #209 | 23/11 | Un rejet ne bloque que les produits jamais publiés ; 0033 fusionne les 7 derniers groupes ; anti-doublon des diffusions par produit. |
 | SEO-2j — fusion des doublons | #207 | 23/11 | Vingt-sixième amendement ; 173 fiches fusionnées dans 164 fiches conservées (0031, 0032), redirection permanente, sortie du sitemap. |
 | SEO-2i — un produit, une fiche | #205 | 23/11 | Vingt-cinquième amendement ; réactivation sur la même URL, prix mis à jour ou expiré, image conservée (0030), Black Friday sur les deals revus sous 48 h. |
 | SEO-2h — réinsertion des expirés | #203 | 23/11 | Seul un rejet admin bloque le retour d'un produit ; un deal expiré ne bloque plus. Premier run : 147 insérés, 96 publiés automatiquement. |
