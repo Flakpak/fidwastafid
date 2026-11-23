@@ -414,14 +414,6 @@ function isGoogleMapsUrl(value: string): boolean {
   return false;
 }
 
-/**
- * Ligne de deal du pipeline admin — le panneau `<details>` est un formulaire
- * d'édition complet (CONTRAT-V1 §3/§4, troisième amendement conscient du
- * 19/07/2026) : le curateur peut corriger n'importe quel champ métier du
- * deal (titre, prix, catégorie, type, ville, lien, enseigne...), en plus des
- * champs terrain (nomVendeur/adresse/lienMaps/whatsapp) déjà éditables, et
- * récupérer l'image produit depuis le lien existant.
- */
 /** Libellés des critères de publication automatique (lot SEO-2g). */
 const MOTIFS_PUBLICATION_AUTO: Record<string, string> = {
   source_hors_cron: "source hors cron",
@@ -436,6 +428,14 @@ const MOTIFS_PUBLICATION_AUTO: Record<string, string> = {
   plafond_source: "plafond de 30 par source atteint",
 };
 
+/**
+ * Ligne de deal du pipeline admin — le panneau `<details>` est un formulaire
+ * d'édition complet (CONTRAT-V1 §3/§4, troisième amendement conscient du
+ * 19/07/2026) : le curateur peut corriger n'importe quel champ métier du
+ * deal (titre, prix, catégorie, type, ville, lien, enseigne...), en plus des
+ * champs terrain (nomVendeur/adresse/lienMaps/whatsapp) déjà éditables, et
+ * récupérer l'image produit depuis le lien existant.
+ */
 export function AdminDealItem({
   deal,
   doublon,
