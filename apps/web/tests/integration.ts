@@ -2720,6 +2720,119 @@ async function main() {
   // Portée d'un rejet admin (lot SEO-2k), de bout en bout avec le VRAI
   // insert-deals.mjs, puis la publication automatique.
   // ----------------------------------------------------------------
+  // ----------------------------------------------------------------
+  // Promo terminée à la source (lot SEO-2l), de bout en bout avec le VRAI
+  // insert-deals.mjs. Jours calculés par Postgres, à Casablanca.
+  // ----------------------------------------------------------------
+  console.log("\npromo terminée à la source — ignorée avant toute étape");
+  {
+    const MARQUEUR_LUS = 6666;
+    const dossier = mkdtempSync(nodePath.join(tmpdir(), "promo-terminee-"));
+    const ancien = "2026-01-01T00:00:00Z";
+    const ids = {
+      publiee: generatePublicId(),
+      expiree: generatePublicId(),
+      publieeDuJour: generatePublicId(),
+      expireeDuJour: generatePublicId(),
+    };
+    const titre = (nom: string) => `Promo terminée ${nom}`;
+    const lien = (nom: string) => `https://exemple.test/promo-terminee/${nom}`;
+    const lire = async (id: string) =>
+      (
+        await query<{ statut: string; prix: string; vu: boolean; maj: boolean }>(
+          `select statut, prix_promo as prix, vu_le > $2::timestamptz as vu, updated_at > $2::timestamptz as maj
+             from deals where public_id = $1`,
+          [id, ancien]
+        )
+      )[0];
+    try {
+      await query("insert into enseignes (slug, nom) values ('kiabi', 'kiabi') on conflict (slug) do nothing");
+      const jours = await query<{ hier: string; jour: string }>(
+        `select ((now() at time zone 'Africa/Casablanca')::date - 1)::text as hier,
+                (now() at time zone 'Africa/Casablanca')::date::text as jour`
+      );
+      const { hier, jour } = jours[0]!;
+      for (const [cle, statut] of [
+        ["publiee", "publie"],
+        ["expiree", "expire"],
+        ["publieeDuJour", "publie"],
+        ["expireeDuJour", "expire"],
+      ] as const) {
+        await query(
+          `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, prix_normal, lien, statut, score, vu_le, updated_at)
+           values ($1, $2, (select id from enseignes where slug = 'kiabi'), 'Maison', 'en_ligne', 50, 100, $3, $4, 0, $5, $5)`,
+          [ids[cle], titre(cle), lien(cle), statut, ancien]
+        );
+        await query(
+          `insert into journal_audit (admin_id, action, cible_type, cible_id, details)
+           values ($1, 'update_deal', 'deal', $2, '{"statut":{"avant":"auto_draft","apres":"publie"},"champs":{}}')`,
+          [userId, ids[cle]]
+        );
+      }
+      const element = (nom: string, prix: number, dateFin: string) => ({
+        titre: titre(nom),
+        prix_promo: prix,
+        prix_normal: 100,
+        categorie: "Maison",
+        description: null,
+        photo_url: null,
+        lien: lien(nom),
+        date_fin: dateFin,
+        enseigne: "kiabi",
+        ville: "National",
+        statut: "auto_draft",
+      });
+      const archive = [
+        element("publiee", 40, hier),
+        element("expiree", 45, hier),
+        element("nouvelle", 45, hier),
+        element("publieeDuJour", 40, jour),
+        element("expireeDuJour", 45, jour),
+      ];
+      // Même prix que la fiche, date passée : ne doit pas compter comme « revu ».
+      const memePrix = { ...element("publiee", 50, hier) };
+      const chemin = nodePath.join(dossier, "2026-11-23_05-00_kiabi.json");
+      ecrireArchiveEtTrace(chemin, archive, {
+        lus: MARQUEUR_LUS,
+        plafondAtteint: false,
+        interrompu: false,
+        enseigne: "kiabi",
+        releves: [...archive, memePrix].map((e) => ({
+          titre: e.titre,
+          prix: e.prix_promo,
+          prixNormal: e.prix_normal,
+          lien: e.lien,
+          dateFin: e.date_fin,
+          photoUrl: null,
+        })),
+      });
+      const sortie = execFileSync(process.execPath, ["--import", "tsx", "insert-deals.mjs", chemin], {
+        cwd: nodePath.resolve(process.cwd(), "../pipeline"),
+        env: process.env,
+        stdio: "pipe",
+      }).toString();
+      const resume = JSON.parse(sortie.match(/^RESUME_JSON=(.*)$/m)?.[1] ?? "{}") as Record<string, number>;
+
+      const p = await lire(ids.publiee);
+      check("date passée, fiche publiée → aucun changement", p?.statut === "publie" && Number(p.prix) === 50 && p.maj === false);
+      check("date passée, fiche publiée → vu_le inchangé", p?.vu === false);
+      const e = await lire(ids.expiree);
+      check("date passée, fiche expirée → pas de réactivation", e?.statut === "expire" && Number(e.prix) === 50 && e.vu === false);
+      const n = await query<{ n: number }>("select count(*)::int as n from deals where titre = $1", [titre("nouvelle")]);
+      check("date passée, produit inconnu → non inséré", n[0]?.n === 0);
+      const pj = await lire(ids.publieeDuJour);
+      check("date de fin du jour → fiche publiée mise à jour", pj?.statut === "publie" && Number(pj.prix) === 40 && pj.vu === true);
+      const ej = await lire(ids.expireeDuJour);
+      check("date de fin du jour → fiche expirée réactivée", ej?.statut === "auto_draft" && Number(ej.prix) === 45);
+      check("trace : éléments ignorés comptés", resume.ignoresDateFinPassee === 4);
+    } finally {
+      rmSync(dossier, { recursive: true, force: true });
+      await query("delete from pipeline_runs where elements_lus = $1", [MARQUEUR_LUS]);
+      await query("delete from journal_audit where cible_type = 'deal' and cible_id = any($1::text[])", [Object.values(ids)]);
+      await query("delete from deals where public_id = any($1::text[])", [Object.values(ids)]);
+    }
+  }
+
   console.log("\nrejet admin — ne bloque que les produits jamais publiés");
   {
     const MARQUEUR_LUS = 9999;

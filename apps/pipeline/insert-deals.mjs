@@ -34,6 +34,7 @@ import { resoudreFichierArgument } from "./argv.mjs";
 import { sourceDepuisFichier, classifierCause, enregistrerRun } from "./_lib/pipelineRuns.mjs";
 import { lireTrace } from "./_lib/traceScraper.mjs";
 import { marquerReleves } from "./_lib/vuLe.mjs";
+import { jourCasablanca, retirerPromosTerminees } from "./_lib/promoTerminee.mjs";
 import { chargerFiches, choisirLigneReactivable, porteeRejet, reactiverLigne, reconcilierActives } from "./_lib/ficheProduit.mjs";
 
 // ---------- Description depuis la fiche produit (Bringo uniquement) ----------
@@ -162,6 +163,14 @@ function mapDeal(d) {
 // ---------- Main ----------
 try {
   await client.connect();
+
+  // Une promo terminée à la source est ignorée (lot SEO-2l), AVANT toute autre
+  // étape : ni vu_le, ni réactivation, ni mise à jour, ni insertion.
+  const { dealsEnCours, relevesEnCours, ignores: ignoresDateFin, ignoresArchive } = retirerPromosTerminees(
+    { deals, releves: trace.releves },
+    await jourCasablanca(client)
+  );
+  console.log(`⏭️  Ignorés : date de fin passée : ${ignoresDateFin} élément(s) lu(s).`);
   console.log("🔌 Connecté à la base.");
 
   const { map: enseignes, count: nbEnseignes } = await chargerEnseignes(client);
@@ -172,7 +181,7 @@ try {
   // le traitement image est sauté pour tout le run — les deals s'insèrent
   // quand même, image_key reste NULL.
   const imagesActivees = storageDisponible();
-  const dealsAvecPhoto = deals.filter((d) => d.photo_url).length;
+  const dealsAvecPhoto = dealsEnCours.filter((d) => d.photo_url).length;
   if (dealsAvecPhoto > 0 && !imagesActivees) {
     console.log(
       `⚠️  SUPABASE_URL et/ou SUPABASE_SECRET_KEY manquant(s) — ` +
@@ -198,10 +207,10 @@ try {
   // été lu, car un produit sorti de promotion n'est plus dans l'archive. Les
   // prix sont réconciliés AVANT vu_le, qui compare au prix de la fiche.
   const source = sourceDepuisFichier(fichier);
-  const produitsLus = trace.releves
+  const produitsLus = relevesEnCours
     .filter((r) => r.principal !== false)
     .map((r) => ({ ...r, titre: decoderEntitesHtml(r.titre).trim().slice(0, 200) }));
-  const elementsArchive = deals.map((raw) => mapDeal(raw)).filter((d) => d.titre);
+  const elementsArchive = dealsEnCours.map((raw) => mapDeal(raw)).filter((d) => d.titre);
   const fiches = await chargerFiches(client, {
     paires: [...produitsLus, ...elementsArchive].map((p) => ({ lien: p.lien, titre: p.titre })),
     enseigneId: enseigneTrace,
@@ -216,10 +225,10 @@ try {
   });
   let reactives = 0;
   let rejetsDoublon = 0;
-  const idsVus = await marquerReleves(client, { releves: trace.releves, enseigneId: enseigneTrace });
+  const idsVus = await marquerReleves(client, { releves: relevesEnCours, enseigneId: enseigneTrace });
   console.log(`📉 Seuil de remise minimum : ${SEUIL_REMISE_MIN_PCT} % (règle partagée, remise.mjs).`);
 
-  for (const raw of deals) {
+  for (const raw of dealsEnCours) {
     const d = mapDeal(raw);
 
     // Validation partagée (Phase 7A, packages/schemas — source de vérité
@@ -405,7 +414,7 @@ try {
   // rejetesEnseigne - rejetesMemoire. inseres + doublons = retenus,
   // toujours (le dédoublonnage est le seul chemin restant après retenus).
   const extraits = deals.length;
-  const retenus = extraits - rejetes - rejetesRemise - rejetesEnseigne - rejetesMemoire;
+  const retenus = extraits - ignoresArchive - rejetes - rejetesRemise - rejetesEnseigne - rejetesMemoire;
   // Une réactivation est un produit qui revient : pas un « déjà en base ».
   const cause = classifierCause({ retenus, inseres: inseres + reactives });
   await enregistrerRun(client, {
@@ -420,10 +429,10 @@ try {
     interrompu: trace.interrompu,
     vus: idsVus.length,
   });
-  console.log(`👁️  Passage : ${trace.releves.length} relevé(s), ${idsVus.length} deal(s) revu(s) (vu_le mis à jour).`);
+  console.log(`👁️  Passage : ${relevesEnCours.length} relevé(s), ${idsVus.length} deal(s) revu(s) (vu_le mis à jour).`);
   // Ligne structurée, capturée par le workflow après cette étape — pour que
   // l'annotation du run reflète la CAUSE réelle plutôt qu'un succès muet.
-  console.log(`RESUME_JSON=${JSON.stringify({ source, cause, extraits, retenus, inseres, doublons, autre: inseresAutre.length, bloquesRejetAdmin: rejetesMemoire, rejetsDoublon, reactives, misAJour: reconciliation.misAJour, expiresPrix: reconciliation.expires, expirationsBloquees: reconciliation.expirationsBloquees })}`);
+  console.log(`RESUME_JSON=${JSON.stringify({ source, cause, extraits, retenus, inseres, doublons, autre: inseresAutre.length, ignoresDateFinPassee: ignoresDateFin, bloquesRejetAdmin: rejetesMemoire, rejetsDoublon, reactives, misAJour: reconciliation.misAJour, expiresPrix: reconciliation.expires, expirationsBloquees: reconciliation.expirationsBloquees })}`);
   if (remisesNonMesurables > 0) {
     console.log(
       `📉 ${remisesNonMesurables} deal(s) insérable(s) sans remise mesurable (prix barré absent) — ` +
