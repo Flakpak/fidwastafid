@@ -1,13 +1,13 @@
 # SUIVI — état à date et file de travail
 
-*Dernière mise à jour : 2026-11-23, sur `main` à `dd57b4d`. Rattrape les lots SEO des 22 et
+*Dernière mise à jour : 2026-11-23, sur `main` à `c4c22df`. Rattrape les lots SEO des 22 et
 23/11 : entités HTML des titres décodées (0023/0024), expiration automatique des deals publiés,
 taxonomie v3 et reclassement de « Autre » (0026), **pages hub SEO livrées** (`/categorie`,
 `/bons-plans`, maillage, sitemap découpé), une seule navigation par catégorie (SEO-3b), puis
 **fraîcheur des deals** (`vu_le`, trace par source, 0027/0028 — SEO-2e et SEO-2e-bis) et
 **publication automatique** des deals scrapés (0029 — SEO-2g, réinsertion — SEO-2h), et
 **un produit, une fiche** (0030 — SEO-2i, fusion des doublons 0031/0032/0033 — SEO-2j et
-SEO-2k, portée des rejets admin — SEO-2k)
+SEO-2k, portée des rejets admin — SEO-2k, promos terminées à la source ignorées, 0034 — SEO-2l)
 — voir §1 et « Derniers lots livrés ». La section
 « Chiffres réels » date toujours du 05/08 et n'a pas été remesurée.*
 
@@ -236,10 +236,6 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
       0 inséré, 8 publiés automatiquement ; 316 bloqués (produit jamais publié), 42 rejets de
       doublon levés. 387 deals publiés.
     - **Points ouverts** :
-      - **13 fiches Carrefour réactivées restent en brouillon** (`date_fin_passee`) : l'API
-        carrefour.ma liste encore ces promotions avec une date de fin passée (avril à novembre).
-        1 fiche publiée a reçu de la même façon une date passée (13/10) : elle expirera au
-        prochain run ;
       - revue de jeudi : **49 deals publiés** portent encore une empreinte rejetée par l'admin
         (54 avant ce lot, les autres ont été fusionnés ou expirés) ;
       - 9 produits n'avaient qu'un brouillon actif et une ancienne fiche expirée au moment de la
@@ -247,6 +243,16 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
       - 4 produits ne sont plus lus à la source (vélo d'appartement, glacière, set d'outils,
         jogging) : leur fiche conservée garde un prix non vérifiable. Le vélo répond 404 chez
         Aswak Assalam.
+  - **Promo terminée à la source** (lot SEO-2l, #211, 23/11/2026) : `insert-deals` écarte, avant
+    toute autre étape, un élément dont la date de fin est strictement antérieure au jour de
+    Casablanca (calculé par Postgres) : pas de `vu_le`, pas de réactivation, pas de mise à jour,
+    pas d'insertion. Le jour de fin reste traité normalement.
+    - Le nombre d'ignorés par source figure dans le journal du run et `RESUME_JSON`
+      (`ignoresDateFinPassee`), pas dans `pipeline_runs`.
+    - 0034 : les 13 fiches Carrefour réactivées à tort sont repassées en `expire`. La fiche publiée
+      `qmsayqve6t` (date passée) a été expirée par le job automatique.
+    - **Run 45269130209** : **282 éléments ignorés sur 290 lus chez Carrefour**, 0 ailleurs ;
+      0 deal publié avec une date de fin passée, 386 deals publiés.
 - **Pages hub SEO** (lots SEO-3 #193 et SEO-3b #195, 22/11/2026 — CONTRAT-V1 §3,
   vingt-deuxième amendement) :
   - `/categorie/[slug]` : 13 slugs fixes (`apps/web/content/hubs.ts`), « autre » → 404. Même
@@ -276,6 +282,7 @@ appliquée en prod le 2026-08-02 19:45 UTC. Repo et prod sont alignés (vérifi�
 
 | Lot | PR | Fusionné | Contenu |
 |---|---|---|---|
+| SEO-2l — promo terminée à la source | #211 | 23/11 | Élément à date de fin passée ignoré avant toute étape ; 0034 expire les 13 fiches Carrefour réactivées à tort ; 282 ignorés chez Carrefour au run de contrôle. |
 | SEO-2k — portée des rejets admin | #209 | 23/11 | Un rejet ne bloque que les produits jamais publiés ; 0033 fusionne les 7 derniers groupes ; anti-doublon des diffusions par produit. |
 | SEO-2j — fusion des doublons | #207 | 23/11 | Vingt-sixième amendement ; 173 fiches fusionnées dans 164 fiches conservées (0031, 0032), redirection permanente, sortie du sitemap. |
 | SEO-2i — un produit, une fiche | #205 | 23/11 | Vingt-cinquième amendement ; réactivation sur la même URL, prix mis à jour ou expiré, image conservée (0030), Black Friday sur les deals revus sous 48 h. |
