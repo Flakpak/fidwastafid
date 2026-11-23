@@ -115,6 +115,7 @@ export async function entreesDeals(): Promise<UrlEntry[]> {
        from deals d
        join deals_protection dp on dp.public_id = d.public_id
       where d.supprime_le is null
+        and d.fusionne_dans is null
         and d.statut = any(array['publie', 'expire'])
       order by d.updated_at desc`
   );

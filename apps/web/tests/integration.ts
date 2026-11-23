@@ -15,6 +15,7 @@ import { GET as getSitemapIndex } from "../src/app/sitemap.xml/route.js";
 import { GET as getSitemapHubs } from "../src/app/sitemap-hubs.xml/route.js";
 import { GET as getSitemapDeals } from "../src/app/sitemap-deals.xml/route.js";
 import { fetchDealsEdition, categoriesFiltre } from "../src/app/api/v1/_lib/hubs.js";
+import { fetchCibleFusion } from "../src/app/api/v1/_lib/deals.js";
 import { PUBLIC_IDS_FIXTURES, PUBLIC_ID_INEXISTANT } from "./fixtures.js";
 import { POST as postDeal, GET as getDealsList } from "../src/app/api/v1/deals/route.js";
 import { GET as getCompte } from "../src/app/api/v1/deals/compte/route.js";
@@ -2707,6 +2708,121 @@ async function main() {
       await query("delete from journal_audit where cible_type = 'deal' and cible_id = any($1::text[])", [creer]);
       await query("delete from memoire_curation where deal_origine_public_id = any($1::text[])", [creer]);
       await query("delete from deals where public_id = any($1::text[])", [creer]);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Fusion des fiches (lot SEO-2j) : redirection, sitemap, et VRAI
+  // insert-deals.mjs : c'est toujours la fiche conservée qui est touchée.
+  // ----------------------------------------------------------------
+  console.log("\nfusion des fiches — redirection, sitemap, fiche conservée");
+  {
+    const MARQUEUR_LUS = 8888;
+    const dossier = mkdtempSync(nodePath.join(tmpdir(), "fusion-"));
+    const ancien = "2026-01-01T00:00:00Z";
+    const ids = {
+      garde: generatePublicId(),
+      fusionnee: generatePublicId(),
+      gardeExpiree: generatePublicId(),
+      fusionneeExpiree: generatePublicId(),
+    };
+    const lienPrix = "https://exemple.test/fusion/prix";
+    const lienRetour = "https://exemple.test/fusion/retour";
+    const inserer = (id: string, titre: string, lien: string, statut: string, fusionneDans: string | null) =>
+      query(
+        `insert into deals (public_id, titre, enseigne_id, categorie, type, prix_promo, prix_normal, lien, statut, score,
+                            vu_le, updated_at, fusionne_dans)
+         values ($1, $2, (select id from enseignes where slug = 'kiabi'), 'Maison', 'en_ligne', 50, 100, $3, $4, 0, $5, $5, $6)`,
+        [id, titre, lien, statut, ancien, fusionneDans]
+      );
+    const lire = async (id: string) =>
+      (
+        await query<{ statut: string; prix: string; vu: boolean }>(
+          "select statut, prix_promo as prix, vu_le > $2::timestamptz as vu from deals where public_id = $1",
+          [id, ancien]
+        )
+      )[0];
+    try {
+      await query("insert into enseignes (slug, nom) values ('kiabi', 'kiabi') on conflict (slug) do nothing");
+      await inserer(ids.garde, "Fusion produit prix", lienPrix, "publie", null);
+      await inserer(ids.fusionnee, "Fusion produit prix", lienPrix, "expire", ids.garde);
+      await inserer(ids.gardeExpiree, "Fusion produit retour", lienRetour, "expire", null);
+      await inserer(ids.fusionneeExpiree, "Fusion produit retour", lienRetour, "expire", ids.gardeExpiree);
+      for (const id of Object.values(ids)) {
+        await query(
+          `insert into journal_audit (admin_id, action, cible_type, cible_id, details)
+           values ($1, 'update_deal', 'deal', $2, '{"statut":{"avant":"auto_draft","apres":"publie"},"champs":{}}')`,
+          [userId, id]
+        );
+      }
+
+      check("fiche fusionnée → redirection vers la fiche conservée", (await fetchCibleFusion(ids.fusionnee))?.publicId === ids.garde);
+      check("fiche conservée → pas de redirection", (await fetchCibleFusion(ids.garde)) === null);
+      const sitemap = await (await getSitemapDeals(new Request("http://localhost/sitemap-deals.xml"))).text();
+      check("fiche fusionnée absente du sitemap", !sitemap.includes(ids.fusionnee));
+      check("fiche conservée présente dans le sitemap", sitemap.includes(ids.garde));
+
+      let refuse = false;
+      try {
+        await query("update deals set statut = 'publie' where public_id = $1", [ids.fusionnee]);
+      } catch {
+        refuse = true;
+      }
+      check("fiche fusionnée : republication refusée par la base", refuse);
+
+      const element = (titre: string, lien: string, prix: number) => ({
+        titre,
+        prix_promo: prix,
+        prix_normal: 100,
+        categorie: "Maison",
+        description: null,
+        photo_url: null,
+        lien,
+        date_fin: null,
+        enseigne: "kiabi",
+        ville: "National",
+        statut: "auto_draft",
+      });
+      const archive = [element("Fusion produit prix", lienPrix, 40), element("Fusion produit retour", lienRetour, 45)];
+      const chemin = nodePath.join(dossier, "2026-11-23_05-00_kiabi.json");
+      ecrireArchiveEtTrace(chemin, archive, {
+        lus: MARQUEUR_LUS,
+        plafondAtteint: false,
+        interrompu: false,
+        enseigne: "kiabi",
+        releves: archive.map((e) => ({
+          titre: e.titre,
+          prix: e.prix_promo,
+          prixNormal: e.prix_normal,
+          lien: e.lien,
+          dateFin: null,
+          photoUrl: null,
+        })),
+      });
+      execFileSync(process.execPath, ["--import", "tsx", "insert-deals.mjs", chemin], {
+        cwd: nodePath.resolve(process.cwd(), "../pipeline"),
+        env: process.env,
+        stdio: "pipe",
+      });
+
+      check("prix changé → fiche conservée mise à jour", Number((await lire(ids.garde))?.prix) === 40);
+      const f1 = await lire(ids.fusionnee);
+      check("prix changé → fiche fusionnée intacte", f1?.statut === "expire" && Number(f1.prix) === 50 && f1.vu === false);
+      const g2 = await lire(ids.gardeExpiree);
+      check("produit revenu → fiche conservée réactivée", g2?.statut === "auto_draft" && Number(g2.prix) === 45);
+      const f2 = await lire(ids.fusionneeExpiree);
+      check("produit revenu → fiche fusionnée jamais réactivée", f2?.statut === "expire" && Number(f2.prix) === 50);
+      const total = await query<{ n: number }>("select count(*)::int as n from deals where titre like 'Fusion produit %'");
+      check("aucune nouvelle ligne", total[0]?.n === 4);
+
+      await query("update deals set supprime_le = now() where public_id = $1", [ids.garde]);
+      check("fiche conservée supprimée → plus de redirection vers un 404", (await fetchCibleFusion(ids.fusionnee)) === null);
+    } finally {
+      rmSync(dossier, { recursive: true, force: true });
+      await query("delete from pipeline_runs where elements_lus = $1", [MARQUEUR_LUS]);
+      await query("delete from journal_audit where cible_type = 'deal' and cible_id = any($1::text[])", [Object.values(ids)]);
+      await query("delete from deals where public_id = any($1::text[]) and fusionne_dans is not null", [Object.values(ids)]);
+      await query("delete from deals where public_id = any($1::text[])", [Object.values(ids)]);
     }
   }
 

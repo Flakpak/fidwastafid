@@ -60,7 +60,8 @@ export async function appliquerLotStatut({
       lien: string | null;
       enseigne_id: string | null;
     }>(
-      "select id, statut, motif_rejet, titre, lien, enseigne_id from deals where public_id = $1 and supprime_le is null for update",
+      // Une fiche fusionnée n'est jamais republiée (vingt-sixième amendement).
+      "select id, statut, motif_rejet, titre, lien, enseigne_id from deals where public_id = $1 and supprime_le is null and fusionne_dans is null for update",
       [publicId]
     );
     const deal = before.rows[0];

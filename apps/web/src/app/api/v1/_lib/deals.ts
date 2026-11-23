@@ -323,6 +323,23 @@ export function estActifSeo(statut: string, protege: boolean): boolean {
 }
 
 /**
+ * Fiche conservée d'une fiche fusionnée (vingt-sixième amendement). `null` si
+ * la fiche n'est pas fusionnée, ou si la fiche conservée a été supprimée :
+ * la page reste alors servie en 200 plutôt que de rediriger vers un 404.
+ */
+export async function fetchCibleFusion(publicId: string): Promise<{ publicId: string; titre: string } | null> {
+  const rows = await query<{ public_id: string; titre: string }>(
+    `select c.public_id, c.titre
+       from deals d
+       join deals c on c.public_id = d.fusionne_dans
+      where d.public_id = $1 and d.supprime_le is null and c.supprime_le is null and c.fusionne_dans is null`,
+    [publicId]
+  );
+  const cible = rows[0];
+  return cible ? { publicId: cible.public_id, titre: cible.titre } : null;
+}
+
+/**
  * `protege` d'un deal précis (`deals_protection`, migration 0015) — vue
  * unconditionnelle : une ligne existe pour tout `public_id` réel, jamais
  * de repli nécessaire pour un deal déjà résolu par ailleurs.

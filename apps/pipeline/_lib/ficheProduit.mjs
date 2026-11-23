@@ -92,6 +92,9 @@ export async function chargerFiches(client, { paires, enseigneId }) {
        join deals_protection dp on dp.public_id = d.public_id
       where d.enseigne_id = $1
         and d.supprime_le is null
+        -- Fiche fusionnée (lot SEO-2j) : jamais réactivée ni mise à jour ;
+        -- c'est la fiche conservée qui porte le produit.
+        and d.fusionne_dans is null
         and empreinte_curation(d.lien, d.titre, d.enseigne_id) = any($2::text[])`,
     [enseigneId, distinctes]
   );
