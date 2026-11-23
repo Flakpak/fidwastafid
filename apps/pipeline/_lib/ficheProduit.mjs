@@ -23,6 +23,7 @@
 
 import { traiterImage } from "../images.mjs";
 import { SOURCE_SQL } from "./publicationAuto.mjs";
+import { estPurgeSql } from "./rejetPurge.mjs";
 import { UTILISATEUR_SYSTEME_ID } from "./utilisateurSysteme.mjs";
 
 export const VERSION_REGLES_FICHE = "2026-11-23.1";
@@ -55,7 +56,7 @@ export function choisirLigneReactivable(lignes) {
 
 /**
  * Portée du rejet admin d'une empreinte (lot SEO-2k) :
- * - `null` : aucun rejet actif ;
+ * - `null` : aucun rejet actif autre qu'une Purge (lot SEO-2m) ;
  * - `doublon` : une fiche non rejetée a déjà été publiée, elle porte le produit ;
  * - `retire` : la seule fiche publiée a elle-même été rejetée. Il n'y a pas de
  *   fiche à conserver, et une fiche rejetée n'est jamais réactivée : bloqué ;
@@ -127,7 +128,8 @@ export async function chargerFiches(client, { paires, enseigneId }) {
   }
   const { rows: memoire } = await client.query(
     `select distinct empreinte from memoire_curation
-      where empreinte = any($1::text[]) and decision = 'rejete' and levee_le is null`,
+      where empreinte = any($1::text[]) and decision = 'rejete' and levee_le is null
+        and not ${estPurgeSql("motif")}`,
     [distinctes]
   );
   return { empreintes, parEmpreinte, rejetees: new Set(memoire.map((m) => m.empreinte)) };
